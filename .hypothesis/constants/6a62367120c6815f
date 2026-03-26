@@ -1,0 +1,4 @@
+# file: C:\project file\BookScope\bookscope\nlp\__init__.py
+# hypothesis_version: 6.151.9
+
+['AnalyzerProtocol', 'ArcClassifier', 'ArcPattern', 'LexiconAnalyzer', 'StyleAnalyzer']

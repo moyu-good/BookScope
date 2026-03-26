@@ -1,0 +1,4 @@
+# file: C:\project file\BookScope\bookscope\ingest\loader.py
+# hypothesis_version: 6.151.9
+
+['.epub', '.txt', 'DC', '[^\\S\\n]+', '\\n{3,}', 'article', 'blockquote', 'br', 'cp1252', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'ignore', 'ignore_ncx', 'latin-1', 'li', 'link', 'meta', 'p', 'replace', 'script', 'section', 'style', 'td', 'th', 'title', 'tr', 'utf-8']

@@ -1,7 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/tools/gstack/**)"
+      "Read(//c/tools/gstack/**)",
+      "Bash(python -c \"import nltk; nltk.download\\(''punkt_tab''\\); nltk.download\\(''averaged_perceptron_tagger_eng''\\)\")",
+      "Bash(python -m pytest tests/ -v --tb=short)",
+      "Bash(ruff check:*)",
+      "Skill(review)",
+      "Skill(review:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd 'c:/project file/BookScope' && python -m ruff check bookscope tests --select E,F,I,UP --quiet 2>&1 | head -20"
+          }
+        ]
+      }
     ]
   }
 }

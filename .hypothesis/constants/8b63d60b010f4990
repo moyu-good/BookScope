@@ -1,0 +1,4 @@
+# file: C:\project file\BookScope\bookscope\models\schemas.py
+# hypothesis_version: 6.151.9
+
+[0.0, 'anger', 'anticipation', 'disgust', 'fear', 'joy', 'sadness', 'surprise', 'trust', 'utf-8']

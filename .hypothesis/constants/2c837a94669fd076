@@ -1,0 +1,4 @@
+# file: C:\project file\BookScope\bookscope\ingest\cleaner.py
+# hypothesis_version: 6.151.9
+
+['NFC', '[^\\S\\n\\t ]+', '[^\\S\\n]+', '\\n{3,}']

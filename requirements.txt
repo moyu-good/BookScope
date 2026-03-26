@@ -1,0 +1,12 @@
+# BookScope runtime dependencies
+# Used by Streamlit Cloud (which uses pip, not uv)
+# Keep in sync with pyproject.toml [project.dependencies]
+
+streamlit>=1.32.0
+plotly>=5.20.0
+pydantic>=2.6.0
+nrclex>=4.0.0
+textblob>=0.17.0
+nltk>=3.9.0
+numpy>=1.26.0
+ebooklib>=0.18

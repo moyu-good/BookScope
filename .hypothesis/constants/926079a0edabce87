@@ -1,0 +1,4 @@
+# file: C:\project file\BookScope\bookscope\ingest\chunker.py
+# hypothesis_version: 6.151.9
+
+[200, '\\n\\n+', 'fixed', 'paragraph']
