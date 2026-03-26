@@ -114,7 +114,7 @@ with st.sidebar:
 st.title("BookScope")
 
 if uploaded is None:
-    st.info("Upload a plain-text (.txt) book file using the sidebar to get started.")
+    st.info("Upload a .txt or .epub book file using the sidebar to get started.")
     st.stop()
 
 with st.spinner("Analysing…"):
