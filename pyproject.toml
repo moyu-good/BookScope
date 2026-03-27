@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bookscope"
-version = "0.5.1.0"
+version = "0.5.2.0"
 description = "Multi-dimensional book text analysis and visualization"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -31,6 +31,9 @@ dev = [
     "pytest-cov>=4.1.0",
     "hypothesis>=6.100.0",
     "ruff>=0.3.0",
+]
+spacy = [
+    "spacy>=3.7.0,<4.0.0",
 ]
 
 [tool.ruff]

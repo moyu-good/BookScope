@@ -979,20 +979,19 @@ def render_quick_insight(
 
     # ── FICTION ──────────────────────────────────────────────────────────────
     if book_type == "fiction":
-        # Genre label (EN only, TD-4)
+        genre_tuple = _EMOTIONAL_GENRE.get((arc_value, top_emotion_key), _DEFAULT_GENRE)
+        lang_idx = {"en": 0, "zh": 1, "ja": 2}.get(ui_lang, 0)
+        genre_label = genre_tuple[lang_idx]
+
         if ui_lang == "en":
-            genre_tuple = _EMOTIONAL_GENRE.get(
-                (arc_value, top_emotion_key), _DEFAULT_GENRE
-            )
-            genre_label = genre_tuple[0]
             headline_text = (
                 f"{h.escape(genre_label)} — "
                 f"{h.escape(top_emotion_name)}-driven {h.escape(arc_display_name)} arc"
             )
             for_you_text = genre_tuple[3]
         else:
-            lang_idx = {"zh": 1, "ja": 2}.get(ui_lang, 0)
-            headline_text = f"{h.escape(arc_display_name)} — {h.escape(top_emotion_name)}"
+            # ZH/JA: show localized genre label + arc name
+            headline_text = f"{h.escape(genre_label)} — {h.escape(arc_display_name)}"
             for_you_text = ""
 
         # Headline card

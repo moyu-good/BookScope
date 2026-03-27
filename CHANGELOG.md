@@ -2,6 +2,21 @@
 
 All notable changes to BookScope will be documented in this file.
 
+## [0.5.2.0] - 2026-03-27
+
+### Added
+- **spaCy NER for character extraction** — `extract_character_names` now tries
+  `spacy.load("en_core_web_sm")` first (proper PERSON entity recognition, handles
+  multi-word names, eliminates common false positives). Falls back to regex NER
+  automatically if spaCy / the model is not installed — zero behavior change for
+  existing users. Enable with: `pip install -e ".[spacy]"`.
+- **`[spacy]` optional extra** in `pyproject.toml` (`spacy>=3.7.0,<4.0.0`).
+  `requirements.txt` includes the spaCy model wheel for Streamlit Cloud.
+- **CJK genre labels in fiction Quick Insight** — `_EMOTIONAL_GENRE` ZH/JA labels
+  (already defined in the mapping) are now displayed for Chinese and Japanese users.
+  Previously the fiction headline card showed only arc + emotion name for non-EN users;
+  now it shows the localized genre label (e.g. "心理悬疑 — 乐极生悲 ↗↘").
+
 ## [0.5.1.0] - 2026-03-27
 
 ### Added

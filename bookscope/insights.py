@@ -3,13 +3,65 @@
 Derives character names, key themes, readability grade, SVG sparkline,
 and first-person density from existing analysis results.
 
-Zero new runtime dependencies — uses only re + Counter.
+Character extraction uses spaCy en_core_web_sm when available
+(install with: pip install -e ".[spacy]"), falling back to regex NER.
+All other helpers have zero new runtime dependencies (re + Counter only).
 """
 
 import re
 from collections import Counter
 
-# ── Character extraction ─────────────────────────────────────────────────────
+# ── spaCy NER — lazy-loaded, optional ────────────────────────────────────────
+
+_spacy_nlp_loaded: bool = False
+_spacy_nlp = None  # spacy.Language object or None
+
+
+def _get_spacy_nlp():
+    """Load spaCy en_core_web_sm once and cache. Returns None if unavailable."""
+    global _spacy_nlp, _spacy_nlp_loaded
+    if _spacy_nlp_loaded:
+        return _spacy_nlp
+    _spacy_nlp_loaded = True
+    try:
+        import spacy  # noqa: PLC0415
+        _spacy_nlp = spacy.load("en_core_web_sm")
+    except (ImportError, OSError):
+        _spacy_nlp = None
+    return _spacy_nlp
+
+
+def _spacy_extract_names(
+    chunks, top_n: int, min_frac: float
+) -> list[str] | None:
+    """Use spaCy PERSON entities. Returns None if spaCy is unavailable."""
+    nlp = _get_spacy_nlp()
+    if nlp is None:
+        return None
+
+    n = len(chunks)
+    min_c = max(2, int(n * min_frac))
+    chunk_pres: Counter = Counter()
+    global_freq: Counter = Counter()
+
+    for chunk in chunks:
+        # Cap text per chunk so large chunks don't slow the pipeline
+        doc = nlp(chunk.text[:5000])
+        seen: set[str] = set()
+        for ent in doc.ents:
+            if ent.label_ == "PERSON":
+                name = ent.text.strip()
+                if len(name) >= 2:
+                    global_freq[name] += 1
+                    seen.add(name)
+        for name in seen:
+            chunk_pres[name] += 1
+
+    candidates = {w: f for w, f in global_freq.items() if chunk_pres[w] >= min_c}
+    return [w for w, _ in Counter(candidates).most_common(top_n)]
+
+
+# ── Regex NER fallback ────────────────────────────────────────────────────────
 
 _NON_NAMES = frozenset([
     "The", "He", "She", "They", "It", "We", "You", "But", "And",
@@ -22,16 +74,7 @@ _NON_NAMES = frozenset([
 _NAME_PAT = re.compile(r'(?:^|(?<=[.!?\s]))[A-Z][a-z]{2,}\b')
 
 
-def extract_character_names(
-    chunks, top_n: int = 5, min_frac: float = 0.05, lang: str = "en"
-) -> list[str]:
-    """Return top character-name candidates from English fiction chunks.
-
-    Returns [] immediately for CJK-script languages (no reliable regex NER).
-    """
-    if lang in ("zh", "ja", "ko"):
-        return []
-
+def _regex_extract_names(chunks, top_n: int, min_frac: float) -> list[str]:
     n = len(chunks)
     min_c = max(2, int(n * min_frac))
     chunk_pres: Counter = Counter()
@@ -48,6 +91,27 @@ def extract_character_names(
 
     candidates = {w: f for w, f in global_freq.items() if chunk_pres[w] >= min_c}
     return [w for w, _ in Counter(candidates).most_common(top_n)]
+
+
+def extract_character_names(
+    chunks, top_n: int = 5, min_frac: float = 0.05, lang: str = "en"
+) -> list[str]:
+    """Return top character-name candidates from English fiction chunks.
+
+    Uses spaCy en_core_web_sm NER when installed (better accuracy, handles
+    multi-word names and titles). Falls back to regex NER automatically.
+    Returns [] immediately for CJK-script languages.
+    """
+    if lang in ("zh", "ja", "ko") or chunks is None:
+        return []
+
+    # Prefer spaCy NER (optional dep)
+    result = _spacy_extract_names(chunks, top_n, min_frac)
+    if result is not None:
+        return result
+
+    # Regex fallback
+    return _regex_extract_names(chunks, top_n, min_frac)
 
 
 # ── Key themes (academic / essay) ────────────────────────────────────────────
