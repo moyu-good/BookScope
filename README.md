@@ -4,7 +4,7 @@
 
 ---
 
-**Multi-dimensional book text analysis and visualization.**
+**Multi-dimensional book text analysis and visualization — in English, 中文, and 日本語.**
 
 [![CI](https://github.com/moyu-good/BookScope/actions/workflows/ci.yml/badge.svg)](https://github.com/moyu-good/BookScope/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
@@ -15,7 +15,11 @@
 ## What is BookScope?
 
 BookScope turns any long-form text into an interactive emotional and stylistic dashboard.
-Upload a `.txt`, `.epub`, or `.pdf` file — or paste a URL — and immediately see:
+Upload a `.txt`, `.epub`, or `.pdf` file — or paste a URL — and immediately get:
+
+- **Hero insight card** — dominant emotion, arc pattern, word count at a glance
+- **Language toggle** — switch the entire UI between English / 中文 / 日本語 instantly
+- **Plain-language explanations** for every chart, designed for general (non-technical) users
 
 | Tab | What you get |
 |-----|-------------|
@@ -63,7 +67,11 @@ Then open `http://localhost:8501`, upload a `.txt`, `.epub`, or `.pdf` file, or 
 
 ## Multilingual Support
 
-BookScope automatically detects the book language and switches analysis backends:
+BookScope automatically detects the book language and switches analysis backends.
+The **entire UI** — all labels, descriptions, arc names, and chart titles — is available
+in English, Chinese, and Japanese via the sidebar language toggle.
+
+**Analysis backends:**
 
 | Language | Detection | Tokenization | Emotion Lexicon |
 |----------|-----------|-------------|-----------------|
@@ -133,6 +141,7 @@ app/
 └── main.py          Streamlit entry point (7 tabs)
 
 tests/               pytest unit + hypothesis property tests (192 tests)
+.streamlit/          Streamlit theme config (dark theme, purple accent)
 ```
 
 ---

@@ -4,7 +4,7 @@
 
 ---
 
-**多维度书籍文本分析与可视化工具。**
+**多维度书籍文本分析与可视化工具 — 支持中文、英文、日文三语界面。**
 
 [![CI](https://github.com/moyu-good/BookScope/actions/workflows/ci.yml/badge.svg)](https://github.com/moyu-good/BookScope/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
@@ -16,6 +16,10 @@
 
 BookScope 能将任意长篇文本转化为交互式情感与文体分析仪表板。
 上传 `.txt`、`.epub`、`.pdf` 文件，或粘贴一个 URL，即可获得：
+
+- **一眼洞察卡片** — 主导情感、情节走向、字数，一目了然
+- **三语界面切换** — 侧边栏一键切换中文 / English / 日本語
+- **通俗易懂的说明** — 每张图表都有白话解读，无需专业背景
 
 | 标签页 | 内容 |
 |--------|------|
@@ -63,7 +67,10 @@ streamlit run app/main.py
 
 ## 多语言支持
 
-BookScope 自动检测书籍语言并切换相应分析后端：
+BookScope 自动检测书籍语言并切换相应分析后端。
+**整个界面**（所有标签、说明、情节弧名称、图表标题）均可通过侧边栏语言切换按钮在中文、英文、日文之间即时切换。
+
+**分析后端：**
 
 | 语言 | 检测 | 分词 | 情感词典 |
 |------|------|------|---------|
@@ -133,6 +140,7 @@ app/
 └── main.py          Streamlit 入口（7 个标签页）
 
 tests/               pytest 单元测试 + hypothesis 属性测试（192 个）
+.streamlit/          Streamlit 主题配置（深色主题 + 紫色强调色）
 ```
 
 ---
