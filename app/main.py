@@ -1,4 +1,4 @@
-"""BookScope — Streamlit entry point (v2: modern dark + i18n).
+"""BookScope — Streamlit entry point (v0.4.0.0: Quick Insight + Full Analysis).
 
 Run with:
     streamlit run app/main.py
@@ -9,8 +9,29 @@ from bookscope.utils import ensure_nltk_data
 
 ensure_nltk_data()
 
+# Fix langdetect non-determinism before first import
+from langdetect import DetectorFactory  # noqa: E402
+
+DetectorFactory.seed = 0
+
+import html as _html  # noqa: E402
+
 import streamlit as st  # noqa: E402
 
+from bookscope.app_utils import (  # noqa: E402  # noqa: E402
+    get_lang,
+    get_mode,
+    inject_fonts,
+    set_lang,
+    set_mode,
+)
+from bookscope.insights import (  # noqa: E402
+    compute_readability,
+    compute_sparkline_points,
+    extract_character_names,
+    extract_key_themes,
+    first_person_density,
+)
 from bookscope.models import EmotionScore  # noqa: E402
 from bookscope.nlp import (  # noqa: E402
     ArcClassifier,
@@ -79,6 +100,45 @@ _STRINGS: dict[str, dict] = {
         "hero_arc": "Story arc",
         "hero_words": "Total words",
         "hero_chunks": "Text blocks",
+        # Mode toggle
+        "mode_quick": "Quick Insight",
+        "mode_full": "Full Analysis",
+        # Book type
+        "book_type_label": "Book type",
+        "type_fiction": "📚 Fiction",
+        "type_academic": "🎓 Academic",
+        "type_essay": "✍️ Essay/Memoir",
+        # Quick Insight — fiction
+        "qi_fi_headline_label": "STORY PROFILE",
+        "qi_fi_chars_label": "KEY CHARACTERS",
+        "qi_fi_chars_en_only": "Character detection: English only",
+        "qi_fi_shape_label": "STORY SHAPE",
+        "qi_fi_style_label": "WRITING STYLE",
+        # Quick Insight — academic
+        "qi_ac_headline_label": "READING PROFILE",
+        "qi_ac_read_time": "~{min} min read",
+        "qi_ac_themes_label": "CORE CONCEPTS",
+        "qi_ac_no_themes": "Not enough text for theme extraction",
+        "qi_ac_strategy_label": "READING STRATEGY",
+        "qi_ac_linear": "Linear reading recommended",
+        "qi_ac_skimmable": "Can skim — key ideas front-loaded",
+        "qi_ac_stance_label": "AUTHOR STANCE",
+        "qi_ac_polemical": "Polemical",
+        "qi_ac_constructive": "Constructive",
+        "qi_ac_cautionary": "Cautionary",
+        "qi_ac_informative": "Informative",
+        # Quick Insight — essay
+        "qi_es_headline_label": "VOICE PROFILE",
+        "qi_es_journey_label": "AUTHOR JOURNEY",
+        "qi_es_voice_label": "VOICE FINGERPRINT",
+        "qi_es_intimacy_label": "INTIMACY",
+        # Who it's for
+        "qi_for_you_label": "Who it's for",
+        # Readability labels
+        "readable_accessible": "Accessible",
+        "readable_moderate": "Moderate",
+        "readable_dense": "Dense",
+        "readable_specialist": "Specialist",
         # Tab names
         "tab_overview": "📊 Overview",
         "tab_heatmap": "🌡 Heatmap",
@@ -212,6 +272,45 @@ _STRINGS: dict[str, dict] = {
         "hero_arc": "故事走向",
         "hero_words": "总字数",
         "hero_chunks": "文本块数",
+        # Mode toggle
+        "mode_quick": "快速洞察",
+        "mode_full": "完整分析",
+        # Book type
+        "book_type_label": "书籍类型",
+        "type_fiction": "📚 小说",
+        "type_academic": "🎓 学术 · 非虚构",
+        "type_essay": "✍️ 随笔 · 回忆录",
+        # Quick Insight — fiction
+        "qi_fi_headline_label": "故事画像",
+        "qi_fi_chars_label": "主要人物",
+        "qi_fi_chars_en_only": "人物检测仅支持英文书籍",
+        "qi_fi_shape_label": "故事形状",
+        "qi_fi_style_label": "写作风格",
+        # Quick Insight — academic
+        "qi_ac_headline_label": "阅读画像",
+        "qi_ac_read_time": "约 {min} 分钟",
+        "qi_ac_themes_label": "核心概念",
+        "qi_ac_no_themes": "文本量不足，无法提取主题",
+        "qi_ac_strategy_label": "阅读策略",
+        "qi_ac_linear": "建议线性阅读",
+        "qi_ac_skimmable": "可跳读，核心论点在前",
+        "qi_ac_stance_label": "作者立场",
+        "qi_ac_polemical": "论战型",
+        "qi_ac_constructive": "建设型",
+        "qi_ac_cautionary": "警示型",
+        "qi_ac_informative": "陈述型",
+        # Quick Insight — essay
+        "qi_es_headline_label": "声音画像",
+        "qi_es_journey_label": "作者历程",
+        "qi_es_voice_label": "声音指纹",
+        "qi_es_intimacy_label": "亲密度",
+        # Who it's for
+        "qi_for_you_label": "适合谁读",
+        # Readability labels
+        "readable_accessible": "通俗易读",
+        "readable_moderate": "一般难度",
+        "readable_dense": "较有难度",
+        "readable_specialist": "专业级",
         # Tab names
         "tab_overview": "📊 概览",
         "tab_heatmap": "🌡 热力图",
@@ -260,7 +359,7 @@ _STRINGS: dict[str, dict] = {
         "chunks_style_header": "文体指标",
         "chunks_no_match": "本块未找到情感词汇。",
         "chunks_show_text": "显示原文",
-        # Arc descriptions (Chinese — idiomatic names)
+        # Arc descriptions
         "arc_descriptions": {
             "Rags to Riches": "白手起家 — 情感持续上升，充满希望与正能量。",
             "Riches to Rags": "盛极而衰 — 情感持续下降，紧张与黑暗逐渐加深。",
@@ -330,6 +429,45 @@ _STRINGS: dict[str, dict] = {
         "hero_arc": "物語の弧",
         "hero_words": "総語数",
         "hero_chunks": "チャンク数",
+        # Mode toggle
+        "mode_quick": "クイック洞察",
+        "mode_full": "詳細分析",
+        # Book type
+        "book_type_label": "書籍タイプ",
+        "type_fiction": "📚 小説",
+        "type_academic": "🎓 学術・ノンフィクション",
+        "type_essay": "✍️ エッセイ・回想録",
+        # Quick Insight — fiction
+        "qi_fi_headline_label": "ストーリープロフィール",
+        "qi_fi_chars_label": "主要人物",
+        "qi_fi_chars_en_only": "人物検出は英語のみ対応",
+        "qi_fi_shape_label": "ストーリーシェイプ",
+        "qi_fi_style_label": "文体スタイル",
+        # Quick Insight — academic
+        "qi_ac_headline_label": "読書プロフィール",
+        "qi_ac_read_time": "約 {min} 分",
+        "qi_ac_themes_label": "コアコンセプト",
+        "qi_ac_no_themes": "テーマ抽出に十分なテキスト量がありません",
+        "qi_ac_strategy_label": "読み方戦略",
+        "qi_ac_linear": "通読を推奨",
+        "qi_ac_skimmable": "流し読み可 — 要点は前半に集中",
+        "qi_ac_stance_label": "著者のスタンス",
+        "qi_ac_polemical": "論争的",
+        "qi_ac_constructive": "建設的",
+        "qi_ac_cautionary": "警告的",
+        "qi_ac_informative": "情報提供型",
+        # Quick Insight — essay
+        "qi_es_headline_label": "ボイスプロフィール",
+        "qi_es_journey_label": "著者の旅",
+        "qi_es_voice_label": "声紋",
+        "qi_es_intimacy_label": "親密度",
+        # Who it's for
+        "qi_for_you_label": "こんな人に",
+        # Readability labels
+        "readable_accessible": "読みやすい",
+        "readable_moderate": "普通",
+        "readable_dense": "難しい",
+        "readable_specialist": "専門的",
         # Tab names
         "tab_overview": "📊 概要",
         "tab_heatmap": "🌡 ヒートマップ",
@@ -385,7 +523,7 @@ _STRINGS: dict[str, dict] = {
         "chunks_style_header": "文体指標",
         "chunks_no_match": "このブロックに感情語は見つかりませんでした。",
         "chunks_show_text": "テキストを表示",
-        # Arc descriptions (Japanese)
+        # Arc descriptions
         "arc_descriptions": {
             "Rags to Riches": "どん底からの成功 — 感情が上昇し、希望と前向きさが高まります。",
             "Riches to Rags": "栄光からの転落 — 感情が持続的に低下し、緊張と暗さが増していきます。",
@@ -454,7 +592,7 @@ _ARC_DISPLAY: dict[str, dict[str, str]] = {
 _EMOTION_COLORS: dict[str, str] = {
     "anger": "#ef4444",
     "anticipation": "#f97316",
-    "disgust": "#a855f7",
+    "disgust": "#84cc16",
     "fear": "#6b7280",
     "joy": "#eab308",
     "sadness": "#3b82f6",
@@ -473,26 +611,56 @@ _EMOTION_FIELDS = (
     "joy", "sadness", "surprise", "trust",
 )
 
-# ---------------------------------------------------------------------------
-# Language selection — resolve before rendering anything else
-# ---------------------------------------------------------------------------
+# ── Emotional genre mapping (fiction, EN only) ───────────────────────────────
+# (arc.value, top_emotion_key) → (label_en, label_zh, label_ja, for_you_en)
+_EMOTIONAL_GENRE: dict[tuple[str, str], tuple[str, str, str, str]] = {
+    ("Icarus",         "fear"):    ("Psychological Thriller", "心理悬疑", "心理スリラー",
+                                   "For readers who can handle dark, relentless tension."),
+    ("Icarus",         "sadness"): ("Tragic Drama", "悲情剧", "悲劇",
+                                   "For readers drawn to emotional depth and catharsis."),
+    ("Icarus",         "anger"):   ("Dark Satire", "黑色讽刺", "ダークサタイア",
+                                   "For readers who appreciate biting social commentary."),
+    ("Cinderella",     "joy"):     ("Feel-Good Story", "励志故事", "ハートウォーミング",
+                                   "For readers who love comeback stories with hopeful endings."),
+    ("Rags to Riches", "joy"):     ("Coming-of-Age", "成长故事", "成長物語",
+                                   "For readers who find joy in watching characters grow."),
+    ("Rags to Riches", "trust"):   ("Inspiring Journey", "励志旅程", "インスピレーション",
+                                   "For readers looking for stories of perseverance."),
+    ("Man in a Hole",  "fear"):    ("Survival Thriller", "生存悬疑", "サバイバル",
+                                   "For readers who thrive on high-stakes suspense."),
+    ("Man in a Hole",  "sadness"): ("Redemption Story", "救赎故事", "救済物語",
+                                   "For readers moved by stories of recovery and second chances."),
+    ("Oedipus",        "sadness"): ("Literary Tragedy", "文学悲剧", "文学的悲劇",
+                                   "For readers who value emotional truth over happy endings."),
+    ("Riches to Rags", "anger"):   ("Social Critique", "社会批判", "社会批評",
+                                   "For readers interested in power, justice, and society."),
+    ("Riches to Rags", "sadness"): ("Fall from Grace", "英雄末路", "転落の物語",
+                                   "For readers fascinated by the fragility of success."),
+}
+_DEFAULT_GENRE = ("Emotional Fiction", "情感小说", "感情的小説",
+                  "For readers who enjoy character-driven emotional journeys.")
 
-if "ui_lang" not in st.session_state:
-    st.session_state["ui_lang"] = "en"
+# ── Book type accent colors ──────────────────────────────────────────────────
+_TYPE_COLOR = {
+    "fiction":  "#f97316",  # orange
+    "academic": "#3b82f6",  # blue
+    "essay":    "#22c55e",  # green
+}
 
 # ---------------------------------------------------------------------------
-# Custom CSS injection
+# CSS injection
 # ---------------------------------------------------------------------------
 
 st.markdown("""
 <style>
-/* Hero card */
+/* ── Hero card ── */
 .bs-hero {
     background: linear-gradient(135deg, #1a0b3d 0%, #0d1b2a 100%);
     border: 1px solid #4c1d95;
     border-radius: 16px;
     padding: 1.75rem 2rem;
     margin-bottom: 1.5rem;
+    animation: bs-card-reveal .5s cubic-bezier(.22,1,.36,1) both;
 }
 .bs-hero-title {
     font-size: 1.7rem;
@@ -534,14 +702,14 @@ st.markdown("""
     color: #f1f5f9;
     line-height: 1.2;
 }
-/* Tab description helper text */
+/* ── Tab description helper text ── */
 .bs-desc {
     color: #94a3b8;
     font-size: 0.88rem;
     margin-bottom: 1rem;
     line-height: 1.5;
 }
-/* Welcome screen */
+/* ── Welcome screen ── */
 .bs-welcome {
     text-align: center;
     padding: 3rem 1rem 2rem;
@@ -558,6 +726,115 @@ st.markdown("""
     max-width: 480px;
     margin: 0 auto;
     line-height: 1.7;
+}
+/* ── Quick Insight: headline card ── */
+.bs-insight-headline {
+    border-radius: 14px;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1rem;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    border-right: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
+}
+.bs-insight-headline-label {
+    font-size: .7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: #64748b;
+    margin-bottom: .5rem;
+}
+.bs-insight-headline-text {
+    font-size: 1.3rem;
+    color: #e6edf3;
+    line-height: 1.55;
+}
+.bs-insight-headline-text-animate {
+    animation: bs-typewriter 1.2s steps(40,end) both;
+}
+/* ── Quick Insight: 3-col grid ── */
+.bs-insight-grid {
+    display: grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+.bs-insight-card {
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    position: relative;
+    overflow: hidden;
+    min-height: 160px;
+}
+.bs-insight-card::before {
+    content:'';
+    position:absolute;
+    top:0; left:0;
+    width:100%; height:2px;
+    background: var(--bs-type-color, #7c3aed);
+    opacity:.6;
+}
+.bs-insight-card-animate {
+    animation: bs-card-reveal .4s cubic-bezier(.22,1,.36,1) both;
+}
+.bs-insight-card-animate:nth-child(2) { animation-delay:.07s; }
+.bs-insight-card-animate:nth-child(3) { animation-delay:.14s; }
+.bs-no-animate { animation: none !important; }
+.bs-insight-card-label {
+    font-size:.68rem;
+    font-weight:500;
+    text-transform:uppercase;
+    letter-spacing:.1em;
+    color:#64748b;
+    margin-bottom:.4rem;
+}
+.bs-insight-card-value {
+    font-size:1.05rem;
+    color:#e6edf3;
+    line-height:1.4;
+    margin-bottom:.3rem;
+}
+.bs-insight-card-sub {
+    font-size:.8rem;
+    color:#94a3b8;
+    line-height:1.4;
+}
+/* ── Tags ── */
+.bs-tag-row { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.4rem; }
+.bs-tag {
+    padding:.2rem .65rem;
+    border-radius:999px;
+    font-size:.75rem;
+    font-weight:500;
+    background:rgba(255,255,255,0.07);
+    border:1px solid rgba(255,255,255,0.12);
+    color:#94a3b8;
+}
+/* ── For-you recommendation card ── */
+.bs-for-you {
+    border-radius:12px;
+    padding:1rem 1.25rem;
+    margin-top:.5rem;
+    background:linear-gradient(90deg,rgba(124,58,237,.12) 0%,rgba(255,255,255,.03) 100%);
+    border:1px solid rgba(124,58,237,.25);
+    display:flex;
+    align-items:flex-start;
+    gap:.75rem;
+}
+.bs-for-you-icon { font-size:1.3rem; flex-shrink:0; margin-top:.1rem; }
+.bs-for-you-text { font-size:.9rem; color:#cbd5e1; line-height:1.6; }
+.bs-for-you-text strong { color:#a78bfa; }
+/* ── Animations ── */
+@keyframes bs-card-reveal {
+    from { opacity:0; transform:translateY(10px); }
+    to   { opacity:1; transform:translateY(0); }
+}
+@keyframes bs-typewriter {
+    from { clip-path: inset(0 100% 0 0); }
+    to   { clip-path: inset(0 0% 0 0); }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -628,6 +905,431 @@ def run_analysis_url(
 
 
 # ---------------------------------------------------------------------------
+# Quick Insight renderer
+# ---------------------------------------------------------------------------
+
+
+def _sparkline_svg(points: str, color: str = "#a78bfa", width: int = 200, height: int = 40) -> str:
+    return (
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'xmlns="http://www.w3.org/2000/svg" style="display:block;margin-top:.4rem">'
+        f'<defs><linearGradient id="spark-grad" x1="0" y1="0" x2="1" y2="0">'
+        f'<stop offset="0%" stop-color="#22c55e"/>'
+        f'<stop offset="100%" stop-color="#ef4444"/>'
+        f'</linearGradient></defs>'
+        f'<polyline points="{_html.escape(points)}" '
+        f'fill="none" stroke="url(#spark-grad)" stroke-width="2" stroke-linejoin="round"/>'
+        f'</svg>'
+    )
+
+
+def render_quick_insight(
+    book_type: str,
+    book_title: str,
+    arc_value: str,
+    arc_display_name: str,
+    top_emotion_key: str,
+    top_emotion_name: str,
+    top_emotion_color: str,
+    total_words: int,
+    chunks,
+    emotion_scores,
+    style_scores,
+    valence_series: list[float],
+    detected_lang: str,
+    ui_lang: str,
+    T: dict,
+) -> None:
+    """Render Quick Insight cards for the given book type."""
+    import html as h
+
+    type_color = _TYPE_COLOR.get(book_type, "#7c3aed")
+
+    # Session-keyed animation (AF-10, AF-13)
+    anim_key = f"{book_title}_{book_type}"
+    is_first = st.session_state.get("_insight_rendered_for") != anim_key
+    if is_first:
+        st.session_state["_insight_rendered_for"] = anim_key
+    card_cls = (
+        "bs-insight-card bs-insight-card-animate" if is_first
+        else "bs-insight-card bs-no-animate"
+    )
+    headline_cls = (
+        "bs-insight-headline-text bs-insight-headline-text-animate" if is_first
+        else "bs-insight-headline-text bs-no-animate"
+    )
+
+    # ── FICTION ──────────────────────────────────────────────────────────────
+    if book_type == "fiction":
+        # Genre label (EN only, TD-4)
+        if ui_lang == "en":
+            genre_tuple = _EMOTIONAL_GENRE.get(
+                (arc_value, top_emotion_key), _DEFAULT_GENRE
+            )
+            genre_label = genre_tuple[0]
+            headline_text = (
+                f"{h.escape(genre_label)} — "
+                f"{h.escape(top_emotion_name)}-driven {h.escape(arc_display_name)} arc"
+            )
+            for_you_text = genre_tuple[3]
+        else:
+            lang_idx = {"zh": 1, "ja": 2}.get(ui_lang, 0)
+            headline_text = f"{h.escape(arc_display_name)} — {h.escape(top_emotion_name)}"
+            for_you_text = ""
+
+        # Headline card
+        st.markdown(
+            f'<div class="bs-insight-headline" style="border-left:4px solid {type_color};">'
+            f'<div class="bs-insight-headline-label">{h.escape(T["qi_fi_headline_label"])}</div>'
+            f'<div class="{headline_cls}">{headline_text}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Card 1: Key Characters
+        chars = extract_character_names(chunks, lang=detected_lang)
+        if detected_lang not in ("zh", "ja", "ko"):
+            if chars:
+                chars_html = (
+                    '<div class="bs-tag-row">'
+                    + "".join(f'<span class="bs-tag">{h.escape(c)}</span>' for c in chars)
+                    + "</div>"
+                )
+                chars_sub = ""
+            else:
+                # Fallback: show top emotion words
+                top_emotions = sorted(
+                    [(e, sum(getattr(s, e) for s in emotion_scores) / len(emotion_scores))
+                     for e in _EMOTION_FIELDS],
+                    key=lambda x: -x[1]
+                )[:3]
+                chars_html = '<div class="bs-tag-row">' + "".join(
+                    f'<span class="bs-tag">{h.escape(T["emotion_names"].get(e, e))}</span>'
+                    for e, _ in top_emotions
+                ) + "</div>"
+                chars_sub = h.escape(T.get("qi_fi_top_emotions_fallback", "Top emotions"))
+        else:
+            chars_html = f'<div class="bs-insight-card-sub">{h.escape(T["qi_fi_chars_en_only"])}</div>'  # noqa: E501
+            chars_sub = ""
+
+        # Card 2: Story Shape (sparkline)
+        spark_pts = compute_sparkline_points(valence_series)
+        spark_svg = _sparkline_svg(spark_pts)
+        shape_sub = h.escape(arc_display_name)
+
+        # Card 3: Writing Style
+        if style_scores:
+            avg_ttr = sum(s.ttr for s in style_scores) / len(style_scores)
+            avg_sent = sum(s.avg_sentence_length for s in style_scores) / len(style_scores)
+            if avg_ttr > 0.65:
+                vocab_desc = "Rich vocabulary"
+            elif avg_ttr > 0.45:
+                vocab_desc = "Moderate vocabulary"
+            else:
+                vocab_desc = "Focused vocabulary"
+            if avg_sent > 20:
+                sent_desc = "long, complex sentences"
+            elif avg_sent > 12:
+                sent_desc = "balanced sentence length"
+            else:
+                sent_desc = "short, punchy sentences"
+            style_val = h.escape(vocab_desc)
+            style_sub = h.escape(sent_desc)
+        else:
+            style_val = "—"
+            style_sub = ""
+
+        # 3-col grid
+        st.markdown(
+            f'<div class="bs-insight-grid" style="--bs-type-color:{type_color};">'
+            # Card 1
+            f'<div class="{card_cls}">'
+            f'<div class="bs-insight-card-label">{h.escape(T["qi_fi_chars_label"])}</div>'
+            f'<div class="bs-insight-card-value">{chars_html}</div>'
+            f'{"<div class=bs-insight-card-sub>" + chars_sub + "</div>" if chars_sub else ""}'
+            f'</div>'
+            # Card 2
+            f'<div class="{card_cls}">'
+            f'<div class="bs-insight-card-label">{h.escape(T["qi_fi_shape_label"])}</div>'
+            f'<div class="bs-insight-card-value">{shape_sub}</div>'
+            f'{spark_svg}'
+            f'</div>'
+            # Card 3
+            f'<div class="{card_cls}">'
+            f'<div class="bs-insight-card-label">{h.escape(T["qi_fi_style_label"])}</div>'
+            f'<div class="bs-insight-card-value">{style_val}</div>'
+            f'<div class="bs-insight-card-sub">{style_sub}</div>'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # For-you card
+        if for_you_text:
+            st.markdown(
+                f'<div class="bs-for-you">'
+                f'<div class="bs-for-you-icon">📖</div>'
+                f'<div class="bs-for-you-text"><strong>{h.escape(T["qi_for_you_label"])}:</strong> '
+                f'{h.escape(for_you_text)}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── ACADEMIC ─────────────────────────────────────────────────────────────
+    elif book_type == "academic":
+        _, readability_label, confidence = compute_readability(style_scores, ui_lang)
+        reading_min = max(1, total_words // 238)
+        read_time_str = T["qi_ac_read_time"].format(min=reading_min)
+
+        headline_text = f"{h.escape(readability_label)} · {h.escape(read_time_str)}"
+
+        st.markdown(
+            f'<div class="bs-insight-headline" style="border-left:4px solid {type_color};">'
+            f'<div class="bs-insight-headline-label">{h.escape(T["qi_ac_headline_label"])}</div>'
+            f'<div class="{headline_cls}">{headline_text}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Card 1: Core Concepts
+        themes = extract_key_themes(chunks, style_scores) if style_scores else []
+        if themes:
+            themes_html = (
+                '<div class="bs-tag-row">'
+                + "".join(f'<span class="bs-tag">{h.escape(t)}</span>' for t in themes)
+                + "</div>"
+            )
+        else:
+            themes_html = f'<div class="bs-insight-card-sub">{h.escape(T["qi_ac_no_themes"])}</div>'
+
+        # Card 2: Reading Strategy (anticipation front-loaded?)
+        if emotion_scores:
+            n = len(emotion_scores)
+            first_half_ant = sum(s.anticipation for s in emotion_scores[: n // 2]) / max(n // 2, 1)
+            second_half_ant = (
+                sum(s.anticipation for s in emotion_scores[n // 2 :]) / max(n - n // 2, 1)
+            )
+            strategy_val = (
+                T["qi_ac_skimmable"] if first_half_ant >= second_half_ant
+                else T["qi_ac_linear"]
+            )
+        else:
+            strategy_val = T["qi_ac_linear"]
+
+        # Card 3: Author Stance
+        if emotion_scores:
+            avg_anger  = sum(s.anger   for s in emotion_scores) / len(emotion_scores)
+            avg_disgust = sum(s.disgust for s in emotion_scores) / len(emotion_scores)
+            avg_trust  = sum(s.trust   for s in emotion_scores) / len(emotion_scores)
+            avg_ant    = sum(s.anticipation for s in emotion_scores) / len(emotion_scores)
+            if avg_anger + avg_disgust > 0.35:
+                stance = T["qi_ac_polemical"]
+            elif avg_trust + avg_ant > 0.45:
+                stance = T["qi_ac_constructive"]
+            elif avg_anger > 0.20:
+                stance = T["qi_ac_cautionary"]
+            else:
+                stance = T["qi_ac_informative"]
+        else:
+            stance = T["qi_ac_informative"]
+
+        st.markdown(
+            f'<div class="bs-insight-grid" style="--bs-type-color:{type_color};">'
+            f'<div class="{card_cls}">'
+            f'<div class="bs-insight-card-label">{h.escape(T["qi_ac_themes_label"])}</div>'
+            f'<div class="bs-insight-card-value">{themes_html}</div>'
+            f'</div>'
+            f'<div class="{card_cls}">'
+            f'<div class="bs-insight-card-label">{h.escape(T["qi_ac_strategy_label"])}</div>'
+            f'<div class="bs-insight-card-value">{h.escape(strategy_val)}</div>'
+            f'</div>'
+            f'<div class="{card_cls}">'
+            f'<div class="bs-insight-card-label">{h.escape(T["qi_ac_stance_label"])}</div>'
+            f'<div class="bs-insight-card-value">{h.escape(stance)}</div>'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # For-you card
+        audience_map = {
+            T["readable_accessible"]: ("general readers new to the topic"
+                                       if ui_lang == "en" else
+                                       "初学者和对该主题感兴趣的普通读者" if ui_lang == "zh" else
+                                       "このテーマに初めて触れる一般読者"),
+            T["readable_moderate"]:   ("informed readers with some background"
+                                       if ui_lang == "en" else
+                                       "有一定背景知识的读者" if ui_lang == "zh" else
+                                       "基礎知識を持つ読者"),
+            T["readable_dense"]:      ("subject-matter experts"
+                                       if ui_lang == "en" else
+                                       "具备专业背景的读者" if ui_lang == "zh" else
+                                       "専門知識を持つ読者"),
+            T["readable_specialist"]: ("domain specialists and researchers"
+                                       if ui_lang == "en" else
+                                       "领域专家和研究人员" if ui_lang == "zh" else
+                                       "専門家および研究者"),
+        }
+        audience = audience_map.get(readability_label, "")
+        if audience and confidence >= 0.3:
+            for_you_body = (
+                f"For {audience}." if ui_lang == "en" else
+                f"适合{audience}。" if ui_lang == "zh" else
+                f"{audience}向け。"
+            )
+            st.markdown(
+                f'<div class="bs-for-you">'
+                f'<div class="bs-for-you-icon">📚</div>'
+                f'<div class="bs-for-you-text"><strong>{h.escape(T["qi_for_you_label"])}:</strong> '
+                f'{h.escape(for_you_body)}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── ESSAY / MEMOIR ────────────────────────────────────────────────────────
+    else:
+        fp = first_person_density(chunks, detected_lang)
+        fp_pct = int(fp * 100)
+
+        # Headline
+        if style_scores:
+            avg_adj = sum(s.adj_ratio for s in style_scores) / len(style_scores)
+            if avg_adj > 0.08:
+                voice_type = ("Sensory" if ui_lang == "en" else
+                              "感官型" if ui_lang == "zh" else "感覚的")
+            elif fp > 0.08:
+                voice_type = ("Intimate" if ui_lang == "en" else
+                              "亲密型" if ui_lang == "zh" else "親密")
+            else:
+                voice_type = ("Observational" if ui_lang == "en" else
+                              "观察型" if ui_lang == "zh" else "観察的")
+        else:
+            voice_type = ("Personal" if ui_lang == "en" else
+                          "个人型" if ui_lang == "zh" else "個人的")
+
+        headline_text = f"{h.escape(voice_type)} · {h.escape(arc_display_name)}"
+
+        st.markdown(
+            f'<div class="bs-insight-headline" style="border-left:4px solid {type_color};">'
+            f'<div class="bs-insight-headline-label">{h.escape(T["qi_es_headline_label"])}</div>'
+            f'<div class="{headline_cls}">{headline_text}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Card 1: Author Journey (sparkline + arc as personal journey)
+        spark_pts = compute_sparkline_points(valence_series)
+        spark_svg = _sparkline_svg(spark_pts, color="#22c55e")
+        arc_as_journey = {
+            "Rags to Riches": ("from darkness into light", "从黑暗走向光明", "暗闇から光へ"),
+            "Riches to Rags": ("a descent into difficulty", "走向困境的历程", "困難への下降"),
+            "Man in a Hole":  ("a fall and comeback", "跌落后的重新站起", "転落と回復"),
+            "Icarus":         ("early hope, late struggle", "先有希望后有挣扎", "希望の後に試練"),
+            "Cinderella":     ("resilience through hardship", "坚韧穿越艰难", "困難を乗り越えた強さ"),  # noqa: E501
+            "Oedipus":        ("hope between two struggles", "两段挣扎之间的希望", "二つの困難の間の希望"),  # noqa: E501
+            "Unknown":        ("a complex personal journey", "复杂的个人旅程", "複雑な旅路"),
+        }
+        lang_idx = {"en": 0, "zh": 1, "ja": 2}.get(ui_lang, 0)
+        journey_desc = arc_as_journey.get(  # noqa: E501
+            arc_value, ("a personal journey", "个人旅程", "個人的旅")
+        )[lang_idx]
+
+        # Card 2: Voice Fingerprint
+        if style_scores:
+            avg_adj_r = sum(s.adj_ratio for s in style_scores) / len(style_scores)
+            avg_adv_r = sum(s.adv_ratio for s in style_scores) / len(style_scores)
+            avg_vrb_r = sum(s.verb_ratio for s in style_scores) / len(style_scores)
+            if avg_adj_r > avg_adv_r and avg_adj_r > avg_vrb_r:
+                dominant_voice = ("Descriptive" if ui_lang == "en" else
+                                  "描述型" if ui_lang == "zh" else "描写的")
+            elif avg_adv_r > avg_vrb_r:
+                dominant_voice = ("Assertive" if ui_lang == "en" else
+                                  "论断型" if ui_lang == "zh" else "断定的")
+            else:
+                dominant_voice = ("Narrative" if ui_lang == "en" else
+                                  "叙述型" if ui_lang == "zh" else "物語的")
+        else:
+            dominant_voice = "—"
+
+        # Card 3: Intimacy
+        if ui_lang == "en":
+            intimacy_val = f"{fp_pct}% first-person"
+            if fp > 0.10:
+                intimacy_sub = "Highly personal narration"
+            elif fp > 0.04:
+                intimacy_sub = "Balanced personal voice"
+            else:
+                intimacy_sub = "More distant, observational"
+        elif ui_lang == "zh":
+            intimacy_val = f"{fp_pct}% 第一人称"
+            intimacy_sub = ("高度个人化叙述" if fp > 0.10 else
+                            "个人视角与观察并重" if fp > 0.04 else
+                            "相对客观的叙事视角")
+        else:
+            intimacy_val = f"{fp_pct}% 一人称"
+            intimacy_sub = ("高度に個人的な語り" if fp > 0.10 else
+                            "個人と観察のバランス" if fp > 0.04 else
+                            "やや客観的な語り口")
+
+        st.markdown(
+            f'<div class="bs-insight-grid" style="--bs-type-color:{type_color};">'
+            f'<div class="{card_cls}">'
+            f'<div class="bs-insight-card-label">{h.escape(T["qi_es_journey_label"])}</div>'
+            f'<div class="bs-insight-card-value">{h.escape(journey_desc)}</div>'
+            f'{spark_svg}'
+            f'</div>'
+            f'<div class="{card_cls}">'
+            f'<div class="bs-insight-card-label">{h.escape(T["qi_es_voice_label"])}</div>'
+            f'<div class="bs-insight-card-value">{h.escape(dominant_voice)}</div>'
+            f'</div>'
+            f'<div class="{card_cls}">'
+            f'<div class="bs-insight-card-label">{h.escape(T["qi_es_intimacy_label"])}</div>'
+            f'<div class="bs-insight-card-value">{h.escape(intimacy_val)}</div>'
+            f'<div class="bs-insight-card-sub">{h.escape(intimacy_sub)}</div>'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # For-you card
+        if fp > 0.10:
+            for_you_body = (
+                "For readers going through a similar personal transition." if ui_lang == "en" else
+                "适合正在经历类似转变的读者。" if ui_lang == "zh" else
+                "似たような人生の転換期にある読者に。"
+            )
+        elif fp > 0.04:
+            for_you_body = (
+                "For readers who value personal voice and reflection." if ui_lang == "en" else
+                "适合欣赏个人视角与思考的读者。" if ui_lang == "zh" else
+                "個人的な語り口と内省を大切にする読者に。"
+            )
+        else:
+            for_you_body = (
+                "For readers who appreciate thoughtful, essay-style observation." if ui_lang == "en" else  # noqa: E501
+                "适合喜爱沉思式、散文风格写作的读者。" if ui_lang == "zh" else
+                "思索的なエッセイスタイルの文章を好む読者に。"
+            )
+        st.markdown(
+            f'<div class="bs-for-you">'
+            f'<div class="bs-for-you-icon">✍️</div>'
+            f'<div class="bs-for-you-text"><strong>{h.escape(T["qi_for_you_label"])}:</strong> '
+            f'{h.escape(for_you_body)}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Language + mode resolution (query_params persist across pages)
+# ---------------------------------------------------------------------------
+
+ui_lang = get_lang()
+ui_mode = get_mode()
+inject_fonts(ui_lang)
+T = _STRINGS[ui_lang]
+
+# ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
 
@@ -639,17 +1341,29 @@ with st.sidebar:
         "Language / 语言 / 言語",
         options=lang_options,
         format_func=lambda x: lang_display[x],
-        index=lang_options.index(st.session_state["ui_lang"]),
+        index=lang_options.index(ui_lang),
         horizontal=True,
         key="lang_radio",
     )
-    st.session_state["ui_lang"] = selected_lang
-    T = _STRINGS[selected_lang]
+    if selected_lang != ui_lang:
+        set_lang(selected_lang)
+        st.rerun()
 
     st.divider()
-
     st.markdown(f"### {T['sidebar_header']}")
     st.caption(T["sidebar_tagline"])
+
+    # Book type selector (TD-1: before upload, in sidebar)
+    book_type_opts = ["fiction", "academic", "essay"]
+    book_type = st.radio(
+        T["book_type_label"],
+        options=book_type_opts,
+        format_func=lambda x: T[f"type_{x}"],
+        horizontal=True,
+        key="book_type_radio",
+    )
+
+    st.divider()
 
     uploaded = st.file_uploader(
         T["upload_label"],
@@ -691,8 +1405,8 @@ with st.sidebar:
     else:
         st.caption(T["no_saved"])
 
-# Keep T in sync if sidebar wasn't rendered yet (first run edge case)
-T = _STRINGS[st.session_state["ui_lang"]]
+# Keep T in sync after sidebar re-render
+T = _STRINGS[ui_lang]
 
 # ---------------------------------------------------------------------------
 # Welcome screen (no input yet)
@@ -702,7 +1416,7 @@ if uploaded is None and not url_input:
     st.markdown(
         f"""
         <div class="bs-welcome">
-            <h2>📖 {T['welcome_title']}</h2>
+            <h2>📖 {_html.escape(T['welcome_title'])}</h2>
             <p>{T['welcome_body']}</p>
         </div>
         """,
@@ -745,7 +1459,7 @@ with st.sidebar:
 # Arc classification
 arc_classifier = ArcClassifier()
 arc = arc_classifier.classify(emotion_scores)
-arc_display_name = _ARC_DISPLAY[selected_lang].get(arc.value, arc.value)
+arc_display_name = _ARC_DISPLAY[ui_lang].get(arc.value, arc.value)
 
 # Compute aggregates
 total_words = sum(c.word_count for c in chunks)
@@ -758,30 +1472,34 @@ top_emotion_color = _EMOTION_COLORS.get(top_emotion_key, "#7c3aed")
 top_emotion_icon = _EMOTION_ICONS.get(top_emotion_key, "✨")
 
 # ---------------------------------------------------------------------------
-# Hero card
+# Hero card (XSS-safe via html.escape)
 # ---------------------------------------------------------------------------
 
+safe_title = _html.escape(book_title)
+safe_emotion_name = _html.escape(top_emotion_name)
+safe_arc_display = _html.escape(arc_display_name)
+
 hero_sentence = T["hero_sentence"].format(
-    emotion=top_emotion_name,
-    arc=arc_display_name,
+    emotion=safe_emotion_name,
+    arc=safe_arc_display,
     chunks=len(chunks),
 )
 
 st.markdown(
     f"""
     <div class="bs-hero">
-        <div class="bs-hero-title">📖 {book_title}</div>
+        <div class="bs-hero-title">📖 {safe_title}</div>
         <div class="bs-hero-sentence">{hero_sentence}</div>
         <div class="bs-metrics">
             <div class="bs-metric">
                 <div class="bs-metric-label">{T['hero_dominant']}</div>
                 <div class="bs-metric-value" style="color:{top_emotion_color};">
-                    {top_emotion_icon} {top_emotion_name}
+                    {top_emotion_icon} {safe_emotion_name}
                 </div>
             </div>
             <div class="bs-metric">
                 <div class="bs-metric-label">{T['hero_arc']}</div>
-                <div class="bs-metric-value" style="color:#a78bfa;">{arc_display_name}</div>
+                <div class="bs-metric-value" style="color:#a78bfa;">{safe_arc_display}</div>
             </div>
             <div class="bs-metric">
                 <div class="bs-metric-label">{T['hero_words']}</div>
@@ -813,200 +1531,249 @@ if save_col.button(T["save_btn"]):
     save_col.success(T["saved_ok"])
 
 # ---------------------------------------------------------------------------
-# Tabs
+# Mode toggle: Quick Insight | Full Analysis
 # ---------------------------------------------------------------------------
 
-tab_overview, tab_heatmap, tab_timeline, tab_style, tab_arc, tab_export, tab_chunks = st.tabs(
-    [
-        T["tab_overview"], T["tab_heatmap"], T["tab_timeline"], T["tab_style"],
-        T["tab_arc"], T["tab_export"], T["tab_chunks"],
-    ]
+view_mode = st.radio(
+    "",
+    options=["quick", "full"],
+    format_func=lambda x: T["mode_quick"] if x == "quick" else T["mode_full"],
+    horizontal=True,
+    key="view_mode_radio",
+    index=0 if ui_mode == "quick" else 1,
 )
+if view_mode != ui_mode:
+    set_mode(view_mode)
 
-# --- Overview ---------------------------------------------------------------
-with tab_overview:
-    st.markdown(f"<p class='bs-desc'>{T['overview_avg_desc']}</p>", unsafe_allow_html=True)
+# ---------------------------------------------------------------------------
+# Quick Insight mode
+# ---------------------------------------------------------------------------
 
-    if emotion_scores:
-        avg_data_raw = {
-            e: sum(getattr(s, e) for s in emotion_scores) / len(emotion_scores)
-            for e in _EMOTION_FIELDS
-        }
-        # Sort descending and translate labels
-        sorted_emotions = sorted(avg_data_raw.items(), key=lambda kv: kv[1], reverse=True)
-        avg_data_translated = {
-            T["emotion_names"].get(k, k.capitalize()): round(v, 4)
-            for k, v in sorted_emotions
-        }
-        st.subheader(T["overview_avg_emotions"])
-        st.bar_chart(avg_data_translated)
-
-# --- Heatmap ----------------------------------------------------------------
-with tab_heatmap:
-    st.markdown(f"<p class='bs-desc'>{T['heatmap_desc']}</p>", unsafe_allow_html=True)
-    heatmap_data = ChartDataAdapter.emotion_heatmap(emotion_scores, chunks=chunks)
-    fig_heatmap = EmotionHeatmapRenderer().render(heatmap_data)
-    st.plotly_chart(fig_heatmap, use_container_width=True)
-
-# --- Emotion Timeline -------------------------------------------------------
-with tab_timeline:
-    st.markdown(f"<p class='bs-desc'>{T['timeline_desc']}</p>", unsafe_allow_html=True)
-
-    emotion_display = {T["emotion_names"].get(e, e.capitalize()): e for e in _EMOTION_FIELDS}
-    selected_labels = st.multiselect(
-        T["timeline_select"],
-        options=list(emotion_display.keys()),
-        default=list(emotion_display.keys()),
-        key="timeline_emotions",
+if view_mode == "quick":
+    valence_series = (
+        arc_classifier.valence_series(emotion_scores) if len(emotion_scores) >= 2 else []
     )
-    selected_keys = [emotion_display[lbl] for lbl in selected_labels]
-
-    if selected_keys:
-        filtered = [
-            EmotionScore(
-                chunk_index=s.chunk_index,
-                **{e: getattr(s, e) for e in selected_keys},
-            )
-            for s in emotion_scores
-        ]
-        timeline_data = ChartDataAdapter.emotion_timeline(filtered)
-        timeline_data.emotions = {
-            k: v for k, v in timeline_data.emotions.items() if k in selected_keys
-        }
-        st.plotly_chart(EmotionTimelineRenderer().render(timeline_data), use_container_width=True)
-    else:
-        st.info(T["timeline_empty"])
-
-# --- Style ------------------------------------------------------------------
-with tab_style:
-    st.markdown(f"<p class='bs-desc'>{T['style_desc']}</p>", unsafe_allow_html=True)
-
-    if style_scores:
-        radar_data = ChartDataAdapter.style_radar(style_scores)
-        st.plotly_chart(StyleRadarRenderer().render(radar_data), use_container_width=True)
-
-        st.subheader(T["style_over_time"])
-        metric_keys = list(radar_data.raw_means.keys())
-        metric_labels = {
-            T["style_metric_names"].get(k, k.replace("_", " ").title()): k
-            for k in metric_keys
-        }
-        selected_metric_label = st.selectbox(
-            T["style_pick"],
-            options=list(metric_labels.keys()),
-            key="style_metric",
-        )
-        selected_metric_key = metric_labels[selected_metric_label]
-        help_text = T["style_metric_help"].get(selected_metric_key, "")
-        if help_text:
-            st.markdown(f"<p class='bs-desc'>{help_text}</p>", unsafe_allow_html=True)
-        st.line_chart({s.chunk_index: getattr(s, selected_metric_key) for s in style_scores})
-    else:
-        st.info(T["style_no_data"])
-
-# --- Arc Pattern ------------------------------------------------------------
-with tab_arc:
-    st.markdown(f"<p class='bs-desc'>{T['arc_desc']}</p>", unsafe_allow_html=True)
-
-    if len(emotion_scores) >= 6:
-        arc_desc_text = T["arc_descriptions"].get(arc.value, "")
-        st.markdown(
-            f"""
-            <div style="background:rgba(124,58,237,0.15);border:1px solid #7c3aed;
-                        border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
-                <div style="font-size:1.4rem;font-weight:700;color:#a78bfa;
-                            margin-bottom:0.4rem;">{arc_display_name}</div>
-                <div style="color:#cbd5e1;font-size:0.95rem;">{arc_desc_text}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        valences = arc_classifier.valence_series(emotion_scores)
-        st.subheader(T["arc_valence_title"])
-        st.markdown(f"<p class='bs-desc'>{T['arc_valence_caption']}</p>", unsafe_allow_html=True)
-        st.line_chart({i: v for i, v in enumerate(valences)})
-    else:
-        st.info(T["arc_short"])
-
-# --- Export -----------------------------------------------------------------
-with tab_export:
-    st.subheader(T["export_title"])
-
-    result = AnalysisResult.create(
+    render_quick_insight(
+        book_type=book_type,
         book_title=book_title,
-        chunk_strategy=strategy,
-        total_chunks=len(chunks),
+        arc_value=arc.value,
+        arc_display_name=arc_display_name,
+        top_emotion_key=top_emotion_key,
+        top_emotion_name=top_emotion_name,
+        top_emotion_color=top_emotion_color,
         total_words=total_words,
-        arc_pattern=arc.value,
+        chunks=chunks,
         emotion_scores=emotion_scores,
         style_scores=style_scores,
+        valence_series=valence_series,
+        detected_lang=detected_lang,
+        ui_lang=ui_lang,
+        T=T,
     )
 
-    col_e, col_s, col_j, col_md = st.columns(4)
-    col_e.download_button(
-        label=T["export_emotions_csv"],
-        data=result.to_csv_emotion(),
-        file_name=f"{result.book_title}_emotions.csv",
-        mime="text/csv",
-    )
-    col_s.download_button(
-        label=T["export_style_csv"],
-        data=result.to_csv_style(),
-        file_name=f"{result.book_title}_style.csv",
-        mime="text/csv",
-    )
-    col_j.download_button(
-        label=T["export_json"],
-        data=result.model_dump_json(indent=2),
-        file_name=f"{result.book_title}_analysis.json",
-        mime="application/json",
-    )
-    col_md.download_button(
-        label=T["export_md"],
-        data=result.to_markdown_report(),
-        file_name=f"{result.book_title}_report.md",
-        mime="text/markdown",
+# ---------------------------------------------------------------------------
+# Full Analysis mode — original 7 tabs (unchanged)
+# ---------------------------------------------------------------------------
+
+else:
+    tab_overview, tab_heatmap, tab_timeline, tab_style, tab_arc, tab_export, tab_chunks = st.tabs(
+        [
+            T["tab_overview"], T["tab_heatmap"], T["tab_timeline"], T["tab_style"],
+            T["tab_arc"], T["tab_export"], T["tab_chunks"],
+        ]
     )
 
-# --- Chunks -----------------------------------------------------------------
-with tab_chunks:
-    st.subheader(T["chunks_title"])
+    # --- Overview ---------------------------------------------------------------
+    with tab_overview:
+        st.markdown(f"<p class='bs-desc'>{T['overview_avg_desc']}</p>", unsafe_allow_html=True)
 
-    if not emotion_scores:
-        st.info(T["chunks_no_match"])
-    else:
-        chunk_idx = st.slider(T["chunks_slider"], 0, len(chunks) - 1, 0, key="chunk_slider")
-        sel_chunk = chunks[chunk_idx]
-        sel_emotion = next((s for s in emotion_scores if s.chunk_index == chunk_idx), None)
-        sel_style = next((s for s in style_scores if s.chunk_index == chunk_idx), None)
+        if emotion_scores:
+            avg_data_raw = {
+                e: sum(getattr(s, e) for s in emotion_scores) / len(emotion_scores)
+                for e in _EMOTION_FIELDS
+            }
+            sorted_emotions = sorted(avg_data_raw.items(), key=lambda kv: kv[1], reverse=True)
+            avg_data_translated = {
+                T["emotion_names"].get(k, k.capitalize()): round(v, 4)
+                for k, v in sorted_emotions
+            }
+            st.subheader(T["overview_avg_emotions"])
+            st.bar_chart(avg_data_translated)
 
-        st.markdown(
-            f"**{T['chunks_header'].format(chunk_idx, sel_chunk.word_count)}**"
+    # --- Heatmap ----------------------------------------------------------------
+    with tab_heatmap:
+        st.markdown(f"<p class='bs-desc'>{T['heatmap_desc']}</p>", unsafe_allow_html=True)
+        heatmap_data = ChartDataAdapter.emotion_heatmap(emotion_scores, chunks=chunks)
+        fig_heatmap = EmotionHeatmapRenderer().render(heatmap_data)
+        st.plotly_chart(fig_heatmap, use_container_width=True)
+
+    # --- Emotion Timeline -------------------------------------------------------
+    with tab_timeline:
+        st.markdown(f"<p class='bs-desc'>{T['timeline_desc']}</p>", unsafe_allow_html=True)
+
+        emotion_display = {T["emotion_names"].get(e, e.capitalize()): e for e in _EMOTION_FIELDS}
+        selected_labels = st.multiselect(
+            T["timeline_select"],
+            options=list(emotion_display.keys()),
+            default=list(emotion_display.keys()),
+            key="timeline_emotions",
+        )
+        selected_keys = [emotion_display[lbl] for lbl in selected_labels]
+
+        if selected_keys:
+            filtered = [
+                EmotionScore(
+                    chunk_index=s.chunk_index,
+                    **{e: getattr(s, e) for e in selected_keys},
+                )
+                for s in emotion_scores
+            ]
+            timeline_data = ChartDataAdapter.emotion_timeline(filtered)
+            timeline_data.emotions = {
+                k: v for k, v in timeline_data.emotions.items() if k in selected_keys
+            }
+            st.plotly_chart(
+                EmotionTimelineRenderer().render(timeline_data), use_container_width=True
+            )
+        else:
+            st.info(T["timeline_empty"])
+
+    # --- Style ------------------------------------------------------------------
+    with tab_style:
+        st.markdown(f"<p class='bs-desc'>{T['style_desc']}</p>", unsafe_allow_html=True)
+
+        if style_scores:
+            radar_data = ChartDataAdapter.style_radar(style_scores)
+            st.plotly_chart(StyleRadarRenderer().render(radar_data), use_container_width=True)
+
+            st.subheader(T["style_over_time"])
+            metric_keys = list(radar_data.raw_means.keys())
+            metric_labels = {
+                T["style_metric_names"].get(k, k.replace("_", " ").title()): k
+                for k in metric_keys
+            }
+            selected_metric_label = st.selectbox(
+                T["style_pick"],
+                options=list(metric_labels.keys()),
+                key="style_metric",
+            )
+            selected_metric_key = metric_labels[selected_metric_label]
+            help_text = T["style_metric_help"].get(selected_metric_key, "")
+            if help_text:
+                st.markdown(f"<p class='bs-desc'>{help_text}</p>", unsafe_allow_html=True)
+            st.line_chart({s.chunk_index: getattr(s, selected_metric_key) for s in style_scores})
+        else:
+            st.info(T["style_no_data"])
+
+    # --- Arc Pattern ------------------------------------------------------------
+    with tab_arc:
+        st.markdown(f"<p class='bs-desc'>{T['arc_desc']}</p>", unsafe_allow_html=True)
+
+        if len(emotion_scores) >= 6:
+            arc_desc_text = T["arc_descriptions"].get(arc.value, "")
+            safe_arc_desc = _html.escape(arc_desc_text)
+            st.markdown(
+                f"""
+                <div style="background:rgba(124,58,237,0.15);border:1px solid #7c3aed;
+                            border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
+                    <div style="font-size:1.4rem;font-weight:700;color:#a78bfa;
+                                margin-bottom:0.4rem;">{safe_arc_display}</div>
+                    <div style="color:#cbd5e1;font-size:0.95rem;">{safe_arc_desc}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            valences = arc_classifier.valence_series(emotion_scores)
+            st.subheader(T["arc_valence_title"])
+            st.markdown(
+                f"<p class='bs-desc'>{T['arc_valence_caption']}</p>", unsafe_allow_html=True
+            )
+            st.line_chart({i: v for i, v in enumerate(valences)})
+        else:
+            st.info(T["arc_short"])
+
+    # --- Export -----------------------------------------------------------------
+    with tab_export:
+        st.subheader(T["export_title"])
+
+        result = AnalysisResult.create(
+            book_title=book_title,
+            chunk_strategy=strategy,
+            total_chunks=len(chunks),
+            total_words=total_words,
+            arc_pattern=arc.value,
+            emotion_scores=emotion_scores,
+            style_scores=style_scores,
         )
 
-        col_e, col_s = st.columns(2)
+        col_e, col_s, col_j, col_md = st.columns(4)
+        col_e.download_button(
+            label=T["export_emotions_csv"],
+            data=result.to_csv_emotion(),
+            file_name=f"{result.book_title}_emotions.csv",
+            mime="text/csv",
+        )
+        col_s.download_button(
+            label=T["export_style_csv"],
+            data=result.to_csv_style(),
+            file_name=f"{result.book_title}_style.csv",
+            mime="text/csv",
+        )
+        col_j.download_button(
+            label=T["export_json"],
+            data=result.model_dump_json(indent=2),
+            file_name=f"{result.book_title}_analysis.json",
+            mime="application/json",
+        )
+        col_md.download_button(
+            label=T["export_md"],
+            data=result.to_markdown_report(),
+            file_name=f"{result.book_title}_report.md",
+            mime="text/markdown",
+        )
 
-        with col_e:
-            st.markdown(f"**{T['chunks_emotion_header']}**")
-            if sel_emotion:
-                score_dict = {k: v for k, v in sel_emotion.to_dict().items() if v > 0}
-                if score_dict:
-                    translated = {
-                        T["emotion_names"].get(k, k.capitalize()): v
-                        for k, v in sorted(score_dict.items(), key=lambda kv: kv[1], reverse=True)
-                    }
-                    st.bar_chart(translated)
-                else:
-                    st.caption(T["chunks_no_match"])
+    # --- Chunks -----------------------------------------------------------------
+    with tab_chunks:
+        st.subheader(T["chunks_title"])
 
-        with col_s:
-            st.markdown(f"**{T['chunks_style_header']}**")
-            if sel_style:
-                st.table({
-                    T["style_metric_names"].get(k, k.replace("_", " ").title()): [f"{v:.3f}"]
-                    for k, v in sel_style.to_dict().items()
-                })
+        if not emotion_scores:
+            st.info(T["chunks_no_match"])
+        else:
+            chunk_idx = st.slider(T["chunks_slider"], 0, len(chunks) - 1, 0, key="chunk_slider")
+            sel_chunk = chunks[chunk_idx]
+            sel_emotion = next((s for s in emotion_scores if s.chunk_index == chunk_idx), None)
+            sel_style = next((s for s in style_scores if s.chunk_index == chunk_idx), None)
 
-        with st.expander(T["chunks_show_text"], expanded=False):
-            st.write(sel_chunk.text[:2000] + ("…" if len(sel_chunk.text) > 2000 else ""))
+            st.markdown(
+                f"**{T['chunks_header'].format(chunk_idx, sel_chunk.word_count)}**"
+            )
+
+            col_e, col_s = st.columns(2)
+
+            with col_e:
+                st.markdown(f"**{T['chunks_emotion_header']}**")
+                if sel_emotion:
+                    score_dict = {k: v for k, v in sel_emotion.to_dict().items() if v > 0}
+                    if score_dict:
+                        sorted_items = sorted(
+                            score_dict.items(), key=lambda kv: kv[1], reverse=True
+                        )
+                        translated = {
+                            T["emotion_names"].get(k, k.capitalize()): v
+                            for k, v in sorted_items
+                        }
+                        st.bar_chart(translated)
+                    else:
+                        st.caption(T["chunks_no_match"])
+
+            with col_s:
+                st.markdown(f"**{T['chunks_style_header']}**")
+                if sel_style:
+                    st.table({
+                        T["style_metric_names"].get(k, k.replace("_", " ").title()): [f"{v:.3f}"]
+                        for k, v in sel_style.to_dict().items()
+                    })
+
+            with st.expander(T["chunks_show_text"], expanded=False):
+                st.write(sel_chunk.text[:2000] + ("…" if len(sel_chunk.text) > 2000 else ""))

@@ -22,6 +22,24 @@
   - Localized arc names (ZH idioms: 乐极生悲/好事多磨/回光返照; JA equivalents)
   - Plain-language descriptions for every chart so general users understand
 
+## Deferred from v0.4.0.0 autoplan (2026-03-27)
+
+- [ ] **Load saved analysis from sidebar** — Add `▶ Load` button to saved analyses list in sidebar.
+  Biggest user retention gap: users cannot resume a previously saved analysis without re-uploading.
+  _(v0.5 scope)_
+
+- [ ] **Streamlit Cloud deployment** — Deploy with demo book data pre-loaded so users can try
+  without uploading. Requires `requirements.txt` from `pyproject.toml` + secrets config.
+  _(v0.5 scope)_
+
+- [ ] **spaCy NER for character extraction** — Replace regex NER (`extract_character_names`) with
+  `spacy en_core_web_sm` for proper named entity recognition in English fiction.
+  Currently deferred to keep zero-new-dependency constraint. _(v0.5 scope)_
+
+- [ ] **Full CJK Quick Insight genre labels** — `_EMOTIONAL_GENRE` mapping currently scoped to
+  EN only (NRC accuracy for CJK unverified). Validate accuracy and extend to ZH/JA in v0.5.
+  _(v0.5 scope)_
+
 ## Fixed during QA (2026-03-27)
 
 - [x] **ISSUE-004 — CJK word_count displayed as 0–1 for Chinese/Japanese** _(fixed 2026-03-27, commit be62d60)_

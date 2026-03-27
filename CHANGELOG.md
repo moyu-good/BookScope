@@ -2,6 +2,49 @@
 
 All notable changes to BookScope will be documented in this file.
 
+## [0.4.0.0] - 2026-03-27
+
+### Added
+- **Quick Insight mode** — book-type-aware insight cards (headline + 3-col grid + "Who it's for")
+  replacing the 7-tab view for general users; Full Analysis mode preserves all existing tabs
+- **Book type selector** in sidebar (Fiction / Academic / Essay) — user-selected before upload,
+  drives Quick Insight card content (no unreliable auto-detection)
+- **`bookscope/insights.py`** — zero-new-dependency helpers: character extraction, key themes,
+  readability grade, SVG sparkline, first-person density
+- **`bookscope/app_utils.py`** — shared language/mode persistence via `st.query_params`
+  (survives page navigation) + Google Fonts CDN injection
+- **Language persistence across pages** — `?lang=` query param written on change; compare page
+  reads it on load, language no longer resets when navigating main ↔ compare
+- **Font override by language** — Instrument Serif + Inter (EN), Noto Serif/Sans SC (ZH),
+  Noto Serif/Sans JP (JA); injected with `!important` to override OS system fonts
+- **Compare page full i18n** — all labels, headers, captions in EN/ZH/JA
+- **PDF support in compare page** — file uploader now accepts `.pdf` alongside `.txt` and `.epub`
+- **Emotional genre classification** (EN fiction) — 11 arc×emotion combos mapped to reading-group
+  recommendations; CJK books show emotion profile without uncertain genre labels
+- New pytest tests for `bookscope/insights.py` (35 tests)
+
+### Fixed
+- **XSS via `unsafe_allow_html=True`** — all user-derived strings (book title, arc name,
+  emotion name) now HTML-escaped before injection
+- **`langdetect` non-determinism** — `DetectorFactory.seed = 0` in both pages for reproducible
+  language detection inside `@st.cache_data`
+- **PDF title stripping in compare page** — `.pdf` suffix now removed from book title display
+- **`bookscope/app_utils.py` location** — moved from `app/ui_utils.py` into installed package
+  to eliminate fragile `sys.path.insert` pattern
+- **Sparkline zero-division** — flat valence series (common for CJK books) returns midpoint
+  line instead of crashing
+- **Character extraction CJK guard** — returns `[]` for ZH/JA/KO text immediately (no false
+  positives from regex NER)
+- **CSS animation replay** — session-keyed class prevents stagger animations replaying on
+  every Streamlit widget interaction
+- **disgust color** changed from `#a855f7` (clashed with purple accent) to `#84cc16`
+
+### Changed
+- `app/main.py`: mode toggle (Quick Insight / Full Analysis) appears below hero card;
+  book type selector moved to sidebar (before upload); query_params language persistence
+- `app/pages/02_compare.py`: full trilingual i18n, PDF support, language sync, langdetect seed
+- `.streamlit/config.toml`: background `#0d1117`, card `#161b22`, text `#e6edf3`
+
 ## [0.3.0.0] - 2026-03-27
 
 ### Added
