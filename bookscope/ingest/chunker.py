@@ -23,6 +23,9 @@ from bookscope.models import BookText, ChunkResult
 DEFAULT_MIN_WORDS = 20
 DEFAULT_WORD_LIMIT = 200
 
+# Characters per "word" for CJK length estimation (each character ≈ 1 word)
+_CJK_CHARS_PER_WORD = 1
+
 
 def chunk(
     book: BookText,
@@ -45,36 +48,63 @@ def chunk(
         ValueError: If strategy is not "paragraph" or "fixed".
     """
     text = clean(book.raw_text)
+    lang = getattr(book, "language", "en")
 
     if strategy == "paragraph":
-        return _chunk_by_paragraph(text, min_words)
+        return _chunk_by_paragraph(text, min_words, lang)
     elif strategy == "fixed":
-        return _chunk_fixed(text, word_limit)
+        return _chunk_fixed(text, word_limit, lang)
     else:
         raise ValueError(f"Unknown chunking strategy: {strategy!r}. Use 'paragraph' or 'fixed'.")
 
 
-def _chunk_by_paragraph(text: str, min_words: int) -> list[ChunkResult]:
+def _word_count(text: str, lang: str) -> int:
+    """Language-aware word count for filtering short chunks."""
+    if lang in ("zh", "ja"):
+        # CJK: count non-whitespace characters as a proxy for word count
+        return len(text.replace(" ", "").replace("\n", "").replace("\t", ""))
+    return len(text.split())
+
+
+def _tokenize_for_fixed(text: str, lang: str) -> list[str]:
+    """Return a token list for the fixed-window chunker."""
+    if lang == "zh":
+        try:
+            import jieba  # type: ignore[import]
+            return list(jieba.cut(text))
+        except ImportError:
+            pass
+    elif lang == "ja":
+        try:
+            from janome.tokenizer import Tokenizer  # type: ignore[import]
+            return [tok.surface for tok in Tokenizer().tokenize(text)]
+        except ImportError:
+            pass
+    return text.split()
+
+
+def _chunk_by_paragraph(text: str, min_words: int, lang: str) -> list[ChunkResult]:
     paragraphs = re.split(r"\n\n+", text) if "\n\n" in text else [text]
     results = []
-    for i, para in enumerate(paragraphs):
+    for para in paragraphs:
         para = para.strip()
-        if len(para.split()) >= min_words:
+        if _word_count(para, lang) >= min_words:
             results.append(ChunkResult(index=len(results), text=para))
     return results
 
 
-def _chunk_fixed(text: str, word_limit: int) -> list[ChunkResult]:
-    words = text.split()
-    if not words:
+def _chunk_fixed(text: str, word_limit: int, lang: str) -> list[ChunkResult]:
+    tokens = _tokenize_for_fixed(text, lang)
+    if not tokens:
         return []
 
+    sep = "" if lang in ("zh", "ja") else " "
     step = max(1, word_limit // 2)
     results = []
     pos = 0
-    while pos < len(words):
-        window = words[pos : pos + word_limit]
-        results.append(ChunkResult(index=len(results), text=" ".join(window)))
+    while pos < len(tokens):
+        window = tokens[pos : pos + word_limit]
+        results.append(ChunkResult(index=len(results), text=sep.join(window)))
         pos += step
 
     return results

@@ -12,7 +12,7 @@ ensure_nltk_data()
 import streamlit as st  # noqa: E402
 
 from bookscope.models import EmotionScore  # noqa: E402
-from bookscope.nlp import ArcClassifier, LexiconAnalyzer, StyleAnalyzer  # noqa: E402
+from bookscope.nlp import ArcClassifier, LexiconAnalyzer, StyleAnalyzer, detect_language  # noqa: E402
 from bookscope.store import AnalysisResult, Repository  # noqa: E402
 from bookscope.viz import (  # noqa: E402
     ChartDataAdapter,
@@ -66,12 +66,16 @@ def run_analysis(
     finally:
         os.unlink(tmp_path)
 
+    # Detect language and attach to book
+    lang = detect_language(book.raw_text)
+    book = book.model_copy(update={"language": lang})
+
     chunks = chunk(book, strategy=strategy, word_limit=chunk_size, min_words=min_words)
 
-    emotion_scores = LexiconAnalyzer().analyze_book(chunks)
-    style_scores = StyleAnalyzer().analyze_book(chunks)
+    emotion_scores = LexiconAnalyzer(language=lang).analyze_book(chunks)
+    style_scores = StyleAnalyzer(language=lang).analyze_book(chunks)
 
-    return chunks, emotion_scores, style_scores
+    return chunks, emotion_scores, style_scores, lang
 
 
 # ---------------------------------------------------------------------------
@@ -119,13 +123,19 @@ if uploaded is None:
 
 with st.spinner("Analysing…"):
     file_bytes = uploaded.read()
-    chunks, emotion_scores, style_scores = run_analysis(
+    chunks, emotion_scores, style_scores, detected_lang = run_analysis(
         file_bytes, uploaded.name, strategy, chunk_size, min_words,
     )
 
 if not chunks:
     st.warning("No chunks were produced. Try lowering the minimum word count.")
     st.stop()
+
+# Show detected language in sidebar
+_LANG_LABELS = {"en": "🇬🇧 English", "zh": "🇨🇳 Chinese", "ja": "🇯🇵 Japanese"}
+with st.sidebar:
+    st.divider()
+    st.caption(f"Detected language: **{_LANG_LABELS.get(detected_lang, detected_lang)}**")
 
 # Arc classification (fast — no caching needed)
 arc_classifier = ArcClassifier()

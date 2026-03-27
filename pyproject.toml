@@ -17,6 +17,9 @@ dependencies = [
     "nltk>=3.9.0",
     "numpy>=1.26.0",
     "ebooklib>=0.18",
+    "langdetect>=1.0.9",
+    "jieba>=0.42.1",
+    "janome>=0.4.2",
 ]
 
 [project.optional-dependencies]
