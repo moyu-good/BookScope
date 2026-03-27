@@ -209,3 +209,34 @@ class TestCJKChunker:
         )
         chunks = chunk(book, strategy="paragraph", min_words=5)
         assert len(chunks) >= 1
+
+    def test_word_count_japanese(self):
+        # Japanese: non-whitespace chars = word count proxy
+        count = _word_count("これはテスト。", "ja")
+        assert count == 7  # 7 non-whitespace chars
+
+    def test_word_count_spaces_excluded(self):
+        # Spaces/tabs/newlines not counted
+        count = _word_count("こ れ\tは\nテスト", "zh")
+        assert count == 6  # こ れ は テ ス ト = 6 non-whitespace chars
+
+
+# ---------------------------------------------------------------------------
+# Language detection — edge cases
+# ---------------------------------------------------------------------------
+
+class TestDetectLanguageEdgeCases:
+    def test_zh_cn_code_normalized(self):
+        """langdetect may return 'zh-cn' — must be normalized to 'zh'."""
+        from bookscope.nlp.lang_detect import detect_language
+        # Feed unambiguously Simplified Chinese text
+        text = "这是一段中文文字，用于测试语言检测功能是否正确返回zh。"
+        result = detect_language(text)
+        assert result == "zh"
+
+    def test_long_text_uses_sample(self):
+        """Very long text should still return a result (uses _SAMPLE_LEN slice)."""
+        from bookscope.nlp.lang_detect import detect_language
+        text = "Hello world. " * 500  # ~6500 chars, well above sample limit
+        result = detect_language(text)
+        assert result == "en"

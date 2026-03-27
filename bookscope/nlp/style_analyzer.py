@@ -125,13 +125,22 @@ _JA_ADJ  = "形容詞"
 _JA_ADV  = "副詞"
 
 
+from functools import lru_cache as _lru_cache
+
+
+@_lru_cache(maxsize=1)
+def _get_ja_tokenizer():  # type: ignore[return]
+    """Return a cached janome Tokenizer (expensive to init — load dictionary once)."""
+    from janome.tokenizer import Tokenizer  # type: ignore[import]
+    return Tokenizer()
+
+
 def _analyze_ja(text: str, chunk_index: int) -> StyleScore:
     try:
-        from janome.tokenizer import Tokenizer  # type: ignore[import]
+        t = _get_ja_tokenizer()
     except ImportError:
         return StyleScore(chunk_index=chunk_index)
 
-    t = Tokenizer()
     tokens = list(t.tokenize(text))
 
     # Sentence-length proxy: mean characters per line
