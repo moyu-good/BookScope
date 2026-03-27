@@ -11,3 +11,10 @@
   The initial commit included `.hypothesis/` (Hypothesis property-test constants).
   Add `/.hypothesis/` to `.gitignore` to avoid committing auto-generated test data.
   _Source: QA session 2026-03-26_
+
+## Fixed during QA (2026-03-27)
+
+- [x] **ISSUE-004 — CJK word_count displayed as 0–1 for Chinese/Japanese** _(fixed 2026-03-27, commit be62d60)_
+  `ChunkResult.word_count` used `len(text.split())` which returns near-zero for CJK
+  text (no spaces). Fixed: chunker now passes `word_count=_word_count(text, lang)`.
+  _Source: QA session 2026-03-27_
