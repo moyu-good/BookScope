@@ -93,8 +93,8 @@ _STRINGS: dict[str, dict] = {
         "saved_ok": "Saved!",
         # Hero card
         "hero_sentence": (
-            "This story is primarily driven by **{emotion}**,"
-            " following a **{arc}** arc across {chunks} blocks."
+            "This story is primarily driven by <strong>{emotion}</strong>,"
+            " following {article} <strong>{arc}</strong> arc across {chunks} blocks."
         ),
         "hero_dominant": "Dominant emotion",
         "hero_arc": "Story arc",
@@ -265,8 +265,8 @@ _STRINGS: dict[str, dict] = {
         "saved_ok": "已保存！",
         # Hero card
         "hero_sentence": (
-            "这本书的主导情感是 **{emotion}**，"
-            "故事走向为 **{arc}**，共分析了 {chunks} 个文本块。"
+            "这本书的主导情感是 <strong>{emotion}</strong>，"
+            "故事走向为 <strong>{arc}</strong>，共分析了 {chunks} 个文本块。"
         ),
         "hero_dominant": "主导情感",
         "hero_arc": "故事走向",
@@ -422,8 +422,8 @@ _STRINGS: dict[str, dict] = {
         "saved_ok": "保存しました！",
         # Hero card
         "hero_sentence": (
-            "この本の主要感情は **{emotion}** で、"
-            "**{arc}** の弧パターンが {chunks} ブロックにわたって検出されました。"
+            "この本の主要感情は <strong>{emotion}</strong> で、"
+            "<strong>{arc}</strong> の弧パターンが {chunks} ブロックにわたって検出されました。"
         ),
         "hero_dominant": "主要感情",
         "hero_arc": "物語の弧",
@@ -1479,10 +1479,12 @@ safe_title = _html.escape(book_title)
 safe_emotion_name = _html.escape(top_emotion_name)
 safe_arc_display = _html.escape(arc_display_name)
 
+_arc_article = "an" if arc_display_name[:1].lower() in "aeiou" else "a"
 hero_sentence = T["hero_sentence"].format(
     emotion=safe_emotion_name,
     arc=safe_arc_display,
     chunks=len(chunks),
+    article=_arc_article,
 )
 
 st.markdown(
