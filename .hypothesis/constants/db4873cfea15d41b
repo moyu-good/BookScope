@@ -1,4 +1,0 @@
-# file: C:\project file\BookScope\bookscope\models\__init__.py
-# hypothesis_version: 6.151.9
-
-['BookText', 'ChunkResult', 'EmotionScore']

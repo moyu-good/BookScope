@@ -1,4 +1,0 @@
-# file: C:\project file\BookScope\bookscope\store\repository.py
-# hypothesis_version: 6.151.9
-
-['## Emotion Summary\n', '## Style Summary\n', '%Y%m%dT%H%M%S', '*.json', ',', '---\n', 'AnalysisResult', '[^\\w\\-]', '_', 'adj_ratio', 'adv_ratio', 'analyses', 'anger', 'anticipation', 'avg_sentence_length', 'chunk_index', 'data', 'disgust', 'fear', 'joy', 'noun_ratio', 'sadness', 'surprise', 'trust', 'ttr', 'utf-8', 'verb_ratio', '| Metric | Average |', '|--------|---------|', '█']

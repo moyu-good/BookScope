@@ -1,4 +1,0 @@
-# file: C:\project file\BookScope\bookscope\viz\chart_data_adapter.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.15, 0.2, 0.35, 0.45, 0.95, 1.0, 5.0, 40.0, 'Adj Density', 'Adv Density', 'Noun Density', 'Sentence Length', 'Verb Density', 'Vocabulary Richness', 'adj_ratio', 'adv_ratio', 'anger', 'anticipation', 'avg_sentence_length', 'disgust', 'fear', 'joy', 'noun_ratio', 'sadness', 'surprise', 'trust', 'ttr', 'verb_ratio']

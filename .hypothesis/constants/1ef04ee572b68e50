@@ -1,4 +1,0 @@
-# file: C:\project file\BookScope\bookscope\ingest\__init__.py
-# hypothesis_version: 6.151.9
-
-['chunk', 'clean', 'load_text']

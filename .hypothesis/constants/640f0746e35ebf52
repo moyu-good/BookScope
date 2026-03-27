@@ -1,4 +1,0 @@
-# file: C:\project file\BookScope\bookscope\ingest\loader.py
-# hypothesis_version: 6.151.9
-
-['.epub', '.txt', 'DC', 'cp1252', 'head', 'ignore', 'ignore_ncx', 'latin-1', 'link', 'meta', 'replace', 'script', 'style', 'title', 'utf-8']
