@@ -40,16 +40,27 @@ streamlit run app/main.py
 ## Tests
 
 ```bash
-pytest                        # all 118 tests
+pytest                        # all 221 tests
 pytest tests/test_models.py   # single module
 ```
 
 ## Lint
 
 ```bash
-ruff check bookscope tests
-ruff check bookscope tests --fix   # auto-fix
+ruff check bookscope app tests
+ruff check bookscope app tests --fix   # auto-fix
 ```
+
+## GitHub Push
+
+Local git config is NOT modified (no stored credentials in git).
+Push using the token inline — token is stored in Claude memory (never in this file):
+
+```bash
+git push https://<TOKEN>@github.com/moyu-good/BookScope.git main
+```
+
+The token is in Claude memory under `reference_github_token.md`.
 
 ## Adding a new emotion backend (Phase 2+)
 
