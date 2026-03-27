@@ -220,6 +220,23 @@ class TestCJKChunker:
         count = _word_count("こ れ\tは\nテスト", "zh")
         assert count == 6  # こ れ は テ ス ト = 6 non-whitespace chars
 
+    def test_chunk_word_count_cjk_uses_char_count(self):
+        # Regression: ISSUE-004 — ChunkResult.word_count was 0 for CJK
+        # (model used text.split() which gives near-zero for spaceless Chinese)
+        # Found by /qa on 2026-03-27
+        # Report: .gstack/qa-reports/qa-report-localhost-2026-03-27.md
+        book = BookText(
+            title="test",
+            raw_text="这是第一段落，包含足够的中文字符用于测试分词计数。\n\n"
+                     "这是第二段落，同样包含很多中文字符，测试计数是否正确。",
+            language="zh",
+        )
+        chunks = chunk(book, strategy="paragraph", min_words=5)
+        assert len(chunks) == 2
+        # Each chunk should have non-zero word_count (character count proxy)
+        for c in chunks:
+            assert c.word_count > 0, f"Chunk {c.index} has word_count=0 for Chinese text"
+
 
 # ---------------------------------------------------------------------------
 # Language detection — edge cases
