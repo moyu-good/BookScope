@@ -2,6 +2,25 @@
 
 All notable changes to BookScope will be documented in this file.
 
+## [0.3.0.0] - 2026-03-27
+
+### Added
+- Full trilingual UI (English / 中文 / 日本語): sidebar language toggle switches all labels,
+  descriptions, tab names, arc names, and metric help text instantly without re-running analysis
+- Hero insight card at top of analysis page: book title, one-sentence story summary,
+  dominant emotion badge (color-coded), localized arc name with shape arrow, word count, chunk count
+- Modern dark theme: deep navy background, purple accent (`#7c3aed`), gradient hero card,
+  frosted-glass metric tiles, plain-language chart descriptions for general users
+- Localized arc names — ZH idioms: 乐极生悲 / 好事多磨 / 回光返照 / 白手起家 / 盛极而衰 / 跌入谷底
+- Localized arc names — JA: イカロス / シンデレラ / オイディプス / どん底からの成功 / etc.
+- Emotion labels translated in bar charts, timeline selector, and chunk explorer (all 3 languages)
+- Style metric labels and help text translated in Style tab
+- Centered welcome screen with hero layout replaces plain info message
+
+### Changed
+- `app/main.py`: complete UI rewrite with i18n string dict, hero card HTML/CSS, language state
+- `.streamlit/config.toml`: `primaryColor` updated to `#7c3aed` (purple)
+
 ## [0.2.0.0] - 2026-03-27
 
 ### Added
