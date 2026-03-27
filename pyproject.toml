@@ -20,6 +20,9 @@ dependencies = [
     "langdetect>=1.0.9",
     "jieba>=0.42.1",
     "janome>=0.4.2",
+    "pymupdf>=1.23.0",
+    "requests>=2.31.0",
+    "trafilatura>=1.6.0",
 ]
 
 [project.optional-dependencies]

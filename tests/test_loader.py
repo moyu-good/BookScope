@@ -3,10 +3,11 @@
 import io
 import zipfile
 from pathlib import Path  # noqa: F401  (used in type annotation)
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from bookscope.ingest.loader import EmptyTextError, load_text
+from bookscope.ingest.loader import EmptyTextError, load_text, load_url
 
 # ---------------------------------------------------------------------------
 # EPUB helpers
@@ -96,8 +97,8 @@ def test_load_latin1(tmp_path):
 
 
 def test_unsupported_extension_raises(tmp_path):
-    f = tmp_path / "book.pdf"
-    f.write_bytes(b"%PDF")
+    f = tmp_path / "book.docx"
+    f.write_bytes(b"PK\x03\x04")
     with pytest.raises(ValueError, match="Unsupported file type"):
         load_text(f)
 
@@ -178,3 +179,144 @@ def test_epub_empty_content_raises(tmp_path):
     epub = _make_epub(tmp_path, "<p>   </p>")
     with pytest.raises(EmptyTextError):
         load_text(epub)
+
+
+# ---------------------------------------------------------------------------
+# PDF tests (require pymupdf / fitz)
+# ---------------------------------------------------------------------------
+
+fitz = pytest.importorskip("fitz", reason="pymupdf not installed")
+
+
+def _make_pdf(tmp_path, text: str, title: str | None = None) -> Path:
+    """Create a minimal single-page PDF containing the given text."""
+    pdf_path = tmp_path / "test.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), text, fontsize=12)
+    if title:
+        doc.set_metadata({"title": title})
+    doc.save(str(pdf_path))
+    doc.close()
+    return pdf_path
+
+
+def test_pdf_loads_text(tmp_path):
+    pdf = _make_pdf(tmp_path, "Hello PDF world")
+    bt = load_text(pdf)
+    assert "Hello PDF world" in bt.raw_text
+    assert bt.encoding == "utf-8"
+
+
+def test_pdf_uses_metadata_title(tmp_path):
+    pdf = _make_pdf(tmp_path, "Some text", title="My Great Book")
+    bt = load_text(pdf)
+    assert bt.title == "My Great Book"
+
+
+def test_pdf_falls_back_to_stem_when_no_title(tmp_path):
+    pdf = _make_pdf(tmp_path, "Some text", title=None)
+    bt = load_text(pdf)
+    assert bt.title == "test"
+
+
+def test_pdf_explicit_title_overrides_metadata(tmp_path):
+    pdf = _make_pdf(tmp_path, "Some text", title="Metadata Title")
+    bt = load_text(pdf, title="Override")
+    assert bt.title == "Override"
+
+
+def test_pdf_multipage(tmp_path):
+    """Text from all pages should be present."""
+    pdf_path = tmp_path / "multi.pdf"
+    doc = fitz.open()
+    for i in range(3):
+        page = doc.new_page()
+        page.insert_text((72, 72), f"Page {i} content here", fontsize=12)
+    doc.save(str(pdf_path))
+    doc.close()
+
+    bt = load_text(pdf_path)
+    for i in range(3):
+        assert f"Page {i}" in bt.raw_text
+
+
+def test_pdf_empty_raises(tmp_path):
+    """A PDF with no text content should raise EmptyTextError."""
+    pdf_path = tmp_path / "blank.pdf"
+    doc = fitz.open()
+    doc.new_page()  # blank page, no text
+    doc.save(str(pdf_path))
+    doc.close()
+
+    with pytest.raises(EmptyTextError):
+        load_text(pdf_path)
+
+
+# ---------------------------------------------------------------------------
+# URL tests (require requests; use mocks — no network calls in tests)
+# ---------------------------------------------------------------------------
+
+pytest.importorskip("requests", reason="requests not installed")
+
+
+def _mock_response(text: str, content_type: str = "text/html; charset=utf-8") -> MagicMock:
+    resp = MagicMock()
+    resp.text = text
+    resp.headers = {"content-type": content_type}
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
+def test_url_plain_text(tmp_path):
+    with patch("requests.get", return_value=_mock_response(
+        "Hello URL world", content_type="text/plain"
+    )):
+        bt = load_url("http://example.com/book.txt")
+    assert "Hello URL world" in bt.raw_text
+
+
+def test_url_plain_text_title_from_path():
+    with patch("requests.get", return_value=_mock_response(
+        "Some text", content_type="text/plain"
+    )):
+        bt = load_url("http://example.com/my-novel.txt")
+    assert bt.title == "my-novel.txt"
+
+
+def test_url_explicit_title_overrides():
+    with patch("requests.get", return_value=_mock_response(
+        "Some text", content_type="text/plain"
+    )):
+        bt = load_url("http://example.com/book.txt", title="Override")
+    assert bt.title == "Override"
+
+
+def test_url_html_extracts_text():
+    html = "<html><head><title>Test Page</title></head><body><p>Article content here.</p></body></html>"
+    with patch("requests.get", return_value=_mock_response(html)):
+        bt = load_url("http://example.com/article")
+    assert "Article content" in bt.raw_text
+
+
+def test_url_html_title_from_title_tag():
+    html = "<html><head><title>My Article</title></head><body><p>Content.</p></body></html>"
+    with patch("requests.get", return_value=_mock_response(html)):
+        bt = load_url("http://example.com/article")
+    assert bt.title == "My Article"
+
+
+def test_url_empty_response_raises():
+    with patch("requests.get", return_value=_mock_response("   ", content_type="text/plain")):
+        with pytest.raises(EmptyTextError):
+            load_url("http://example.com/empty.txt")
+
+
+def test_url_http_error_propagates():
+    import requests
+
+    resp = MagicMock()
+    resp.raise_for_status.side_effect = requests.HTTPError("404")
+    with patch("requests.get", return_value=resp):
+        with pytest.raises(requests.HTTPError):
+            load_url("http://example.com/notfound")

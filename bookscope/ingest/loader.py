@@ -1,10 +1,13 @@
-"""Load plain-text and EPUB book files into BookText objects.
+"""Load plain-text, EPUB, PDF, and URL sources into BookText objects.
 
 Supported formats:
   .txt   — UTF-8 / latin-1 / cp1252 with automatic fallback
   .epub  — extracted via ebooklib + HTML tag stripping
+  .pdf   — extracted via PyMuPDF (pymupdf)
+  URL    — fetched via requests; HTML stripped or trafilatura if available
 """
 
+import re
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -19,12 +22,12 @@ FALLBACK_ENCODINGS = ["utf-8", "latin-1", "cp1252"]
 
 
 def load_text(path: Path | str, title: str | None = None) -> BookText:
-    """Read a .txt or .epub file and return a BookText.
+    """Read a .txt, .epub, or .pdf file and return a BookText.
 
     Dispatches to the appropriate loader based on file extension.
 
     Args:
-        path: Path to the .txt or .epub file.
+        path: Path to the .txt, .epub, or .pdf file.
         title: Display title. Defaults to the filename stem.
 
     Raises:
@@ -39,14 +42,114 @@ def load_text(path: Path | str, title: str | None = None) -> BookText:
     suffix = path.suffix.lower()
     if suffix == ".epub":
         return _load_epub(path, title)
+    if suffix == ".pdf":
+        return _load_pdf(path, title)
     if suffix in (".txt", ""):
         return _load_txt(path, title)
-    raise ValueError(f"Unsupported file type: {suffix!r}. Supported: .txt, .epub")
+    raise ValueError(f"Unsupported file type: {suffix!r}. Supported: .txt, .epub, .pdf")
+
+
+def load_url(url: str, title: str | None = None) -> BookText:
+    """Fetch a URL and return a BookText.
+
+    Handles plain-text and HTML responses. HTML is cleaned via trafilatura
+    (if installed) or the built-in _HTMLTextExtractor as a fallback.
+
+    Args:
+        url: HTTP/HTTPS URL to fetch.
+        title: Display title. Defaults to the page <title> tag or the URL path.
+
+    Raises:
+        ImportError: If requests is not installed.
+        EmptyTextError: If the URL returns no readable text.
+        requests.HTTPError: If the server returns a non-2xx status.
+    """
+    try:
+        import requests
+    except ImportError as exc:
+        raise ImportError(
+            "requests is required for URL support. "
+            "Install it with: pip install requests"
+        ) from exc
+
+    response = requests.get(
+        url,
+        timeout=20,
+        headers={"User-Agent": "BookScope/0.2 (+https://github.com/bookscope)"},
+    )
+    response.raise_for_status()
+
+    content_type = response.headers.get("content-type", "")
+
+    if "text/plain" in content_type:
+        raw_text = response.text
+        if title is None:
+            title = url.rstrip("/").rsplit("/", 1)[-1] or url
+    else:
+        html = response.text
+        if title is None:
+            m = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+            title = m.group(1).strip() if m else (url.rstrip("/").rsplit("/", 1)[-1] or url)
+        raw_text = _extract_html_text(html)
+
+    if not raw_text.strip():
+        raise EmptyTextError(f"URL returned no readable text: {url}")
+
+    return BookText(title=title, raw_text=raw_text)
 
 
 # ---------------------------------------------------------------------------
 # Private loaders
 # ---------------------------------------------------------------------------
+
+def _load_pdf(path: Path, title: str | None) -> BookText:
+    """Extract plain text from a PDF file via PyMuPDF."""
+    try:
+        import fitz  # PyMuPDF
+    except ImportError as exc:
+        raise ImportError(
+            "PyMuPDF is required for PDF support. "
+            "Install it with: pip install pymupdf"
+        ) from exc
+
+    doc = fitz.open(str(path))
+
+    if title is None:
+        meta_title = (doc.metadata or {}).get("title", "").strip()
+        title = meta_title or path.stem
+
+    parts: list[str] = []
+    for page in doc:
+        text = page.get_text("text")
+        if text.strip():
+            parts.append(text.strip())
+    doc.close()
+
+    raw_text = "\n\n".join(parts)
+    if not raw_text.strip():
+        raise EmptyTextError(f"PDF contains no readable text: {path}")
+
+    return BookText(title=title, raw_text=raw_text, encoding="utf-8")
+
+
+def _extract_html_text(html: str) -> str:
+    """Extract readable text from HTML.
+
+    Tries trafilatura first (article-quality extraction);
+    falls back to _HTMLTextExtractor if not installed.
+    """
+    try:
+        import trafilatura
+        text = trafilatura.extract(html, include_comments=False, include_tables=False)
+        if text:
+            return text
+    except ImportError:
+        pass
+
+    extractor = _HTMLTextExtractor()
+    extractor.feed(html)
+    return extractor.get_text()
+
 
 def _load_txt(path: Path, title: str | None) -> BookText:
     raw_text: str | None = None

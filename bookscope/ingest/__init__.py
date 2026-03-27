@@ -1,5 +1,5 @@
 from bookscope.ingest.chunker import chunk
 from bookscope.ingest.cleaner import clean
-from bookscope.ingest.loader import load_text
+from bookscope.ingest.loader import load_text, load_url
 
-__all__ = ["load_text", "clean", "chunk"]
+__all__ = ["load_text", "load_url", "clean", "chunk"]

@@ -41,6 +41,18 @@ _EMOTION_FIELDS = (
 # Analysis pipeline
 # ---------------------------------------------------------------------------
 
+def _run_pipeline(book, strategy, chunk_size, min_words):
+    """Shared analysis pipeline used by both file and URL entry points."""
+    from bookscope.ingest import chunk
+
+    lang = detect_language(book.raw_text)
+    book = book.model_copy(update={"language": lang})
+    chunks = chunk(book, strategy=strategy, word_limit=chunk_size, min_words=min_words)
+    emotion_scores = LexiconAnalyzer(language=lang).analyze_book(chunks)
+    style_scores = StyleAnalyzer(language=lang).analyze_book(chunks)
+    return chunks, emotion_scores, style_scores, lang
+
+
 @st.cache_data(show_spinner=False)
 def run_analysis(
     file_bytes: bytes,
@@ -49,33 +61,42 @@ def run_analysis(
     chunk_size: int,
     min_words: int,
 ):
-    """Load → clean → chunk → emotion + style analysis."""
+    """Load → clean → chunk → emotion + style analysis (file upload path)."""
     import os
     import tempfile
 
-    from bookscope.ingest import chunk
     from bookscope.ingest.loader import load_text
 
     suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".txt"
+    stem = filename
+    for ext in (".txt", ".epub", ".pdf"):
+        stem = stem.removesuffix(ext)
+
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(file_bytes)
         tmp_path = tmp.name
 
     try:
-        book = load_text(tmp_path, title=filename.removesuffix(".txt").removesuffix(".epub"))
+        book = load_text(tmp_path, title=stem)
     finally:
         os.unlink(tmp_path)
 
-    # Detect language and attach to book
-    lang = detect_language(book.raw_text)
-    book = book.model_copy(update={"language": lang})
+    return _run_pipeline(book, strategy, chunk_size, min_words)
 
-    chunks = chunk(book, strategy=strategy, word_limit=chunk_size, min_words=min_words)
 
-    emotion_scores = LexiconAnalyzer(language=lang).analyze_book(chunks)
-    style_scores = StyleAnalyzer(language=lang).analyze_book(chunks)
+@st.cache_data(show_spinner=False)
+def run_analysis_url(
+    url: str,
+    strategy: str,
+    chunk_size: int,
+    min_words: int,
+):
+    """Fetch URL → clean → chunk → emotion + style analysis."""
+    from bookscope.ingest.loader import load_url
 
-    return chunks, emotion_scores, style_scores, lang
+    book = load_url(url)
+    chunks, emotion_scores, style_scores, lang = _run_pipeline(book, strategy, chunk_size, min_words)
+    return chunks, emotion_scores, style_scores, lang, book.title
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +107,8 @@ with st.sidebar:
     st.header("BookScope")
     st.caption("Emotion arc & style analysis for long-form text")
 
-    uploaded = st.file_uploader("Upload a .txt or .epub file", type=["txt", "epub"])
+    uploaded = st.file_uploader("Upload a .txt, .epub, or .pdf file", type=["txt", "epub", "pdf"])
+    url_input = st.text_input("Or enter a URL", placeholder="https://…")
 
     st.divider()
     st.subheader("Chunking options")
@@ -117,15 +139,27 @@ with st.sidebar:
 
 st.title("BookScope")
 
-if uploaded is None:
-    st.info("Upload a .txt or .epub book file using the sidebar to get started.")
+if uploaded is None and not url_input:
+    st.info("Upload a .txt, .epub, or .pdf file — or enter a URL — using the sidebar to get started.")
     st.stop()
 
 with st.spinner("Analysing…"):
-    file_bytes = uploaded.read()
-    chunks, emotion_scores, style_scores, detected_lang = run_analysis(
-        file_bytes, uploaded.name, strategy, chunk_size, min_words,
-    )
+    if uploaded is not None:
+        file_bytes = uploaded.read()
+        chunks, emotion_scores, style_scores, detected_lang = run_analysis(
+            file_bytes, uploaded.name, strategy, chunk_size, min_words,
+        )
+        book_title = uploaded.name
+        for ext in (".txt", ".epub", ".pdf"):
+            book_title = book_title.removesuffix(ext)
+    else:
+        try:
+            chunks, emotion_scores, style_scores, detected_lang, book_title = run_analysis_url(
+                url_input, strategy, chunk_size, min_words,
+            )
+        except Exception as exc:
+            st.error(f"Failed to fetch URL: {exc}")
+            st.stop()
 
 if not chunks:
     st.warning("No chunks were produced. Try lowering the minimum word count.")
@@ -149,7 +183,7 @@ save_col, _ = st.columns([1, 4])
 if save_col.button("💾 Save analysis"):
     total_words = sum(c.word_count for c in chunks)
     result = AnalysisResult.create(
-        book_title=uploaded.name.removesuffix(".txt"),
+        book_title=book_title,
         chunk_strategy=strategy,
         total_chunks=len(chunks),
         total_words=total_words,
@@ -279,7 +313,7 @@ with tab_export:
 
     total_words = sum(c.word_count for c in chunks)
     result = AnalysisResult.create(
-        book_title=uploaded.name.removesuffix(".txt"),
+        book_title=book_title,
         chunk_strategy=strategy,
         total_chunks=len(chunks),
         total_words=total_words,
