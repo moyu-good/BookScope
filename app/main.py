@@ -80,6 +80,10 @@ _STRINGS: dict[str, dict] = {
         "min_words_label": "Skip blocks shorter than",
         "saved_header": "Saved analyses",
         "no_saved": "No saved analyses yet.",
+        "load_btn": "▶ Load",
+        "loaded_badge": "📂 Viewing saved analysis",
+        "loaded_clear": "× New analysis",
+        "chunks_unavailable": "Block text is not available for saved analyses.",
         "welcome_title": "What story hides in your book?",
         "welcome_body": (
             "Upload a **.txt**, **.epub**, or **.pdf** file — or paste a URL — "
@@ -252,6 +256,10 @@ _STRINGS: dict[str, dict] = {
         "min_words_label": "忽略短于以下字数的块",
         "saved_header": "已保存的分析",
         "no_saved": "暂无保存记录。",
+        "load_btn": "▶ 加载",
+        "loaded_badge": "📂 正在查看已保存的分析",
+        "loaded_clear": "× 新建分析",
+        "chunks_unavailable": "保存的分析不包含原始文本块。",
         "welcome_title": "你的书里藏着什么故事？",
         "welcome_body": (
             "上传 **.txt**、**.epub** 或 **.pdf** 文件，或粘贴网址，"
@@ -409,6 +417,10 @@ _STRINGS: dict[str, dict] = {
         "min_words_label": "以下の語数のブロックをスキップ",
         "saved_header": "保存済み分析",
         "no_saved": "保存された分析はありません。",
+        "load_btn": "▶ 読み込む",
+        "loaded_badge": "📂 保存済み分析を表示中",
+        "loaded_clear": "× 新規分析",
+        "chunks_unavailable": "保存済み分析にはブロックテキストが含まれません。",
         "welcome_title": "あなたの本に隠された物語は？",
         "welcome_body": (
             "**.txt** · **.epub** · **.pdf** ファイルをアップロードするか、"
@@ -987,7 +999,7 @@ def render_quick_insight(
         )
 
         # Card 1: Key Characters
-        chars = extract_character_names(chunks, lang=detected_lang)
+        chars = extract_character_names(chunks, lang=detected_lang) if chunks is not None else []
         if detected_lang not in ("zh", "ja", "ko"):
             if chars:
                 chars_html = (
@@ -1092,7 +1104,10 @@ def render_quick_insight(
         )
 
         # Card 1: Core Concepts
-        themes = extract_key_themes(chunks, style_scores) if style_scores else []
+        themes = (
+            extract_key_themes(chunks, style_scores)
+            if (chunks is not None and style_scores) else []
+        )
         if themes:
             themes_html = (
                 '<div class="bs-tag-row">'
@@ -1188,7 +1203,7 @@ def render_quick_insight(
 
     # ── ESSAY / MEMOIR ────────────────────────────────────────────────────────
     else:
-        fp = first_person_density(chunks, detected_lang)
+        fp = first_person_density(chunks, detected_lang) if chunks is not None else 0.0
         fp_pct = int(fp * 100)
 
         # Headline
@@ -1397,10 +1412,14 @@ with st.sidebar:
     saved = repo.list_results()
     if saved:
         for p in saved[:5]:
-            col1, col2 = st.columns([3, 1])
+            col1, col2, col3 = st.columns([3, 1, 1])
             col1.caption(p.stem)
-            if col2.button("🗑", key=f"del_{p.name}", help="Delete"):
+            if col2.button(T["load_btn"], key=f"load_{p.name}"):
+                st.session_state["_loaded_result"] = repo.load(p)
+                st.rerun()
+            if col3.button("🗑", key=f"del_{p.name}", help="Delete"):
                 repo.delete(p)
+                st.session_state.pop("_loaded_result", None)
                 st.rerun()
     else:
         st.caption(T["no_saved"])
@@ -1408,11 +1427,17 @@ with st.sidebar:
 # Keep T in sync after sidebar re-render
 T = _STRINGS[ui_lang]
 
+# If new file or URL is provided, clear any previously loaded result
+_loaded_result = st.session_state.get("_loaded_result")
+if uploaded is not None or url_input:
+    st.session_state.pop("_loaded_result", None)
+    _loaded_result = None
+
 # ---------------------------------------------------------------------------
-# Welcome screen (no input yet)
+# Welcome screen (no input yet and nothing loaded)
 # ---------------------------------------------------------------------------
 
-if uploaded is None and not url_input:
+if uploaded is None and not url_input and _loaded_result is None:
     st.markdown(
         f"""
         <div class="bs-welcome">
@@ -1425,30 +1450,45 @@ if uploaded is None and not url_input:
     st.stop()
 
 # ---------------------------------------------------------------------------
-# Run analysis
+# Populate analysis data — from saved result OR from upload/URL
 # ---------------------------------------------------------------------------
 
-with st.spinner(T["analysing"]):
-    if uploaded is not None:
-        file_bytes = uploaded.read()
-        chunks, emotion_scores, style_scores, detected_lang = run_analysis(
-            file_bytes, uploaded.name, strategy, chunk_size, min_words,
-        )
-        book_title = uploaded.name
-        for ext in (".txt", ".epub", ".pdf"):
-            book_title = book_title.removesuffix(ext)
-    else:
-        try:
-            chunks, emotion_scores, style_scores, detected_lang, book_title = run_analysis_url(
-                url_input, strategy, chunk_size, min_words,
-            )
-        except Exception as exc:
-            st.error(T["url_error"].format(exc))
-            st.stop()
+_from_saved = False
+chunks = None  # may remain None when restoring from a saved result
 
-if not chunks:
-    st.warning(T["no_chunks_warning"])
-    st.stop()
+if _loaded_result is not None and uploaded is None and not url_input:
+    emotion_scores = _loaded_result.emotion_scores
+    style_scores = _loaded_result.style_scores
+    book_title = _loaded_result.book_title
+    detected_lang = _loaded_result.detected_lang
+    n_chunks = _loaded_result.total_chunks
+    total_words = _loaded_result.total_words
+    _from_saved = True
+else:
+    with st.spinner(T["analysing"]):
+        if uploaded is not None:
+            file_bytes = uploaded.read()
+            chunks, emotion_scores, style_scores, detected_lang = run_analysis(
+                file_bytes, uploaded.name, strategy, chunk_size, min_words,
+            )
+            book_title = uploaded.name
+            for ext in (".txt", ".epub", ".pdf"):
+                book_title = book_title.removesuffix(ext)
+        else:
+            try:
+                chunks, emotion_scores, style_scores, detected_lang, book_title = run_analysis_url(
+                    url_input, strategy, chunk_size, min_words,
+                )
+            except Exception as exc:
+                st.error(T["url_error"].format(exc))
+                st.stop()
+
+    if not chunks:
+        st.warning(T["no_chunks_warning"])
+        st.stop()
+
+    n_chunks = len(chunks)
+    total_words = sum(c.word_count for c in chunks)
 
 # Show detected language in sidebar
 with st.sidebar:
@@ -1461,8 +1501,6 @@ arc_classifier = ArcClassifier()
 arc = arc_classifier.classify(emotion_scores)
 arc_display_name = _ARC_DISPLAY[ui_lang].get(arc.value, arc.value)
 
-# Compute aggregates
-total_words = sum(c.word_count for c in chunks)
 from collections import Counter  # noqa: E402
 
 dominants = Counter(s.dominant_emotion for s in emotion_scores) if emotion_scores else Counter()
@@ -1483,7 +1521,7 @@ _arc_article = "an" if arc_display_name[:1].lower() in "aeiou" else "a"
 hero_sentence = T["hero_sentence"].format(
     emotion=safe_emotion_name,
     arc=safe_arc_display,
-    chunks=len(chunks),
+    chunks=n_chunks,
     article=_arc_article,
 )
 
@@ -1509,7 +1547,7 @@ st.markdown(
             </div>
             <div class="bs-metric">
                 <div class="bs-metric-label">{T['hero_chunks']}</div>
-                <div class="bs-metric-value">{len(chunks)}</div>
+                <div class="bs-metric-value">{n_chunks}</div>
             </div>
         </div>
     </div>
@@ -1517,20 +1555,30 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Save button
-save_col, _ = st.columns([1, 5])
-if save_col.button(T["save_btn"]):
-    result = AnalysisResult.create(
-        book_title=book_title,
-        chunk_strategy=strategy,
-        total_chunks=len(chunks),
-        total_words=total_words,
-        arc_pattern=arc.value,
-        emotion_scores=emotion_scores,
-        style_scores=style_scores,
-    )
-    repo.save(result)
-    save_col.success(T["saved_ok"])
+# Loaded badge + clear button (only shown when viewing a saved result)
+if _from_saved:
+    badge_col, clear_col, _ = st.columns([2, 1, 3])
+    badge_col.info(T["loaded_badge"])
+    if clear_col.button(T["loaded_clear"]):
+        st.session_state.pop("_loaded_result", None)
+        st.rerun()
+
+# Save button (hidden when already viewing a saved result)
+if not _from_saved:
+    save_col, _ = st.columns([1, 5])
+    if save_col.button(T["save_btn"]):
+        result = AnalysisResult.create(
+            book_title=book_title,
+            chunk_strategy=strategy,
+            total_chunks=n_chunks,
+            total_words=total_words,
+            arc_pattern=arc.value,
+            detected_lang=detected_lang,
+            emotion_scores=emotion_scores,
+            style_scores=style_scores,
+        )
+        repo.save(result)
+        save_col.success(T["saved_ok"])
 
 # ---------------------------------------------------------------------------
 # Mode toggle: Quick Insight | Full Analysis
@@ -1702,9 +1750,10 @@ else:
         result = AnalysisResult.create(
             book_title=book_title,
             chunk_strategy=strategy,
-            total_chunks=len(chunks),
+            total_chunks=n_chunks,
             total_words=total_words,
             arc_pattern=arc.value,
+            detected_lang=detected_lang,
             emotion_scores=emotion_scores,
             style_scores=style_scores,
         )
@@ -1739,7 +1788,9 @@ else:
     with tab_chunks:
         st.subheader(T["chunks_title"])
 
-        if not emotion_scores:
+        if chunks is None:
+            st.info(T["chunks_unavailable"])
+        elif not emotion_scores:
             st.info(T["chunks_no_match"])
         else:
             chunk_idx = st.slider(T["chunks_slider"], 0, len(chunks) - 1, 0, key="chunk_slider")

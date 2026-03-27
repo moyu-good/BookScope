@@ -36,6 +36,7 @@ class AnalysisResult(BaseModel):
     total_chunks: int
     total_words: int
     arc_pattern: str             # ArcPattern.value string
+    detected_lang: str = "en"   # ISO 639-1 language code; defaults to "en" for old saves
     emotion_scores: list[EmotionScore]
     style_scores: list[StyleScore]
 
@@ -48,6 +49,7 @@ class AnalysisResult(BaseModel):
         total_chunks: int,
         total_words: int,
         arc_pattern: str,
+        detected_lang: str = "en",
         emotion_scores: list[EmotionScore],
         style_scores: list[StyleScore],
     ) -> "AnalysisResult":
@@ -58,6 +60,7 @@ class AnalysisResult(BaseModel):
             total_chunks=total_chunks,
             total_words=total_words,
             arc_pattern=arc_pattern,
+            detected_lang=detected_lang,
             emotion_scores=emotion_scores,
             style_scores=style_scores,
         )

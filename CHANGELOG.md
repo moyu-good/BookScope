@@ -2,6 +2,24 @@
 
 All notable changes to BookScope will be documented in this file.
 
+## [0.5.0.0] - 2026-03-27
+
+### Added
+- **Load saved analysis from sidebar** — `▶ Load` button on each saved entry resumes a
+  prior analysis instantly without re-uploading. Loaded badge + "× New analysis" clear button
+  shown in main area. Save button hidden when viewing a saved result.
+- **`detected_lang` field in `AnalysisResult`** — persisted to JSON (backward-compatible,
+  defaults to `"en"` for old saves) so loaded analyses display the correct language label
+  and drive CJK-aware features.
+
+### Fixed
+- **Chunks tab guarded for saved results** — shows info message instead of crashing when raw
+  chunk text is not available (saved analyses store only scores, not source text)
+- **Quick Insight `chunks=None` guards** — character extraction, key-theme extraction, and
+  first-person density now handle `chunks=None` gracefully (return `[]` / `0.0`)
+- **Export tab `detected_lang`** — analysis results exported/saved now include detected
+  language field
+
 ## [0.4.0.0] - 2026-03-27
 
 ### Added

@@ -1,6 +1,5 @@
 """Unit tests for bookscope.insights."""
 
-import pytest
 
 from bookscope.insights import (
     compute_readability,
@@ -10,7 +9,6 @@ from bookscope.insights import (
     first_person_density,
 )
 from bookscope.models import ChunkResult
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,7 +58,7 @@ class TestExtractCharacterNames:
 
     def test_top_n_respected(self):
         texts = [
-            f"Harry met Hermione. Ron joined Harry. Harry and Ron laughed."
+            "Harry met Hermione. Ron joined Harry. Harry and Ron laughed."
         ] * 20
         names = extract_character_names(_chunks(texts), top_n=2, lang="en")
         assert len(names) <= 2
@@ -92,7 +90,7 @@ class TestExtractKeyThemes:
         assert extract_key_themes([], []) == []
 
     def test_top_n_respected(self):
-        texts = [f"democracy freedom justice equality liberty peace"] * 20
+        texts = ["democracy freedom justice equality liberty peace"] * 20
         chunks = _chunks(texts)
         scores = [_FakeStyleScore(i) for i in range(len(chunks))]
         themes = extract_key_themes(chunks, scores, top_n=3)

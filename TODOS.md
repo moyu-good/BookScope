@@ -24,9 +24,8 @@
 
 ## Deferred from v0.4.0.0 autoplan (2026-03-27)
 
-- [ ] **Load saved analysis from sidebar** — Add `▶ Load` button to saved analyses list in sidebar.
-  Biggest user retention gap: users cannot resume a previously saved analysis without re-uploading.
-  _(v0.5 scope)_
+- [x] **Load saved analysis from sidebar** — `▶ Load` button on each saved entry; resumes prior
+  analysis without re-uploading. Loaded badge + "× New analysis" clear button. _(done 2026-03-27)_
 
 - [ ] **Streamlit Cloud deployment** — Deploy with demo book data pre-loaded so users can try
   without uploading. Requires `requirements.txt` from `pyproject.toml` + secrets config.
