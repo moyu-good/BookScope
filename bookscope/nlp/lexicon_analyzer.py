@@ -60,11 +60,17 @@ def _tokenize_zh(text: str) -> list[str]:
         return text.split()
 
 
+@lru_cache(maxsize=1)
+def _get_ja_tokenizer():  # type: ignore[return]
+    """Return a cached janome Tokenizer (expensive to init — load dictionary once)."""
+    from janome.tokenizer import Tokenizer  # type: ignore[import]
+    return Tokenizer()
+
+
 def _tokenize_ja(text: str) -> list[str]:
     """Tokenize Japanese text using janome."""
     try:
-        from janome.tokenizer import Tokenizer  # type: ignore[import]
-        t = Tokenizer()
+        t = _get_ja_tokenizer()
         return [token.surface for token in t.tokenize(text)]
     except ImportError:
         return list(text)

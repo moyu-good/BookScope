@@ -23,9 +23,6 @@ from bookscope.models import BookText, ChunkResult
 DEFAULT_MIN_WORDS = 20
 DEFAULT_WORD_LIMIT = 200
 
-# Characters per "word" for CJK length estimation (each character ≈ 1 word)
-_CJK_CHARS_PER_WORD = 1
-
 
 def chunk(
     book: BookText,
