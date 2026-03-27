@@ -1,7 +1,10 @@
 # BookScope 📖
 
+**🌐 Language / 语言 / 言語:** [English](README.md) · [中文](README.zh.md) · [日本語](README.ja.md)
+
+---
+
 **Multi-dimensional book text analysis and visualization.**
-**多次元書籍テキスト分析・可視化プラットフォーム**
 
 [![CI](https://github.com/moyu-good/BookScope/actions/workflows/ci.yml/badge.svg)](https://github.com/moyu-good/BookScope/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
