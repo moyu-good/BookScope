@@ -3,7 +3,7 @@
 **Multi-dimensional book text analysis and visualization.**
 **多次元書籍テキスト分析・可視化プラットフォーム**
 
-[![CI](https://github.com/YOUR_USERNAME/BookScope/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/BookScope/actions)
+[![CI](https://github.com/moyu-good/BookScope/actions/workflows/ci.yml/badge.svg)](https://github.com/moyu-good/BookScope/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -30,7 +30,7 @@ Upload a `.txt`, `.epub`, or `.pdf` file — or paste a URL — and immediately 
 
 ```bash
 # 1. Clone and install (editable — required so Python finds the bookscope package)
-git clone https://github.com/YOUR_USERNAME/BookScope.git
+git clone https://github.com/moyu-good/BookScope.git
 cd BookScope
 pip install -e ".[dev]"
 
