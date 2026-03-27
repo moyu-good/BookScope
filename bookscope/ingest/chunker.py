@@ -85,8 +85,9 @@ def _chunk_by_paragraph(text: str, min_words: int, lang: str) -> list[ChunkResul
     results = []
     for para in paragraphs:
         para = para.strip()
-        if _word_count(para, lang) >= min_words:
-            results.append(ChunkResult(index=len(results), text=para))
+        wc = _word_count(para, lang)
+        if wc >= min_words:
+            results.append(ChunkResult(index=len(results), text=para, word_count=wc))
     return results
 
 
@@ -101,7 +102,8 @@ def _chunk_fixed(text: str, word_limit: int, lang: str) -> list[ChunkResult]:
     pos = 0
     while pos < len(tokens):
         window = tokens[pos : pos + word_limit]
-        results.append(ChunkResult(index=len(results), text=sep.join(window)))
+        chunk_text = sep.join(window)
+        results.append(ChunkResult(index=len(results), text=chunk_text, word_count=_word_count(chunk_text, lang)))
         pos += step
 
     return results
