@@ -11,12 +11,12 @@
 
 ## What is BookScope?
 
-BookScope turns any plain-text book into an interactive emotional and stylistic dashboard.
-Upload a `.txt` file and immediately see:
+BookScope turns any long-form text into an interactive emotional and stylistic dashboard.
+Upload a `.txt`, `.epub`, or `.pdf` file — or paste a URL — and immediately see:
 
 | Tab | What you get |
 |-----|-------------|
-| **Overview** | Dominant emotion, average scores, word count |
+| **Overview** | Dominant emotion, average scores, word count, detected language |
 | **Heatmap** | 8-emotion × chunk intensity grid |
 | **Emotion Timeline** | Scrollable arc chart across all chunks |
 | **Style** | Radar fingerprint + per-metric trend lines |
@@ -29,49 +29,59 @@ Upload a `.txt` file and immediately see:
 ## Quick Start
 
 ```bash
-# 1. Install
-pip install -r requirements.txt
+# 1. Clone and install (editable — required so Python finds the bookscope package)
+git clone https://github.com/YOUR_USERNAME/BookScope.git
+cd BookScope
+pip install -e ".[dev]"
 
 # 2. Download NLTK corpora (one-time)
 python -m textblob.download_corpora
 
-# 3. Download demo books (optional)
-python scripts/download_demo.py
-
-# 4. Launch
+# 3. Launch
 streamlit run app/main.py
 ```
 
-Then open `http://localhost:8501` and upload any `.txt` file.
+Then open `http://localhost:8501`, upload a `.txt`, `.epub`, or `.pdf` file, or enter a URL.
+
+> **Tip:** If you see `ModuleNotFoundError: No module named 'bookscope'`, run `pip install -e .` from the project root.
 
 ---
 
-## Installation (development)
+## Supported Input Formats
 
-```bash
-# Requires Python 3.11+
-pip install uv
-uv pip install -e ".[dev]"
-python -m textblob.download_corpora
+| Format | How |
+|--------|-----|
+| `.txt` | UTF-8 / latin-1 / cp1252, auto-detected |
+| `.epub` | Extracts HTML document items via ebooklib |
+| `.pdf` | Per-page text extraction via PyMuPDF |
+| URL | Fetches HTML or plain text; article body extracted via trafilatura |
 
-# Run tests
-pytest
+---
 
-# Run linter
-ruff check bookscope tests
-```
+## Multilingual Support
+
+BookScope automatically detects the book language and switches analysis backends:
+
+| Language | Detection | Tokenization | Emotion Lexicon |
+|----------|-----------|-------------|-----------------|
+| 🇬🇧 English | langdetect | NLTK | NRC English |
+| 🇨🇳 Chinese | langdetect | jieba | NRC Chinese (bundled) |
+| 🇯🇵 Japanese | langdetect | janome | NRC Japanese (bundled) |
+
+Word count for CJK text uses non-whitespace character count as a proxy (since there are no spaces between words).
 
 ---
 
 ## How It Works
 
 ```
-.txt file
+.txt / .epub / .pdf / URL
     │
-    ├─ ingest/loader.py     UTF-8 / latin-1 / cp1252 fallback
+    ├─ ingest/loader.py     format dispatch → plain text
     ├─ ingest/cleaner.py    Unicode NFC normalization + whitespace
     ├─ ingest/chunker.py    paragraph split or fixed-window (50% overlap)
     │
+    ├─ nlp/multilingual.py  language detection, CJK tokenization
     ├─ nlp/lexicon_analyzer.py   NRC Emotion Lexicon → 8 Plutchik scores [0,1]
     ├─ nlp/style_analyzer.py     NLTK POS tagging → TTR, sentence length, POS ratios
     ├─ nlp/arc_classifier.py     Polynomial valence fit → Vonnegut arc pattern
@@ -105,38 +115,13 @@ BookScope detects one of six emotional arc patterns identified by [Reagan et al.
 
 ---
 
-## Demo Books
-
-Download public-domain classics from Project Gutenberg:
-
-```bash
-python scripts/download_demo.py
-# Saves to data/demo/
-```
-
-Included books:
-- *Pride and Prejudice* — Jane Austen (1813)
-- *The Adventures of Sherlock Holmes* — Arthur Conan Doyle (1892)
-- *Alice's Adventures in Wonderland* — Lewis Carroll (1865)
-
----
-
-## Deploying to Streamlit Cloud
-
-1. Push to GitHub
-2. Go to [share.streamlit.io](https://share.streamlit.io) → New app
-3. Set **Main file path** to `app/main.py`
-4. Done — NLTK corpora are downloaded automatically on first run
-
----
-
 ## Project Structure
 
 ```
 bookscope/
-├── ingest/          Text loading, cleaning, chunking
+├── ingest/          Text loading (.txt/.epub/.pdf/URL), cleaning, chunking
 ├── models/          Pydantic schemas (BookText, EmotionScore, StyleScore, …)
-├── nlp/             Emotion analysis, style metrics, arc classification
+├── nlp/             Emotion analysis, style metrics, arc classification, multilingual
 ├── store/           JSON persistence (AnalysisResult, Repository)
 ├── utils/           NLTK bootstrap utility
 └── viz/             Plotly renderers + ChartDataAdapter
@@ -144,9 +129,7 @@ bookscope/
 app/
 └── main.py          Streamlit entry point (7 tabs)
 
-tests/               pytest unit + hypothesis property tests (118 tests)
-scripts/             Utilities (download_demo.py)
-data/demo/           Sample books (git-ignored)
+tests/               pytest unit + hypothesis property tests (192 tests)
 ```
 
 ---
@@ -162,9 +145,41 @@ data/demo/           Sample books (git-ignored)
 | Emotion analysis | nrclex (NRC Emotion Lexicon) |
 | Style analysis | NLTK averaged_perceptron_tagger |
 | Arc detection | numpy polynomial fitting |
+| Language detection | langdetect |
+| Chinese tokenization | jieba |
+| Japanese tokenization | janome |
+| PDF extraction | PyMuPDF |
+| URL fetching | requests + trafilatura |
 | Tests | pytest + hypothesis |
 | Lint | ruff |
 | CI | GitHub Actions |
+
+---
+
+## Deploying to Streamlit Cloud
+
+1. Push to GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io) → New app
+3. Set **Main file path** to `app/main.py`
+4. Done — NLTK corpora are downloaded automatically on first run
+
+---
+
+## Development
+
+```bash
+# Install with dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Run linter
+ruff check bookscope tests
+
+# Auto-fix lint
+ruff check bookscope tests --fix
+```
 
 ---
 
@@ -172,7 +187,7 @@ data/demo/           Sample books (git-ignored)
 
 1. Fork the repo
 2. Create a branch: `git checkout -b feature/your-feature`
-3. Install dev deps: `uv pip install -e ".[dev]"`
+3. Install dev deps: `pip install -e ".[dev]"`
 4. Write tests for your changes
 5. Run `pytest && ruff check bookscope tests`
 6. Open a pull request
