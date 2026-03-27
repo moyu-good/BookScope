@@ -22,6 +22,7 @@ class BookText(BaseModel):
     title: str
     raw_text: str
     encoding: str = "utf-8"
+    language: str = "unknown"  # "en", "zh", "ja", or BCP-47 code
     word_count: int = Field(default=0)
 
     def model_post_init(self, __context: object) -> None:

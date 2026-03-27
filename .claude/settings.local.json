@@ -6,7 +6,25 @@
       "Bash(python -m pytest tests/ -v --tb=short)",
       "Bash(ruff check:*)",
       "Skill(review)",
-      "Skill(review:*)"
+      "Skill(review:*)",
+      "Bash(mkdir -p ~/.gstack/telemetry)",
+      "Bash(~/.gstack/telemetry/skills.log:*)",
+      "Skill(ship)",
+      "Skill(ship:*)",
+      "Bash(gh auth:*)",
+      "Bash(cmd.exe /c \"where gh 2>nul\")",
+      "Bash(cmd.exe /c \"gh --version\")",
+      "Bash(cmd.exe /c \"gh --version && gh auth status\")",
+      "Bash(powershell.exe -Command \"gh --version; gh auth status\")",
+      "Bash(cmd.exe /c \"where gh\")",
+      "Bash(cmd.exe /c \"where gh 2>&1\")",
+      "Bash(\"/mnt/c/Program Files/GitHub CLI/gh.exe\" --version)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" --version)",
+      "Bash(python -m pytest tests/ -q --tb=short)",
+      "Bash(pip install:*)",
+      "Bash(python -c \"import langdetect; import jieba; from janome.tokenizer import Tokenizer; print\\(''all ok''\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(python -m pytest tests/test_multilingual.py -v --tb=short)"
     ]
   },
   "hooks": {
