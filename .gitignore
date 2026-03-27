@@ -20,6 +20,12 @@ data/demo/
 # Hypothesis property-test data
 .hypothesis/
 
+# Claude Code local settings (session-specific permissions)
+.claude/settings.local.json
+
+# Scratch / test files
+test_book.txt
+
 # OS
 .DS_Store
 Thumbs.db
