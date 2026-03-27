@@ -13,6 +13,15 @@
   Add `/.hypothesis/` to `.gitignore` to avoid committing auto-generated test data.
   _Source: QA session 2026-03-26_
 
+## Redesign (2026-03-27)
+
+- [x] **UI redesign — modern dark theme + full EN/ZH/JA i18n** _(done 2026-03-27, branch feature/ui-ux-i18n-redesign)_
+  - Modern dark UI: purple accent, gradient hero card, card-style metric panels
+  - Hero insight card: book title, one-sentence summary, dominant emotion, arc name
+  - Sidebar language toggle (EN / 中文 / 日本語) — all UI text switches instantly
+  - Localized arc names (ZH idioms: 乐极生悲/好事多磨/回光返照; JA equivalents)
+  - Plain-language descriptions for every chart so general users understand
+
 ## Fixed during QA (2026-03-27)
 
 - [x] **ISSUE-004 — CJK word_count displayed as 0–1 for Chinese/Japanese** _(fixed 2026-03-27, commit be62d60)_
