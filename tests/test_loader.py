@@ -293,7 +293,10 @@ def test_url_explicit_title_overrides():
 
 
 def test_url_html_extracts_text():
-    html = "<html><head><title>Test Page</title></head><body><p>Article content here.</p></body></html>"
+    html = (
+        "<html><head><title>Test Page</title></head>"
+        "<body><p>Article content here.</p></body></html>"
+    )
     with patch("requests.get", return_value=_mock_response(html)):
         bt = load_url("http://example.com/article")
     assert "Article content" in bt.raw_text

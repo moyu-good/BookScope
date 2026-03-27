@@ -27,7 +27,6 @@ def detect_language(text: str) -> str:
 
     try:
         from langdetect import detect  # type: ignore[import]
-        from langdetect.lang_detect_exception import LangDetectException  # type: ignore[import]
 
         code = detect(sample)
     except ImportError:

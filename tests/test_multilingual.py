@@ -2,12 +2,11 @@
 
 import pytest
 
+from bookscope.ingest.chunker import _word_count, chunk
 from bookscope.models import BookText, ChunkResult
 from bookscope.nlp.lang_detect import detect_language
 from bookscope.nlp.lexicon_analyzer import LexiconAnalyzer
 from bookscope.nlp.style_analyzer import StyleAnalyzer
-from bookscope.ingest.chunker import chunk, _word_count
-
 
 # ---------------------------------------------------------------------------
 # Language detection
@@ -131,7 +130,9 @@ class TestStyleAnalyzerChinese:
         assert 0.0 <= score.ttr <= 1.0
 
     def test_analyze_book(self):
-        chunks = [ChunkResult(index=i, text=f"这是第{i}个段落，包含一些中文文字。") for i in range(3)]
+        chunks = [
+            ChunkResult(index=i, text=f"这是第{i}个段落，包含一些中文文字。") for i in range(3)
+        ]
         scores = self.analyzer.analyze_book(chunks)
         assert len(scores) == 3
 
@@ -151,7 +152,9 @@ class TestStyleAnalyzerJapanese:
         assert 0.0 <= score.ttr <= 1.0
 
     def test_analyze_book(self):
-        chunks = [ChunkResult(index=i, text=f"これは第{i}段落です。日本語のテキストを含む。") for i in range(3)]
+        chunks = [
+            ChunkResult(index=i, text=f"これは第{i}段落です。日本語テキスト。") for i in range(3)
+        ]
         scores = self.analyzer.analyze_book(chunks)
         assert len(scores) == 3
 

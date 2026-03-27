@@ -17,6 +17,8 @@ Computed metrics (all languages):
 
 from __future__ import annotations
 
+from functools import lru_cache as _lru_cache
+
 from bookscope.models import ChunkResult, StyleScore
 
 # ---------------------------------------------------------------------------
@@ -123,9 +125,6 @@ _JA_NOUN = "名詞"
 _JA_VERB = "動詞"
 _JA_ADJ  = "形容詞"
 _JA_ADV  = "副詞"
-
-
-from functools import lru_cache as _lru_cache
 
 
 @_lru_cache(maxsize=1)
