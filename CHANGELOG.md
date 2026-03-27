@@ -2,6 +2,20 @@
 
 All notable changes to BookScope will be documented in this file.
 
+## [0.5.1.0] - 2026-03-27
+
+### Added
+- **Demo mode** — "📖 Try with a demo book" button on the welcome screen; loads a
+  20-paragraph embedded story ("The Lighthouse Keeper's Last Storm") so visitors can
+  explore all features without uploading a file. Demo badge + "× New analysis" clear
+  button shown in the main area. Demo state cleared automatically when a real file/URL
+  is provided.
+- **`app/demo_book.txt`** — embedded demo story; Man-in-a-Hole arc, strong emotion mix,
+  designed to exercise all 7 Full Analysis tabs and Quick Insight cards.
+- **`requirements.txt`** — Streamlit Cloud compatible dependency list, kept in sync with
+  `pyproject.toml`. Streamlit Cloud also auto-installs the `bookscope` package via
+  `pyproject.toml` at build time.
+
 ## [0.5.0.0] - 2026-03-27
 
 ### Added

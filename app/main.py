@@ -89,6 +89,8 @@ _STRINGS: dict[str, dict] = {
             "Upload a **.txt**, **.epub**, or **.pdf** file — or paste a URL — "
             "to reveal the emotional journey hidden inside."
         ),
+        "try_demo": "📖 Try with a demo book",
+        "demo_badge": "🎭 Viewing demo: The Lighthouse Keeper's Last Storm",
         "analysing": "Reading your book…",
         "no_chunks_warning": "No text blocks produced. Try lowering the minimum word count.",
         "url_error": "Could not fetch URL: {}",
@@ -260,6 +262,8 @@ _STRINGS: dict[str, dict] = {
         "loaded_badge": "📂 正在查看已保存的分析",
         "loaded_clear": "× 新建分析",
         "chunks_unavailable": "保存的分析不包含原始文本块。",
+        "try_demo": "📖 用示例书籍体验",
+        "demo_badge": "🎭 演示模式：《灯塔守望者的最后一夜》",
         "welcome_title": "你的书里藏着什么故事？",
         "welcome_body": (
             "上传 **.txt**、**.epub** 或 **.pdf** 文件，或粘贴网址，"
@@ -421,6 +425,8 @@ _STRINGS: dict[str, dict] = {
         "loaded_badge": "📂 保存済み分析を表示中",
         "loaded_clear": "× 新規分析",
         "chunks_unavailable": "保存済み分析にはブロックテキストが含まれません。",
+        "try_demo": "📖 デモ本を試す",
+        "demo_badge": "🎭 デモ表示中：「灯台守の最後の嵐」",
         "welcome_title": "あなたの本に隠された物語は？",
         "welcome_body": (
             "**.txt** · **.epub** · **.pdf** ファイルをアップロードするか、"
@@ -1427,17 +1433,20 @@ with st.sidebar:
 # Keep T in sync after sidebar re-render
 T = _STRINGS[ui_lang]
 
-# If new file or URL is provided, clear any previously loaded result
+# If new file or URL is provided, clear any previously loaded/demo result
 _loaded_result = st.session_state.get("_loaded_result")
+_demo_mode = st.session_state.get("_demo_mode", False)
 if uploaded is not None or url_input:
     st.session_state.pop("_loaded_result", None)
+    st.session_state["_demo_mode"] = False
     _loaded_result = None
+    _demo_mode = False
 
 # ---------------------------------------------------------------------------
 # Welcome screen (no input yet and nothing loaded)
 # ---------------------------------------------------------------------------
 
-if uploaded is None and not url_input and _loaded_result is None:
+if uploaded is None and not url_input and _loaded_result is None and not _demo_mode:
     st.markdown(
         f"""
         <div class="bs-welcome">
@@ -1447,6 +1456,10 @@ if uploaded is None and not url_input and _loaded_result is None:
         """,
         unsafe_allow_html=True,
     )
+    _, center_col, _ = st.columns([2, 1, 2])
+    if center_col.button(T["try_demo"], use_container_width=True):
+        st.session_state["_demo_mode"] = True
+        st.rerun()
     st.stop()
 
 # ---------------------------------------------------------------------------
@@ -1456,7 +1469,24 @@ if uploaded is None and not url_input and _loaded_result is None:
 _from_saved = False
 chunks = None  # may remain None when restoring from a saved result
 
-if _loaded_result is not None and uploaded is None and not url_input:
+# ── Demo mode branch ──────────────────────────────────────────────────────────
+if _demo_mode and uploaded is None and not url_input and _loaded_result is None:
+    import pathlib as _pl
+    _demo_path = _pl.Path(__file__).parent / "demo_book.txt"
+    _demo_bytes = _demo_path.read_bytes()
+    with st.spinner(T["analysing"]):
+        chunks, emotion_scores, style_scores, detected_lang = run_analysis(
+            _demo_bytes, "The_Lighthouse_Keepers_Last_Storm.txt",
+            strategy, chunk_size, min_words,
+        )
+    if not chunks:
+        st.warning(T["no_chunks_warning"])
+        st.stop()
+    book_title = "The Lighthouse Keeper's Last Storm"
+    n_chunks = len(chunks)
+    total_words = sum(c.word_count for c in chunks)
+
+elif _loaded_result is not None and uploaded is None and not url_input:
     emotion_scores = _loaded_result.emotion_scores
     style_scores = _loaded_result.style_scores
     book_title = _loaded_result.book_title
@@ -1554,6 +1584,14 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# Demo badge + clear button
+if _demo_mode and not _from_saved:
+    badge_col, clear_col, _ = st.columns([3, 1, 2])
+    badge_col.info(T["demo_badge"])
+    if clear_col.button(T["loaded_clear"]):
+        st.session_state["_demo_mode"] = False
+        st.rerun()
 
 # Loaded badge + clear button (only shown when viewing a saved result)
 if _from_saved:

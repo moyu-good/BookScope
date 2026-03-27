@@ -27,9 +27,10 @@
 - [x] **Load saved analysis from sidebar** — `▶ Load` button on each saved entry; resumes prior
   analysis without re-uploading. Loaded badge + "× New analysis" clear button. _(done 2026-03-27)_
 
-- [ ] **Streamlit Cloud deployment** — Deploy with demo book data pre-loaded so users can try
-  without uploading. Requires `requirements.txt` from `pyproject.toml` + secrets config.
-  _(v0.5 scope)_
+- [x] **Streamlit Cloud deployment prep** — Demo mode added (welcome screen "Try demo" button
+  loads embedded 20-paragraph story); `requirements.txt` generated; `pyproject.toml` enables
+  auto-install on Cloud. _(done 2026-03-27)_ To deploy: push to GitHub, connect repo at
+  share.streamlit.io, set Main file path to `app/main.py`.
 
 - [ ] **spaCy NER for character extraction** — Replace regex NER (`extract_character_names`) with
   `spacy en_core_web_sm` for proper named entity recognition in English fiction.
