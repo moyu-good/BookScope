@@ -41,4 +41,4 @@ All notable changes to BookScope will be documented in this file.
 
 ### Changed
 - `.hypothesis/` excluded from version control (auto-generated test data)
-- `.claude/settings.local.json` excluded from version control (session-specific)
+- Local editor settings excluded from version control (session-specific)

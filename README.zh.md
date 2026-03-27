@@ -112,9 +112,9 @@ BookScope 能识别 [Reagan 等人（2016）](https://epjdatascience.springerope
 | 白手起家（Rags to Riches） | ↗ 持续上升 | 《远大前程》 |
 | 盛极而衰（Riches to Rags） | ↘ 持续下降 | 《哈姆雷特》 |
 | 跌入谷底（Man in a Hole） | ↘↗ 先降后升 | 《霍比特人》 |
-| 伊卡洛斯（Icarus） | ↗↘ 先升后降 | 《麦克白》 |
-| 灰姑娘（Cinderella） | ↗↘↗ 升-降-升 | 《灰姑娘》 |
-| 俄狄浦斯（Oedipus） | ↘↗↘ 降-升-降 | 《俄狄浦斯王》 |
+| 乐极生悲（Icarus） | ↗↘ 先升后降 | 《麦克白》 |
+| 好事多磨（Cinderella） | ↗↘↗ 升-降-升 | 《灰姑娘》 |
+| 回光返照（Oedipus） | ↘↗↘ 降-升-降 | 《俄狄浦斯王》 |
 
 ---
 
