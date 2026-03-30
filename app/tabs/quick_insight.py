@@ -107,6 +107,30 @@ def render_quick_insight(
         else "bs-insight-headline-text bs-no-animate"
     )
 
+    # Pre-compute AI narrative before branch rendering.
+    # Session-state cached — spinner only shows on first analysis per book+type.
+    _ai_text = ""
+    if analysis_result is not None:
+        with st.spinner(""):
+            _ai_text = generate_narrative_insight(
+                analysis_result, ui_lang, genre_type=book_type
+            )
+
+    def _render_ai_card() -> None:
+        """Render AI narrative card immediately after the type headline."""
+        if not _ai_text:
+            return
+        _label = _html.escape(T.get("qi_ai_narrative_label", "AI NARRATIVE"))
+        st.markdown(
+            f'<div class="bs-insight-headline" style="border-left:4px solid #7c3aed;'
+            f'margin-top:.5rem;margin-bottom:.5rem;">'
+            f'<div class="bs-insight-headline-label">✨ {_label}</div>'
+            f'<div class="bs-insight-headline-text bs-no-animate">'
+            f'{_html.escape(_ai_text)}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
     # ── FICTION ──────────────────────────────────────────────────────────────
     if book_type == "fiction":
         genre_tuple = _EMOTIONAL_GENRE.get((arc_value, top_emotion_key), _DEFAULT_GENRE)
@@ -132,6 +156,7 @@ def render_quick_insight(
             f'</div>',
             unsafe_allow_html=True,
         )
+        _render_ai_card()
 
         # Card 1: Key Characters
         chars = extract_character_names(chunks, lang=detected_lang) if chunks is not None else []
@@ -250,6 +275,7 @@ def render_quick_insight(
             f'</div>',
             unsafe_allow_html=True,
         )
+        _render_ai_card()
 
         # Card 1: Core Concepts — LLM extraction first, heuristic fallback
         with st.spinner(""):
@@ -422,6 +448,7 @@ def render_quick_insight(
             f'</div>',
             unsafe_allow_html=True,
         )
+        _render_ai_card()
 
         # Card 1: Author Journey (sparkline)
         spark_pts = compute_sparkline_points(valence_series)
@@ -550,22 +577,3 @@ def render_quick_insight(
             unsafe_allow_html=True,
         )
 
-    # ── AI NARRATIVE CARD (all book types, shown only when API key is present) ─
-    # Map UI book_type directly — llm_analyzer accepts "academic" as alias for
-    # "nonfiction", so no translation is needed here.
-    if analysis_result is not None:
-        with st.spinner(""):
-            ai_text = generate_narrative_insight(
-                analysis_result, ui_lang, genre_type=book_type
-            )
-        if ai_text:
-            label = _html.escape(T.get("qi_ai_narrative_label", "AI NARRATIVE"))
-            st.markdown(
-                f'<div class="bs-insight-headline" style="border-left:4px solid #7c3aed;'
-                f'margin-top:.75rem;">'
-                f'<div class="bs-insight-headline-label">✨ {label}</div>'
-                f'<div class="bs-insight-headline-text bs-no-animate">'
-                f'{_html.escape(ai_text)}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )

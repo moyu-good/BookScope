@@ -70,6 +70,18 @@ def render_sidebar_inputs(ui_lang: str, T: dict) -> tuple:
         min_words = st.slider(T["min_words_label"], 10, 200, 50, step=10, key="min_words")
 
         st.divider()
+        # API key status indicator
+        import os
+        _has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
+        if not _has_key:
+            try:
+                import streamlit as _st
+                _has_key = bool(_st.secrets.get("ANTHROPIC_API_KEY", ""))
+            except Exception:
+                pass
+        if not _has_key:
+            st.caption("⚠️ AI insights unavailable — add ANTHROPIC_API_KEY")
+
         with st.expander(f"⚙️ {T['ai_options_header']}"):
             model_opts = ["claude-haiku-4-5", "claude-sonnet-4-6"]
             model_labels = {
