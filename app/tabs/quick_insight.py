@@ -11,6 +11,7 @@ from bookscope.insights import (
     extract_key_themes,
     first_person_density,
 )
+from bookscope.nlp.genre_analyzer import extract_essay_voice, extract_nonfiction_concepts
 from bookscope.nlp.llm_analyzer import generate_narrative_insight
 
 # ── Emotional genre mapping (fiction, EN only) ────────────────────────────────
@@ -250,25 +251,42 @@ def render_quick_insight(
             unsafe_allow_html=True,
         )
 
-        # Card 1: Core Concepts
-        themes = (
-            extract_key_themes(chunks, style_scores)
-            if (chunks is not None and style_scores)
-            else []
-        )
-        if themes:
+        # Card 1: Core Concepts — LLM extraction first, heuristic fallback
+        with st.spinner(""):
+            llm_concepts, llm_argument = (
+                extract_nonfiction_concepts(chunks, ui_lang, book_title)
+                if chunks is not None
+                else ([], "")
+            )
+        if llm_concepts:
             themes_html = (
                 '<div class="bs-tag-row">'
                 + "".join(
-                    f'<span class="bs-tag">{_html.escape(t)}</span>' for t in themes
+                    f'<span class="bs-tag">{_html.escape(c)}</span>' for c in llm_concepts
                 )
                 + "</div>"
             )
+            themes_sub = _html.escape(llm_argument) if llm_argument else ""
         else:
-            themes_html = (
-                f'<div class="bs-insight-card-sub">'
-                f'{_html.escape(T["qi_ac_no_themes"])}</div>'
+            themes = (
+                extract_key_themes(chunks, style_scores)
+                if (chunks is not None and style_scores)
+                else []
             )
+            if themes:
+                themes_html = (
+                    '<div class="bs-tag-row">'
+                    + "".join(
+                        f'<span class="bs-tag">{_html.escape(t)}</span>' for t in themes
+                    )
+                    + "</div>"
+                )
+            else:
+                themes_html = (
+                    f'<div class="bs-insight-card-sub">'
+                    f'{_html.escape(T["qi_ac_no_themes"])}</div>'
+                )
+            themes_sub = ""
 
         # Card 2: Reading Strategy (anticipation front-loaded?)
         if emotion_scores:
@@ -309,6 +327,7 @@ def render_quick_insight(
             f'<div class="bs-insight-card-label">'
             f'{_html.escape(T["qi_ac_themes_label"])}</div>'
             f'<div class="bs-insight-card-value">{themes_html}</div>'
+            f'{"<div class=bs-insight-card-sub>" + themes_sub + "</div>" if themes_sub else ""}'
             f'</div>'
             f'<div class="{card_cls}">'
             f'<div class="bs-insight-card-label">'
@@ -423,7 +442,13 @@ def render_quick_insight(
             arc_value, ("a personal journey", "个人旅程", "個人的旅")
         )[lang_idx]
 
-        # Card 2: Voice Fingerprint
+        # Card 2: Voice Fingerprint — LLM description enriches heuristic label
+        with st.spinner(""):
+            llm_voice = (
+                extract_essay_voice(chunks, ui_lang, book_title)
+                if chunks is not None
+                else ""
+            )
         if style_scores:
             avg_adj_r = sum(s.adj_ratio for s in style_scores) / len(style_scores)
             avg_adv_r = sum(s.adv_ratio for s in style_scores) / len(style_scores)
@@ -445,6 +470,7 @@ def render_quick_insight(
                 )
         else:
             dominant_voice = "—"
+        voice_sub = _html.escape(llm_voice) if llm_voice else ""
 
         # Card 3: Intimacy
         if ui_lang == "en":
@@ -482,6 +508,7 @@ def render_quick_insight(
             f'<div class="bs-insight-card-label">'
             f'{_html.escape(T["qi_es_voice_label"])}</div>'
             f'<div class="bs-insight-card-value">{_html.escape(dominant_voice)}</div>'
+            f'{"<div class=bs-insight-card-sub>" + voice_sub + "</div>" if voice_sub else ""}'
             f'</div>'
             f'<div class="{card_cls}">'
             f'<div class="bs-insight-card-label">'
