@@ -17,7 +17,7 @@ bookscope/
   viz/             ChartDataAdapter, EmotionTimelineRenderer, EmotionHeatmapRenderer,
                    StyleRadarRenderer, BaseRenderer, BookScopeTheme
 app/main.py        Streamlit entry (7 tabs)
-tests/             221 pytest tests (unit + hypothesis property tests)
+tests/             243 pytest tests (unit + hypothesis property tests)
 ```
 
 ## Key invariants
@@ -40,7 +40,7 @@ streamlit run app/main.py
 ## Tests
 
 ```bash
-pytest                        # all 221 tests
+pytest                        # all 243 tests
 pytest tests/test_models.py   # single module
 ```
 

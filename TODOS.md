@@ -44,3 +44,22 @@
   `ChunkResult.word_count` used `len(text.split())` which returns near-zero for CJK
   text (no spaces). Fixed: chunker now passes `word_count=_word_count(text, lang)`.
   _Source: QA session 2026-03-27_
+
+## v0.6.0 — completed 2026-03-30
+
+- [x] **app/main.py refactor** — 1869 → 296 lines, split into 8 modules under `app/tabs/`,
+  `app/sidebar.py`, `app/analysis_flow.py`, `app/css.py`, `app/strings.py`. _(commit 3f262f4)_
+- [x] **LLM narrative insight** — `bookscope/nlp/llm_analyzer.py`, Claude Haiku AI Narrative
+  card in Quick Insight tab, MD5 cache key, truncation guard, 12 new tests. _(commit 0474fbd)_
+- [x] **Compare tab QA + polish** — same-book guard (`_content_fingerprint`), single-book note,
+  fixed hardcoded `"No style data."`, 10 new tests. _(commit c049f3d)_
+- Tests: 221 → 243 (+22)
+
+## Deferred to v0.7
+
+- [ ] **Analysis card sharing**: Generate downloadable PNG card (book title + arc + emotion
+  mini-chart) in Export tab. "Spotify Wrapped for books." Effort M / CC ~30 min.
+- [ ] **LLM model selector in sidebar**: Expose haiku/sonnet toggle in Advanced Options.
+  Deferred from LLM insight v0.6.
+- [ ] **AnalyzerProtocol integration for LLM**: If LLM output becomes structured EmotionScore,
+  wrap `llm_analyzer.py` in AnalyzerProtocol.
