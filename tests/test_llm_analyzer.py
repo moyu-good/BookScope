@@ -174,3 +174,114 @@ class TestGenerateNarrativeInsight:
                     text = generate_narrative_insight(result, "en")
 
         assert text == ""
+
+    def test_authentication_error_returns_empty(self):
+        """AuthenticationError → returns '' (and would show actionable warning in Streamlit)."""
+        result = _make_result()
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-invalid"}):
+            with patch("anthropic.Anthropic") as MockAnthropic:
+                import anthropic as _anthropic
+                MockAnthropic.return_value.messages.create.side_effect = (
+                    _anthropic.AuthenticationError(
+                        message="invalid api key",
+                        response=MagicMock(),
+                        body=None,
+                    )
+                )
+                with patch("bookscope.nlp.llm_analyzer.st", None):
+                    text = generate_narrative_insight(result, "en")
+
+        assert text == ""
+
+    def test_genre_type_nonfiction_passes_through(self):
+        """genre_type='nonfiction' is accepted and produces a non-empty result."""
+        result = _make_result()
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="Dense but rewarding reading.")]
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}):
+            with patch("anthropic.Anthropic") as MockAnthropic:
+                MockAnthropic.return_value.messages.create.return_value = mock_message
+                with patch("bookscope.nlp.llm_analyzer.st", None):
+                    text = generate_narrative_insight(result, "en", genre_type="nonfiction")
+
+        assert text == "Dense but rewarding reading."
+
+    def test_genre_type_essay_passes_through(self):
+        """genre_type='essay' is accepted and produces a non-empty result."""
+        result = _make_result()
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="An intimate, reflective voice.")]
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}):
+            with patch("anthropic.Anthropic") as MockAnthropic:
+                MockAnthropic.return_value.messages.create.return_value = mock_message
+                with patch("bookscope.nlp.llm_analyzer.st", None):
+                    text = generate_narrative_insight(result, "en", genre_type="essay")
+
+        assert text == "An intimate, reflective voice."
+
+
+# ---------------------------------------------------------------------------
+# Genre-aware cache key tests
+# ---------------------------------------------------------------------------
+
+class TestCacheKeyGenre:
+    def test_different_genre_produces_different_key(self):
+        """Same result, different genre_type → different cache key."""
+        result = _make_result()
+        key_fiction = _cache_key(result, "fiction")
+        key_nonfiction = _cache_key(result, "nonfiction")
+        key_essay = _cache_key(result, "essay")
+        assert key_fiction != key_nonfiction
+        assert key_fiction != key_essay
+        assert key_nonfiction != key_essay
+
+    def test_same_genre_stable(self):
+        """Same result + same genre_type → same key across calls."""
+        result = _make_result()
+        assert _cache_key(result, "nonfiction") == _cache_key(result, "nonfiction")
+
+    def test_genre_suffix_in_key(self):
+        """Cache key explicitly includes genre_type."""
+        result = _make_result()
+        assert "nonfiction" in _cache_key(result, "nonfiction")
+        assert "essay" in _cache_key(result, "essay")
+        assert "fiction" in _cache_key(result, "fiction")
+
+
+# ---------------------------------------------------------------------------
+# Genre-aware prompt builder tests
+# ---------------------------------------------------------------------------
+
+class TestBuildPromptGenre:
+    def test_nonfiction_prompt_mentions_reading_time(self):
+        """Non-fiction prompt includes reading density / time framing."""
+        from bookscope.nlp.llm_analyzer import _build_prompt
+        result = _make_result()
+        prompt = _build_prompt(result, "en", genre_type="nonfiction")
+        # Should mention density or reading strategy, not emotional experience
+        assert "density" in prompt or "reading" in prompt.lower()
+
+    def test_essay_prompt_mentions_voice(self):
+        """Essay prompt includes voice / emotional atmosphere framing."""
+        from bookscope.nlp.llm_analyzer import _build_prompt
+        result = _make_result()
+        prompt = _build_prompt(result, "en", genre_type="essay")
+        assert "voice" in prompt.lower() or "atmosphere" in prompt.lower()
+
+    def test_fiction_prompt_unchanged(self):
+        """Fiction prompt still asks about emotional experience."""
+        from bookscope.nlp.llm_analyzer import _build_prompt
+        result = _make_result()
+        prompt = _build_prompt(result, "en", genre_type="fiction")
+        assert "emotional experience" in prompt or "FEELS like" in prompt
+
+    def test_nonfiction_differs_from_fiction(self):
+        """Nonfiction and fiction prompts are meaningfully different."""
+        from bookscope.nlp.llm_analyzer import _build_prompt
+        result = _make_result()
+        p_fiction = _build_prompt(result, "en", genre_type="fiction")
+        p_nonfiction = _build_prompt(result, "en", genre_type="nonfiction")
+        assert p_fiction != p_nonfiction
