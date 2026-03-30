@@ -18,15 +18,11 @@ full arc of the book rather than just the opening (which may be a preface).
 
 import hashlib
 import os
-from typing import TYPE_CHECKING
 
 try:
     import streamlit as st
 except ImportError:
     st = None  # type: ignore[assignment]
-
-if TYPE_CHECKING:
-    from bookscope.models import ChunkResult
 
 
 # ---------------------------------------------------------------------------

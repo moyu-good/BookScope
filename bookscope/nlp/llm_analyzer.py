@@ -110,7 +110,8 @@ def _build_prompt_fiction(result, lang: str) -> str:
         f"- Arc pattern: {arc_label} ({arc_desc})\n"
         f"- Style scores: {style_avgs}\n"
         f"Write 2-3 sentences describing the emotional experience of reading this book. "
-        f"Be specific about what it FEELS like to read. Use {lang_name} language. No generic praise."
+        f"Be specific about what it FEELS like to read. "
+        f"Use {lang_name} language. No generic praise."
     )
 
 
