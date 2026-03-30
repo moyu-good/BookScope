@@ -11,6 +11,7 @@ from bookscope.insights import (
     extract_key_themes,
     first_person_density,
 )
+from bookscope.nlp.llm_analyzer import generate_narrative_insight
 
 # ── Emotional genre mapping (fiction, EN only) ────────────────────────────────
 # (arc.value, top_emotion_key) → (label_en, label_zh, label_ja, for_you_en)
@@ -86,6 +87,7 @@ def render_quick_insight(
     detected_lang: str,
     ui_lang: str,
     T: dict,
+    analysis_result=None,
 ) -> None:
     """Render Quick Insight cards for the given book type."""
     type_color = _TYPE_COLOR.get(book_type, "#7c3aed")
@@ -518,3 +520,19 @@ def render_quick_insight(
             f'</div>',
             unsafe_allow_html=True,
         )
+
+    # ── AI NARRATIVE CARD (all book types, shown only when API key is present) ─
+    if analysis_result is not None:
+        with st.spinner(""):
+            ai_text = generate_narrative_insight(analysis_result, ui_lang)
+        if ai_text:
+            label = _html.escape(T.get("qi_ai_narrative_label", "AI NARRATIVE"))
+            st.markdown(
+                f'<div class="bs-insight-headline" style="border-left:4px solid #7c3aed;'
+                f'margin-top:.75rem;">'
+                f'<div class="bs-insight-headline-label">✨ {label}</div>'
+                f'<div class="bs-insight-headline-text bs-no-animate">'
+                f'{_html.escape(ai_text)}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )

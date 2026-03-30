@@ -78,6 +78,8 @@ _STRINGS: dict[str, dict] = {
         "qi_es_intimacy_label": "INTIMACY",
         # Who it's for
         "qi_for_you_label": "Who it's for",
+        # AI Narrative
+        "qi_ai_narrative_label": "AI NARRATIVE",
         # Readability labels
         "readable_accessible": "Accessible",
         "readable_moderate": "Moderate",
@@ -256,6 +258,8 @@ _STRINGS: dict[str, dict] = {
         "qi_es_intimacy_label": "亲密度",
         # Who it's for
         "qi_for_you_label": "适合谁读",
+        # AI Narrative
+        "qi_ai_narrative_label": "AI 叙述",
         # Readability labels
         "readable_accessible": "通俗易读",
         "readable_moderate": "一般难度",
@@ -419,6 +423,8 @@ _STRINGS: dict[str, dict] = {
         "qi_es_intimacy_label": "親密度",
         # Who it's for
         "qi_for_you_label": "こんな人に",
+        # AI Narrative
+        "qi_ai_narrative_label": "AI ナレーション",
         # Readability labels
         "readable_accessible": "読みやすい",
         "readable_moderate": "普通",

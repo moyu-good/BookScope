@@ -240,6 +240,16 @@ if view_mode == "quick":
     valence_series = (
         arc_classifier.valence_series(emotion_scores) if len(emotion_scores) >= 2 else []
     )
+    _qi_result = AnalysisResult.create(
+        book_title=book_title,
+        chunk_strategy=strategy,
+        total_chunks=n_chunks,
+        total_words=total_words,
+        arc_pattern=arc.value,
+        detected_lang=detected_lang,
+        emotion_scores=emotion_scores,
+        style_scores=style_scores,
+    )
     render_quick_insight(
         book_type=book_type,
         book_title=book_title,
@@ -256,6 +266,7 @@ if view_mode == "quick":
         detected_lang=detected_lang,
         ui_lang=ui_lang,
         T=T,
+        analysis_result=_qi_result,
     )
 
 # ---------------------------------------------------------------------------
