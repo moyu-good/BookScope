@@ -140,6 +140,7 @@ _STRINGS: dict[str, dict] = {
         "export_style_csv": "📥 Style scores (.csv)",
         "export_json": "📥 Full analysis (.json)",
         "export_md": "📥 Report (.md)",
+        "export_card": "🖼️ Share card (.png)",
         # Chunks
         "chunks_title": "Block explorer",
         "chunks_slider": "Block number",
@@ -305,6 +306,7 @@ _STRINGS: dict[str, dict] = {
         "export_style_csv": "📥 文体分数 (.csv)",
         "export_json": "📥 完整分析 (.json)",
         "export_md": "📥 报告 (.md)",
+        "export_card": "🖼️ 分享卡片 (.png)",
         # Chunks
         "chunks_title": "文本块浏览器",
         "chunks_slider": "块编号",
@@ -477,6 +479,7 @@ _STRINGS: dict[str, dict] = {
         "export_style_csv": "📥 文体スコア (.csv)",
         "export_json": "📥 完全分析 (.json)",
         "export_md": "📥 レポート (.md)",
+        "export_card": "🖼️ シェアカード (.png)",
         # Chunks
         "chunks_title": "ブロックエクスプローラー",
         "chunks_slider": "ブロック番号",

@@ -1,8 +1,9 @@
-"""Export tab — CSV / JSON / Markdown download buttons."""
+"""Export tab — CSV / JSON / Markdown / PNG share card download buttons."""
 
 import streamlit as st
 
 from bookscope.store import AnalysisResult
+from bookscope.viz import generate_share_card
 
 
 def render_export(
@@ -29,7 +30,7 @@ def render_export(
         style_scores=style_scores,
     )
 
-    col_e, col_s, col_j, col_md = st.columns(4)
+    col_e, col_s, col_j, col_md, col_card = st.columns(5)
     col_e.download_button(
         label=T["export_emotions_csv"],
         data=result.to_csv_emotion(),
@@ -53,4 +54,18 @@ def render_export(
         data=result.to_markdown_report(),
         file_name=f"{result.book_title}_report.md",
         mime="text/markdown",
+    )
+    card_png = generate_share_card(
+        book_title=result.book_title,
+        arc_pattern=result.arc_pattern,
+        detected_lang=result.detected_lang,
+        total_words=result.total_words,
+        n_chunks=result.total_chunks,
+        emotion_scores=result.emotion_scores,
+    )
+    col_card.download_button(
+        label=T["export_card"],
+        data=card_png,
+        file_name=f"{result.book_title}_card.png",
+        mime="image/png",
     )

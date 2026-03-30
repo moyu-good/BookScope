@@ -1,4 +1,5 @@
 from bookscope.viz.base_renderer import BaseRenderer
+from bookscope.viz.card_renderer import generate_share_card
 from bookscope.viz.chart_data_adapter import ChartDataAdapter
 from bookscope.viz.emotion_timeline import EmotionTimelineRenderer
 from bookscope.viz.heatmap import EmotionHeatmapRenderer
@@ -10,6 +11,7 @@ __all__ = [
     "ChartDataAdapter",
     "EmotionHeatmapRenderer",
     "EmotionTimelineRenderer",
+    "generate_share_card",
     "StyleRadarRenderer",
     "BookScopeTheme",
 ]
