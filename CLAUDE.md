@@ -17,7 +17,7 @@ bookscope/
   viz/             ChartDataAdapter, EmotionTimelineRenderer, EmotionHeatmapRenderer,
                    StyleRadarRenderer, BaseRenderer, BookScopeTheme
 app/main.py        Streamlit entry (7 tabs)
-tests/             118 pytest tests (unit + hypothesis property tests)
+tests/             221 pytest tests (unit + hypothesis property tests)
 ```
 
 ## Key invariants
