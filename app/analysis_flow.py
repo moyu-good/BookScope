@@ -20,6 +20,47 @@ def _run_pipeline(book, strategy: str, chunk_size: int, min_words: int):
 
 
 @st.cache_data(show_spinner=False)
+def run_preview(
+    file_bytes: bytes,
+    filename: str,
+    strategy: str,
+    chunk_size: int,
+    min_words: int,
+) -> list:
+    """Load and chunk only — no emotion or style analysis.
+
+    Returns list[ChunkResult]. Callers take the first 5 chunks for a
+    quick LLM-generated preview without running the full pipeline.
+    Uses @st.cache_data so a subsequent run_analysis() call with the
+    same arguments benefits from the OS page cache on the tmp file.
+    """
+    import os
+    import tempfile
+
+    from bookscope.ingest import chunk
+    from bookscope.ingest.loader import load_text
+
+    suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".txt"
+    stem = filename
+    for ext in (".txt", ".epub", ".pdf"):
+        stem = stem.removesuffix(ext)
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    try:
+        book = load_text(tmp_path, title=stem)
+    finally:
+        os.unlink(tmp_path)
+
+    lang = detect_language(book.raw_text)
+    book = book.model_copy(update={"language": lang})
+    chunks = chunk(book, strategy=strategy, word_limit=chunk_size, min_words=min_words)
+    return chunks
+
+
+@st.cache_data(show_spinner=False)
 def run_analysis(
     file_bytes: bytes,
     filename: str,
@@ -116,7 +157,7 @@ def resolve_analysis_state(
     else:
         with st.spinner(T["analysing"]):
             if uploaded is not None:
-                file_bytes = uploaded.read()
+                file_bytes = uploaded.getvalue()
                 chunks, emotion_scores, style_scores, detected_lang = run_analysis(
                     file_bytes, uploaded.name, strategy, chunk_size, min_words,
                 )

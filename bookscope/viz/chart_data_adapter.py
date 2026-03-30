@@ -12,6 +12,7 @@ Transformations:
 from dataclasses import dataclass, field
 
 from bookscope.models import ChunkResult, EmotionScore, StyleScore
+from bookscope.store import AnalysisResult
 
 _EMOTION_FIELDS = (
     "anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust"
@@ -66,6 +67,27 @@ class StyleRadarData:
     labels: list[str]         # display names for each metric
     values: list[float]       # normalized [0, 1] book-average per metric
     raw_means: dict[str, float]  # actual (unnormalized) per-metric averages
+
+
+@dataclass
+class EmotionRadarData:
+    """Adapted payload for EmotionRadarRenderer (8-axis polar chart)."""
+
+    labels: list[str]    # emotion display names (8)
+    values: list[float]  # average score per emotion, normalized [0, 1]
+    colors: list[str]    # hex color per axis
+
+
+@dataclass
+class EmotionArcComparisonData:
+    """Adapted payload for EmotionComparisonRenderer (dual-series arc overlay)."""
+
+    x_a: list[float]       # normalized position [0, 1] for book A
+    x_b: list[float]       # normalized position [0, 1] for book B
+    series_a: list[float]  # valence scores (normalized) for book A
+    series_b: list[float]  # valence scores (normalized) for book B
+    label_a: str           # book A title
+    label_b: str           # book B title
 
 
 class ChartDataAdapter:
@@ -174,3 +196,85 @@ class ChartDataAdapter:
             labels.append(_STYLE_LABELS[metric])
 
         return StyleRadarData(labels=labels, values=values, raw_means=raw_means)
+
+    @staticmethod
+    def build_emotion_radar_data(
+        scores: list[EmotionScore],
+        emotion_colors: dict[str, str] | None = None,
+    ) -> "EmotionRadarData":
+        """Adapt EmotionScores for the Emotion DNA radar chart.
+
+        Averages each of the 8 NRC emotion dimensions across all chunks.
+        Each axis uses the emotion's canonical color from the theme palette.
+
+        Args:
+            scores: List of EmotionScore objects (one per chunk).
+            emotion_colors: Optional mapping of emotion name → hex color.
+                            Falls back to grey when absent.
+
+        Returns:
+            EmotionRadarData with 8 labeled, colored axes.
+            Returns empty data structure for empty input.
+        """
+        if not scores:
+            return EmotionRadarData(labels=[], values=[], colors=[])
+
+        ec = emotion_colors or {}
+        n = len(scores)
+        labels: list[str] = []
+        values: list[float] = []
+        colors: list[str] = []
+        for emotion in _EMOTION_FIELDS:
+            labels.append(emotion.capitalize())
+            values.append(sum(getattr(s, emotion) for s in scores) / n)
+            colors.append(ec.get(emotion, "#888888"))
+
+        return EmotionRadarData(labels=labels, values=values, colors=colors)
+
+    @staticmethod
+    def build_emotion_arc_comparison_data(
+        result_a: "AnalysisResult",
+        result_b: "AnalysisResult",
+    ) -> "EmotionArcComparisonData":
+        """Build dual-series arc comparison data for two books.
+
+        Computes per-chunk valence = joy + trust + anticipation − fear − sadness
+        − anger − disgust, then normalizes both x-axis (position in book, 0→1)
+        and y-axis (valence, 0→1) so books of different lengths overlay cleanly.
+
+        Args:
+            result_a: First AnalysisResult (book A).
+            result_b: Second AnalysisResult (book B).
+
+        Returns:
+            EmotionArcComparisonData ready for EmotionComparisonRenderer.
+        """
+
+        def _valence(scores: list[EmotionScore]) -> list[float]:
+            sorted_s = sorted(scores, key=lambda s: s.chunk_index)
+            raw = [
+                s.joy + s.trust + s.anticipation - s.fear - s.sadness - s.anger - s.disgust
+                for s in sorted_s
+            ]
+            v_min, v_max = min(raw), max(raw)
+            span = v_max - v_min
+            if span == 0:
+                return [0.5] * len(raw)
+            return [(v - v_min) / span for v in raw]
+
+        def _norm_x(n: int) -> list[float]:
+            if n <= 1:
+                return [0.0] * n
+            return [i / (n - 1) for i in range(n)]
+
+        sa = _valence(result_a.emotion_scores) if result_a.emotion_scores else []
+        sb = _valence(result_b.emotion_scores) if result_b.emotion_scores else []
+
+        return EmotionArcComparisonData(
+            x_a=_norm_x(len(sa)),
+            x_b=_norm_x(len(sb)),
+            series_a=sa,
+            series_b=sb,
+            label_a=result_a.book_title,
+            label_b=result_b.book_title,
+        )

@@ -3,8 +3,6 @@
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from bookscope.nlp.genre_analyzer import (
     _build_essay_prompt,
     _build_nonfiction_prompt,
@@ -15,7 +13,6 @@ from bookscope.nlp.genre_analyzer import (
     extract_essay_voice,
     extract_nonfiction_concepts,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -65,7 +65,58 @@
   _(same commit)_
 - Tests: 243 → 250 (+7)
 
-## Deferred to v0.8+
+## v0.8.0 — completed 2026-03-30
 
-- [ ] **AnalyzerProtocol integration for LLM**: If LLM output becomes structured EmotionScore,
-  wrap `llm_analyzer.py` in AnalyzerProtocol.
+- [x] **Genre-aware LLM prompt pipeline** — `llm_analyzer.py` extended with 3 prompt builders
+  (fiction / nonfiction / essay), `genre_type` param, "academic" alias. 10 new tests. _(commit 031a482)_
+- [x] **`genre_analyzer.py` — raw-text LLM extraction** — New module reads actual chunk text
+  (not scores) via uniform 5-chunk sampling. `extract_nonfiction_concepts()` → concept tags +
+  argument sentence. `extract_essay_voice()` → 2-sentence voice description. Session-state
+  cache. Graceful fallback when API key absent. 39 new tests. _(commit fce1c1a)_
+- [x] **Wire genre_analyzer into quick_insight.py** — Nonfiction Card 1 (Core Concepts): LLM
+  first, heuristic fallback. Essay Card 2 (Voice Fingerprint): LLM sub-text enriches heuristic
+  label. Both use `st.spinner`. _(commit e551e66)_
+- [x] **Code quality** — Remove dead `TYPE_CHECKING` import in `genre_analyzer.py`; fix E501 in
+  `llm_analyzer.py`. _(commit 95e3e11)_
+- Tests: 250 → 299 (+49 new tests)
+
+## v0.9 — planned (CEO plan: 2026-03-30)
+
+- [ ] **Chat Tab (Approach C)** — New Chat tab; user asks questions about the book, LLM reads
+  from chunk context to answer. Uses `st.text_input` + button (primary pattern; avoids
+  `st.chat_input` re-run freeze). Session-state history with 10-turn rolling window.
+  NOTE: verify `_call_llm` is thread-safe before parallelization (per-call client vs singleton).
+- [ ] **Reading time estimate** — Show "~X hr Y min" in hero card.
+  Formula: word_count / wpm (fiction:250 / nonfiction:200 / essay:220) * readability factor.
+  Guard: skip if word_count < 100 or > 200 hr equivalent.
+- [ ] **Emotion DNA radar chart** — Add `EmotionRadarRenderer` (polar chart) for Overview tab.
+  Keep `EmotionTimelineRenderer` bar chart in Compare tab. New `bookscope/viz/emotion_radar_renderer.py`.
+- [ ] **Book recommendations [Experimental]** — After Quick Insight, LLM suggests 3 similar books.
+  Gate behind `ENABLE_BOOK_RECS=true` env var (defaults off). Add "AI suggestions" disclaimer.
+- [ ] **Pre-reading quick preview** — "Quick Preview" button alongside "Analyze (Full)".
+  LLM reads first 5 chunks, returns 3-sentence summary before full analysis.
+- [ ] **Multi-book library view** — New Library tab; shows all saved analyses, mini comparison
+  of 2 books' emotion arcs (extend `EmotionTimelineRenderer` with `series_b` OR create
+  `EmotionComparisonRenderer` subclass — reviewer recommends subclass to preserve SRP).
+  Display cap: most recent 20. Empty state: "No analyses saved yet."
+- [ ] **Parallelize LLM calls** — nonfiction and essay Quick Insight show 2 sequential spinners
+  (~2-4s); use `concurrent.futures.ThreadPoolExecutor` to run both calls simultaneously (~1-2s).
+  CRITICAL: no `st.session_state` or Streamlit UI calls inside worker threads.
+  Verify `_call_llm` constructs per-call `anthropic.Anthropic()` client, not shared singleton.
+- [ ] **`_call_llm` unit tests** — direct coverage of `max_tokens`, model selection path,
+  and API client construction; currently exercised only through integration mocks.
+- [ ] **`quick_insight.py` smoke test** — single test that calls `render_quick_insight()` with
+  mock data and asserts no exceptions (catches import/wiring regressions).
+- [ ] **Japanese LLM output validation** — `lang_name="Japanese"` may still elicit English
+  responses from Claude Haiku; add a smoke test / CI check.
+
+## Deferred to v1.0+
+
+- [ ] **AnalyzerProtocol for LLM** — wrap `llm_analyzer.py` in `AnalyzerProtocol` when a
+  second LLM backend is introduced. Not needed while only one backend exists.
+- [ ] **Author cross-book comparison** — compare emotion arcs and style signatures across
+  multiple books by the same author. Requires library view (v0.9) first.
+  (Human: 2d / CC: ~45 min)
+- [ ] **Server-side shareable URLs** — each analysis gets a public URL with cached results.
+  Requires replacing local JSON store with server-side persistence (major architecture change).
+  (Human: ~1 week / CC: ~3 hours)

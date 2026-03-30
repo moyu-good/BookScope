@@ -323,6 +323,48 @@ def generate_narrative_insight(
         return ""
 
 
+def call_llm(
+    prompt: str,
+    api_key: str | None = None,
+    model: str | None = None,
+    max_tokens: int = 500,
+) -> str:
+    """Public single-call LLM wrapper for use by Chat Tab and other modules.
+
+    Thread-safe: constructs a per-call Anthropic client; never reads session_state.
+    Callers must resolve api_key and model in the main Streamlit thread and pass
+    them as arguments if calling from a worker thread.
+
+    Args:
+        prompt:     The user prompt to send.
+        api_key:    Anthropic API key.  If None, resolved via _get_api_key().
+        model:      Model ID.  If None, falls back to claude-haiku-4-5.
+        max_tokens: Max tokens in the LLM response.
+
+    Returns:
+        Stripped response text, or "" on any error / missing key.
+    """
+    resolved_key = api_key or _get_api_key()
+    if not resolved_key:
+        return ""
+    resolved_model = model or "claude-haiku-4-5"
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=resolved_key)
+        message = client.messages.create(
+            model=resolved_model,
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = message.content[0].text.strip() if message.content else ""
+        if text and text[-1] not in ".!?。！？":
+            text = text + " …"
+        return text
+    except Exception:
+        return ""
+
+
 def _warn_user(exc: Exception) -> None:
     """Show a Streamlit warning for known Anthropic API errors."""
     if st is None:

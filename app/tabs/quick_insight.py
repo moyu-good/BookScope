@@ -1,6 +1,9 @@
 """Quick Insight tab — book-type-aware insight cards."""
 
+import hashlib
 import html as _html
+import os
+from concurrent.futures import ThreadPoolExecutor
 
 import streamlit as st
 
@@ -12,7 +15,7 @@ from bookscope.insights import (
     first_person_density,
 )
 from bookscope.nlp.genre_analyzer import extract_essay_voice, extract_nonfiction_concepts
-from bookscope.nlp.llm_analyzer import generate_narrative_insight
+from bookscope.nlp.llm_analyzer import call_llm, generate_narrative_insight
 
 # ── Emotional genre mapping (fiction, EN only) ────────────────────────────────
 # (arc.value, top_emotion_key) → (label_en, label_zh, label_ja, for_you_en)
@@ -72,6 +75,85 @@ def _sparkline_svg(points: str, color: str = "#a78bfa", width: int = 200, height
     )
 
 
+def _render_book_recommendations(
+    book_title: str,
+    arc_value: str,
+    top_emotion_key: str,
+    top_emotion_name: str,
+    book_type: str,
+    ai_narrative: str,
+    ui_lang: str,
+    T: dict,
+) -> None:
+    """Render the '[Experimental] You might also like' recommendations card.
+
+    Gated by ENABLE_BOOK_RECS=true env var. Uses call_llm() which is
+    thread-safe and does not read session_state.
+    Results are cached per book+emotion+arc in session_state.
+    """
+    if os.environ.get("ENABLE_BOOK_RECS", "").lower() not in ("true", "1", "yes"):
+        return
+
+    lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(ui_lang, "English")
+    genre_label_map = {
+        "fiction": "fiction",
+        "academic": "non-fiction / academic",
+        "essay": "essay / memoir",
+    }
+    genre_label = genre_label_map.get(book_type, book_type)
+
+    # Cache key: md5(book_title + top_emotion + arc_value)
+    ck_src = f"{book_title}_{top_emotion_key}_{arc_value}"
+    ck = "book_recs_" + hashlib.md5(ck_src.encode()).hexdigest()[:8]
+
+    recs_text: str | None = st.session_state.get(ck)
+
+    if recs_text is None:
+        prompt = (
+            f"This book has a {arc_value} narrative arc, dominant emotion: {top_emotion_name}, "
+            f"genre: {genre_label}.\n"
+        )
+        if ai_narrative:
+            prompt += f"The reading experience: {ai_narrative}\n"
+        prompt += (
+            f"Recommend 3 specific books (title + author) that readers who enjoyed this "
+            f"would likely also enjoy. Format: numbered list. Respond in {lang_name}."
+        )
+        recs_text = call_llm(prompt, max_tokens=300)
+        st.session_state[ck] = recs_text or ""
+
+    label = T.get("qi_recs_label", "[Experimental] You might also like")
+    disclaimer = T.get(
+        "qi_recs_disclaimer", "AI suggestions — quality varies. Trust your own taste."
+    )
+
+    if not recs_text:
+        unavailable = T.get(
+            "qi_recs_unavailable",
+            "Recommendations unavailable. Check LLM configuration.",
+        )
+        st.markdown(
+            f'<div class="bs-for-you" style="opacity:0.5;">'
+            f'<div class="bs-for-you-icon">📚</div>'
+            f'<div class="bs-for-you-text">{_html.escape(unavailable)}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(
+        '<div class="bs-insight-headline"'
+        ' style="border-left:4px solid #475569;margin-top:.75rem;">'
+        f'<div class="bs-insight-headline-label">📚 {_html.escape(label)}</div>'
+        f'<div style="white-space:pre-line;color:#e6edf3;font-size:.9rem;line-height:1.6;">'
+        f'{_html.escape(recs_text)}</div>'
+        f'<div style="font-size:.72rem;color:#64748b;margin-top:.5rem;">'
+        f'{_html.escape(disclaimer)}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_quick_insight(
     book_type: str,
     book_title: str,
@@ -107,14 +189,60 @@ def render_quick_insight(
         else "bs-insight-headline-text bs-no-animate"
     )
 
-    # Pre-compute AI narrative before branch rendering.
-    # Session-state cached — spinner only shows on first analysis per book+type.
+    # ── LLM pre-computation (parallelized for academic/essay) ─────────────────
+    # Model pre-fetched in main Streamlit thread — worker threads must not call
+    # st.session_state; they receive model as an explicit argument.
     _ai_text = ""
+    _llm_concepts: list[str] = []
+    _llm_argument = ""
+    _llm_voice = ""
+    _llm_model = st.session_state.get("llm_model", "claude-haiku-4-5")
+
     if analysis_result is not None:
-        with st.spinner(""):
-            _ai_text = generate_narrative_insight(
-                analysis_result, ui_lang, genre_type=book_type
-            )
+        if book_type in ("academic", "nonfiction") and chunks is not None:
+            # Parallel: AI narrative + nonfiction concept extraction
+            with st.spinner(""):
+                with ThreadPoolExecutor(max_workers=2) as _ex:
+                    _f_ai = _ex.submit(
+                        generate_narrative_insight, analysis_result, ui_lang, book_type
+                    )
+                    _f_concepts = _ex.submit(
+                        extract_nonfiction_concepts, chunks, ui_lang, book_title, _llm_model
+                    )
+                try:
+                    _ai_text = _f_ai.result(timeout=30)
+                except Exception:
+                    _ai_text = ""
+                try:
+                    _llm_concepts, _llm_argument = _f_concepts.result(timeout=30)
+                except Exception:
+                    _llm_concepts, _llm_argument = [], ""
+
+        elif book_type == "essay" and chunks is not None:
+            # Parallel: AI narrative + essay voice extraction
+            with st.spinner(""):
+                with ThreadPoolExecutor(max_workers=2) as _ex:
+                    _f_ai = _ex.submit(
+                        generate_narrative_insight, analysis_result, ui_lang, book_type
+                    )
+                    _f_voice = _ex.submit(
+                        extract_essay_voice, chunks, ui_lang, book_title, _llm_model
+                    )
+                try:
+                    _ai_text = _f_ai.result(timeout=30)
+                except Exception:
+                    _ai_text = ""
+                try:
+                    _llm_voice = _f_voice.result(timeout=30)
+                except Exception:
+                    _llm_voice = ""
+
+        else:
+            # fiction (or no chunks): only one LLM call, no parallelization needed
+            with st.spinner(""):
+                _ai_text = generate_narrative_insight(
+                    analysis_result, ui_lang, genre_type=book_type
+                )
 
     def _render_ai_card() -> None:
         """Render AI narrative card immediately after the type headline."""
@@ -277,13 +405,8 @@ def render_quick_insight(
         )
         _render_ai_card()
 
-        # Card 1: Core Concepts — LLM extraction first, heuristic fallback
-        with st.spinner(""):
-            llm_concepts, llm_argument = (
-                extract_nonfiction_concepts(chunks, ui_lang, book_title)
-                if chunks is not None
-                else ([], "")
-            )
+        # Card 1: Core Concepts — LLM extraction first (pre-computed above), heuristic fallback
+        llm_concepts, llm_argument = _llm_concepts, _llm_argument
         if llm_concepts:
             themes_html = (
                 '<div class="bs-tag-row">'
@@ -469,13 +592,8 @@ def render_quick_insight(
             arc_value, ("a personal journey", "个人旅程", "個人的旅")
         )[lang_idx]
 
-        # Card 2: Voice Fingerprint — LLM description enriches heuristic label
-        with st.spinner(""):
-            llm_voice = (
-                extract_essay_voice(chunks, ui_lang, book_title)
-                if chunks is not None
-                else ""
-            )
+        # Card 2: Voice Fingerprint — LLM description enriches heuristic label (pre-computed above)
+        llm_voice = _llm_voice
         if style_scores:
             avg_adj_r = sum(s.adj_ratio for s in style_scores) / len(style_scores)
             avg_adv_r = sum(s.adv_ratio for s in style_scores) / len(style_scores)
@@ -577,3 +695,14 @@ def render_quick_insight(
             unsafe_allow_html=True,
         )
 
+    # ── BOOK RECOMMENDATIONS (all types, gated by ENABLE_BOOK_RECS env var) ──
+    _render_book_recommendations(
+        book_title=book_title,
+        arc_value=arc_value,
+        top_emotion_key=top_emotion_key,
+        top_emotion_name=top_emotion_name,
+        book_type=book_type,
+        ai_narrative=_ai_text,
+        ui_lang=ui_lang,
+        T=T,
+    )

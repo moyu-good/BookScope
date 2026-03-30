@@ -29,21 +29,25 @@ from collections import Counter  # noqa: E402
 
 import streamlit as st  # noqa: E402
 
-from app.analysis_flow import resolve_analysis_state  # noqa: E402
+from app.analysis_flow import resolve_analysis_state, run_preview  # noqa: E402
 from app.css import inject_css  # noqa: E402
 from app.sidebar import render_sidebar_detected_lang, render_sidebar_inputs  # noqa: E402
 from app.strings import _ARC_DISPLAY, _STRINGS  # noqa: E402
 from app.tabs.arc_pattern import render_arc_pattern  # noqa: E402
+from app.tabs.chat import render_chat_tab  # noqa: E402
 from app.tabs.chunks import render_chunks  # noqa: E402
 from app.tabs.export_tab import render_export  # noqa: E402
 from app.tabs.heatmap import render_heatmap  # noqa: E402
+from app.tabs.library import render_library_tab  # noqa: E402
 from app.tabs.overview import render_overview  # noqa: E402
 from app.tabs.quick_insight import render_quick_insight  # noqa: E402
 from app.tabs.style import render_style  # noqa: E402
 from app.tabs.timeline import render_timeline  # noqa: E402
 from app.ui_constants import _EMOTION_COLORS, _EMOTION_FIELDS, _EMOTION_ICONS  # noqa: E402
 from bookscope.app_utils import get_lang, get_mode, inject_fonts, set_mode  # noqa: E402
+from bookscope.insights import compute_readability  # noqa: E402
 from bookscope.nlp import ArcClassifier  # noqa: E402
+from bookscope.nlp.llm_analyzer import call_llm as _call_llm_preview  # noqa: E402
 from bookscope.store import AnalysisResult, Repository  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -108,6 +112,99 @@ if uploaded is None and not url_input and _loaded_result is None and not _demo_m
     st.stop()
 
 # ---------------------------------------------------------------------------
+# Quick Preview gate (upload path only; URL auto-analyses)
+# ---------------------------------------------------------------------------
+
+if uploaded is not None and not url_input and _loaded_result is None and not _demo_mode:
+    # Scope session keys to this specific file so they reset on new upload
+    import hashlib as _hl
+    _fkey = _hl.md5(uploaded.name.encode()).hexdigest()[:8]
+    _preview_done_key = f"_preview_done_{_fkey}"
+    _wants_full_key = f"_wants_full_{_fkey}"
+    _preview_text_key = f"_preview_text_{_fkey}"
+
+    _preview_done = st.session_state.get(_preview_done_key, False)
+    _wants_full = st.session_state.get(_wants_full_key, False)
+
+    # Determine API key availability for the preview button
+    import os as _os_prev
+    _prev_api_ok = bool(_os_prev.environ.get("ANTHROPIC_API_KEY"))
+    if not _prev_api_ok:
+        try:
+            _prev_api_ok = bool(st.secrets.get("ANTHROPIC_API_KEY", ""))
+        except Exception:
+            pass
+
+    if not _wants_full and not _preview_done:
+        # Neither chosen — show two-column buttons
+        col_full, col_prev = st.columns(2)
+        if col_full.button(
+            T.get("btn_full_analysis", "📊 Analyze (Full)"),
+            use_container_width=True,
+        ):
+            st.session_state[_wants_full_key] = True
+            st.rerun()
+        if col_prev.button(
+            T.get("btn_quick_preview", "👁 Quick Preview"),
+            disabled=not _prev_api_ok,
+            help=(
+                T.get("btn_preview_needs_key", "Add ANTHROPIC_API_KEY to enable")
+                if not _prev_api_ok
+                else None
+            ),
+            use_container_width=True,
+        ):
+            st.session_state[_preview_done_key] = True
+            st.rerun()
+        st.stop()
+
+    if _preview_done:
+        # Run partial pipeline (load + chunk only) — cached
+        with st.spinner(T.get("btn_quick_preview", "Quick Preview") + "…"):
+            _prev_chunks = run_preview(
+                uploaded.getvalue(), uploaded.name, strategy, chunk_size, min_words
+            )
+        # Generate or retrieve LLM preview text
+        _prev_text: str = st.session_state.get(_preview_text_key, "")
+        if not _prev_text and _prev_api_ok and _prev_chunks:
+            _lang_name = {
+                "en": "English", "zh": "Chinese", "ja": "Japanese"
+            }.get(ui_lang, "English")
+            _sample = "\n\n".join(
+                c.text[:800] for c in _prev_chunks[:5]
+            )
+            _prev_prompt = (
+                f"Based on these opening passages of a book:\n\n{_sample}\n\n"
+                f"Answer in 3 sentences, in {_lang_name}:\n"
+                f"1. What is this book about?\n"
+                f"2. How does it feel to read?\n"
+                f"3. Who is it for?"
+            )
+            _prev_text = _call_llm_preview(_prev_prompt, max_tokens=300) or ""
+            st.session_state[_preview_text_key] = _prev_text
+
+        with st.expander(
+            T.get("preview_panel_label", "👁 Quick Preview"),
+            expanded=not _wants_full,
+        ):
+            if _prev_text:
+                st.markdown(_prev_text)
+            else:
+                st.info(T.get(
+                    "preview_unavailable",
+                    "Preview unavailable — add ANTHROPIC_API_KEY.",
+                ))
+
+        if not _wants_full:
+            if st.button(
+                T.get("btn_full_analysis", "📊 Analyze (Full)"),
+                use_container_width=False,
+            ):
+                st.session_state[_wants_full_key] = True
+                st.rerun()
+            st.stop()
+
+# ---------------------------------------------------------------------------
 # Resolve analysis data
 # ---------------------------------------------------------------------------
 
@@ -144,6 +241,29 @@ safe_title = _html.escape(book_title)
 safe_emotion_name = _html.escape(top_emotion_name)
 safe_arc_display = _html.escape(arc_display_name)
 
+# Reading time estimate
+_WPM = {"fiction": 250, "academic": 200, "essay": 220}
+_reading_time_str = ""
+if 100 <= total_words <= 200 * 60 * 250:  # skip if too short or > 200 hr equivalent
+    _readability_score, _readability_label, _read_confidence = compute_readability(
+        style_scores, ui_lang
+    )
+    _readability_factor = {"Accessible": 0.2, "Moderate": 0.5, "Dense": 0.75, "Specialist": 1.0}
+    _rf = _readability_factor.get(_readability_label, 0.5)
+    _base_minutes = total_words / _WPM.get(book_type, 238)
+    _adj_minutes = _base_minutes * (0.8 + _rf * 0.4)
+    _total_minutes = int(_adj_minutes)
+    if _total_minutes >= 90:
+        _hours = _total_minutes // 60
+        _mins = _total_minutes % 60
+        _reading_time_str = T.get("hero_reading_time_hr", "~{h}h {m}min").format(
+            h=_hours, m=_mins
+        )
+    else:
+        _reading_time_str = T.get("hero_reading_time_min", "~{m} min").format(
+            m=max(1, _total_minutes)
+        )
+
 _arc_article = "an" if arc_display_name[:1].lower() in "aeiou" else "a"
 hero_sentence = T["hero_sentence"].format(
     emotion=safe_emotion_name,
@@ -176,6 +296,10 @@ st.markdown(
                 <div class="bs-metric-label">{T['hero_chunks']}</div>
                 <div class="bs-metric-value">{n_chunks}</div>
             </div>
+            {f'''<div class="bs-metric">
+                <div class="bs-metric-label">{T.get("hero_reading_time", "Reading time")}</div>
+                <div class="bs-metric-value">{_html.escape(_reading_time_str)}</div>
+            </div>''' if _reading_time_str else ''}
         </div>
     </div>
     """,
@@ -269,16 +393,18 @@ if view_mode == "quick":
     )
 
 # ---------------------------------------------------------------------------
-# Full Analysis mode — 7 tabs
+# Full Analysis mode — 8 tabs (+ Chat)
 # ---------------------------------------------------------------------------
 
 else:
     (
         tab_overview, tab_heatmap, tab_timeline, tab_style,
-        tab_arc, tab_export, tab_chunks,
+        tab_arc, tab_chat, tab_library, tab_export, tab_chunks,
     ) = st.tabs([
         T["tab_overview"], T["tab_heatmap"], T["tab_timeline"], T["tab_style"],
-        T["tab_arc"], T["tab_export"], T["tab_chunks"],
+        T["tab_arc"], T.get("tab_chat", "💬 Chat"),
+        T.get("tab_library", "📚 Library"),
+        T["tab_export"], T["tab_chunks"],
     ])
 
     with tab_overview:
@@ -295,6 +421,12 @@ else:
 
     with tab_arc:
         render_arc_pattern(emotion_scores, arc, arc_display_name, arc_classifier, T)
+
+    with tab_chat:
+        render_chat_tab(chunks, ui_lang, T)
+
+    with tab_library:
+        render_library_tab(T, ui_lang)
 
     with tab_export:
         render_export(

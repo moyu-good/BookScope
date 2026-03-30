@@ -49,6 +49,9 @@ _STRINGS: dict[str, dict] = {
         "hero_arc": "Story arc",
         "hero_words": "Total words",
         "hero_chunks": "Text blocks",
+        "hero_reading_time": "Reading time",
+        "hero_reading_time_hr": "~{h}h {m}min",
+        "hero_reading_time_min": "~{m} min",
         # Mode toggle
         "mode_quick": "Quick Insight",
         "mode_full": "Full Analysis",
@@ -57,6 +60,39 @@ _STRINGS: dict[str, dict] = {
         "type_fiction": "📚 Fiction",
         "type_academic": "🎓 Academic",
         "type_essay": "✍️ Essay/Memoir",
+        # Quick Preview
+        "btn_full_analysis": "📊 Analyze (Full)",
+        "btn_quick_preview": "👁 Quick Preview",
+        "btn_preview_needs_key": "Add ANTHROPIC_API_KEY to enable",
+        "preview_panel_label": "👁 Quick Preview",
+        "preview_unavailable": "Preview unavailable — add ANTHROPIC_API_KEY.",
+        # Chat Tab
+        "tab_chat": "💬 Chat",
+        "chat_no_chunks": (
+            "Chat requires re-analyzing the book. Raw text is not stored in saved analyses."
+        ),
+        "chat_no_key": "Chat requires an LLM key. Add ANTHROPIC_API_KEY to enable this tab.",
+        "chat_input_label": "Ask a question about this book",
+        "chat_input_placeholder": "What themes appear most often?",
+        "chat_send_btn": "Send",
+        "chat_error": "Sorry, I couldn't generate a response. Try again.",
+        "chat_clear_btn": "Clear conversation",
+        # Library Tab
+        "tab_library": "📚 Library",
+        "library_empty": "No analyses saved yet. Analyze a book to add it to your library.",
+        "library_all_corrupted": "All saved analyses appear corrupted.",
+        "library_title": "Your Book Library",
+        "library_compare_title": "Compare Two Books",
+        "library_compare_a": "Book A",
+        "library_compare_b": "Book B",
+        "library_compare_same": "Select two different books to compare.",
+        "library_compare_no_data": "One of the selected books has no emotion data.",
+        # Book Recommendations
+        "qi_recs_label": "[Experimental] You might also like",
+        "qi_recs_disclaimer": "AI suggestions — quality varies. Trust your own taste.",
+        "qi_recs_unavailable": "Recommendations unavailable. Check LLM configuration.",
+        # Fallback for character detection
+        "qi_fi_top_emotions_fallback": "Top emotions",
         # Quick Insight — fiction
         "qi_fi_headline_label": "STORY PROFILE",
         "qi_fi_chars_label": "KEY CHARACTERS",
@@ -235,6 +271,9 @@ _STRINGS: dict[str, dict] = {
         "hero_arc": "故事走向",
         "hero_words": "总字数",
         "hero_chunks": "文本块数",
+        "hero_reading_time": "阅读时间",
+        "hero_reading_time_hr": "约 {h} 小时 {m} 分钟",
+        "hero_reading_time_min": "约 {m} 分钟",
         # Mode toggle
         "mode_quick": "快速洞察",
         "mode_full": "完整分析",
@@ -243,6 +282,37 @@ _STRINGS: dict[str, dict] = {
         "type_fiction": "📚 小说",
         "type_academic": "🎓 学术 · 非虚构",
         "type_essay": "✍️ 随笔 · 回忆录",
+        # Quick Preview
+        "btn_full_analysis": "📊 完整分析",
+        "btn_quick_preview": "👁 快速预览",
+        "btn_preview_needs_key": "添加 ANTHROPIC_API_KEY 以启用",
+        "preview_panel_label": "👁 快速预览",
+        "preview_unavailable": "预览不可用 — 请添加 ANTHROPIC_API_KEY。",
+        # Chat Tab
+        "tab_chat": "💬 对话",
+        "chat_no_chunks": "对话功能需要重新分析本书。已保存的分析不包含原始文本。",
+        "chat_no_key": "对话功能需要 LLM 密钥。请添加 ANTHROPIC_API_KEY。",
+        "chat_input_label": "向这本书提问",
+        "chat_input_placeholder": "这本书的主要主题是什么？",
+        "chat_send_btn": "发送",
+        "chat_error": "抱歉，无法生成回复，请重试。",
+        "chat_clear_btn": "清除对话",
+        # Library Tab
+        "tab_library": "📚 书库",
+        "library_empty": "还没有保存的分析。分析一本书后即可加入书库。",
+        "library_all_corrupted": "所有已保存的分析文件均已损坏。",
+        "library_title": "我的书库",
+        "library_compare_title": "对比两本书",
+        "library_compare_a": "书目 A",
+        "library_compare_b": "书目 B",
+        "library_compare_same": "请选择两本不同的书进行对比。",
+        "library_compare_no_data": "所选书目之一没有情感数据。",
+        # Book Recommendations
+        "qi_recs_label": "【实验功能】你可能也喜欢",
+        "qi_recs_disclaimer": "AI 推荐，质量不一，请凭自己的判断。",
+        "qi_recs_unavailable": "推荐功能不可用。请检查 LLM 配置。",
+        # Fallback for character detection
+        "qi_fi_top_emotions_fallback": "主要情感",
         # Quick Insight — fiction
         "qi_fi_headline_label": "故事画像",
         "qi_fi_chars_label": "主要人物",
@@ -406,6 +476,9 @@ _STRINGS: dict[str, dict] = {
         "hero_arc": "物語の弧",
         "hero_words": "総語数",
         "hero_chunks": "チャンク数",
+        "hero_reading_time": "読書時間",
+        "hero_reading_time_hr": "約{h}時間{m}分",
+        "hero_reading_time_min": "約{m}分",
         # Mode toggle
         "mode_quick": "クイック洞察",
         "mode_full": "詳細分析",
@@ -414,6 +487,41 @@ _STRINGS: dict[str, dict] = {
         "type_fiction": "📚 小説",
         "type_academic": "🎓 学術・ノンフィクション",
         "type_essay": "✍️ エッセイ・回想録",
+        # Quick Preview
+        "btn_full_analysis": "📊 全文分析",
+        "btn_quick_preview": "👁 クイックプレビュー",
+        "btn_preview_needs_key": "ANTHROPIC_API_KEY を追加して有効化",
+        "preview_panel_label": "👁 クイックプレビュー",
+        "preview_unavailable": "プレビュー不可 — ANTHROPIC_API_KEY を追加してください。",
+        # Chat Tab
+        "tab_chat": "💬 チャット",
+        "chat_no_chunks": (
+            "チャットには本の再分析が必要です。保存済み分析には生テキストが含まれません。"
+        ),
+        "chat_no_key": "チャットには LLM キーが必要です。ANTHROPIC_API_KEY を追加してください。",
+        "chat_input_label": "この本について質問する",
+        "chat_input_placeholder": "最もよく登場するテーマは何ですか？",
+        "chat_send_btn": "送信",
+        "chat_error": "応答を生成できませんでした。もう一度お試しください。",
+        "chat_clear_btn": "会話をクリア",
+        # Library Tab
+        "tab_library": "📚 ライブラリ",
+        "library_empty": "まだ保存された分析がありません。本を分析してライブラリに追加しましょう。",
+        "library_all_corrupted": "保存済みの分析ファイルがすべて破損しています。",
+        "library_title": "マイライブラリ",
+        "library_compare_title": "2冊を比較",
+        "library_compare_a": "本 A",
+        "library_compare_b": "本 B",
+        "library_compare_same": "比較するには2冊の異なる本を選んでください。",
+        "library_compare_no_data": "選択した本の一方に感情データがありません。",
+        # Book Recommendations
+        "qi_recs_label": "【実験的機能】こんな本もおすすめ",
+        "qi_recs_disclaimer": (
+            "AI によるおすすめ — 品質はさまざまです。ご自身の判断を優先してください。"
+        ),
+        "qi_recs_unavailable": "おすすめ機能は利用できません。LLM の設定を確認してください。",
+        # Fallback for character detection
+        "qi_fi_top_emotions_fallback": "主要感情",
         # Quick Insight — fiction
         "qi_fi_headline_label": "ストーリープロフィール",
         "qi_fi_chars_label": "主要人物",

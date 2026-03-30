@@ -81,7 +81,10 @@ def _cache_key_genre(book_title: str, genre_type: str, chunk_hashes: str) -> str
 
 
 def _get_model() -> str:
-    """Return the model ID from session_state or fall back to haiku."""
+    """Return the model ID from session_state or fall back to haiku.
+
+    MUST be called from the main Streamlit thread only — not from worker threads.
+    """
     _default = "claude-haiku-4-5"
     if st is not None:
         try:
@@ -91,14 +94,22 @@ def _get_model() -> str:
     return _default
 
 
-def _call_llm(prompt: str, api_key: str) -> str:
-    """Make a single Claude API call and return stripped text, or ""."""
+def _call_llm(prompt: str, api_key: str, model: str | None = None) -> str:
+    """Make a single Claude API call and return stripped text, or "".
+
+    Args:
+        prompt:   The user prompt to send.
+        api_key:  Anthropic API key (resolved in the caller's thread).
+        model:    Model ID.  If None, resolved via _get_model() (main-thread safe only).
+                  Pass model explicitly when calling from a worker thread.
+    """
     try:
         import anthropic
 
+        resolved_model = model if model is not None else _get_model()
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
-            model=_get_model(),
+            model=resolved_model,
             max_tokens=250,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -148,6 +159,7 @@ def extract_nonfiction_concepts(
     chunks: list,
     lang: str,
     book_title: str = "",
+    model: str | None = None,
 ) -> tuple[list[str], str]:
     """Extract key concepts and argument style from non-fiction text.
 
@@ -155,6 +167,8 @@ def extract_nonfiction_concepts(
         chunks:     list[ChunkResult] — raw chunks from chunker
         lang:       UI language code ("en" / "zh" / "ja")
         book_title: used for session-state cache key
+        model:      Model ID to use.  If None, read from session_state (main-thread only).
+                    Pass explicitly when calling from a ThreadPoolExecutor worker.
 
     Returns:
         (concepts: list[str], argument_sentence: str)
@@ -178,7 +192,7 @@ def extract_nonfiction_concepts(
 
     text_block = _chunk_text_block(sampled)
     prompt = _build_nonfiction_prompt(text_block, lang)
-    response = _call_llm(prompt, api_key)
+    response = _call_llm(prompt, api_key, model=model)
     result = _parse_nonfiction_response(response) if response else ([], "")
 
     if st is not None and ck:
@@ -214,6 +228,7 @@ def extract_essay_voice(
     chunks: list,
     lang: str,
     book_title: str = "",
+    model: str | None = None,
 ) -> str:
     """Characterize the author's voice and emotional atmosphere from essay text.
 
@@ -221,6 +236,8 @@ def extract_essay_voice(
         chunks:     list[ChunkResult] — raw chunks from chunker
         lang:       UI language code ("en" / "zh" / "ja")
         book_title: used for session-state cache key
+        model:      Model ID to use.  If None, read from session_state (main-thread only).
+                    Pass explicitly when calling from a ThreadPoolExecutor worker.
 
     Returns:
         2-sentence voice description, or "" if API key absent / call fails.
@@ -243,7 +260,7 @@ def extract_essay_voice(
 
     text_block = _chunk_text_block(sampled)
     prompt = _build_essay_prompt(text_block, lang)
-    result = _call_llm(prompt, api_key)
+    result = _call_llm(prompt, api_key, model=model)
 
     if st is not None and ck:
         try:

@@ -299,3 +299,128 @@ class TestBuildPromptGenre:
         """'academic' normalises to 'nonfiction' in cache key."""
         result = _make_result()
         assert _cache_key(result, "academic") == _cache_key(result, "nonfiction")
+
+
+# ---------------------------------------------------------------------------
+# call_llm public wrapper
+# ---------------------------------------------------------------------------
+
+class TestCallLlm:
+    """Tests for the thread-safe call_llm() public function."""
+
+    def test_returns_string_on_success(self):
+        from bookscope.nlp.llm_analyzer import call_llm
+
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="A clear literary analysis.")]
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}):
+            with patch("anthropic.Anthropic") as MockAnthropic:
+                MockAnthropic.return_value.messages.create.return_value = mock_message
+                result = call_llm("Describe this book.", api_key="sk-test")
+
+        assert result == "A clear literary analysis."
+
+    def test_returns_empty_string_with_no_key(self):
+        from bookscope.nlp.llm_analyzer import call_llm
+
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            with patch("bookscope.nlp.llm_analyzer._get_api_key", return_value=None):
+                result = call_llm("Hello.", api_key=None)
+
+        assert result == ""
+
+    def test_api_error_returns_empty(self):
+        from bookscope.nlp.llm_analyzer import call_llm
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}):
+            with patch("anthropic.Anthropic") as MockAnthropic:
+                import anthropic as _anthropic
+                MockAnthropic.return_value.messages.create.side_effect = (
+                    _anthropic.APIError(
+                        message="server error",
+                        request=MagicMock(),
+                        body=None,
+                    )
+                )
+                result = call_llm("Hello.", api_key="sk-test")
+
+        assert result == ""
+
+    def test_truncated_response_gets_ellipsis(self):
+        from bookscope.nlp.llm_analyzer import call_llm
+
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="The story unfolds slowly")]
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}):
+            with patch("anthropic.Anthropic") as MockAnthropic:
+                MockAnthropic.return_value.messages.create.return_value = mock_message
+                result = call_llm("Describe.", api_key="sk-test")
+
+        assert result.endswith(" …")
+
+    def test_sentence_punctuation_not_doubled(self):
+        """Response ending with '.' should NOT get ' …' appended."""
+        from bookscope.nlp.llm_analyzer import call_llm
+
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="The story is complete.")]
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}):
+            with patch("anthropic.Anthropic") as MockAnthropic:
+                MockAnthropic.return_value.messages.create.return_value = mock_message
+                result = call_llm("Describe.", api_key="sk-test")
+
+        assert result == "The story is complete."
+
+    def test_custom_model_passed_to_client(self):
+        """The model parameter is forwarded to the Anthropic client."""
+        from bookscope.nlp.llm_analyzer import call_llm
+
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="Done.")]
+
+        with patch("anthropic.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = mock_message
+            call_llm("Hello.", api_key="sk-test", model="claude-sonnet-4-6")
+            call_kwargs = MockAnthropic.return_value.messages.create.call_args
+            assert call_kwargs.kwargs.get("model") == "claude-sonnet-4-6"
+
+    def test_max_tokens_forwarded(self):
+        from bookscope.nlp.llm_analyzer import call_llm
+
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="Done.")]
+
+        with patch("anthropic.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = mock_message
+            call_llm("Hello.", api_key="sk-test", max_tokens=42)
+            call_kwargs = MockAnthropic.return_value.messages.create.call_args
+            assert call_kwargs.kwargs.get("max_tokens") == 42
+
+    def test_empty_content_returns_empty(self):
+        from bookscope.nlp.llm_analyzer import call_llm
+
+        mock_message = MagicMock()
+        mock_message.content = []
+
+        with patch("anthropic.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = mock_message
+            result = call_llm("Hello.", api_key="sk-test")
+
+        assert result == ""
+
+    def test_default_model_is_haiku(self):
+        """When model=None, falls back to claude-haiku-4-5."""
+        from bookscope.nlp.llm_analyzer import call_llm
+
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="Done.")]
+
+        with patch("anthropic.Anthropic") as MockAnthropic:
+            MockAnthropic.return_value.messages.create.return_value = mock_message
+            call_llm("Hello.", api_key="sk-test", model=None)
+            call_kwargs = MockAnthropic.return_value.messages.create.call_args
+            assert call_kwargs.kwargs.get("model") == "claude-haiku-4-5"

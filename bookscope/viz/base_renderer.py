@@ -33,6 +33,13 @@ class BaseRenderer(ABC):
             A fully configured plotly Figure ready for st.plotly_chart().
         """
 
+    @staticmethod
+    def _with_alpha(hex_color: str, alpha: float) -> str:
+        """Convert a 6-digit hex color to an rgba() string with the given alpha."""
+        hex_color = hex_color.lstrip("#")
+        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        return f"rgba({r},{g},{b},{alpha})"
+
     def _apply_dark_layout(self, fig: go.Figure, title: str = "") -> go.Figure:
         """Apply the BookScope dark theme layout to any figure."""
         fig.update_layout(
