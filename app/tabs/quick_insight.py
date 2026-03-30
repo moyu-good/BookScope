@@ -524,9 +524,13 @@ def render_quick_insight(
         )
 
     # ── AI NARRATIVE CARD (all book types, shown only when API key is present) ─
+    # Map UI book_type directly — llm_analyzer accepts "academic" as alias for
+    # "nonfiction", so no translation is needed here.
     if analysis_result is not None:
         with st.spinner(""):
-            ai_text = generate_narrative_insight(analysis_result, ui_lang)
+            ai_text = generate_narrative_insight(
+                analysis_result, ui_lang, genre_type=book_type
+            )
         if ai_text:
             label = _html.escape(T.get("qi_ai_narrative_label", "AI NARRATIVE"))
             st.markdown(

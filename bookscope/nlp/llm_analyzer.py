@@ -45,12 +45,14 @@ def _cache_key(result, genre_type: str = "fiction") -> str:
 
     Uses hashlib.md5 (not Python's hash()) for cross-process stability.
     Including genre_type prevents cache collision when the same book is analysed
-    under different genre lenses.
+    under different genre lenses.  "academic" is normalised to "nonfiction" so
+    that UI-layer book_type values produce the same key as the canonical name.
     """
+    normalized = "nonfiction" if genre_type == "academic" else genre_type
     emotion_hash = hashlib.md5(
         str(result.emotion_scores).encode()
     ).hexdigest()[:8]
-    return f"llm_insight_{result.book_title}_{emotion_hash}_{genre_type}"
+    return f"llm_insight_{result.book_title}_{emotion_hash}_{normalized}"
 
 
 # ---------------------------------------------------------------------------
@@ -229,8 +231,12 @@ def _build_prompt_essay(result, lang: str) -> str:
 
 
 def _build_prompt(result, lang: str, genre_type: str = "fiction") -> str:
-    """Dispatch to the correct genre-specific prompt builder."""
-    if genre_type == "nonfiction":
+    """Dispatch to the correct genre-specific prompt builder.
+
+    Accepts "academic" as a UI-layer alias for "nonfiction" so that the
+    sidebar book_type value can be passed directly without mapping.
+    """
+    if genre_type in ("nonfiction", "academic"):
         return _build_prompt_nonfiction(result, lang)
     elif genre_type == "essay":
         return _build_prompt_essay(result, lang)

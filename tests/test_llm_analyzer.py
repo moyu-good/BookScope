@@ -285,3 +285,17 @@ class TestBuildPromptGenre:
         p_fiction = _build_prompt(result, "en", genre_type="fiction")
         p_nonfiction = _build_prompt(result, "en", genre_type="nonfiction")
         assert p_fiction != p_nonfiction
+
+    def test_academic_alias_equals_nonfiction(self):
+        """'academic' is a UI alias for 'nonfiction' — same prompt."""
+        from bookscope.nlp.llm_analyzer import _build_prompt
+        result = _make_result()
+        assert (
+            _build_prompt(result, "en", genre_type="academic")
+            == _build_prompt(result, "en", genre_type="nonfiction")
+        )
+
+    def test_academic_cache_key_equals_nonfiction(self):
+        """'academic' normalises to 'nonfiction' in cache key."""
+        result = _make_result()
+        assert _cache_key(result, "academic") == _cache_key(result, "nonfiction")
