@@ -16,6 +16,7 @@ from langdetect import DetectorFactory  # noqa: E402
 
 DetectorFactory.seed = 0
 
+import hashlib  # noqa: E402
 import html as _html  # noqa: E402
 
 import plotly.graph_objects as go  # noqa: E402
@@ -84,6 +85,12 @@ _COMPARE_STRINGS: dict[str, dict] = {
         "unique_b_expander": "Words unique to Book {} ({})",
         "lang_labels": {"en": "🇬🇧 English", "zh": "🇨🇳 Chinese", "ja": "🇯🇵 Japanese"},
         "detected_lang": "Detected language",
+        "no_style_data": "No style data available.",
+        "same_book_warning": (
+            "Both slots contain the same book. "
+            "Upload two different books for a meaningful comparison."
+        ),
+        "one_book_note": "Upload a second book to enable the comparison sections below.",
     },
     "zh": {
         "page_title": "书籍对比",
@@ -127,6 +134,12 @@ _COMPARE_STRINGS: dict[str, dict] = {
         "unique_b_expander": "书籍 {} 独有词汇（{}）",
         "lang_labels": {"en": "🇬🇧 英语", "zh": "🇨🇳 中文", "ja": "🇯🇵 日语"},
         "detected_lang": "检测到的语言",
+        "no_style_data": "暂无文体数据。",
+        "same_book_warning": (
+            "两个槽位上传了同一本书，"
+            "请上传两本不同的书以进行有意义的对比。"
+        ),
+        "one_book_note": "上传第二本书以启用下方的对比功能。",
     },
     "ja": {
         "page_title": "書籍比較",
@@ -170,6 +183,12 @@ _COMPARE_STRINGS: dict[str, dict] = {
         "unique_b_expander": "本 {} のみの語彙（{}）",
         "lang_labels": {"en": "🇬🇧 英語", "zh": "🇨🇳 中国語", "ja": "🇯🇵 日本語"},
         "detected_lang": "検出された言語",
+        "no_style_data": "文体データがありません。",
+        "same_book_warning": (
+            "両スロットに同じ本がアップロードされています。"
+            "比較には2冊の異なる本をアップロードしてください。"
+        ),
+        "one_book_note": "比較セクションを有効にするには2冊目をアップロードしてください。",
     },
 }
 
@@ -221,6 +240,11 @@ def _analyse(file_bytes: bytes, filename: str, strategy: str, chunk_size: int, m
     emotion_scores = LexiconAnalyzer(language=lang).analyze_book(chunks)
     style_scores = StyleAnalyzer(language=lang).analyze_book(chunks)
     return chunks, emotion_scores, style_scores, lang
+
+
+def _content_fingerprint(file_bytes: bytes) -> str:
+    """MD5 of the first 8 KB of file bytes — fast duplicate-book detection."""
+    return hashlib.md5(file_bytes[:8192]).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -277,12 +301,14 @@ if uploaded_a is None and uploaded_b is None:
 # ---------------------------------------------------------------------------
 
 results: dict[str, tuple] = {}
+_fingerprints: dict[str, str] = {}
 
 for label, uploaded in [("A", uploaded_a), ("B", uploaded_b)]:
     if uploaded is None:
         continue
     with st.spinner(T["analysing"].format(label)):
         file_bytes = uploaded.read()
+        _fingerprints[label] = _content_fingerprint(file_bytes)
         chunks, emotion_scores, style_scores, detected_lang = _analyse(
             file_bytes, uploaded.name, strategy, chunk_size, min_words,
         )
@@ -294,7 +320,19 @@ for label, uploaded in [("A", uploaded_a), ("B", uploaded_b)]:
 if not results:
     st.stop()
 
+# Same-book guard
+if (
+    len(_fingerprints) == 2
+    and _fingerprints.get("A") == _fingerprints.get("B")
+):
+    st.warning(T["same_book_warning"])
+    st.stop()
+
 arc_classifier = ArcClassifier()
+
+# Single-book note — user uploaded only one book
+if len(results) == 1:
+    st.info(T["one_book_note"])
 
 # Map label → analysis dict
 analyses: dict[str, dict] = {}
@@ -436,7 +474,7 @@ for col, (label, info) in zip(radar_cols, analyses.items()):
                 key=f"radar_{label}",
             )
         else:
-            st.info("No style data.")
+            st.info(T["no_style_data"])
 
 # ---------------------------------------------------------------------------
 # Style metrics table — both books together
