@@ -80,35 +80,29 @@
   `llm_analyzer.py`. _(commit 95e3e11)_
 - Tests: 250 → 299 (+49 new tests)
 
-## v0.9 — planned (CEO plan: 2026-03-30)
+## v0.9 — completed 2026-03-30
 
-- [ ] **Chat Tab (Approach C)** — New Chat tab; user asks questions about the book, LLM reads
-  from chunk context to answer. Uses `st.text_input` + button (primary pattern; avoids
-  `st.chat_input` re-run freeze). Session-state history with 10-turn rolling window.
-  NOTE: verify `_call_llm` is thread-safe before parallelization (per-call client vs singleton).
-- [ ] **Reading time estimate** — Show "~X hr Y min" in hero card.
-  Formula: word_count / wpm (fiction:250 / nonfiction:200 / essay:220) * readability factor.
-  Guard: skip if word_count < 100 or > 200 hr equivalent.
-- [ ] **Emotion DNA radar chart** — Add `EmotionRadarRenderer` (polar chart) for Overview tab.
-  Keep `EmotionTimelineRenderer` bar chart in Compare tab. New `bookscope/viz/emotion_radar_renderer.py`.
-- [ ] **Book recommendations [Experimental]** — After Quick Insight, LLM suggests 3 similar books.
-  Gate behind `ENABLE_BOOK_RECS=true` env var (defaults off). Add "AI suggestions" disclaimer.
-- [ ] **Pre-reading quick preview** — "Quick Preview" button alongside "Analyze (Full)".
-  LLM reads first 5 chunks, returns 3-sentence summary before full analysis.
-- [ ] **Multi-book library view** — New Library tab; shows all saved analyses, mini comparison
-  of 2 books' emotion arcs (extend `EmotionTimelineRenderer` with `series_b` OR create
-  `EmotionComparisonRenderer` subclass — reviewer recommends subclass to preserve SRP).
-  Display cap: most recent 20. Empty state: "No analyses saved yet."
-- [ ] **Parallelize LLM calls** — nonfiction and essay Quick Insight show 2 sequential spinners
-  (~2-4s); use `concurrent.futures.ThreadPoolExecutor` to run both calls simultaneously (~1-2s).
-  CRITICAL: no `st.session_state` or Streamlit UI calls inside worker threads.
-  Verify `_call_llm` constructs per-call `anthropic.Anthropic()` client, not shared singleton.
-- [ ] **`_call_llm` unit tests** — direct coverage of `max_tokens`, model selection path,
-  and API client construction; currently exercised only through integration mocks.
-- [ ] **`quick_insight.py` smoke test** — single test that calls `render_quick_insight()` with
-  mock data and asserts no exceptions (catches import/wiring regressions).
-- [ ] **Japanese LLM output validation** — `lang_name="Japanese"` may still elicit English
-  responses from Claude Haiku; add a smoke test / CI check.
+- [x] **Chat Tab (Approach C)** — `app/tabs/chat.py`; 8-chunk context sampling, MD5 cache,
+  10-turn rolling window, no session_state in worker threads. _(commit 17c6d4f)_
+- [x] **Reading time estimate** — "~X hr Y min" in hero card; wpm by book type × readability
+  factor; guard for <100 or >200-hr equivalent. _(commit 17c6d4f)_
+- [x] **Emotion DNA radar chart** — `EmotionRadarRenderer` + `build_emotion_radar_data()`;
+  8-axis polar, fill keyed to dominant emotion color. _(commit 17c6d4f)_
+- [x] **Book recommendations [Experimental]** — `_render_book_recommendations()` in
+  quick_insight.py; gated by `ENABLE_BOOK_RECS=true`; MD5 session cache. _(commit 17c6d4f)_
+- [x] **Pre-reading quick preview** — Quick Preview gate in `app/main.py`; LLM 3-sentence
+  summary from first 5 chunks before full analysis. _(commit 17c6d4f)_
+- [x] **Multi-book library view** — `app/tabs/library.py` + `EmotionComparisonRenderer`;
+  most recent 20 analyses; mini dual-arc comparison with normalized x-axis. _(commit 17c6d4f)_
+- [x] **Parallelize LLM calls** — `ThreadPoolExecutor(max_workers=2)` for academic/essay
+  Quick Insight; worker threads receive model as explicit arg (no session_state). _(commit 17c6d4f)_
+- [x] **`_call_llm` unit tests** — `TestCallLlm` class (9 tests): max_tokens, model path,
+  API client construction, truncation, empty content. _(commit 17c6d4f)_
+- [x] **`quick_insight.py` smoke test** — 6 tests in `test_quick_insight_smoke.py`: all three
+  book types, empty chunks, CJK lang, markdown call assertion. _(commit 75c555d)_
+- [x] **Japanese LLM output validation** — `TestJapaneseLLMPrompt` (7 tests): all three genre
+  prompts include "Japanese" for lang='ja'. _(commit 75c555d)_
+- Tests: 299 → 379 (+80)
 
 ## Deferred to v1.0+
 
