@@ -55,11 +55,17 @@
   fixed hardcoded `"No style data."`, 10 new tests. _(commit c049f3d)_
 - Tests: 221 → 243 (+22)
 
-## Deferred to v0.7
+## v0.7.0 — completed 2026-03-30
 
-- [ ] **Analysis card sharing**: Generate downloadable PNG card (book title + arc + emotion
-  mini-chart) in Export tab. "Spotify Wrapped for books." Effort M / CC ~30 min.
-- [ ] **LLM model selector in sidebar**: Expose haiku/sonnet toggle in Advanced Options.
-  Deferred from LLM insight v0.6.
+- [x] **Analysis card sharing** — `bookscope/viz/card_renderer.py`: 800×480 dark PNG card with
+  title, top emotion badge, arc pattern, stats, and emotion bar chart. Download button in
+  Export tab. No new runtime deps (matplotlib already present). 7 new tests. _(commit 31de16c)_
+- [x] **LLM model selector in sidebar** — Haiku (fast) / Sonnet (quality) radio in "AI options"
+  expander. Choice stored in `st.session_state["llm_model"]` and read by `generate_narrative_insight`.
+  _(same commit)_
+- Tests: 243 → 250 (+7)
+
+## Deferred to v0.8+
+
 - [ ] **AnalyzerProtocol integration for LLM**: If LLM output becomes structured EmotionScore,
   wrap `llm_analyzer.py` in AnalyzerProtocol.

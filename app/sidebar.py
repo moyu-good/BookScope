@@ -70,6 +70,23 @@ def render_sidebar_inputs(ui_lang: str, T: dict) -> tuple:
         min_words = st.slider(T["min_words_label"], 10, 200, 50, step=10, key="min_words")
 
         st.divider()
+        with st.expander(f"⚙️ {T['ai_options_header']}"):
+            model_opts = ["claude-haiku-4-5", "claude-sonnet-4-6"]
+            model_labels = {
+                "claude-haiku-4-5": T["ai_model_haiku"],
+                "claude-sonnet-4-6": T["ai_model_sonnet"],
+            }
+            current_model = st.session_state.get("llm_model", "claude-haiku-4-5")
+            selected_model = st.radio(
+                T["ai_model_label"],
+                options=model_opts,
+                format_func=lambda x: model_labels[x],
+                index=model_opts.index(current_model) if current_model in model_opts else 0,
+                key="llm_model_radio",
+            )
+            st.session_state["llm_model"] = selected_model
+
+        st.divider()
         st.subheader(T["saved_header"])
         repo = Repository()
         saved = repo.list_results()

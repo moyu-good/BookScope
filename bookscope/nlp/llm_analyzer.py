@@ -134,11 +134,20 @@ def generate_narrative_insight(result, lang: str) -> str:
     try:
         import anthropic
 
-        # Use stable model alias; snapshot claude-haiku-4-5-20251001 is equivalent.
-        # TODO(v0.7): expose model selector in sidebar
+        # Model: read from st.session_state["llm_model"] (set by sidebar selector).
+        # Falls back to claude-haiku-4-5 when running outside Streamlit.
+        _default_model = "claude-haiku-4-5"
+        if st is not None:
+            try:
+                model_id = st.session_state.get("llm_model", _default_model)
+            except Exception:
+                model_id = _default_model
+        else:
+            model_id = _default_model
+
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
-            model="claude-haiku-4-5",
+            model=model_id,
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}],
         )

@@ -33,6 +33,11 @@ _STRINGS: dict[str, dict] = {
         "no_chunks_warning": "No text blocks produced. Try lowering the minimum word count.",
         "url_error": "Could not fetch URL: {}",
         "detected_lang": "Detected language",
+        # AI options
+        "ai_options_header": "AI options",
+        "ai_model_label": "Narrative model",
+        "ai_model_haiku": "Haiku — Fast",
+        "ai_model_sonnet": "Sonnet — Quality",
         "save_btn": "💾 Save analysis",
         "saved_ok": "Saved!",
         # Hero card
@@ -214,6 +219,11 @@ _STRINGS: dict[str, dict] = {
         "no_chunks_warning": "未生成任何文本块，请尝试降低最小字数。",
         "url_error": "无法获取网址内容：{}",
         "detected_lang": "检测到的语言",
+        # AI options
+        "ai_options_header": "AI 选项",
+        "ai_model_label": "叙述模型",
+        "ai_model_haiku": "Haiku — 快速",
+        "ai_model_sonnet": "Sonnet — 高质量",
         "save_btn": "💾 保存分析",
         "saved_ok": "已保存！",
         # Hero card
@@ -380,6 +390,11 @@ _STRINGS: dict[str, dict] = {
         "no_chunks_warning": "テキストブロックが生成されませんでした。最小語数を下げてください。",
         "url_error": "URLの取得に失敗しました：{}",
         "detected_lang": "検出された言語",
+        # AI options
+        "ai_options_header": "AI オプション",
+        "ai_model_label": "ナレーションモデル",
+        "ai_model_haiku": "Haiku — 高速",
+        "ai_model_sonnet": "Sonnet — 高品質",
         "save_btn": "💾 保存",
         "saved_ok": "保存しました！",
         # Hero card
