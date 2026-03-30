@@ -3,15 +3,12 @@
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from bookscope.nlp.llm_analyzer import (
     _build_prompt,
     _cache_key,
     generate_narrative_insight,
 )
 from bookscope.store import AnalysisResult
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

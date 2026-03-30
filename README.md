@@ -17,19 +17,23 @@
 BookScope turns any long-form text into an interactive emotional and stylistic dashboard.
 Upload a `.txt`, `.epub`, or `.pdf` file — or paste a URL — and immediately get:
 
+- **Quick Insight mode** — book-type cards (fiction / academic / essay) with genre label, story shape, writing style, and an AI-generated narrative paragraph (Claude API)
 - **Hero insight card** — dominant emotion, arc pattern, word count at a glance
 - **Language toggle** — switch the entire UI between English / 中文 / 日本語 instantly
+- **Book comparison** — upload two books and compare emotion timelines, style fingerprints, arc patterns, and vocabulary overlap side-by-side
 - **Plain-language explanations** for every chart, designed for general (non-technical) users
 
-| Tab | What you get |
-|-----|-------------|
+| View | What you get |
+|------|-------------|
+| **Quick Insight** | Genre label, story shape, AI narrative paragraph, "who it's for" recommendation |
 | **Overview** | Dominant emotion, average scores, word count, detected language |
 | **Heatmap** | 8-emotion × chunk intensity grid |
 | **Emotion Timeline** | Scrollable arc chart across all chunks |
 | **Style** | Radar fingerprint + per-metric trend lines |
 | **Arc Pattern** | Automatic Vonnegut arc classification |
-| **Export** | Download scores as CSV or full analysis as JSON |
+| **Export** | CSV · JSON · Markdown report · PNG share card |
 | **Chunks** | Browse individual chunks with scores |
+| **Compare** | Side-by-side emotion, style, arc, and vocabulary comparison |
 
 ---
 
@@ -138,9 +142,15 @@ bookscope/
 └── viz/             Plotly renderers + ChartDataAdapter
 
 app/
-└── main.py          Streamlit entry point (7 tabs)
+├── main.py          Streamlit entry point (Quick Insight + Full Analysis modes)
+├── analysis_flow.py Analysis state resolver
+├── sidebar.py       Sidebar inputs + language selector + AI options
+├── strings.py       All UI strings (EN / ZH / JA)
+├── css.py           Injected CSS
+├── ui_constants.py  Emotion colors, icons, field lists
+└── tabs/            overview · heatmap · timeline · style · arc · export · quick_insight · chunks
 
-tests/               pytest unit + hypothesis property tests (192 tests)
+tests/               pytest unit + hypothesis property tests (250 tests)
 .streamlit/          Streamlit theme config (dark theme, purple accent)
 ```
 
@@ -162,6 +172,8 @@ tests/               pytest unit + hypothesis property tests (192 tests)
 | Japanese tokenization | janome |
 | PDF extraction | PyMuPDF |
 | URL fetching | requests + trafilatura |
+| AI narrative | anthropic (Claude API) |
+| Share card | matplotlib (Agg backend) |
 | Tests | pytest + hypothesis |
 | Lint | ruff |
 | CI | GitHub Actions |
@@ -187,10 +199,10 @@ pip install -e ".[dev]"
 pytest
 
 # Run linter
-ruff check bookscope tests
+ruff check bookscope app tests
 
 # Auto-fix lint
-ruff check bookscope tests --fix
+ruff check bookscope app tests --fix
 ```
 
 ---
@@ -201,7 +213,7 @@ ruff check bookscope tests --fix
 2. Create a branch: `git checkout -b feature/your-feature`
 3. Install dev deps: `pip install -e ".[dev]"`
 4. Write tests for your changes
-5. Run `pytest && ruff check bookscope tests`
+5. Run `pytest && ruff check bookscope app tests`
 6. Open a pull request
 
 ---

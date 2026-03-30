@@ -412,8 +412,10 @@ def render_quick_insight(
             "Riches to Rags": ("a descent into difficulty", "走向困境的历程", "困難への下降"),
             "Man in a Hole":  ("a fall and comeback", "跌落后的重新站起", "転落と回復"),
             "Icarus":         ("early hope, late struggle", "先有希望后有挣扎", "希望の後に試練"),
-            "Cinderella":     ("resilience through hardship", "坚韧穿越艰难", "困難を乗り越えた強さ"),
-            "Oedipus":        ("hope between two struggles", "两段挣扎之间的希望", "二つの困難の間の希望"),
+            "Cinderella":     ("resilience through hardship", "坚韧穿越艰难",  # noqa: E501
+                               "困難を乗り越えた強さ"),
+            "Oedipus":        ("hope between two struggles", "两段挣扎之间的希望",  # noqa: E501
+                               "二つの困難の間の希望"),
             "Unknown":        ("a complex personal journey", "复杂的个人旅程", "複雑な旅路"),
         }
         lang_idx = {"en": 0, "zh": 1, "ja": 2}.get(ui_lang, 0)

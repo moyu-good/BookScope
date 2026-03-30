@@ -69,8 +69,8 @@ def generate_share_card(
     try:
         import matplotlib
         matplotlib.use("Agg")  # non-interactive backend — safe in Streamlit
-        import matplotlib.pyplot as plt
         import matplotlib.patches as mpatches
+        import matplotlib.pyplot as plt
     except ImportError:
         # Minimal 1×1 transparent PNG fallback
         return (

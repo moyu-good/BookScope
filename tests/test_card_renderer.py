@@ -1,10 +1,8 @@
 """Tests for bookscope.viz.card_renderer."""
 
-import pytest
 
 from bookscope.models import EmotionScore
 from bookscope.viz.card_renderer import generate_share_card
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

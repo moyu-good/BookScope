@@ -10,7 +10,7 @@ from bookscope.utils import ensure_nltk_data
 ensure_nltk_data()
 
 # Load .env if present (local dev only — never required in production)
-import pathlib as _pl
+import pathlib as _pl  # noqa: E402
 
 if _pl.Path(".env").exists():
     try:
@@ -29,10 +29,6 @@ from collections import Counter  # noqa: E402
 
 import streamlit as st  # noqa: E402
 
-from bookscope.app_utils import get_lang, get_mode, inject_fonts, set_mode  # noqa: E402
-from bookscope.nlp import ArcClassifier  # noqa: E402
-from bookscope.store import AnalysisResult, Repository  # noqa: E402
-
 from app.analysis_flow import resolve_analysis_state  # noqa: E402
 from app.css import inject_css  # noqa: E402
 from app.sidebar import render_sidebar_detected_lang, render_sidebar_inputs  # noqa: E402
@@ -46,6 +42,9 @@ from app.tabs.quick_insight import render_quick_insight  # noqa: E402
 from app.tabs.style import render_style  # noqa: E402
 from app.tabs.timeline import render_timeline  # noqa: E402
 from app.ui_constants import _EMOTION_COLORS, _EMOTION_FIELDS, _EMOTION_ICONS  # noqa: E402
+from bookscope.app_utils import get_lang, get_mode, inject_fonts, set_mode  # noqa: E402
+from bookscope.nlp import ArcClassifier  # noqa: E402
+from bookscope.store import AnalysisResult, Repository  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Page config (must be the very first Streamlit call)

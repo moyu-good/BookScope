@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import pytest
 from streamlit.testing.v1 import AppTest
 
-
 # ---------------------------------------------------------------------------
 # Helpers shared across test classes
 # ---------------------------------------------------------------------------
