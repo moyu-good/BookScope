@@ -424,3 +424,63 @@ class TestCallLlm:
             call_llm("Hello.", api_key="sk-test", model=None)
             call_kwargs = MockAnthropic.return_value.messages.create.call_args
             assert call_kwargs.kwargs.get("model") == "claude-haiku-4-5"
+
+
+# ---------------------------------------------------------------------------
+# Japanese LLM prompt validation
+# ---------------------------------------------------------------------------
+
+class TestJapaneseLLMPrompt:
+    """Verify that lang='ja' produces prompts that explicitly request Japanese output.
+
+    Claude Haiku may respond in English unless the prompt contains an explicit
+    language instruction. These tests ensure the prompt builders include
+    'Japanese' in the language directive for all three genre types.
+    """
+
+    def test_fiction_prompt_specifies_japanese(self):
+        result = _make_result()
+        prompt = _build_prompt(result, "ja", genre_type="fiction")
+        assert "Japanese" in prompt, (
+            "Fiction prompt must include 'Japanese' language instruction for lang='ja'"
+        )
+
+    def test_nonfiction_prompt_specifies_japanese(self):
+        result = _make_result()
+        prompt = _build_prompt(result, "ja", genre_type="nonfiction")
+        assert "Japanese" in prompt, (
+            "Nonfiction prompt must include 'Japanese' language instruction for lang='ja'"
+        )
+
+    def test_essay_prompt_specifies_japanese(self):
+        result = _make_result()
+        prompt = _build_prompt(result, "ja", genre_type="essay")
+        assert "Japanese" in prompt, (
+            "Essay prompt must include 'Japanese' language instruction for lang='ja'"
+        )
+
+    def test_fiction_ja_differs_from_en(self):
+        """lang='ja' and lang='en' produce different prompts (language line differs)."""
+        result = _make_result()
+        p_en = _build_prompt(result, "en", genre_type="fiction")
+        p_ja = _build_prompt(result, "ja", genre_type="fiction")
+        assert p_en != p_ja
+
+    def test_nonfiction_ja_differs_from_en(self):
+        result = _make_result()
+        p_en = _build_prompt(result, "en", genre_type="nonfiction")
+        p_ja = _build_prompt(result, "ja", genre_type="nonfiction")
+        assert p_en != p_ja
+
+    def test_essay_ja_differs_from_en(self):
+        result = _make_result()
+        p_en = _build_prompt(result, "en", genre_type="essay")
+        p_ja = _build_prompt(result, "ja", genre_type="essay")
+        assert p_en != p_ja
+
+    def test_chinese_prompt_specifies_chinese(self):
+        """Sanity check: lang='zh' requests Chinese, not Japanese."""
+        result = _make_result()
+        prompt = _build_prompt(result, "zh", genre_type="fiction")
+        assert "Chinese" in prompt
+        assert "Japanese" not in prompt

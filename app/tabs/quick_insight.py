@@ -300,9 +300,14 @@ def render_quick_insight(
                 chars_sub = ""
             else:
                 # Fallback: show top emotion words
+                n_scores = len(emotion_scores)
                 top_emotions = sorted(
                     [
-                        (e, sum(getattr(s, e) for s in emotion_scores) / len(emotion_scores))
+                        (
+                            e,
+                            sum(getattr(s, e) for s in emotion_scores) / n_scores
+                            if n_scores else 0.0,
+                        )
                         for e in _EMOTION_FIELDS
                     ],
                     key=lambda x: -x[1],
