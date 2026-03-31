@@ -4,6 +4,8 @@ Lets users ask questions about their book using LLM + sampled text chunks.
 Context is built once and cached in session_state; history is a rolling
 window of the last 10 turns.
 
+Also provides a full-text keyword search over all chunks (no LLM required).
+
 Architecture (from v0.9 plan):
   - render_chat_tab(chunks, ui_lang, T) -> None
   - _build_context(chunks) -> str      (cached in session_state by chunk MD5)
@@ -13,6 +15,8 @@ Architecture (from v0.9 plan):
 """
 
 import hashlib
+import html
+import re
 
 import streamlit as st
 
@@ -63,6 +67,52 @@ def render_chat_tab(chunks, ui_lang: str, T: dict) -> None:
         ui_lang: UI language code ("en" / "zh" / "ja").
         T:       Localised string dictionary.
     """
+    # ── Full-text search (no LLM required) ───────────────────────────────────
+    if chunks is not None:
+        s_col, b_col = st.columns([5, 1])
+        with s_col:
+            search_kw = st.text_input(
+                label=T.get("chat_search_label", "Search in book"),
+                placeholder=T.get("chat_search_placeholder", "Enter keyword to search..."),
+                label_visibility="collapsed",
+                key="chat_search_input",
+            )
+        with b_col:
+            do_search = st.button(
+                T.get("chat_search_btn", "Search"),
+                use_container_width=True,
+                key="chat_search_btn_key",
+            )
+
+        if do_search and search_kw.strip():
+            kw = search_kw.strip()
+            kw_lower = kw.lower()
+            matches = [c for c in chunks if kw_lower in getattr(c, "text", "").lower()]
+            if matches:
+                st.caption(T.get("chat_search_results", 'Found {n} match(es) for "{kw}"').format(
+                    n=len(matches), kw=kw
+                ))
+                for chunk in matches[:10]:
+                    idx = getattr(chunk, "index", "?")
+                    label = T.get("chat_search_chunk", "Chunk {idx}").format(idx=idx)
+                    # HTML-escape before highlighting to prevent XSS
+                    safe_text = html.escape(getattr(chunk, "text", ""))
+                    safe_kw = html.escape(kw)
+                    highlighted = re.sub(
+                        f"(?i){re.escape(safe_kw)}",
+                        lambda m: f"**{m.group(0)}**",
+                        safe_text,
+                    )
+                    with st.expander(label, expanded=False):
+                        st.markdown(highlighted[:800] + ("…" if len(highlighted) > 800 else ""))
+                if len(matches) > 10:
+                    st.caption(f"… and {len(matches) - 10} more")
+            else:
+                msg = T.get("chat_search_no_results", 'No matches found for "{kw}"')
+                st.info(msg.format(kw=kw))
+
+        st.divider()
+
     # Guard: saved analyses don't have raw chunks
     if chunks is None:
         st.info(T.get(

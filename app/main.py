@@ -41,6 +41,7 @@ from app.tabs.heatmap import render_heatmap  # noqa: E402
 from app.tabs.library import render_library_tab  # noqa: E402
 from app.tabs.overview import render_overview  # noqa: E402
 from app.tabs.quick_insight import render_quick_insight  # noqa: E402
+from app.tabs.share import render_share_view  # noqa: E402
 from app.tabs.style import render_style  # noqa: E402
 from app.tabs.timeline import render_timeline  # noqa: E402
 from app.ui_constants import _EMOTION_COLORS, _EMOTION_FIELDS, _EMOTION_ICONS  # noqa: E402
@@ -72,12 +73,21 @@ inject_css()
 T = _STRINGS[ui_lang]
 
 # ---------------------------------------------------------------------------
+# Share view gate — renders before anything else and halts normal UI
+# ---------------------------------------------------------------------------
+
+_share_slug = st.query_params.get("share")
+if _share_slug:
+    render_share_view(_share_slug, T, ui_lang)
+    st.stop()
+
+# ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
 
-book_type, uploaded, url_input, strategy, chunk_size, min_words = render_sidebar_inputs(
-    ui_lang, T
-)
+(
+    book_type, uploaded, url_input, strategy, chunk_size, min_words, writer_mode
+) = render_sidebar_inputs(ui_lang, T)
 
 # Keep T in sync after sidebar re-render
 T = _STRINGS[ui_lang]
@@ -325,7 +335,13 @@ if _from_saved:
 # Save button (hidden when viewing a saved result)
 if not _from_saved:
     repo = Repository()
-    save_col, _ = st.columns([1, 5])
+    author_input = st.text_input(
+        T.get("author_label", "Author name (optional)"),
+        placeholder=T.get("author_placeholder", "e.g. Jane Austen"),
+        key="_author_input",
+        label_visibility="visible",
+    )
+    save_col, share_col, _ = st.columns([1, 1, 4])
     if save_col.button(T["save_btn"]):
         result = AnalysisResult.create(
             book_title=book_title,
@@ -334,11 +350,54 @@ if not _from_saved:
             total_words=total_words,
             arc_pattern=arc.value,
             detected_lang=detected_lang,
+            author=author_input.strip(),
             emotion_scores=emotion_scores,
             style_scores=style_scores,
         )
         repo.save(result)
         save_col.success(T["saved_ok"])
+
+    # Share button — disabled when Supabase is not configured
+    from bookscope.store.supabase_repository import SupabaseRepository as _SupabaseRepo
+    _supabase_repo = _SupabaseRepo()
+    if share_col.button(
+        T.get("share_btn", "🔗 Share analysis"),
+        disabled=not _supabase_repo.available,
+        help=(
+            None if _supabase_repo.available
+            else T.get("share_btn_disabled", "Supabase not configured")
+        ),
+    ):
+        st.session_state["_share_confirm_pending"] = True
+
+    if st.session_state.get("_share_confirm_pending"):
+        st.warning(T.get(
+            "share_confirm_warning",
+            "Once shared, this link is permanent.",
+        ))
+        confirm_col, cancel_col, _ = st.columns([1, 1, 4])
+        if confirm_col.button(T.get("share_confirm_btn", "Yes, share publicly")):
+            _share_result = AnalysisResult.create(
+                book_title=book_title,
+                chunk_strategy=strategy,
+                total_chunks=n_chunks,
+                total_words=total_words,
+                arc_pattern=arc.value,
+                detected_lang=detected_lang,
+                author=author_input.strip(),
+                emotion_scores=emotion_scores,
+                style_scores=style_scores,
+            )
+            _slug = _supabase_repo.publish(_share_result, book_type=book_type)
+            st.session_state.pop("_share_confirm_pending", None)
+            if _slug:
+                st.success(T.get("share_success", "✅ Shared! Add this to your app URL:"))
+                st.code(f"?share={_slug}")
+            else:
+                st.error(T.get("share_error", "Failed to share."))
+        if cancel_col.button(T.get("share_cancel", "Cancel")):
+            st.session_state.pop("_share_confirm_pending", None)
+            st.rerun()
 
 # ---------------------------------------------------------------------------
 # Mode toggle: Quick Insight | Full Analysis
@@ -390,6 +449,8 @@ if view_mode == "quick":
         ui_lang=ui_lang,
         T=T,
         analysis_result=_qi_result,
+        writer_mode=writer_mode,
+        arc_classifier=arc_classifier,
     )
 
 # ---------------------------------------------------------------------------

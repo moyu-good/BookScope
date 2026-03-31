@@ -105,7 +105,10 @@ class TestChunkTextBlock:
 
 class TestParseNonfictionResponse:
     def test_parses_concepts_and_argument(self):
-        raw = "CONCEPTS: System 1, heuristics, bias, loss aversion\nARGUMENT: Builds from evidence toward a unified theory."
+        raw = (
+            "CONCEPTS: System 1, heuristics, bias, loss aversion\n"
+            "ARGUMENT: Builds from evidence toward a unified theory."
+        )
         concepts, arg = _parse_nonfiction_response(raw)
         assert "System 1" in concepts
         assert "heuristics" in concepts
@@ -287,7 +290,9 @@ class TestExtractEssayVoice:
     def test_returns_voice_text(self):
         chunks = _make_chunks(10)
         mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text="Lyrical and introspective. The atmosphere is quietly melancholy.")]
+        mock_msg.content = [MagicMock(
+            text="Lyrical and introspective. The atmosphere is quietly melancholy."
+        )]
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}):
             with patch("anthropic.Anthropic") as MockAnthropic:
                 MockAnthropic.return_value.messages.create.return_value = mock_msg

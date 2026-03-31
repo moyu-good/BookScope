@@ -37,6 +37,7 @@ class AnalysisResult(BaseModel):
     total_words: int
     arc_pattern: str             # ArcPattern.value string
     detected_lang: str = "en"   # ISO 639-1 language code; defaults to "en" for old saves
+    author: str = ""             # optional author name; defaults to "" for old saves
     emotion_scores: list[EmotionScore]
     style_scores: list[StyleScore]
 
@@ -50,6 +51,7 @@ class AnalysisResult(BaseModel):
         total_words: int,
         arc_pattern: str,
         detected_lang: str = "en",
+        author: str = "",
         emotion_scores: list[EmotionScore],
         style_scores: list[StyleScore],
     ) -> "AnalysisResult":
@@ -61,6 +63,7 @@ class AnalysisResult(BaseModel):
             total_words=total_words,
             arc_pattern=arc_pattern,
             detected_lang=detected_lang,
+            author=author,
             emotion_scores=emotion_scores,
             style_scores=style_scores,
         )
@@ -173,3 +176,31 @@ class Repository:
     def delete(self, path: Path | str) -> None:
         """Delete a saved analysis file."""
         Path(path).unlink(missing_ok=True)
+
+    # ── Reading diary (sidecar notes) ────────────────────────────────────────
+
+    def save_notes(self, analysis_path: Path | str, notes: dict) -> None:
+        """Persist notes dict as a sidecar JSON file next to the analysis.
+
+        Notes are stored at ``{stem}_notes.json`` alongside the analysis file.
+        Keys: mood_score (int|None), memorable_quote (str), read_date (str).
+        """
+        import json
+        p = Path(analysis_path)
+        notes_path = p.with_name(p.stem + "_notes.json")
+        notes_path.write_text(json.dumps(notes, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def load_notes(self, analysis_path: Path | str) -> dict:
+        """Load sidecar notes for an analysis file.
+
+        Returns an empty dict (backward-compatible) when no notes file exists.
+        """
+        import json
+        p = Path(analysis_path)
+        notes_path = p.with_name(p.stem + "_notes.json")
+        if not notes_path.exists():
+            return {}
+        try:
+            return json.loads(notes_path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}

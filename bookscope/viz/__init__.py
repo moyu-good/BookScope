@@ -5,6 +5,7 @@ from bookscope.viz.emotion_comparison_renderer import EmotionComparisonRenderer
 from bookscope.viz.emotion_radar_renderer import EmotionRadarRenderer
 from bookscope.viz.emotion_timeline import EmotionTimelineRenderer
 from bookscope.viz.heatmap import EmotionHeatmapRenderer
+from bookscope.viz.multi_book_comparison_renderer import MultiBookComparisonRenderer
 from bookscope.viz.style_radar import StyleRadarRenderer
 from bookscope.viz.theme import BookScopeTheme
 
@@ -16,6 +17,7 @@ __all__ = [
     "EmotionRadarRenderer",
     "EmotionTimelineRenderer",
     "generate_share_card",
+    "MultiBookComparisonRenderer",
     "StyleRadarRenderer",
     "BookScopeTheme",
 ]

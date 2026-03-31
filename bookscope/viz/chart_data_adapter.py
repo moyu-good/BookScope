@@ -90,6 +90,15 @@ class EmotionArcComparisonData:
     label_b: str           # book B title
 
 
+@dataclass
+class MultiBookArcData:
+    """Adapted payload for N-series arc comparison (author cross-book view)."""
+
+    series: list[list[float]]    # one normalized valence series per book
+    x_series: list[list[float]]  # normalized x positions per book (same length as series)
+    labels: list[str]            # book titles
+
+
 class ChartDataAdapter:
     """Transforms domain models into renderer-ready data structures."""
 
@@ -278,3 +287,46 @@ class ChartDataAdapter:
             label_a=result_a.book_title,
             label_b=result_b.book_title,
         )
+
+    @staticmethod
+    def build_multi_book_comparison_data(
+        results: "list[AnalysisResult]",
+    ) -> "MultiBookArcData":
+        """Build N-series arc comparison data for multiple books.
+
+        Same valence formula as build_emotion_arc_comparison_data; normalizes
+        x to [0, 1] per book so books of different lengths overlay cleanly.
+
+        Args:
+            results: List of AnalysisResult objects (2 or more).
+
+        Returns:
+            MultiBookArcData with one series per book.
+        """
+        def _valence(scores: list[EmotionScore]) -> list[float]:
+            sorted_s = sorted(scores, key=lambda s: s.chunk_index)
+            raw = [
+                s.joy + s.trust + s.anticipation - s.fear - s.sadness - s.anger - s.disgust
+                for s in sorted_s
+            ]
+            v_min, v_max = min(raw), max(raw)
+            span = v_max - v_min
+            if span == 0:
+                return [0.5] * len(raw)
+            return [(v - v_min) / span for v in raw]
+
+        def _norm_x(n: int) -> list[float]:
+            if n <= 1:
+                return [0.0] * n
+            return [i / (n - 1) for i in range(n)]
+
+        series: list[list[float]] = []
+        x_series: list[list[float]] = []
+        labels: list[str] = []
+        for r in results:
+            vals = _valence(r.emotion_scores) if r.emotion_scores else []
+            series.append(vals)
+            x_series.append(_norm_x(len(vals)))
+            labels.append(r.book_title)
+
+        return MultiBookArcData(series=series, x_series=x_series, labels=labels)

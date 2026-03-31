@@ -154,6 +154,87 @@ def _render_book_recommendations(
     )
 
 
+def _render_draft_diagnosis(
+    valence_series: list,
+    arc_value: str,
+    arc_classifier,
+    ui_lang: str,
+    T: dict,
+) -> None:
+    """Render writer-mode arc diagnosis cards.
+
+    Shows how closely the draft's valence series matches each of the 6
+    classic arc templates, plus a pattern-specific writing tip.
+    """
+    from bookscope.nlp.arc_classifier import ArcPattern
+
+    st.divider()
+    st.markdown(
+        f'<div class="bs-insight-headline" style="border-left:4px solid #7c3aed;">'
+        f'<div class="bs-insight-headline-label">'
+        f'{_html.escape(T.get("draft_diag_label", "DRAFT ARC DIAGNOSIS"))}</div>'
+        f'<div class="bs-insight-headline-text bs-no-animate">'
+        f'{_html.escape(T.get("draft_diag_desc", "How your draft compares to the 6 classic arc patterns."))}'  # noqa: E501
+        f'</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    if len(valence_series) < 6:
+        st.info(T.get("draft_diag_too_short", "Need at least 6 text blocks for arc diagnosis."))
+        return
+
+    # Compute match score (1 - MAE) for each named pattern
+    named_patterns = [
+        ArcPattern.RAGS_TO_RICHES,
+        ArcPattern.RICHES_TO_RAGS,
+        ArcPattern.MAN_IN_HOLE,
+        ArcPattern.ICARUS,
+        ArcPattern.CINDERELLA,
+        ArcPattern.OEDIPUS,
+    ]
+    scores = {
+        p: max(0.0, 1.0 - arc_classifier.distance_to_arc(valence_series, p))
+        for p in named_patterns
+    }
+    sorted_patterns = sorted(scores.items(), key=lambda x: -x[1])
+    best_pattern, best_score = sorted_patterns[0]
+
+    # Closest match caption
+    closest_label = T.get("draft_diag_closest", "Closest match: {pattern} ({score:.0%})")
+    st.caption(closest_label.format(pattern=best_pattern.value, score=best_score))
+
+    # Progress bars — best to worst
+    for pattern, score in sorted_patterns:
+        col_label, col_bar, col_pct = st.columns([2, 5, 1])
+        col_label.caption(pattern.value)
+        col_bar.progress(float(score))
+        col_pct.caption(f"{score:.0%}")
+
+    # Pattern-specific writing tip
+    _tip_keys = {
+        ArcPattern.RAGS_TO_RICHES: "draft_diag_tip_rtr",
+        ArcPattern.RICHES_TO_RAGS: "draft_diag_tip_r2r",
+        ArcPattern.MAN_IN_HOLE:    "draft_diag_tip_mih",
+        ArcPattern.ICARUS:         "draft_diag_tip_icarus",
+        ArcPattern.CINDERELLA:     "draft_diag_tip_cinderella",
+        ArcPattern.OEDIPUS:        "draft_diag_tip_oedipus",
+    }
+    if best_score < 0.7:
+        tip = T.get("draft_diag_tip_refine", "")
+    else:
+        tip = T.get(_tip_keys.get(best_pattern, "draft_diag_tip_refine"), "")
+
+    if tip:
+        st.markdown(
+            f'<div class="bs-for-you" style="margin-top:.5rem;">'
+            f'<div class="bs-for-you-icon">✍️</div>'
+            f'<div class="bs-for-you-text">{_html.escape(tip)}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+
 def render_quick_insight(
     book_type: str,
     book_title: str,
@@ -171,6 +252,8 @@ def render_quick_insight(
     ui_lang: str,
     T: dict,
     analysis_result=None,
+    writer_mode: bool = False,
+    arc_classifier=None,
 ) -> None:
     """Render Quick Insight cards for the given book type."""
     type_color = _TYPE_COLOR.get(book_type, "#7c3aed")
@@ -711,3 +794,13 @@ def render_quick_insight(
         ui_lang=ui_lang,
         T=T,
     )
+
+    # ── WRITER MODE: DRAFT DIAGNOSIS ─────────────────────────────────────────
+    if writer_mode and arc_classifier is not None:
+        _render_draft_diagnosis(
+            valence_series=valence_series,
+            arc_value=arc_value,
+            arc_classifier=arc_classifier,
+            ui_lang=ui_lang,
+            T=T,
+        )

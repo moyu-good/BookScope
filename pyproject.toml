@@ -37,6 +37,9 @@ dev = [
 spacy = [
     "spacy>=3.7.0,<4.0.0",
 ]
+share = [
+    "supabase>=2.3.0",
+]
 
 [tool.ruff]
 line-length = 100
