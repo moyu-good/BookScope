@@ -86,7 +86,7 @@ if _share_slug:
 # ---------------------------------------------------------------------------
 
 (
-    book_type, uploaded, url_input, strategy, chunk_size, min_words, writer_mode
+    book_type, uploaded, url_input, strategy, chunk_size, min_words
 ) = render_sidebar_inputs(ui_lang, T)
 
 # Keep T in sync after sidebar re-render
@@ -449,8 +449,6 @@ if view_mode == "quick":
         ui_lang=ui_lang,
         T=T,
         analysis_result=_qi_result,
-        writer_mode=writer_mode,
-        arc_classifier=arc_classifier,
     )
 
 # ---------------------------------------------------------------------------

@@ -18,12 +18,15 @@
     --gold-dim:  rgba(232,184,75,.12);
     --violet:    #a78bfa;
     --violet-dim: rgba(167,139,250,.1);
+    --teal:      #34d399;
+    --teal-dim:  rgba(52,211,153,.08);
     --cream:     #f0e8d8;
     --cream-dim: #b8a898;
     --muted:     #6b607c;
     --border:    rgba(240,232,216,.07);
     --border-gold: rgba(232,184,75,.2);
     --border-violet: rgba(167,139,250,.2);
+    --border-teal: rgba(52,211,153,.2);
     --ff-serif: 'Playfair Display', Georgia, serif;
     --ff-sans:  'Plus Jakarta Sans', system-ui, sans-serif;
     --ff-mono:  'JetBrains Mono', monospace;
@@ -141,7 +144,7 @@ nav {
     top: 0; left: -20%;
     width: 70%; height: 100%;
     background: radial-gradient(ellipse at 30% 40%,
-        rgba(167,139,250,.06) 0%,
+        rgba(232,184,75,.04) 0%,
         transparent 60%);
     pointer-events: none;
 }
@@ -159,7 +162,16 @@ nav {
 .hero-headline em {
     font-style: italic;
     color: var(--gold);
+    position: relative;
     -webkit-text-stroke: 0;
+}
+.hero-headline em::after {
+    content: '';
+    position: absolute;
+    bottom: -4px; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gold), rgba(232,184,75,0));
+    border-radius: 1px;
 }
 .hero-sub {
     font-size: 1.1rem;
@@ -218,9 +230,7 @@ nav {
 .hero-note span { color: var(--gold); opacity: .7; }
 
 /* ── Hero demo card ────────────────────────────────────────────── */
-.hero-demo {
-    position: relative;
-}
+.hero-demo { position: relative; }
 .demo-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -239,33 +249,101 @@ nav {
     position: absolute;
     top: -60px; right: -60px;
     width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(232,184,75,.06) 0%, transparent 65%);
+    background: radial-gradient(circle, rgba(232,184,75,.05) 0%, transparent 65%);
     pointer-events: none;
 }
-.demo-title {
-    font-family: var(--ff-serif);
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--cream);
-    margin-bottom: .25rem;
-}
-.demo-meta {
+
+/* Book DNA section */
+.demo-dna-label {
     font-family: var(--ff-mono);
-    font-size: .68rem;
-    color: var(--muted);
-    letter-spacing: .08em;
+    font-size: .65rem;
+    letter-spacing: .18em;
     text-transform: uppercase;
-    margin-bottom: 1.25rem;
+    color: var(--gold);
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    margin-bottom: .65rem;
 }
+.dna-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    flex-shrink: 0;
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(232,184,75,.4); }
+    50%       { opacity: .6; box-shadow: 0 0 0 5px rgba(232,184,75,0); }
+}
+.demo-dna-text {
+    font-family: var(--ff-sans);
+    font-size: .88rem;
+    color: var(--cream);
+    line-height: 1.65;
+    min-height: 3.2em;
+    border-left: 2px solid rgba(232,184,75,.4);
+    padding-left: .85rem;
+    margin-bottom: 1.1rem;
+    position: relative;
+}
+.demo-dna-cursor {
+    display: inline-block;
+    width: 1.5px;
+    height: .95em;
+    background: var(--gold);
+    vertical-align: text-bottom;
+    margin-left: 1px;
+    animation: cursor-blink .7s step-end infinite;
+}
+@keyframes cursor-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
 .demo-divider {
     height: 1px;
     background: var(--border);
     margin: 1rem 0;
 }
+.demo-book-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .85rem;
+}
+.demo-book-title {
+    font-family: var(--ff-serif);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--cream);
+    line-height: 1.2;
+}
+.demo-book-meta {
+    font-family: var(--ff-mono);
+    font-size: .63rem;
+    color: var(--muted);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-top: .18rem;
+}
+.demo-arc-pill {
+    flex-shrink: 0;
+    padding: .22rem .65rem;
+    border-radius: 4px;
+    font-family: var(--ff-mono);
+    font-size: .65rem;
+    font-weight: 500;
+    letter-spacing: .06em;
+    border: 1px solid;
+    white-space: nowrap;
+}
+
 .demo-metrics {
     display: flex;
     gap: 1.5rem;
-    margin-bottom: 1.25rem;
+    margin-bottom: 1.1rem;
 }
 .demo-metric-label {
     font-size: .58rem;
@@ -276,30 +354,18 @@ nav {
     margin-bottom: .2rem;
 }
 .demo-metric-value {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 800;
     color: var(--cream);
     letter-spacing: -.02em;
     line-height: 1;
 }
-.demo-metric-value.gold { color: var(--gold); }
+.demo-metric-value.gold   { color: var(--gold); }
 .demo-metric-value.violet { color: var(--violet); }
+.demo-metric-value.teal   { color: var(--teal); }
 
 /* Arc SVG canvas */
-.demo-arc {
-    width: 100%;
-    height: 80px;
-    margin: .5rem 0;
-}
-.demo-arc-label {
-    font-size: .62rem;
-    color: var(--muted);
-    font-family: var(--ff-mono);
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    text-align: center;
-    margin-top: .25rem;
-}
+.demo-arc { width: 100%; height: 72px; }
 
 .demo-pills {
     display: flex;
@@ -323,17 +389,16 @@ nav {
     position: absolute;
     top: 1.25rem; right: -1.5rem;
     background: var(--surface);
-    border: 1px solid var(--border-violet);
+    border: 1px solid var(--border-gold);
     border-radius: 8px;
     padding: .6rem .85rem;
     font-size: .72rem;
-    color: var(--violet);
+    color: var(--gold);
     font-family: var(--ff-mono);
     box-shadow: 0 8px 24px rgba(0,0,0,.4);
     white-space: nowrap;
     animation: float 4s ease-in-out infinite;
 }
-
 @keyframes float {
     0%, 100% { transform: translateY(0); }
     50%       { transform: translateY(-6px); }
@@ -371,7 +436,48 @@ section {
     margin: 0 auto;
 }
 
-/* ── Feature cards ─────────────────────────────────────────────── */
+/* ── Format support pills ──────────────────────────────────────── */
+.formats {
+    padding: 3rem 5%;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+.formats-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+.formats-label {
+    font-family: var(--ff-mono);
+    font-size: .72rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+}
+.formats-pills {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+.fmt-pill {
+    padding: .4rem .9rem;
+    border-radius: 6px;
+    font-family: var(--ff-mono);
+    font-size: .78rem;
+    font-weight: 500;
+    letter-spacing: .06em;
+    background: rgba(240,232,216,.05);
+    border: 1px solid rgba(240,232,216,.1);
+    color: var(--cream-dim);
+    transition: all .15s;
+}
+.fmt-pill:hover { border-color: var(--border-gold); color: var(--gold); }
+
+/* ── Persona cards (features) ──────────────────────────────────── */
 .features {
     background: #0c0b13;
     padding: 6rem 0;
@@ -383,69 +489,99 @@ section {
     margin: 0 auto;
     padding: 0 5%;
 }
-.features-grid {
+.personas-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 1.25rem;
+    gap: 1.5rem;
     margin-top: 3.5rem;
 }
-.feature-card {
+.persona-card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 1.75rem;
+    border-radius: 20px;
+    padding: 2rem;
     position: relative;
     overflow: hidden;
     transition: transform .25s, box-shadow .25s;
+    border: 1px solid var(--border);
 }
-.feature-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 48px rgba(0,0,0,.4);
+.persona-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 24px 56px rgba(0,0,0,.45);
 }
-.feature-card::before {
+.persona-card::before {
     content: '';
     position: absolute;
     top: 0; left: 0;
-    width: 100%; height: 2px;
+    width: 100%; height: 3px;
 }
-.feature-card.fc-gold::before  { background: linear-gradient(90deg, var(--gold), transparent); }
-.feature-card.fc-violet::before { background: linear-gradient(90deg, var(--violet), transparent); }
-.feature-card.fc-teal::before  { background: linear-gradient(90deg, #34d399, transparent); }
-.feature-icon {
-    width: 40px; height: 40px;
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.3rem;
-    margin-bottom: 1.1rem;
+.pc-gold::before   { background: linear-gradient(90deg, var(--gold), rgba(232,184,75,.2)); }
+.pc-teal::before   { background: linear-gradient(90deg, var(--teal), rgba(52,211,153,.2)); }
+.pc-violet::before { background: linear-gradient(90deg, var(--violet), rgba(167,139,250,.2)); }
+
+.persona-card::after {
+    content: '';
+    position: absolute;
+    bottom: -40px; right: -40px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    pointer-events: none;
 }
-.fi-gold   { background: rgba(232,184,75,.12); }
-.fi-violet { background: rgba(167,139,250,.1); }
-.fi-teal   { background: rgba(52,211,153,.1); }
-.feature-name {
-    font-size: 1.05rem;
+.pc-gold::after   { background: radial-gradient(circle, rgba(232,184,75,.04), transparent 70%); }
+.pc-teal::after   { background: radial-gradient(circle, rgba(52,211,153,.04), transparent 70%); }
+.pc-violet::after { background: radial-gradient(circle, rgba(167,139,250,.04), transparent 70%); }
+
+.persona-icon {
+    font-size: 2rem;
+    margin-bottom: 1.25rem;
+    display: block;
+}
+.persona-for {
+    font-family: var(--ff-mono);
+    font-size: .62rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    margin-bottom: .4rem;
+}
+.pf-gold   { color: var(--gold); }
+.pf-teal   { color: var(--teal); }
+.pf-violet { color: var(--violet); }
+
+.persona-name {
+    font-family: var(--ff-serif);
+    font-size: 1.35rem;
     font-weight: 700;
     color: var(--cream);
-    margin-bottom: .5rem;
+    margin-bottom: .75rem;
     letter-spacing: -.01em;
+    line-height: 1.25;
 }
-.feature-desc {
-    font-size: .88rem;
+.persona-desc {
+    font-size: .9rem;
     color: var(--cream-dim);
-    line-height: 1.65;
+    line-height: 1.7;
+    margin-bottom: 1.25rem;
 }
-.feature-badge {
-    display: inline-block;
-    margin-top: .85rem;
-    font-family: var(--ff-mono);
-    font-size: .65rem;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    padding: .2rem .55rem;
-    border-radius: 3px;
+.persona-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
 }
-.badge-gold   { color: var(--gold);   background: var(--gold-dim);   border: 1px solid rgba(232,184,75,.2); }
-.badge-violet { color: var(--violet); background: var(--violet-dim); border: 1px solid rgba(167,139,250,.2); }
-.badge-teal   { color: #34d399;       background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.2); }
+.persona-features li {
+    font-size: .82rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.persona-features li::before {
+    content: '';
+    width: 14px; height: 1px;
+    flex-shrink: 0;
+}
+.pc-gold   .persona-features li::before { background: var(--gold); opacity: .5; }
+.pc-teal   .persona-features li::before { background: var(--teal); opacity: .5; }
+.pc-violet .persona-features li::before { background: var(--violet); opacity: .5; }
 
 /* ── Arc gallery ───────────────────────────────────────────────── */
 .arc-section { padding: 6rem 5%; }
@@ -528,27 +664,24 @@ section {
     background: #0c0b13;
     border-top: 1px solid var(--border);
 }
-.how-inner {
-    max-width: 1280px;
-    margin: 0 auto;
-}
+.how-inner { max-width: 1280px; margin: 0 auto; }
 .steps {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 2rem;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2.5rem;
     margin-top: 3rem;
     position: relative;
 }
 .steps::before {
     content: '';
     position: absolute;
-    top: 1.5rem; left: 0; right: 0;
+    top: 1.5rem; left: 5%; right: 5%;
     height: 1px;
     background: linear-gradient(90deg,
-        transparent 5%, var(--border) 20%,
-        var(--border) 80%, transparent 95%);
+        transparent 0%, var(--border) 15%,
+        var(--border) 85%, transparent 100%);
 }
-.step { position: relative; padding-top: 0; }
+.step { position: relative; }
 .step-num {
     width: 3rem; height: 3rem;
     background: var(--surface);
@@ -573,59 +706,28 @@ section {
 .step-desc {
     font-size: .83rem;
     color: var(--cream-dim);
-    line-height: 1.6;
+    line-height: 1.65;
 }
-
-/* ── Format support pills ──────────────────────────────────────── */
-.formats {
-    padding: 3rem 5%;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-}
-.formats-inner {
-    max-width: 1280px;
-    margin: 0 auto;
+.step-pills {
     display: flex;
-    align-items: center;
-    gap: 2rem;
+    gap: .35rem;
     flex-wrap: wrap;
+    margin-top: .75rem;
 }
-.formats-label {
+.step-pill {
+    padding: .15rem .55rem;
+    border-radius: 3px;
     font-family: var(--ff-mono);
-    font-size: .72rem;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--muted);
-    white-space: nowrap;
-}
-.formats-pills {
-    display: flex;
-    gap: .5rem;
-    flex-wrap: wrap;
-}
-.fmt-pill {
-    padding: .4rem .9rem;
-    border-radius: 6px;
-    font-family: var(--ff-mono);
-    font-size: .78rem;
-    font-weight: 500;
+    font-size: .65rem;
     letter-spacing: .06em;
     background: rgba(240,232,216,.05);
-    border: 1px solid rgba(240,232,216,.1);
-    color: var(--cream-dim);
-    transition: all .15s;
-}
-.fmt-pill:hover { border-color: var(--border-gold); color: var(--gold); }
-.fmt-pill.coming {
+    border: 1px solid rgba(240,232,216,.09);
     color: var(--muted);
-    opacity: .5;
-    border-style: dashed;
-    cursor: default;
 }
 
 /* ── CTA section ───────────────────────────────────────────────── */
 .cta-section {
-    padding: 8rem 5%;
+    padding: 9rem 5% 8rem;
     text-align: center;
     position: relative;
     overflow: hidden;
@@ -635,11 +737,27 @@ section {
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 600px; height: 600px;
-    background: radial-gradient(circle, rgba(232,184,75,.04) 0%, transparent 65%);
+    width: 700px; height: 700px;
+    background: radial-gradient(circle, rgba(232,184,75,.035) 0%, transparent 65%);
     pointer-events: none;
 }
-.cta-inner { position: relative; max-width: 600px; margin: 0 auto; }
+/* BookScope watermark */
+.cta-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--ff-serif);
+    font-size: clamp(5rem, 15vw, 12rem);
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(232,184,75,.05);
+    letter-spacing: -.03em;
+    user-select: none;
+    pointer-events: none;
+    white-space: nowrap;
+}
+.cta-inner { position: relative; max-width: 640px; margin: 0 auto; }
 .cta-headline {
     font-family: var(--ff-serif);
     font-size: clamp(2.2rem, 4vw, 3.5rem);
@@ -654,6 +772,9 @@ section {
     color: var(--cream-dim);
     line-height: 1.7;
     margin-bottom: 2.5rem;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
 }
 .cta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
 
@@ -708,19 +829,18 @@ footer {
 }
 
 /* ── Responsive ────────────────────────────────────────────────── */
-@media (max-width: 900px) {
+@media (max-width: 960px) {
     .hero { grid-template-columns: 1fr; padding-top: 7rem; }
     .hero-demo { display: none; }
-    .features-grid { grid-template-columns: 1fr; }
+    .personas-grid { grid-template-columns: 1fr; }
     .arc-grid { grid-template-columns: 1fr 1fr; }
-    .steps { grid-template-columns: 1fr 1fr; }
+    .steps { grid-template-columns: 1fr; }
     .steps::before { display: none; }
     nav { padding: 1rem 1.5rem; }
     .nav-links { display: none; }
 }
 @media (max-width: 600px) {
     .arc-grid { grid-template-columns: 1fr; }
-    .steps { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -730,7 +850,7 @@ footer {
 <nav>
     <a href="#" class="nav-logo">📖 Book<span>Scope</span></a>
     <ul class="nav-links">
-        <li><a href="#features">Features</a></li>
+        <li><a href="#personas">For you</a></li>
         <li><a href="#arcs">Narrative Arcs</a></li>
         <li><a href="#how">How it works</a></li>
     </ul>
@@ -738,20 +858,20 @@ footer {
 </nav>
 
 <!-- Hero -->
-<div class="hero" style="max-width:1280px;margin:0 auto;padding:8rem 5% 4rem;display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center;">
+<div class="hero" style="max-width:1280px;margin:0 auto;padding:8rem 5% 4rem;display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center;min-height:100vh;position:relative;">
     <div class="hero-text">
         <div class="eyebrow">Book Intelligence</div>
         <h1 class="hero-headline">
-            Decode every<br>
-            book's <em>emotional</em><br>
-            DNA.
+            Your book,<br>
+            <em>decoded</em><br>
+            in 60 seconds.
         </h1>
         <p class="hero-sub">
-            Understand any book in 60 seconds. Book DNA, arc shape, reading grade, and a one-line AI take — all from a single upload.
+            Book DNA, arc shape, reading grade — and an AI one-liner that captures what a book <em>feels</em> like. All from a single upload.
         </p>
         <div class="hero-actions">
             <a href="http://localhost:8501" class="btn-primary">
-                Analyze a Book
+                Decode a Book
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -764,59 +884,75 @@ footer {
             </a>
         </div>
         <p class="hero-note">
-            <span>✓</span> Free to use &nbsp;·&nbsp;
-            <span>✓</span> .txt · .epub · URL &nbsp;·&nbsp;
+            <span>✓</span> No account needed &nbsp;·&nbsp;
+            <span>✓</span> .txt · .epub · .pdf · URL &nbsp;·&nbsp;
             <span>✓</span> EN · ZH · JA
         </p>
     </div>
 
     <div class="hero-demo">
-        <div class="demo-annotation">⚡ Analysis complete — 2.4s</div>
+        <div class="demo-annotation">🧬 Book DNA ready</div>
         <div class="demo-card">
-            <div class="demo-title">Crime &amp; Punishment</div>
-            <div class="demo-meta">Fyodor Dostoevsky · 1866 · 211,591 words</div>
+            <!-- Book DNA — typewriter -->
+            <div class="demo-dna-label">
+                <span class="dna-dot"></span>
+                🧬 Book DNA
+            </div>
+            <div class="demo-dna-text" id="dna-text">
+                <span id="dna-typed"></span><span class="demo-dna-cursor"></span>
+            </div>
+
+            <div class="demo-divider"></div>
+
+            <!-- Book header (changes with typewriter) -->
+            <div class="demo-book-header">
+                <div>
+                    <div class="demo-book-title" id="demo-book-title">Crime &amp; Punishment</div>
+                    <div class="demo-book-meta" id="demo-book-meta">Dostoevsky · 211,591 words · Fiction</div>
+                </div>
+                <div class="demo-arc-pill" id="demo-arc-pill" style="color:#a78bfa;border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.08);">Icarus</div>
+            </div>
+
             <div class="demo-metrics">
                 <div>
                     <div class="demo-metric-label">Dominant Emotion</div>
-                    <div class="demo-metric-value gold">Fear</div>
+                    <div class="demo-metric-value gold" id="demo-emotion">Fear</div>
                 </div>
                 <div>
-                    <div class="demo-metric-label">Narrative Arc</div>
-                    <div class="demo-metric-value violet">Icarus</div>
+                    <div class="demo-metric-label">Readability</div>
+                    <div class="demo-metric-value" id="demo-readability" style="color:var(--cream-dim)">Dense</div>
                 </div>
                 <div>
-                    <div class="demo-metric-label">Chunks</div>
-                    <div class="demo-metric-value">42</div>
+                    <div class="demo-metric-label">Reading Time</div>
+                    <div class="demo-metric-value" id="demo-readtime" style="color:var(--cream-dim)">~14h</div>
                 </div>
             </div>
-            <div class="demo-metric-label" style="margin-bottom:.4rem;">Emotional Valence Arc</div>
-            <!-- Animated SVG arc -->
-            <svg class="demo-arc" viewBox="0 0 300 80" preserveAspectRatio="none">
+
+            <!-- Arc SVG (static Icarus shape, recolored per book) -->
+            <svg class="demo-arc" viewBox="0 0 300 72" preserveAspectRatio="none">
                 <defs>
-                    <linearGradient id="arc-grad" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%"   stop-color="#a78bfa" stop-opacity=".15"/>
+                    <linearGradient id="arc-fill-grad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" id="arc-grad-stop" stop-color="#a78bfa" stop-opacity=".18"/>
                         <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
                     </linearGradient>
                 </defs>
-                <!-- Icarus arc: rises then falls -->
-                <polygon
-                    points="0,75 0,65 30,52 60,38 90,22 120,10 150,8 180,16 210,30 240,46 270,60 300,72 300,75"
-                    fill="url(#arc-grad)"
-                    class="arc-fill"
+                <polygon id="demo-arc-fill"
+                    points="0,70 0,62 50,45 100,28 150,12 200,20 250,42 300,65 300,70"
+                    fill="url(#arc-fill-grad)"
+                    opacity=".7"
                 />
-                <polyline
-                    points="0,65 30,52 60,38 90,22 120,10 150,8 180,16 210,30 240,46 270,60 300,72"
+                <polyline id="demo-arc-line"
+                    points="0,62 50,45 100,28 150,12 200,20 250,42 300,65"
                     fill="none" stroke="#a78bfa" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round"
-                    class="arc-path"
                 />
             </svg>
-            <div class="demo-arc-label">Emotional tension rises — then collapses</div>
+
             <div class="demo-divider"></div>
-            <div class="demo-pills">
+            <div class="demo-pills" id="demo-pills">
                 <div class="demo-pill">TTR 0.71 · Rich vocabulary</div>
                 <div class="demo-pill">avg 24.3 words/sentence</div>
-                <div class="demo-pill">Readability: Dense</div>
+                <div class="demo-pill">Dominant: Fear</div>
             </div>
         </div>
     </div>
@@ -829,8 +965,8 @@ footer {
         <div class="formats-pills">
             <div class="fmt-pill">.txt</div>
             <div class="fmt-pill">.epub</div>
+            <div class="fmt-pill">.pdf</div>
             <div class="fmt-pill">URL</div>
-            <div class="fmt-pill">.pdf <span style="font-size:.6rem;opacity:.6">soon</span></div>
             <div class="fmt-pill">Demo mode</div>
         </div>
         <div class="formats-label" style="margin-left:auto;">Languages</div>
@@ -842,66 +978,66 @@ footer {
     </div>
 </div>
 
-<!-- Features -->
-<div class="features" id="features">
+<!-- Personas -->
+<div class="features" id="personas">
     <div class="features-inner">
         <div class="reveal">
-            <div class="eyebrow">What you get</div>
-            <h2 class="section-headline" style="margin-top:1rem;">Three lenses.<br>One book.</h2>
+            <div class="eyebrow">Who it's for</div>
+            <h2 class="section-headline" style="margin-top:1rem;">Intelligence that<br>meets you where you are.</h2>
+            <p class="section-sub" style="margin-top:.5rem;max-width:540px;">
+                Whether you're picking your next read, running a book club, or doing literary research — BookScope speaks your language.
+            </p>
         </div>
-        <div class="features-grid">
-            <div class="feature-card fc-gold reveal">
-                <div class="feature-icon fi-gold">⚡</div>
-                <div class="feature-name">Quick Insight</div>
-                <div class="feature-desc">
-                    Three sentences that tell you what the book is about, how it feels to read, and who it's written for. Powered by Claude — in the language of your choice.
-                </div>
-                <div class="feature-badge badge-gold">AI-powered</div>
-            </div>
-            <div class="feature-card fc-violet reveal" style="transition-delay:.1s">
-                <div class="feature-icon fi-violet">📊</div>
-                <div class="feature-name">Full Analysis</div>
-                <div class="feature-desc">
-                    Eight analytical tabs: emotion timeline, heatmap, style fingerprint, arc classification, comparison, and raw data export. Everything a researcher needs.
-                </div>
-                <div class="feature-badge badge-violet">8 tabs</div>
-            </div>
-            <div class="feature-card fc-teal reveal" style="transition-delay:.2s">
-                <div class="feature-icon fi-teal">✍️</div>
-                <div class="feature-name">Writer Mode</div>
-                <div class="feature-desc">
-                    Diagnose your draft's emotional arc against six canonical narrative patterns. See which story shape your manuscript most resembles — with specific revision tips.
-                </div>
-                <div class="feature-badge badge-teal">For authors</div>
-            </div>
-        </div>
+        <div class="personas-grid">
 
-        <!-- Second row -->
-        <div class="features-grid" style="margin-top:1rem;">
-            <div class="feature-card fc-gold reveal" style="transition-delay:.05s">
-                <div class="feature-icon fi-gold">📚</div>
-                <div class="feature-name">Library + Comparison</div>
-                <div class="feature-desc">
-                    Save analyses to your local library. Compare any two books side-by-side, or overlay all books by an author to reveal their stylistic evolution.
+            <!-- Curious Reader -->
+            <div class="persona-card pc-gold reveal" style="transition-delay:.05s">
+                <span class="persona-icon">⚡</span>
+                <div class="persona-for pf-gold">For the curious reader</div>
+                <div class="persona-name">60-second<br>Book Intelligence</div>
+                <div class="persona-desc">
+                    Upload any book. Get a one-sentence Book DNA, the narrative arc shape, writing grade, and a reading time estimate. Know what you're getting into before page one.
                 </div>
-                <div class="feature-badge badge-gold">Cross-book</div>
+                <ul class="persona-features">
+                    <li>🧬 AI Book DNA — one sentence, the whole book</li>
+                    <li>Narrative arc shape (Icarus, Cinderella…)</li>
+                    <li>Reading grade: Accessible → Specialist</li>
+                    <li>Estimated reading time</li>
+                </ul>
             </div>
-            <div class="feature-card fc-violet reveal" style="transition-delay:.15s">
-                <div class="feature-icon fi-violet">🔗</div>
-                <div class="feature-name">Shareable Links</div>
-                <div class="feature-desc">
-                    Publish any analysis to a permanent public URL. Share the emotional profile of a book with a reader, student, or book club — no account required to view.
+
+            <!-- Book Club -->
+            <div class="persona-card pc-teal reveal" style="transition-delay:.12s">
+                <span class="persona-icon">🫂</span>
+                <div class="persona-for pf-teal">For book clubs</div>
+                <div class="persona-name">The Book Club<br>Pack</div>
+                <div class="persona-desc">
+                    One click generates 8 curated discussion questions, an emotional journey summary, and a "who it's for" recommendation — tailored to the book's specific arc and emotional profile.
                 </div>
-                <div class="feature-badge badge-violet">Supabase-backed</div>
+                <ul class="persona-features">
+                    <li>8 AI discussion questions per book</li>
+                    <li>Emotional journey narrative</li>
+                    <li>"Who it's for" recommendation</li>
+                    <li>Shareable club link</li>
+                </ul>
             </div>
-            <div class="feature-card fc-teal reveal" style="transition-delay:.25s">
-                <div class="feature-icon fi-teal">🌐</div>
-                <div class="feature-name">Multilingual</div>
-                <div class="feature-desc">
-                    Full EN / ZH / JA interface. Language-aware font loading, CJK-safe NLP pipeline, and locale-appropriate narrative arc descriptions. Built for global readers.
+
+            <!-- Deep Analysis -->
+            <div class="persona-card pc-violet reveal" style="transition-delay:.19s">
+                <span class="persona-icon">📊</span>
+                <div class="persona-for pf-violet">For researchers &amp; writers</div>
+                <div class="persona-name">Full Analytical<br>Suite</div>
+                <div class="persona-desc">
+                    8 tabs of quantitative literary analysis. Compare two books side-by-side, export raw emotion scores to CSV, or overlay author style evolution over a series.
                 </div>
-                <div class="feature-badge badge-teal">3 languages</div>
+                <ul class="persona-features">
+                    <li>Emotion heatmap · Timeline · Style radar</li>
+                    <li>Arc pattern classification</li>
+                    <li>CSV / JSON / Markdown export</li>
+                    <li>Cross-book library comparison</li>
+                </ul>
             </div>
+
         </div>
     </div>
 </div>
@@ -912,7 +1048,7 @@ footer {
         <div class="eyebrow">Narrative theory</div>
         <h2 class="section-headline">Every story has<br>an emotional <em style="color:var(--gold)">shape</em>.</h2>
         <p class="section-sub">
-            Based on Kurt Vonnegut's narrative arc research, BookScope classifies every book into one of six fundamental emotional trajectories.
+            Based on Kurt Vonnegut's research, BookScope classifies every book into one of six fundamental emotional trajectories — automatically.
         </p>
     </div>
 
@@ -934,7 +1070,7 @@ footer {
                     stroke-linecap="round" stroke-linejoin="round"
                     class="arc-path" style="stroke-dasharray:280;stroke-dashoffset:280"/>
             </svg>
-            <div class="arc-desc">Steady rise from hardship to triumph. Found in Oliver Twist, Jane Eyre, The Alchemist.</div>
+            <div class="arc-desc">Steady rise from hardship to triumph. Oliver Twist, Jane Eyre, The Alchemist.</div>
         </div>
 
         <!-- Riches to Rags -->
@@ -953,7 +1089,7 @@ footer {
                     stroke-linecap="round" stroke-linejoin="round"
                     class="arc-path" style="stroke-dasharray:280;stroke-dashoffset:280"/>
             </svg>
-            <div class="arc-desc">Unrelenting descent. Found in Requiem for a Dream, Of Mice and Men.</div>
+            <div class="arc-desc">Unrelenting descent. Requiem for a Dream, Of Mice and Men.</div>
         </div>
 
         <!-- Man in a Hole -->
@@ -972,7 +1108,7 @@ footer {
                     stroke-linecap="round" stroke-linejoin="round"
                     class="arc-path" style="stroke-dasharray:280;stroke-dashoffset:280"/>
             </svg>
-            <div class="arc-desc">Trouble found, then escaped. The most universal story shape.</div>
+            <div class="arc-desc">Trouble found, then escaped. The Hobbit, The Martian, Room.</div>
         </div>
 
         <!-- Icarus -->
@@ -991,7 +1127,7 @@ footer {
                     stroke-linecap="round" stroke-linejoin="round"
                     class="arc-path" style="stroke-dasharray:280;stroke-dashoffset:280"/>
             </svg>
-            <div class="arc-desc">Heights of ambition, then catastrophe. Crime & Punishment, Breaking Bad.</div>
+            <div class="arc-desc">Heights of ambition, then catastrophe. Crime &amp; Punishment, Macbeth.</div>
         </div>
 
         <!-- Cinderella -->
@@ -1029,7 +1165,7 @@ footer {
                     stroke-linecap="round" stroke-linejoin="round"
                     class="arc-path" style="stroke-dasharray:280;stroke-dashoffset:280"/>
             </svg>
-            <div class="arc-desc">False hope, partial recovery, final ruin. Hamlet, King Lear, Macbeth.</div>
+            <div class="arc-desc">False hope, partial recovery, final ruin. Hamlet, King Lear.</div>
         </div>
 
     </div>
@@ -1040,28 +1176,39 @@ footer {
     <div class="how-inner">
         <div class="reveal">
             <div class="eyebrow">Process</div>
-            <h2 class="section-headline" style="margin-top:1rem;">From raw text<br>to emotional map.</h2>
+            <h2 class="section-headline" style="margin-top:1rem;">Upload. Decode.<br>Understand.</h2>
         </div>
         <div class="steps">
             <div class="step reveal">
                 <div class="step-num">01</div>
-                <div class="step-title">Upload or link</div>
-                <div class="step-desc">Drop a .txt or .epub file, paste a URL, or try the built-in demo. BookScope handles encoding detection automatically.</div>
+                <div class="step-title">Upload your book</div>
+                <div class="step-desc">Drop a file or paste a URL. BookScope handles encoding, structure, and language detection automatically. No preprocessing needed.</div>
+                <div class="step-pills">
+                    <span class="step-pill">.txt</span>
+                    <span class="step-pill">.epub</span>
+                    <span class="step-pill">.pdf</span>
+                    <span class="step-pill">URL</span>
+                </div>
             </div>
-            <div class="step reveal" style="transition-delay:.1s">
+            <div class="step reveal" style="transition-delay:.12s">
                 <div class="step-num">02</div>
-                <div class="step-title">Chunk &amp; analyze</div>
-                <div class="step-desc">The text is split into chunks. Each chunk is scored across 8 NRC emotions — anger, anticipation, disgust, fear, joy, sadness, surprise, trust.</div>
+                <div class="step-title">Decode it</div>
+                <div class="step-desc">The text is split into chunks and scored across 8 NRC emotions. Claude writes a one-sentence Book DNA. The narrative arc is classified automatically.</div>
+                <div class="step-pills">
+                    <span class="step-pill">NRC Emotions</span>
+                    <span class="step-pill">Claude API</span>
+                    <span class="step-pill">Arc Detection</span>
+                </div>
             </div>
-            <div class="step reveal" style="transition-delay:.2s">
+            <div class="step reveal" style="transition-delay:.24s">
                 <div class="step-num">03</div>
-                <div class="step-title">Classify arc</div>
-                <div class="step-desc">A valence series is derived from emotional scores and compared to 6 canonical arc templates using mean absolute error matching.</div>
-            </div>
-            <div class="step reveal" style="transition-delay:.3s">
-                <div class="step-num">04</div>
-                <div class="step-title">Render insight</div>
-                <div class="step-desc">Results appear as Quick Insight cards or an 8-tab full analysis. Save to library, compare with other books, or share a permanent link.</div>
+                <div class="step-title">Understand it</div>
+                <div class="step-desc">Quick Insight for readers, Book Club Pack for groups, or the full analytical suite for researchers. Save to your library, compare books, or share a permanent link.</div>
+                <div class="step-pills">
+                    <span class="step-pill">Quick Insight</span>
+                    <span class="step-pill">Book Club Pack</span>
+                    <span class="step-pill">Full Analysis</span>
+                </div>
             </div>
         </div>
     </div>
@@ -1069,15 +1216,16 @@ footer {
 
 <!-- CTA -->
 <div class="cta-section">
+    <div class="cta-watermark" aria-hidden="true">BookScope</div>
     <div class="cta-inner">
         <div class="reveal">
             <div class="eyebrow" style="justify-content:center;">Try it now</div>
             <h2 class="cta-headline">
                 What does your<br>
-                book <em style="color:var(--gold);font-style:italic">feel</em> like?
+                next book <em style="color:var(--gold);font-style:italic">decode</em> to?
             </h2>
             <p class="cta-sub">
-                Upload any book and see its emotional DNA in under five seconds. No account, no signup, no cost.
+                Upload any book and get its Book DNA in under 60 seconds. No account, no signup, no cost.
             </p>
             <div class="cta-actions">
                 <a href="http://localhost:8501" class="btn-primary" style="font-size:1rem;padding:.9rem 2.25rem;">
@@ -1097,7 +1245,7 @@ footer {
         <div class="footer-logo">📖 Book<span>Scope</span></div>
         <ul class="footer-links">
             <li><a href="https://github.com/moyu-good/BookScope">GitHub</a></li>
-            <li><a href="#features">Features</a></li>
+            <li><a href="#personas">For you</a></li>
             <li><a href="#arcs">Arc Library</a></li>
         </ul>
         <div class="footer-copy">MIT LICENSE · BUILT WITH STREAMLIT + CLAUDE</div>
@@ -1105,18 +1253,16 @@ footer {
 </footer>
 
 <script>
-// Scroll reveal
-const observer = new IntersectionObserver(entries => {
+// ── Scroll reveal ────────────────────────────────────────────────
+const revealObserver = new IntersectionObserver(entries => {
     entries.forEach(e => {
-        if (e.isIntersecting) {
-            e.target.classList.add('visible');
-        }
+        if (e.isIntersecting) e.target.classList.add('visible');
     });
 }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
 
-document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
-// Trigger arc animations when arc cards enter viewport
+// ── Arc draw on scroll ───────────────────────────────────────────
 const arcObserver = new IntersectionObserver(entries => {
     entries.forEach(e => {
         if (e.isIntersecting) {
@@ -1137,6 +1283,132 @@ const arcObserver = new IntersectionObserver(entries => {
 }, { threshold: 0.3 });
 
 document.querySelectorAll('.arc-card').forEach(card => arcObserver.observe(card));
+
+// ── Book DNA typewriter ──────────────────────────────────────────
+const books = [
+    {
+        dna:          'A psychological descent into guilt — where intellect and morality collapse under the weight of one terrible act.',
+        title:        'Crime &amp; Punishment',
+        meta:         'Dostoevsky · 211,591 words · Fiction',
+        arc:          'Icarus',
+        arcColor:     '#a78bfa',
+        arcBg:        'rgba(167,139,250,.08)',
+        arcBorder:    'rgba(167,139,250,.3)',
+        arcPoints:    '0,62 50,45 100,28 150,12 200,20 250,42 300,65',
+        arcPoly:      '0,70 0,62 50,45 100,28 150,12 200,20 250,42 300,65 300,70',
+        emotion:      'Fear',
+        emotionClass: 'gold',
+        readability:  'Dense',
+        readtime:     '~14h',
+        pills:        ['TTR 0.71 · Rich vocabulary', 'avg 24.3 words/sentence', 'Dominant: Fear']
+    },
+    {
+        dna:          'A landmark map of the two-speed mind — rigorous behavioral science made unforgettable by the weight of its evidence.',
+        title:        'Thinking, Fast and Slow',
+        meta:         'Kahneman · 164,000 words · Academic',
+        arc:          'Man in a Hole',
+        arcColor:     '#60a5fa',
+        arcBg:        'rgba(96,165,250,.08)',
+        arcBorder:    'rgba(96,165,250,.3)',
+        arcPoints:    '0,20 50,32 100,48 150,54 200,44 250,26 300,14',
+        arcPoly:      '0,70 0,20 50,32 100,48 150,54 200,44 250,26 300,14 300,70',
+        emotion:      'Anticipation',
+        emotionClass: 'teal',
+        readability:  'Specialist',
+        readtime:     '~11h',
+        pills:        ['noun-heavy prose', 'avg 19.8 words/sentence', 'Dominant: Anticipation']
+    },
+    {
+        dna:          'The American Dream refracted through green light and longing — beautiful on the surface, hollow at its heart.',
+        title:        'The Great Gatsby',
+        meta:         'Fitzgerald · 47,094 words · Fiction',
+        arc:          'Icarus',
+        arcColor:     '#a78bfa',
+        arcBg:        'rgba(167,139,250,.08)',
+        arcBorder:    'rgba(167,139,250,.3)',
+        arcPoints:    '0,62 50,45 100,28 150,12 200,20 250,42 300,65',
+        arcPoly:      '0,70 0,62 50,45 100,28 150,12 200,20 250,42 300,65 300,70',
+        emotion:      'Sadness',
+        emotionClass: 'violet',
+        readability:  'Moderate',
+        readtime:     '~3h',
+        pills:        ['TTR 0.68 · Lyrical prose', 'avg 18.6 words/sentence', 'Dominant: Sadness']
+    }
+];
+
+let bookIdx = 0;
+const typedEl  = document.getElementById('dna-typed');
+const titleEl  = document.getElementById('demo-book-title');
+const metaEl   = document.getElementById('demo-book-meta');
+const pillEl   = document.getElementById('demo-arc-pill');
+const emotEl   = document.getElementById('demo-emotion');
+const readEl   = document.getElementById('demo-readability');
+const rtEl     = document.getElementById('demo-readtime');
+const pillsEl  = document.getElementById('demo-pills');
+const arcLine  = document.getElementById('demo-arc-line');
+const arcFill  = document.getElementById('demo-arc-fill');
+const gradStop = document.getElementById('arc-grad-stop');
+
+function updateBookMeta(book) {
+    titleEl.innerHTML = book.title;
+    metaEl.textContent = book.meta;
+    pillEl.textContent = book.arc;
+    pillEl.style.color       = book.arcColor;
+    pillEl.style.background  = book.arcBg;
+    pillEl.style.borderColor = book.arcBorder;
+    emotEl.textContent = book.emotion;
+    emotEl.className = 'demo-metric-value ' + book.emotionClass;
+    readEl.textContent = book.readability;
+    rtEl.textContent   = book.readtime;
+    arcLine.setAttribute('points', book.arcPoints);
+    arcFill.setAttribute('points', book.arcPoly);
+    arcLine.setAttribute('stroke', book.arcColor);
+    gradStop.setAttribute('stop-color', book.arcColor);
+    pillsEl.innerHTML = book.pills
+        .map(p => `<div class="demo-pill">${p}</div>`)
+        .join('');
+}
+
+function typeText(text, onDone) {
+    let i = 0;
+    typedEl.textContent = '';
+    function tick() {
+        if (i < text.length) {
+            typedEl.textContent += text[i++];
+            setTimeout(tick, 22 + Math.random() * 18);
+        } else {
+            onDone && setTimeout(onDone, 2400);
+        }
+    }
+    tick();
+}
+
+function eraseText(onDone) {
+    function tick() {
+        const t = typedEl.textContent;
+        if (t.length > 0) {
+            typedEl.textContent = t.slice(0, -1);
+            setTimeout(tick, 10);
+        } else {
+            onDone && onDone();
+        }
+    }
+    tick();
+}
+
+function cycle() {
+    const book = books[bookIdx];
+    updateBookMeta(book);
+    typeText(book.dna, () => {
+        eraseText(() => {
+            bookIdx = (bookIdx + 1) % books.length;
+            setTimeout(cycle, 300);
+        });
+    });
+}
+
+// Start after a short delay so the page loads first
+setTimeout(cycle, 800);
 </script>
 </body>
 </html>

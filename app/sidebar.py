@@ -10,7 +10,7 @@ def render_sidebar_inputs(ui_lang: str, T: dict) -> tuple:
     """Render sidebar inputs section.
 
     Returns:
-        (book_type, uploaded, url_input, strategy, chunk_size, min_words)
+        (book_type, uploaded, url_input, strategy, chunk_size, min_words)  # noqa: E501
     """
     with st.sidebar:
         # Language selector
@@ -116,17 +116,8 @@ def render_sidebar_inputs(ui_lang: str, T: dict) -> tuple:
         else:
             st.caption(T["no_saved"])
 
-        st.divider()
-        writer_mode = st.checkbox(
-            T.get("writer_mode_label", "✍️ Writer mode"),
-            key="_writer_mode",
-            help=T.get(
-                "writer_mode_help",
-                "Analyze your draft's emotional arc against classic story patterns.",
-            ),
-        )
 
-    return book_type, uploaded, url_input, strategy, chunk_size, min_words, writer_mode
+    return book_type, uploaded, url_input, strategy, chunk_size, min_words
 
 
 def render_sidebar_detected_lang(detected_lang: str, T: dict) -> None:
