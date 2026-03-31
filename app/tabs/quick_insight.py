@@ -154,6 +154,27 @@ def _render_book_recommendations(
     )
 
 
+def _detect_pacing_flatlines(
+    valence_series: list,
+    low_threshold: float = 0.3,
+    min_run: int = 3,
+) -> list[tuple[int, int]]:
+    """Return (start_idx, end_idx) pairs for consecutive low-valence runs."""
+    runs = []
+    run_start = None
+    for i, v in enumerate(valence_series):
+        if v <= low_threshold:
+            if run_start is None:
+                run_start = i
+        else:
+            if run_start is not None and (i - run_start) >= min_run:
+                runs.append((run_start, i - 1))
+            run_start = None
+    if run_start is not None and (len(valence_series) - run_start) >= min_run:
+        runs.append((run_start, len(valence_series) - 1))
+    return runs
+
+
 def _render_draft_diagnosis(
     valence_series: list,
     arc_value: str,
@@ -230,6 +251,145 @@ def _render_draft_diagnosis(
             f'<div class="bs-for-you" style="margin-top:.5rem;">'
             f'<div class="bs-for-you-icon">✍️</div>'
             f'<div class="bs-for-you-text">{_html.escape(tip)}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Pacing flatline detector ──────────────────────────────────────────────
+    flatlines = _detect_pacing_flatlines(valence_series)
+    pacing_label = _html.escape(T.get("draft_diag_pacing_label", "PACING ALERTS"))
+    if flatlines:
+        flatline_tpl = T.get(
+            "draft_diag_flatline",
+            "Tension flatlines in section {start}–{end} ({n} consecutive low-energy blocks)",
+        )
+        items_html = "".join(
+            f'<div style="padding:.35rem 0;border-bottom:1px solid rgba(255,255,255,.05);">'
+            f'⚡ {_html.escape(flatline_tpl.format(start=s+1, end=e+1, n=e-s+1))}'
+            f'</div>'
+            for s, e in flatlines
+        )
+        st.markdown(
+            f'<div class="bs-insight-headline" '
+            f'style="border-left:4px solid #f97316;margin-top:.75rem;">'
+            f'<div class="bs-insight-headline-label">{pacing_label}</div>'
+            f'<div style="font-size:.9rem;color:#e6edf3;line-height:1.6;">'
+            f'{items_html}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        no_alerts = _html.escape(T.get("draft_diag_no_alerts", "No pacing issues detected. ✓"))
+        st.markdown(
+            f'<div class="bs-insight-headline" '
+            f'style="border-left:4px solid #22c55e;margin-top:.75rem;">'
+            f'<div class="bs-insight-headline-label">{pacing_label}</div>'
+            f'<div style="font-size:.9rem;color:#22c55e;">{no_alerts}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Arc deviation alert ───────────────────────────────────────────────────
+    if best_pattern.value != arc_value and best_score >= 0.6:
+        n = len(valence_series)
+        # Determine which section deviates most by checking where valence
+        # is lowest (most likely source of structural drift)
+        section_idx = 1  # default: middle
+        if n >= 6:
+            third = n // 3
+            thirds_valence = [
+                sum(valence_series[:third]) / max(third, 1),
+                sum(valence_series[third:2*third]) / max(third, 1),
+                sum(valence_series[2*third:]) / max(third, 1),
+            ]
+            section_idx = thirds_valence.index(min(thirds_valence))
+
+        section_name = (
+            ["opening", "middle", "final"] if ui_lang == "en" else
+            ["开篇", "中段", "结尾"] if ui_lang == "zh" else
+            ["序盤", "中盤", "終盤"]
+        )[section_idx]
+
+        dev_tpl = T.get(
+            "draft_diag_deviation",
+            "Your draft reads more like a {actual} arc than {target} — "
+            "the {section} section may need restructuring.",
+        )
+        dev_text = _html.escape(dev_tpl.format(
+            actual=best_pattern.value, target=arc_value, section=section_name
+        ))
+        st.markdown(
+            f'<div class="bs-for-you" style="margin-top:.5rem;'
+            f'border:1px solid rgba(249,115,22,.3);">'
+            f'<div class="bs-for-you-icon">🔄</div>'
+            f'<div class="bs-for-you-text">{dev_text}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+
+def _render_book_club_pack(
+    book_title: str,
+    arc_value: str,
+    arc_display_name: str,
+    top_emotion_name: str,
+    book_type: str,
+    style_scores,
+    emotion_scores,
+    ai_narrative: str,
+    ui_lang: str,
+    T: dict,
+) -> None:
+    """Render a Book Club Pack button + LLM-generated discussion guide.
+
+    Cached in session_state per book so re-renders don't re-call the LLM.
+    """
+    btn_label = T.get("qi_book_club_btn", "📚 Book Club Pack")
+    ck = "book_club_" + hashlib.md5(
+        f"{book_title}_{arc_value}_{top_emotion_name}".encode()
+    ).hexdigest()[:8]
+
+    pack_text: str | None = st.session_state.get(ck)
+
+    col_btn = st.columns([1, 3])[0]
+    generate = col_btn.button(btn_label, key=f"bc_btn_{ck}")
+
+    if generate and not pack_text:
+        lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(
+            ui_lang, "English"
+        )
+        type_label = {
+            "fiction": "fiction", "academic": "non-fiction", "essay": "essay/memoir"
+        }.get(book_type, book_type)
+        prompt = (
+            f"You are preparing a book club discussion guide for '{book_title}', "
+            f"a {type_label} with a {arc_value} emotional arc, "
+            f"primarily driven by {top_emotion_name}.\n"
+        )
+        if ai_narrative:
+            prompt += f"About the book: {ai_narrative}\n"
+        prompt += (
+            f"\nIn {lang_name}, provide:\n"
+            f"1. A 2-3 sentence description of the reading experience (not plot summary)\n"
+            f"2. 8 discussion questions that go beyond plot to explore themes, "
+            f"emotions, and personal reflection\n"
+            f"3. One sentence about who this book is most for\n\n"
+            f"Format with clear numbered sections."
+        )
+        spinner_msg = T.get("qi_book_club_spinner", "Generating discussion guide…")
+        with st.spinner(spinner_msg):
+            pack_text = call_llm(prompt, max_tokens=600) or ""
+        st.session_state[ck] = pack_text
+
+    if pack_text:
+        label = _html.escape(T.get("qi_book_club_label", "BOOK CLUB PACK"))
+        st.markdown(
+            f'<div class="bs-insight-headline" '
+            f'style="border-left:4px solid #22c55e;margin-top:.75rem;">'
+            f'<div class="bs-insight-headline-label">📚 {label}</div>'
+            f'<div style="white-space:pre-line;color:#e6edf3;'
+            f'font-size:.9rem;line-height:1.7;">'
+            f'{_html.escape(pack_text)}</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -328,15 +488,15 @@ def render_quick_insight(
                 )
 
     def _render_ai_card() -> None:
-        """Render AI narrative card immediately after the type headline."""
+        """Render Book DNA card — LLM narrative as primary insight, shown first."""
         if not _ai_text:
             return
-        _label = _html.escape(T.get("qi_ai_narrative_label", "AI NARRATIVE"))
+        _label = _html.escape(T.get("qi_ai_narrative_label", "BOOK DNA"))
         st.markdown(
-            f'<div class="bs-insight-headline" style="border-left:4px solid #7c3aed;'
-            f'margin-top:.5rem;margin-bottom:.5rem;">'
-            f'<div class="bs-insight-headline-label">✨ {_label}</div>'
-            f'<div class="bs-insight-headline-text bs-no-animate">'
+            f'<div class="bs-insight-headline" style="border-left:4px solid #e8b84b;'
+            f'margin-top:.25rem;margin-bottom:.75rem;">'
+            f'<div class="bs-insight-headline-label">🧬 {_label}</div>'
+            f'<div style="font-size:1rem;color:#e6edf3;line-height:1.65;">'
             f'{_html.escape(_ai_text)}</div>'
             f'</div>',
             unsafe_allow_html=True,
@@ -358,7 +518,8 @@ def render_quick_insight(
             headline_text = f"{_html.escape(genre_label)} — {_html.escape(arc_display_name)}"
             for_you_text = ""
 
-        # Headline card
+        # Book DNA card first, then type headline as supporting context
+        _render_ai_card()
         st.markdown(
             f'<div class="bs-insight-headline" style="border-left:4px solid {type_color};">'
             f'<div class="bs-insight-headline-label">'
@@ -367,7 +528,6 @@ def render_quick_insight(
             f'</div>',
             unsafe_allow_html=True,
         )
-        _render_ai_card()
 
         # Card 1: Key Characters
         chars = extract_character_names(chunks, lang=detected_lang) if chunks is not None else []
@@ -483,6 +643,7 @@ def render_quick_insight(
             f"{_html.escape(readability_label)} · {_html.escape(read_time_str)}"
         )
 
+        _render_ai_card()
         st.markdown(
             f'<div class="bs-insight-headline" style="border-left:4px solid {type_color};">'
             f'<div class="bs-insight-headline-label">'
@@ -491,7 +652,6 @@ def render_quick_insight(
             f'</div>',
             unsafe_allow_html=True,
         )
-        _render_ai_card()
 
         # Card 1: Core Concepts — LLM extraction first (pre-computed above), heuristic fallback
         llm_concepts, llm_argument = _llm_concepts, _llm_argument
@@ -651,6 +811,7 @@ def render_quick_insight(
 
         headline_text = f"{_html.escape(voice_type)} · {_html.escape(arc_display_name)}"
 
+        _render_ai_card()
         st.markdown(
             f'<div class="bs-insight-headline" style="border-left:4px solid {type_color};">'
             f'<div class="bs-insight-headline-label">'
@@ -659,7 +820,6 @@ def render_quick_insight(
             f'</div>',
             unsafe_allow_html=True,
         )
-        _render_ai_card()
 
         # Card 1: Author Journey (sparkline)
         spark_pts = compute_sparkline_points(valence_series)
@@ -790,6 +950,21 @@ def render_quick_insight(
         top_emotion_key=top_emotion_key,
         top_emotion_name=top_emotion_name,
         book_type=book_type,
+        ai_narrative=_ai_text,
+        ui_lang=ui_lang,
+        T=T,
+    )
+
+    # ── BOOK CLUB PACK ────────────────────────────────────────────────────────
+    st.divider()
+    _render_book_club_pack(
+        book_title=book_title,
+        arc_value=arc_value,
+        arc_display_name=arc_display_name,
+        top_emotion_name=top_emotion_name,
+        book_type=book_type,
+        style_scores=style_scores,
+        emotion_scores=emotion_scores,
         ai_narrative=_ai_text,
         ui_lang=ui_lang,
         T=T,

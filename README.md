@@ -4,7 +4,7 @@
 
 ---
 
-**Multi-dimensional book text analysis and visualization — in English, 中文, and 日本語.**
+**Book intelligence for readers, writers, and book clubs — in English, 中文, and 日本語.**
 
 [![CI](https://github.com/moyu-good/BookScope/actions/workflows/ci.yml/badge.svg)](https://github.com/moyu-good/BookScope/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)

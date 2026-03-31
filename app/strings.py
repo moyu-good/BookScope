@@ -3,9 +3,9 @@
 _STRINGS: dict[str, dict] = {
     "en": {
         "page_title": "BookScope",
-        "tagline": "Discover the emotional soul of any book",
+        "tagline": "Book intelligence for readers, writers, and book clubs",
         "sidebar_header": "BookScope",
-        "sidebar_tagline": "Emotion arc & style analysis",
+        "sidebar_tagline": "Book intelligence",
         "upload_label": "Upload a file",
         "upload_types": "Supports .txt · .epub · .pdf",
         "url_label": "Or paste a URL",
@@ -22,7 +22,7 @@ _STRINGS: dict[str, dict] = {
         "loaded_badge": "📂 Viewing saved analysis",
         "loaded_clear": "× New analysis",
         "chunks_unavailable": "Block text is not available for saved analyses.",
-        "welcome_title": "What story hides in your book?",
+        "welcome_title": "Your book, decoded.",
         "welcome_body": (
             "Upload a **.txt**, **.epub**, or **.pdf** file — or paste a URL — "
             "to reveal the emotional journey hidden inside."
@@ -188,8 +188,23 @@ _STRINGS: dict[str, dict] = {
         "qi_es_intimacy_label": "INTIMACY",
         # Who it's for
         "qi_for_you_label": "Who it's for",
-        # AI Narrative
-        "qi_ai_narrative_label": "AI NARRATIVE",
+        # AI Narrative / Book DNA
+        "qi_ai_narrative_label": "BOOK DNA",
+        # Book Club Pack
+        "qi_book_club_btn": "📚 Book Club Pack",
+        "qi_book_club_label": "BOOK CLUB PACK",
+        "qi_book_club_spinner": "Generating discussion guide…",
+        # Writer mode pacing
+        "draft_diag_pacing_label": "PACING ALERTS",
+        "draft_diag_flatline": (
+            "Tension flatlines in section {start}–{end} "
+            "({n} consecutive low-energy blocks)"
+        ),
+        "draft_diag_no_alerts": "No pacing issues detected. ✓",
+        "draft_diag_deviation": (
+            "Your draft reads more like a {actual} arc than {target} — "
+            "the {section} section may need restructuring."
+        ),
         # Readability labels
         "readable_accessible": "Accessible",
         "readable_moderate": "Moderate",
@@ -294,9 +309,9 @@ _STRINGS: dict[str, dict] = {
     },
     "zh": {
         "page_title": "BookScope",
-        "tagline": "探索任何书籍的情感灵魂",
+        "tagline": "为读者、作者和读书会打造的书籍智能",
         "sidebar_header": "BookScope",
-        "sidebar_tagline": "情感弧线 & 文体分析",
+        "sidebar_tagline": "书籍智能",
         "upload_label": "上传文件",
         "upload_types": "支持 .txt · .epub · .pdf",
         "url_label": "或输入网址",
@@ -315,7 +330,7 @@ _STRINGS: dict[str, dict] = {
         "chunks_unavailable": "保存的分析不包含原始文本块。",
         "try_demo": "📖 用示例书籍体验",
         "demo_badge": "🎭 演示模式：《灯塔守望者的最后一夜》",
-        "welcome_title": "你的书里藏着什么故事？",
+        "welcome_title": "解读你的书。",
         "welcome_body": (
             "上传 **.txt**、**.epub** 或 **.pdf** 文件，或粘贴网址，"
             "即可揭示书中隐藏的情感之旅。"
@@ -470,8 +485,21 @@ _STRINGS: dict[str, dict] = {
         "qi_es_intimacy_label": "亲密度",
         # Who it's for
         "qi_for_you_label": "适合谁读",
-        # AI Narrative
-        "qi_ai_narrative_label": "AI 叙述",
+        # AI Narrative / Book DNA
+        "qi_ai_narrative_label": "书籍 DNA",
+        # Book Club Pack
+        "qi_book_club_btn": "📚 读书会工具包",
+        "qi_book_club_label": "读书会工具包",
+        "qi_book_club_spinner": "正在生成讨论指南……",
+        # Writer mode pacing
+        "draft_diag_pacing_label": "节奏预警",
+        "draft_diag_flatline": (
+            "第 {start}–{end} 块情感能量持续低迷（{n} 个连续低能量块）"
+        ),
+        "draft_diag_no_alerts": "未发现节奏问题 ✓",
+        "draft_diag_deviation": (
+            "你的草稿更接近 {actual} 弧型而非 {target}——{section} 部分可能需要调整。"
+        ),
         # Readability labels
         "readable_accessible": "通俗易读",
         "readable_moderate": "一般难度",
@@ -561,9 +589,9 @@ _STRINGS: dict[str, dict] = {
     },
     "ja": {
         "page_title": "BookScope",
-        "tagline": "あらゆる本の感情的な魂を発見する",
+        "tagline": "読者・作者・読書会のための本のインテリジェンス",
         "sidebar_header": "BookScope",
-        "sidebar_tagline": "感情弧・文体分析",
+        "sidebar_tagline": "本のインテリジェンス",
         "upload_label": "ファイルをアップロード",
         "upload_types": ".txt · .epub · .pdf に対応",
         "url_label": "またはURLを入力",
@@ -582,7 +610,7 @@ _STRINGS: dict[str, dict] = {
         "chunks_unavailable": "保存済み分析にはブロックテキストが含まれません。",
         "try_demo": "📖 デモ本を試す",
         "demo_badge": "🎭 デモ表示中：「灯台守の最後の嵐」",
-        "welcome_title": "あなたの本に隠された物語は？",
+        "welcome_title": "あなたの本を、解読する。",
         "welcome_body": (
             "**.txt** · **.epub** · **.pdf** ファイルをアップロードするか、"
             "URLを貼り付けると、感情の旅を可視化します。"
@@ -744,8 +772,21 @@ _STRINGS: dict[str, dict] = {
         "qi_es_intimacy_label": "親密度",
         # Who it's for
         "qi_for_you_label": "こんな人に",
-        # AI Narrative
-        "qi_ai_narrative_label": "AI ナレーション",
+        # AI Narrative / Book DNA
+        "qi_ai_narrative_label": "ブック DNA",
+        # Book Club Pack
+        "qi_book_club_btn": "📚 読書会パック",
+        "qi_book_club_label": "読書会パック",
+        "qi_book_club_spinner": "ディスカッションガイドを生成中…",
+        # Writer mode pacing
+        "draft_diag_pacing_label": "ペーシングアラート",
+        "draft_diag_flatline": (
+            "セクション {start}–{end} で感情エネルギーが低迷（{n} 連続低エネルギーブロック）"
+        ),
+        "draft_diag_no_alerts": "ペーシングの問題なし ✓",
+        "draft_diag_deviation": (
+            "草稿は {target} より {actual} の弧型に近い——{section} セクションの見直しを推奨します。"
+        ),
         # Readability labels
         "readable_accessible": "読みやすい",
         "readable_moderate": "普通",
