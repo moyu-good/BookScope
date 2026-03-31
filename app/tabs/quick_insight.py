@@ -172,7 +172,7 @@ def _render_book_club_pack(
     """
     btn_label = T.get("qi_book_club_btn", "📚 Book Club Pack")
     ck = "book_club_" + hashlib.md5(
-        f"{book_title}_{arc_value}_{top_emotion_name}".encode()
+        f"{book_title}_{arc_value}_{top_emotion_name}_{ui_lang}".encode()
     ).hexdigest()[:8]
 
     pack_text: str | None = st.session_state.get(ck)
@@ -205,6 +205,11 @@ def _render_book_club_pack(
         spinner_msg = T.get("qi_book_club_spinner", "Generating discussion guide…")
         with st.spinner(spinner_msg):
             pack_text = call_llm(prompt, max_tokens=600) or ""
+        if not pack_text:
+            st.warning(T.get(
+                "qi_book_club_error",
+                "Could not generate discussion guide — check your API key.",
+            ))
         st.session_state[ck] = pack_text
 
     if pack_text:
@@ -456,6 +461,47 @@ def render_quick_insight(
                 f'</div>',
                 unsafe_allow_html=True,
             )
+
+        # Character relation graph (fiction + English only)
+        if ui_lang == "en" and chunks is not None:
+            _rel_api_key = os.environ.get("ANTHROPIC_API_KEY")
+            if not _rel_api_key:
+                try:
+                    _rel_api_key = st.secrets.get("ANTHROPIC_API_KEY", None)
+                except Exception:
+                    pass
+            if _rel_api_key:
+                from bookscope.nlp.relation_extractor import extract_character_relations
+                from bookscope.viz.relation_graph_renderer import render_relation_graph
+
+                with st.spinner(""):
+                    _rel_graph = extract_character_relations(
+                        chunks,
+                        lang=detected_lang,
+                        api_key=_rel_api_key,
+                        model=_llm_model,
+                    )
+                _rel_fig = render_relation_graph(_rel_graph)
+                if _rel_fig is not None:
+                    _rel_label = _html.escape(
+                        T.get("qi_rel_graph_label", "CHARACTER RELATIONSHIPS")
+                    )
+                    n_chunks_used = min(5, len(chunks))
+                    _rel_caption = _html.escape(
+                        T.get(
+                            "qi_rel_graph_caption",
+                            "Based on first {n} chapter(s)",
+                        ).format(n=n_chunks_used)
+                    )
+                    st.markdown(
+                        f'<div class="bs-insight-headline" '
+                        f'style="border-left:4px solid #38bdf8;margin-top:.75rem;">'
+                        f'<div class="bs-insight-headline-label">👥 {_rel_label}</div>'
+                        f'<div style="font-size:.8rem;color:#7d8590;">{_rel_caption}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.plotly_chart(_rel_fig, use_container_width=True)
 
     # ── ACADEMIC ─────────────────────────────────────────────────────────────
     elif book_type == "academic":

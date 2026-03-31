@@ -45,7 +45,7 @@ from app.tabs.share import render_share_view  # noqa: E402
 from app.tabs.style import render_style  # noqa: E402
 from app.tabs.timeline import render_timeline  # noqa: E402
 from app.ui_constants import _EMOTION_COLORS, _EMOTION_FIELDS, _EMOTION_ICONS  # noqa: E402
-from bookscope.app_utils import get_lang, get_mode, inject_fonts, set_mode  # noqa: E402
+from bookscope.app_utils import get_lang, inject_fonts  # noqa: E402
 from bookscope.insights import compute_readability  # noqa: E402
 from bookscope.nlp import ArcClassifier  # noqa: E402
 from bookscope.nlp.llm_analyzer import call_llm as _call_llm_preview  # noqa: E402
@@ -67,7 +67,6 @@ st.set_page_config(
 # ---------------------------------------------------------------------------
 
 ui_lang = get_lang()
-ui_mode = get_mode()
 inject_fonts(ui_lang)
 inject_css()
 T = _STRINGS[ui_lang]
@@ -400,62 +399,47 @@ if not _from_saved:
             st.rerun()
 
 # ---------------------------------------------------------------------------
-# Mode toggle: Quick Insight | Full Analysis
+# Layer 1: Quick Insight (always shown — pre-reader decision card)
 # ---------------------------------------------------------------------------
 
-view_mode = st.radio(
-    "",
-    options=["quick", "full"],
-    format_func=lambda x: T["mode_quick"] if x == "quick" else T["mode_full"],
-    horizontal=True,
-    key="view_mode_radio",
-    index=0 if ui_mode == "quick" else 1,
+valence_series = (
+    arc_classifier.valence_series(emotion_scores) if len(emotion_scores) >= 2 else []
 )
-if view_mode != ui_mode:
-    set_mode(view_mode)
+_qi_result = AnalysisResult.create(
+    book_title=book_title,
+    chunk_strategy=strategy,
+    total_chunks=n_chunks,
+    total_words=total_words,
+    arc_pattern=arc.value,
+    detected_lang=detected_lang,
+    emotion_scores=emotion_scores,
+    style_scores=style_scores,
+)
+render_quick_insight(
+    book_type=book_type,
+    book_title=book_title,
+    arc_value=arc.value,
+    arc_display_name=arc_display_name,
+    top_emotion_key=top_emotion_key,
+    top_emotion_name=top_emotion_name,
+    top_emotion_color=top_emotion_color,
+    total_words=total_words,
+    chunks=chunks,
+    emotion_scores=emotion_scores,
+    style_scores=style_scores,
+    valence_series=valence_series,
+    detected_lang=detected_lang,
+    ui_lang=ui_lang,
+    T=T,
+    analysis_result=_qi_result,
+)
 
 # ---------------------------------------------------------------------------
-# Quick Insight mode
+# Layer 2: Deep Analysis (collapsed by default)
 # ---------------------------------------------------------------------------
 
-if view_mode == "quick":
-    valence_series = (
-        arc_classifier.valence_series(emotion_scores) if len(emotion_scores) >= 2 else []
-    )
-    _qi_result = AnalysisResult.create(
-        book_title=book_title,
-        chunk_strategy=strategy,
-        total_chunks=n_chunks,
-        total_words=total_words,
-        arc_pattern=arc.value,
-        detected_lang=detected_lang,
-        emotion_scores=emotion_scores,
-        style_scores=style_scores,
-    )
-    render_quick_insight(
-        book_type=book_type,
-        book_title=book_title,
-        arc_value=arc.value,
-        arc_display_name=arc_display_name,
-        top_emotion_key=top_emotion_key,
-        top_emotion_name=top_emotion_name,
-        top_emotion_color=top_emotion_color,
-        total_words=total_words,
-        chunks=chunks,
-        emotion_scores=emotion_scores,
-        style_scores=style_scores,
-        valence_series=valence_series,
-        detected_lang=detected_lang,
-        ui_lang=ui_lang,
-        T=T,
-        analysis_result=_qi_result,
-    )
-
-# ---------------------------------------------------------------------------
-# Full Analysis mode — 8 tabs (+ Chat)
-# ---------------------------------------------------------------------------
-
-else:
+_expander_label = T.get("deep_analysis_expander", "▼ Deep Analysis (charts + data)")
+with st.expander(_expander_label, expanded=False):
     (
         tab_overview, tab_heatmap, tab_timeline, tab_style,
         tab_arc, tab_chat, tab_library, tab_export, tab_chunks,

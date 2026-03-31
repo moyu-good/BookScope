@@ -194,6 +194,10 @@ _STRINGS: dict[str, dict] = {
         "qi_book_club_btn": "📚 Book Club Pack",
         "qi_book_club_label": "BOOK CLUB PACK",
         "qi_book_club_spinner": "Generating discussion guide…",
+        "qi_book_club_error": "Could not generate discussion guide — check your API key.",
+        # Character relation graph
+        "qi_rel_graph_label": "CHARACTER RELATIONSHIPS",
+        "qi_rel_graph_caption": "Based on first {n} chapter(s)",
         # Writer mode pacing
         "draft_diag_pacing_label": "PACING ALERTS",
         "draft_diag_flatline": (
@@ -210,6 +214,8 @@ _STRINGS: dict[str, dict] = {
         "readable_moderate": "Moderate",
         "readable_dense": "Dense",
         "readable_specialist": "Specialist",
+        # Deep analysis expander
+        "deep_analysis_expander": "▼ Deep Analysis (charts + data)",
         # Tab names
         "tab_overview": "📊 Overview",
         "tab_heatmap": "🌡 Heatmap",
@@ -491,6 +497,10 @@ _STRINGS: dict[str, dict] = {
         "qi_book_club_btn": "📚 读书会工具包",
         "qi_book_club_label": "读书会工具包",
         "qi_book_club_spinner": "正在生成讨论指南……",
+        "qi_book_club_error": "无法生成讨论指南——请检查 API key。",
+        # Character relation graph
+        "qi_rel_graph_label": "人物关系图",
+        "qi_rel_graph_caption": "基于前 {n} 章",
         # Writer mode pacing
         "draft_diag_pacing_label": "节奏预警",
         "draft_diag_flatline": (
@@ -505,6 +515,8 @@ _STRINGS: dict[str, dict] = {
         "readable_moderate": "一般难度",
         "readable_dense": "较有难度",
         "readable_specialist": "专业级",
+        # Deep analysis expander
+        "deep_analysis_expander": "▼ 深度分析（图表 + 数据）",
         # Tab names
         "tab_overview": "📊 概览",
         "tab_heatmap": "🌡 热力图",
@@ -778,6 +790,12 @@ _STRINGS: dict[str, dict] = {
         "qi_book_club_btn": "📚 読書会パック",
         "qi_book_club_label": "読書会パック",
         "qi_book_club_spinner": "ディスカッションガイドを生成中…",
+        "qi_book_club_error": (
+            "ディスカッションガイドを生成できませんでした — API キーを確認してください。"
+        ),
+        # Character relation graph
+        "qi_rel_graph_label": "登場人物の関係図",
+        "qi_rel_graph_caption": "最初の {n} 章に基づく",
         # Writer mode pacing
         "draft_diag_pacing_label": "ペーシングアラート",
         "draft_diag_flatline": (
@@ -792,6 +810,8 @@ _STRINGS: dict[str, dict] = {
         "readable_moderate": "普通",
         "readable_dense": "難しい",
         "readable_specialist": "専門的",
+        # Deep analysis expander
+        "deep_analysis_expander": "▼ 詳細分析（グラフ + データ）",
         # Tab names
         "tab_overview": "📊 概要",
         "tab_heatmap": "🌡 ヒートマップ",

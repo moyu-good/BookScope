@@ -31,7 +31,7 @@ jobs:
         run: python -m textblob.download_corpora
 
       - name: Lint with ruff
-        run: ruff check bookscope tests
+        run: ruff check bookscope app tests
 
       - name: Run tests with coverage
         run: pytest tests/ --cov=bookscope --cov-report=term-missing -q

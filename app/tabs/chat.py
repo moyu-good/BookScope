@@ -147,10 +147,11 @@ def render_chat_tab(chunks, ui_lang: str, T: dict) -> None:
         context = _build_context(chunks)
         st.session_state[ctx_key] = context
 
-    # Chat history in session_state
-    if "_chat_history" not in st.session_state:
-        st.session_state["_chat_history"] = []
-    history: list[dict] = st.session_state["_chat_history"]
+    # Chat history keyed per book (ctx_key is unique per book's content)
+    hist_key = f"_chat_history_{ctx_key}"
+    if hist_key not in st.session_state:
+        st.session_state[hist_key] = []
+    history: list[dict] = st.session_state[hist_key]
 
     # Render existing conversation
     for turn in history:
@@ -209,7 +210,7 @@ def render_chat_tab(chunks, ui_lang: str, T: dict) -> None:
             st.markdown(answer)
 
         history.append({"role": "assistant", "content": answer})
-        st.session_state["_chat_history"] = history
+        st.session_state[hist_key] = history
 
         # Clear the input field by re-running
         st.rerun()
@@ -217,5 +218,5 @@ def render_chat_tab(chunks, ui_lang: str, T: dict) -> None:
     # Clear conversation button
     if history:
         if st.button(T.get("chat_clear_btn", "Clear conversation"), key="chat_clear"):
-            st.session_state["_chat_history"] = []
+            st.session_state[hist_key] = []
             st.rerun()
