@@ -54,7 +54,8 @@ def test_relations_with_unknown_nodes_are_filtered():
         characters=["Alice", "Bob"],
         relations=[
             CharacterRelation(source="Alice", target="Bob", relation="rivals"),
-            CharacterRelation(source="Ghost", target="Bob", relation="unknown"),  # Ghost not in chars
+            # Ghost not in chars — should be filtered out
+            CharacterRelation(source="Ghost", target="Bob", relation="unknown"),
         ],
     )
     fig = render_relation_graph(graph)

@@ -474,7 +474,10 @@ def render_quick_insight(
                 from bookscope.nlp.relation_extractor import extract_character_relations
                 from bookscope.viz.relation_graph_renderer import render_relation_graph
 
-                with st.spinner(T.get("qi_rel_graph_spinner", "Mapping character relationships\u2026")):
+                _spinner_text = T.get(
+                    "qi_rel_graph_spinner", "Mapping character relationships\u2026"
+                )
+                with st.spinner(_spinner_text):
                     _rel_graph = extract_character_relations(
                         chunks,
                         lang=detected_lang,
