@@ -78,6 +78,15 @@ html, body, .stApp, .stApp * {{ font-family: {bf} !important; }}
 .stApp .bs-hero-title, .stApp .bs-insight-headline-text {{
     font-family: {hf} !important;
 }}
+/* Restore Material Symbols Rounded for Streamlit icon spans.
+   Streamlit renders icons as text ligatures (e.g. "keyboard_arrow_right")
+   inside spans with font-family "Material Symbols Rounded".
+   The wildcard rule above overrides that font, breaking icon rendering.
+   The static emotion class ejhh0er0 identifies these icon spans. */
+.stApp .ejhh0er0 {{
+    font-family: "Material Symbols Rounded" !important;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+}}
 </style>""",
         unsafe_allow_html=True,
     )
