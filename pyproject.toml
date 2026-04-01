@@ -25,6 +25,7 @@ dependencies = [
     "trafilatura>=1.6.0",
     "anthropic>=0.25",
     "networkx>=3.2",
+    "matplotlib>=3.7.0",
 ]
 
 [project.optional-dependencies]
