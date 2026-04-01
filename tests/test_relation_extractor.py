@@ -165,3 +165,22 @@ def test_returns_empty_graph_when_llm_fails(mock_st, mock_call_llm):
     graph = extract_character_relations(_make_chunks(), lang="en", api_key="test-key")
     assert graph.characters == []
     assert graph.relations == []
+
+
+@patch("bookscope.nlp.relation_extractor.call_llm")
+@patch("bookscope.nlp.relation_extractor.st")
+def test_only_first_max_chunks_sent_to_llm(mock_st, mock_call_llm):
+    """When more than _MAX_CHUNKS chunks are provided, only the first 5 are used."""
+    mock_st.session_state = {}
+    mock_call_llm.return_value = json.dumps({
+        "characters": ["A", "B"],
+        "relations": [{"source": "A", "target": "B", "relation": "rivals"}],
+    })
+
+    chunks = _make_chunks(10)  # 10 chunks, but only 5 should be sent
+    extract_character_relations(chunks, lang="en", api_key="test-key")
+
+    # The prompt passed to call_llm should only contain text from the first 5 chunks
+    prompt_arg = mock_call_llm.call_args[0][0]
+    assert "Chapter 5" not in prompt_arg  # chunk index 5 (6th) must not appear
+    assert "Chapter 4" in prompt_arg       # chunk index 4 (5th) must appear

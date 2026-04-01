@@ -462,8 +462,8 @@ def render_quick_insight(
                 unsafe_allow_html=True,
             )
 
-        # Character relation graph (fiction + English only)
-        if ui_lang == "en" and chunks is not None:
+        # Character relation graph (fiction + English books only)
+        if detected_lang == "en" and chunks is not None:
             _rel_api_key = os.environ.get("ANTHROPIC_API_KEY")
             if not _rel_api_key:
                 try:
@@ -474,7 +474,7 @@ def render_quick_insight(
                 from bookscope.nlp.relation_extractor import extract_character_relations
                 from bookscope.viz.relation_graph_renderer import render_relation_graph
 
-                with st.spinner(""):
+                with st.spinner(T.get("qi_rel_graph_spinner", "Mapping character relationships\u2026")):
                     _rel_graph = extract_character_relations(
                         chunks,
                         lang=detected_lang,

@@ -46,3 +46,19 @@ def test_figure_has_node_and_edge_traces():
     assert fig is not None
     # Should have at least edge traces + 1 node trace
     assert len(fig.data) >= 2
+
+
+def test_relations_with_unknown_nodes_are_filtered():
+    """Relations whose source/target are not in characters list must be excluded."""
+    graph = RelationGraph(
+        characters=["Alice", "Bob"],
+        relations=[
+            CharacterRelation(source="Alice", target="Bob", relation="rivals"),
+            CharacterRelation(source="Ghost", target="Bob", relation="unknown"),  # Ghost not in chars
+        ],
+    )
+    fig = render_relation_graph(graph)
+    assert fig is not None
+    # Only 1 valid edge should exist; Ghost relation is filtered out
+    edge_traces = [t for t in fig.data if t.mode == "lines"]
+    assert len(edge_traces) == 1

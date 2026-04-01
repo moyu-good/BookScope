@@ -198,6 +198,7 @@ _STRINGS: dict[str, dict] = {
         # Character relation graph
         "qi_rel_graph_label": "CHARACTER RELATIONSHIPS",
         "qi_rel_graph_caption": "Based on first {n} chapter(s)",
+        "qi_rel_graph_spinner": "Mapping character relationships\u2026",
         # Writer mode pacing
         "draft_diag_pacing_label": "PACING ALERTS",
         "draft_diag_flatline": (
@@ -501,6 +502,7 @@ _STRINGS: dict[str, dict] = {
         # Character relation graph
         "qi_rel_graph_label": "人物关系图",
         "qi_rel_graph_caption": "基于前 {n} 章",
+        "qi_rel_graph_spinner": "分析人物关系\u2026",
         # Writer mode pacing
         "draft_diag_pacing_label": "节奏预警",
         "draft_diag_flatline": (
@@ -796,6 +798,7 @@ _STRINGS: dict[str, dict] = {
         # Character relation graph
         "qi_rel_graph_label": "登場人物の関係図",
         "qi_rel_graph_caption": "最初の {n} 章に基づく",
+        "qi_rel_graph_spinner": "登場人物の関係を分析中\u2026",
         # Writer mode pacing
         "draft_diag_pacing_label": "ペーシングアラート",
         "draft_diag_flatline": (
