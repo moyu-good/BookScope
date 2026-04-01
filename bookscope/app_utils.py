@@ -74,7 +74,8 @@ def inject_fonts(lang: str) -> None:
         f"""<style>
 @import url('{url}');
 html, body, .stApp, .stApp * {{ font-family: {bf} !important; }}
-h1, h2, h3, .bs-hero-title, .bs-insight-headline-text {{
+.stApp h1, .stApp h2, .stApp h3,
+.stApp .bs-hero-title, .stApp .bs-insight-headline-text {{
     font-family: {hf} !important;
 }}
 </style>""",
