@@ -76,6 +76,7 @@ class EmotionRadarData:
     labels: list[str]    # emotion display names (8)
     values: list[float]  # average score per emotion, normalized [0, 1]
     colors: list[str]    # hex color per axis
+    avg_density: float = 0.0  # mean emotion_density across chunks (0-1)
 
 
 @dataclass
@@ -238,7 +239,11 @@ class ChartDataAdapter:
             values.append(sum(getattr(s, emotion) for s in scores) / n)
             colors.append(ec.get(emotion, "#888888"))
 
-        return EmotionRadarData(labels=labels, values=values, colors=colors)
+        avg_density = sum(s.emotion_density for s in scores) / n
+
+        return EmotionRadarData(
+            labels=labels, values=values, colors=colors, avg_density=avg_density
+        )
 
     @staticmethod
     def build_emotion_arc_comparison_data(

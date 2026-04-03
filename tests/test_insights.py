@@ -2,13 +2,14 @@
 
 
 from bookscope.insights import (
+    build_reader_verdict,
     compute_readability,
     compute_sparkline_points,
     extract_character_names,
     extract_key_themes,
     first_person_density,
 )
-from bookscope.models import ChunkResult
+from bookscope.models import ChunkResult, ReaderVerdict
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -220,3 +221,120 @@ class TestFirstPersonDensity:
         texts = ["I am here. You are there."] * 5
         density = first_person_density(_chunks(texts), lang="en")
         assert 0.0 <= density <= 1.0
+
+
+# ── build_reader_verdict ──────────────────────────────────────────────────────
+
+def _style_scores(n: int = 5, avg_sentence_length: float = 15.0,
+                  ttr: float = 0.5, adj_ratio: float = 0.08):
+    return [
+        _FakeStyleScore(i, ttr=ttr, avg_sentence_length=avg_sentence_length,
+                        adj_ratio=adj_ratio)
+        for i in range(n)
+    ]
+
+
+class TestBuildReaderVerdict:
+    def test_happy_path_rags_to_riches_joy_fiction(self):
+        verdict = build_reader_verdict(
+            arc_value="Rags to Riches",
+            top_emotion_key="joy",
+            style_scores=_style_scores(),
+            book_type="fiction",
+            ui_lang="en",
+        )
+        assert isinstance(verdict, ReaderVerdict)
+        assert verdict.sentence != ""
+        assert verdict.confidence >= 0.5
+
+    def test_arc_unknown_gives_low_confidence(self):
+        verdict = build_reader_verdict(
+            arc_value="Unknown",
+            top_emotion_key="joy",
+            style_scores=_style_scores(),
+        )
+        assert verdict.confidence < 0.3
+        assert verdict.sentence != ""  # fallback sentence still present
+
+    def test_empty_style_scores_no_crash(self):
+        verdict = build_reader_verdict(
+            arc_value="Icarus",
+            top_emotion_key="fear",
+            style_scores=[],
+        )
+        assert isinstance(verdict, ReaderVerdict)
+        assert verdict.confidence < 0.9  # reduced by missing style
+
+    def test_disgust_emotion_no_key_error(self):
+        # disgust is covered in the full table — no KeyError, non-empty sentence
+        verdict = build_reader_verdict(
+            arc_value="Cinderella",
+            top_emotion_key="disgust",
+            style_scores=_style_scores(),
+        )
+        assert verdict.sentence != ""
+
+    def test_unknown_ui_lang_falls_back_to_english(self):
+        verdict_en = build_reader_verdict(
+            arc_value="Rags to Riches",
+            top_emotion_key="joy",
+            style_scores=_style_scores(),
+            ui_lang="en",
+        )
+        verdict_de = build_reader_verdict(
+            arc_value="Rags to Riches",
+            top_emotion_key="joy",
+            style_scores=_style_scores(),
+            ui_lang="de",
+        )
+        # Both should produce the same English sentence (de → en fallback)
+        assert verdict_de.sentence == verdict_en.sentence
+        assert verdict_de.for_you == verdict_en.for_you
+
+    def test_unknown_book_type_no_crash(self):
+        verdict = build_reader_verdict(
+            arc_value="Cinderella",
+            top_emotion_key="joy",
+            style_scores=_style_scores(),
+            book_type="unknown",
+        )
+        assert isinstance(verdict, ReaderVerdict)
+        assert verdict.sentence != ""
+
+    def test_double_fallback_arc_unknown_and_no_style(self):
+        verdict = build_reader_verdict(
+            arc_value="Unknown",
+            top_emotion_key="joy",
+            style_scores=[],
+        )
+        assert verdict.confidence == 0.0
+
+    def test_all_six_arcs_return_non_empty_sentence(self):
+        arcs = [
+            "Rags to Riches",
+            "Riches to Rags",
+            "Man in a Hole",
+            "Icarus",
+            "Cinderella",
+            "Oedipus",
+        ]
+        for arc in arcs:
+            verdict = build_reader_verdict(
+                arc_value=arc,
+                top_emotion_key="joy",
+                style_scores=_style_scores(),
+            )
+            assert verdict.sentence != "", f"Empty sentence for arc: {arc}"
+
+    def test_model_dump_includes_all_four_fields(self):
+        verdict = build_reader_verdict(
+            arc_value="Icarus",
+            top_emotion_key="sadness",
+            style_scores=_style_scores(),
+        )
+        d = verdict.model_dump()
+        assert "sentence" in d
+        assert "for_you" in d
+        assert "not_for_you" in d
+        assert "confidence" in d
+        assert isinstance(d["confidence"], float)

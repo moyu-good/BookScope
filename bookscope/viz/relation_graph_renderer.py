@@ -16,11 +16,19 @@ import plotly.graph_objects as go
 from bookscope.nlp.relation_extractor import RelationGraph
 
 
-def render_relation_graph(graph: RelationGraph) -> go.Figure | None:
+def render_relation_graph(
+    graph: RelationGraph,
+    edge_palette: dict[str, str] | None = None,
+) -> go.Figure | None:
     """Build a Plotly scatter + edge trace figure from a RelationGraph.
 
     Args:
-        graph: RelationGraph with characters and relations.
+        graph:        RelationGraph with characters/concepts and relations.
+        edge_palette: Optional mapping of relation type → hex color.
+                      When provided, edges are colored by relation type.
+                      "contradicts" edges are rendered as dashed lines.
+                      Unknown relation types fall back to "#555".
+                      If None (default), all edges use "#555" (character graph mode).
 
     Returns:
         Plotly Figure, or None if the graph has fewer than 2 characters or
@@ -51,17 +59,26 @@ def render_relation_graph(graph: RelationGraph) -> go.Figure | None:
     for u, v, data in G.edges(data=True):
         x0, y0 = pos[u]
         x1, y1 = pos[v]
+        label = data.get("label", "")
+
+        if edge_palette is not None:
+            edge_color = edge_palette.get(label, "#555")
+            line_spec: dict = {"width": 2, "color": edge_color}
+            if label == "contradicts":
+                line_spec["dash"] = "dot"
+        else:
+            line_spec = {"width": 1.5, "color": "#555"}
+
         edge_traces.append(go.Scatter(
             x=[x0, x1, None],
             y=[y0, y1, None],
             mode="lines",
-            line={"width": 1.5, "color": "#555"},
+            line=line_spec,
             hoverinfo="none",
             showlegend=False,
         ))
         # Midpoint label
         mx, my = (x0 + x1) / 2, (y0 + y1) / 2
-        label = data.get("label", "")
         if label:
             edge_label_traces.append(go.Scatter(
                 x=[mx],

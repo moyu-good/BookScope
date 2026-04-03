@@ -242,3 +242,167 @@ def generate_share_card(
     plt.close(fig)
     buf.seek(0)
     return buf.read()
+
+
+# ── Book Club Pack card ────────────────────────────────────────────────────────
+
+_BC_W, _BC_H = 800, 600
+
+_DIFFICULTY_COLORS: dict[str, str] = {
+    "Easy": "#22c55e",
+    "Medium": "#f97316",
+    "Challenging": "#ef4444",
+}
+
+
+def render_book_club_card(pack) -> bytes:
+    """Render an 800×600 dark PNG Book Club Pack card.
+
+    Args:
+        pack: BookClubPack Pydantic model instance.
+
+    Returns raw PNG bytes. Falls back to empty 1×1 PNG if matplotlib unavailable.
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.patches as mpatches
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+            b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+            b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+
+    dpi = 100
+    fig = plt.figure(figsize=(_BC_W / dpi, _BC_H / dpi), dpi=dpi, facecolor="#0d1117")
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(0, _BC_W)
+    ax.set_ylim(0, _BC_H)
+    ax.axis("off")
+    ax.set_facecolor("#0d1117")
+
+    # Background card rectangle
+    card = mpatches.FancyBboxPatch(
+        (20, 20), _BC_W - 40, _BC_H - 40,
+        boxstyle="round,pad=10",
+        facecolor="#161b22", edgecolor="#30363d", linewidth=1.5,
+    )
+    ax.add_patch(card)
+
+    # Top 4px accent bar (difficulty color)
+    diff_color = _DIFFICULTY_COLORS.get(pack.difficulty, "#a78bfa")
+    diff_rgb = _hex_to_rgb01(diff_color)
+    accent_bar = mpatches.Rectangle((20, _BC_H - 24), _BC_W - 40, 4, color=diff_rgb)
+    ax.add_patch(accent_bar)
+
+    # "BookScope" branding (top-left)
+    ax.text(
+        48, _BC_H - 48, "BookScope",
+        color="#6b7280", fontsize=11, fontweight="bold",
+        va="top", ha="left",
+    )
+
+    # Difficulty badge (top-right)
+    badge_color = _DIFFICULTY_COLORS.get(pack.difficulty, "#a78bfa")
+    badge_rgb = _hex_to_rgb01(badge_color)
+    badge_bg = mpatches.FancyBboxPatch(
+        (_BC_W - 160, _BC_H - 62), 112, 26,
+        boxstyle="round,pad=4",
+        facecolor=(*badge_rgb, 0.2), edgecolor=(*badge_rgb, 0.6), linewidth=1,
+    )
+    ax.add_patch(badge_bg)
+    ax.text(
+        _BC_W - 104, _BC_H - 49,
+        pack.difficulty,
+        color=badge_color, fontsize=10, fontweight="semibold",
+        va="center", ha="center",
+    )
+
+    # "BOOK CLUB PACK" label
+    ax.text(
+        48, _BC_H - 88, "BOOK CLUB PACK",
+        color="#6b7280", fontsize=9,
+        va="top", ha="left",
+    )
+
+    # Pack doesn't carry title; export_tab passes it separately — use arc_summary header.
+    # We render arc_summary as the "about" subtitle since title comes from the caller.
+
+    # arc_summary as the "about" row (2-3 sentences, ≤120 chars)
+    arc_text = pack.arc_summary[:120]
+    ax.text(
+        48, _BC_H - 112, arc_text,
+        color="#94a3b8", fontsize=10,
+        va="top", ha="left", wrap=True,
+        bbox={"boxstyle": "square,pad=0", "facecolor": "none", "edgecolor": "none",
+              "linewidth": 0},
+    )
+
+    # target_audience row
+    audience_text = f"For: {pack.target_audience[:58]}"
+    ax.text(
+        48, _BC_H - 160, audience_text,
+        color="#94a3b8", fontsize=10,
+        va="top", ha="left",
+    )
+
+    # Divider
+    ax.plot([48, _BC_W - 48], [_BC_H - 188, _BC_H - 188],
+            color="#30363d", linewidth=0.8)
+
+    # "DISCUSSION QUESTIONS" label
+    ax.text(
+        48, _BC_H - 204, "DISCUSSION QUESTIONS",
+        color="#4b5563", fontsize=9,
+        va="top", ha="left",
+    )
+
+    # Questions (3-5 items)
+    q_start_y = _BC_H - 228
+    line_height = 44
+    for i, question in enumerate(pack.questions[:5]):
+        q_y = q_start_y - i * line_height
+        if q_y < 40:
+            break
+        # Wrap long questions at ~85 chars
+        q_text = f"{i + 1}. {question}"
+        if len(q_text) > 87:
+            # Simple word-wrap at 85 chars
+            words = q_text.split()
+            lines_out = []
+            cur_line = ""
+            for word in words:
+                if len(cur_line) + len(word) + 1 <= 85:
+                    cur_line = (cur_line + " " + word).lstrip()
+                else:
+                    if cur_line:
+                        lines_out.append(cur_line)
+                    cur_line = word
+            if cur_line:
+                lines_out.append(cur_line)
+            q_text = "\n".join(lines_out)
+
+        ax.text(
+            48, q_y, q_text,
+            color="#e6edf3", fontsize=10, linespacing=1.5,
+            va="top", ha="left",
+        )
+
+    # Watermark
+    ax.text(
+        _BC_W - 48, 30, "bookscope.app",
+        color="#374151", fontsize=8,
+        va="bottom", ha="right",
+    )
+
+    import warnings
+    buf = io.BytesIO()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Glyph .*missing from font")
+        fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", facecolor="#0d1117")
+    plt.close(fig)
+    buf.seek(0)
+    return buf.read()

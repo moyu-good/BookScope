@@ -8,14 +8,25 @@ from concurrent.futures import ThreadPoolExecutor
 import streamlit as st
 
 from bookscope.insights import (
+    build_reader_verdict,
     compute_readability,
     compute_sparkline_points,
     extract_character_names,
     extract_key_themes,
     first_person_density,
 )
-from bookscope.nlp.genre_analyzer import extract_essay_voice, extract_nonfiction_concepts
-from bookscope.nlp.llm_analyzer import call_llm, generate_narrative_insight
+from bookscope.nlp.arc_classifier import ArcClassifier as _ArcClassifier
+from bookscope.nlp.genre_analyzer import (
+    extract_concept_relations,
+    extract_essay_phrases,
+    extract_essay_voice,
+    extract_nonfiction_concepts,
+)
+from bookscope.nlp.llm_analyzer import (
+    call_llm,
+    generate_narrative_insight,
+    generate_narrative_insight_stream,
+)
 
 # ── Emotional genre mapping (fiction, EN only) ────────────────────────────────
 # (arc.value, top_emotion_key) → (label_en, label_zh, label_ja, for_you_en)
@@ -50,9 +61,9 @@ _DEFAULT_GENRE = (
 
 # Book type accent colors
 _TYPE_COLOR = {
-    "fiction":  "#f97316",  # orange
-    "academic": "#3b82f6",  # blue
-    "essay":    "#22c55e",  # green
+    "fiction":  "#C8781A",  # amber
+    "academic": "#2A5A8A",  # steel blue
+    "essay":    "#2A7A5A",  # forest green
 }
 
 _EMOTION_FIELDS = (
@@ -60,18 +71,64 @@ _EMOTION_FIELDS = (
     "joy", "sadness", "surprise", "trust",
 )
 
+# Edge color palette for concept relation graphs (nonfiction)
+_CONCEPT_EDGE_PALETTE: dict[str, str] = {
+    "supports": "#2A7A5A",
+    "contradicts": "#C0392B",
+    "extends": "#2A5A8A",
+    "defines": "#8C4E08",
+}
 
-def _sparkline_svg(points: str, color: str = "#a78bfa", width: int = 200, height: int = 40) -> str:
+
+def _sparkline_svg(points: str, color: str = "#C8781A", width: int = 200, height: int = 40) -> str:
     return (
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'xmlns="http://www.w3.org/2000/svg" style="display:block;margin-top:.4rem">'
         f'<defs><linearGradient id="spark-grad" x1="0" y1="0" x2="1" y2="0">'
-        f'<stop offset="0%" stop-color="#22c55e"/>'
-        f'<stop offset="100%" stop-color="#ef4444"/>'
+        f'<stop offset="0%" stop-color="#2A7A5A"/>'
+        f'<stop offset="100%" stop-color="#C0392B"/>'
         f'</linearGradient></defs>'
         f'<polyline points="{_html.escape(points)}" '
         f'fill="none" stroke="url(#spark-grad)" stroke-width="2" stroke-linejoin="round"/>'
         f'</svg>'
+    )
+
+
+def _render_verdict_card(verdict, T: dict, ui_lang: str) -> None:
+    """Render the Reader Verdict card above all book-type branches.
+
+    Called once at the top of render_quick_insight(), before any if/elif
+    book_type branching, so the verdict always appears first.
+    """
+    label = _html.escape(T.get("verdict_label", "READER VERDICT"))
+    for_you_prefix = _html.escape(T.get("verdict_for_you", "Great for"))
+    not_for_you_prefix = _html.escape(T.get("verdict_not_for_you", "Skip if"))
+    sentence = _html.escape(verdict.sentence)
+    for_you = _html.escape(verdict.for_you)
+    not_for_you = _html.escape(verdict.not_for_you)
+
+    disclaimer_html = ""
+    if verdict.confidence < 0.3:
+        low_conf = _html.escape(T.get("verdict_low_confidence", "Limited data — rough guide only"))
+        _icon = (
+            '<span class="material-symbols-rounded"'
+            ' style="font-size:12px;vertical-align:middle;">info</span>'
+        )
+        disclaimer_html = (
+            f'<div class="bs-verdict-sub" style="margin-top:.6rem;">'
+            f'{_icon} {low_conf}</div>'
+        )
+
+    st.markdown(
+        f'<div class="bs-verdict-card">'
+        f'<div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;'
+        f'color:#C8781A;margin-bottom:.5rem;">{label}</div>'
+        f'<div class="bs-verdict-for-you">{for_you_prefix}: {for_you}</div>'
+        f'<div class="bs-verdict-sentence">{sentence}</div>'
+        f'<div class="bs-verdict-not-for-you">{not_for_you_prefix}: {not_for_you}</div>'
+        f'{disclaimer_html}'
+        f'</div>',
+        unsafe_allow_html=True,
     )
 
 
@@ -143,11 +200,11 @@ def _render_book_recommendations(
 
     st.markdown(
         '<div class="bs-insight-headline"'
-        ' style="border-left:4px solid #475569;margin-top:.75rem;">'
+        ' style="border-left:4px solid #7A6A5A;margin-top:.75rem;">'
         f'<div class="bs-insight-headline-label">📚 {_html.escape(label)}</div>'
-        f'<div style="white-space:pre-line;color:#e6edf3;font-size:.9rem;line-height:1.6;">'
+        f'<div style="white-space:pre-line;color:#3A2A1A;font-size:.9rem;line-height:1.6;">'
         f'{_html.escape(recs_text)}</div>'
-        f'<div style="font-size:.72rem;color:#64748b;margin-top:.5rem;">'
+        f'<div style="font-size:.72rem;color:#B8A898;margin-top:.5rem;">'
         f'{_html.escape(disclaimer)}</div>'
         f'</div>',
         unsafe_allow_html=True,
@@ -216,9 +273,9 @@ def _render_book_club_pack(
         label = _html.escape(T.get("qi_book_club_label", "BOOK CLUB PACK"))
         st.markdown(
             f'<div class="bs-insight-headline" '
-            f'style="border-left:4px solid #22c55e;margin-top:.75rem;">'
+            f'style="border-left:4px solid #2A7A5A;margin-top:.75rem;">'
             f'<div class="bs-insight-headline-label">📚 {label}</div>'
-            f'<div style="white-space:pre-line;color:#e6edf3;'
+            f'<div style="white-space:pre-line;color:#3A2A1A;'
             f'font-size:.9rem;line-height:1.7;">'
             f'{_html.escape(pack_text)}</div>'
             f'</div>',
@@ -243,6 +300,7 @@ def render_quick_insight(
     ui_lang: str,
     T: dict,
     analysis_result=None,
+    show_verdict: bool = True,
 ) -> None:
     """Render Quick Insight cards for the given book type."""
     type_color = _TYPE_COLOR.get(book_type, "#7c3aed")
@@ -264,22 +322,28 @@ def render_quick_insight(
     # ── LLM pre-computation (parallelized for academic/essay) ─────────────────
     # Model pre-fetched in main Streamlit thread — worker threads must not call
     # st.session_state; they receive model as an explicit argument.
+    # Fiction: no batch pre-computation — streaming handles BOOK DNA inline.
     _ai_text = ""
     _llm_concepts: list[str] = []
     _llm_argument = ""
     _llm_voice = ""
+    _llm_concept_graph = None
+    _llm_essay_phrases: list[str] = []
     _llm_model = st.session_state.get("llm_model", "claude-haiku-4-5")
 
     if analysis_result is not None:
         if book_type in ("academic", "nonfiction") and chunks is not None:
-            # Parallel: AI narrative + nonfiction concept extraction
+            # Parallel: AI narrative + nonfiction concepts + concept relation graph
             with st.spinner(""):
-                with ThreadPoolExecutor(max_workers=2) as _ex:
+                with ThreadPoolExecutor(max_workers=3) as _ex:
                     _f_ai = _ex.submit(
                         generate_narrative_insight, analysis_result, ui_lang, book_type
                     )
                     _f_concepts = _ex.submit(
                         extract_nonfiction_concepts, chunks, ui_lang, book_title, _llm_model
+                    )
+                    _f_concept_graph = _ex.submit(
+                        extract_concept_relations, chunks, ui_lang, book_title, _llm_model
                     )
                 try:
                     _ai_text = _f_ai.result(timeout=30)
@@ -289,16 +353,23 @@ def render_quick_insight(
                     _llm_concepts, _llm_argument = _f_concepts.result(timeout=30)
                 except Exception:
                     _llm_concepts, _llm_argument = [], ""
+                try:
+                    _llm_concept_graph = _f_concept_graph.result(timeout=30)
+                except Exception:
+                    _llm_concept_graph = None
 
         elif book_type == "essay" and chunks is not None:
-            # Parallel: AI narrative + essay voice extraction
+            # Parallel: AI narrative + essay voice + essay phrases for timeline
             with st.spinner(""):
-                with ThreadPoolExecutor(max_workers=2) as _ex:
+                with ThreadPoolExecutor(max_workers=3) as _ex:
                     _f_ai = _ex.submit(
                         generate_narrative_insight, analysis_result, ui_lang, book_type
                     )
                     _f_voice = _ex.submit(
                         extract_essay_voice, chunks, ui_lang, book_title, _llm_model
+                    )
+                    _f_phrases = _ex.submit(
+                        extract_essay_phrases, chunks, ui_lang, book_title, _llm_model
                     )
                 try:
                     _ai_text = _f_ai.result(timeout=30)
@@ -308,13 +379,23 @@ def render_quick_insight(
                     _llm_voice = _f_voice.result(timeout=30)
                 except Exception:
                     _llm_voice = ""
+                try:
+                    _llm_essay_phrases = _f_phrases.result(timeout=30)
+                except Exception:
+                    _llm_essay_phrases = []
 
-        else:
-            # fiction (or no chunks): only one LLM call, no parallelization needed
-            with st.spinner(""):
-                _ai_text = generate_narrative_insight(
-                    analysis_result, ui_lang, genre_type=book_type
-                )
+        # Fiction: no pre-computation — BOOK DNA rendered via streaming inline
+
+    # ── Reader Verdict (rendered before any book_type branch) ────────────────
+    if show_verdict:
+        _verdict = build_reader_verdict(
+            arc_value=arc_value,
+            top_emotion_key=top_emotion_key,
+            style_scores=style_scores or [],
+            book_type=book_type,
+            ui_lang=ui_lang,
+        )
+        _render_verdict_card(_verdict, T, ui_lang)
 
     def _render_ai_card() -> None:
         """Render Book DNA card — LLM narrative as primary insight, shown first."""
@@ -322,10 +403,10 @@ def render_quick_insight(
             return
         _label = _html.escape(T.get("qi_ai_narrative_label", "BOOK DNA"))
         st.markdown(
-            f'<div class="bs-insight-headline" style="border-left:4px solid #e8b84b;'
+            f'<div class="bs-insight-headline" style="border-left:4px solid #C8781A;'
             f'margin-top:.25rem;margin-bottom:.75rem;">'
             f'<div class="bs-insight-headline-label">🧬 {_label}</div>'
-            f'<div style="font-size:1rem;color:#e6edf3;line-height:1.65;">'
+            f'<div style="font-size:1rem;color:#3A2A1A;line-height:1.65;">'
             f'{_html.escape(_ai_text)}</div>'
             f'</div>',
             unsafe_allow_html=True,
@@ -342,13 +423,21 @@ def render_quick_insight(
                 f"{_html.escape(genre_label)} — "
                 f"{_html.escape(top_emotion_name)}-driven {_html.escape(arc_display_name)} arc"
             )
-            for_you_text = genre_tuple[3]
         else:
             headline_text = f"{_html.escape(genre_label)} — {_html.escape(arc_display_name)}"
-            for_you_text = ""
 
-        # Book DNA card first, then type headline as supporting context
-        _render_ai_card()
+        # Book DNA card — streaming (Streamlit native, no HTML div wrapper)
+        if analysis_result is not None:
+            _dna_label = _html.escape(T.get("qi_ai_narrative_label", "BOOK DNA"))
+            st.markdown(
+                f'<div class="bs-insight-headline-label" '
+                f'style="color:#C8781A;margin-bottom:.25rem;">🧬 {_dna_label}</div>',
+                unsafe_allow_html=True,
+            )
+            st.write_stream(
+                generate_narrative_insight_stream(analysis_result, ui_lang, "fiction")
+            )
+
         st.markdown(
             f'<div class="bs-insight-headline" style="border-left:4px solid {type_color};">'
             f'<div class="bs-insight-headline-label">'
@@ -357,6 +446,24 @@ def render_quick_insight(
             f'</div>',
             unsafe_allow_html=True,
         )
+
+        # Emotional Intensity indicator (avg emotion_density across chunks)
+        if emotion_scores:
+            _avg_density = sum(s.emotion_density for s in emotion_scores) / len(emotion_scores)
+            if _avg_density >= 0.20:
+                _intensity_label = T.get("intensity_high", "High emotional intensity")
+                _intensity_color = "#f97316"
+            elif _avg_density >= 0.08:
+                _intensity_label = T.get("intensity_moderate", "Moderate emotional intensity")
+                _intensity_color = "#A8600E"
+            else:
+                _intensity_label = T.get("intensity_low", "Low emotional intensity")
+                _intensity_color = "#B8A898"
+            st.markdown(
+                f'<div style="font-size:.72rem;color:{_intensity_color};'
+                f'margin-bottom:.5rem;">⚡ {_html.escape(_intensity_label)}</div>',
+                unsafe_allow_html=True,
+            )
 
         # Card 1: Key Characters
         chars = extract_character_names(chunks, lang=detected_lang) if chunks is not None else []
@@ -401,10 +508,28 @@ def render_quick_insight(
             )
             chars_sub = ""
 
-        # Card 2: Story Shape (sparkline)
+        # Card 2: Story Shape (sparkline) + arc confidence badge
         spark_pts = compute_sparkline_points(valence_series)
         spark_svg = _sparkline_svg(spark_pts)
         shape_sub = _html.escape(arc_display_name)
+
+        # Compute arc confidence via distance_to_arc (Reagan et al.)
+        _arc_conf_html = ""
+        if emotion_scores and len(emotion_scores) >= 6:
+            _, _arc_confidence = _ArcClassifier().classify_with_confidence(emotion_scores)
+            if _arc_confidence >= 0.85:
+                _conf_label = T.get("arc_conf_high", "High confidence")
+                _conf_color = "#2A7A5A"
+            elif _arc_confidence >= 0.70:
+                _conf_label = T.get("arc_conf_moderate", "Moderate")
+                _conf_color = "#A8600E"
+            else:
+                _conf_label = T.get("arc_conf_low", "Low — arc is ambiguous")
+                _conf_color = "#B8A898"
+            _arc_conf_html = (
+                f'<div style="margin-top:.35rem;font-size:.68rem;color:{_conf_color};">'
+                f'◉ {_html.escape(_conf_label)}</div>'
+            )
 
         # Card 3: Writing Style
         if style_scores:
@@ -428,19 +553,27 @@ def render_quick_insight(
             style_val = "—"
             style_sub = ""
 
-        # 3-col grid
+        # Single-column card stack
         st.markdown(
             f'<div class="bs-insight-grid" style="--bs-type-color:{type_color};">'
+            # Card 1: Key Characters
             f'<div class="{card_cls}">'
             f'<div class="bs-insight-card-label">{_html.escape(T["qi_fi_chars_label"])}</div>'
             f'<div class="bs-insight-card-value">{chars_html}</div>'
             f'{"<div class=bs-insight-card-sub>" + chars_sub + "</div>" if chars_sub else ""}'
             f'</div>'
+            # Card 2: Story Shape — arc name + full-width sparkline side by side
             f'<div class="{card_cls}">'
             f'<div class="bs-insight-card-label">{_html.escape(T["qi_fi_shape_label"])}</div>'
+            f'<div style="display:flex;align-items:center;gap:1.5rem;">'
+            f'<div style="flex:0 0 auto;">'
             f'<div class="bs-insight-card-value">{shape_sub}</div>'
-            f'{spark_svg}'
+            f'{_arc_conf_html}'
             f'</div>'
+            f'<div style="flex:1 1 auto;">{spark_svg}</div>'
+            f'</div>'
+            f'</div>'
+            # Card 3: Writing Style
             f'<div class="{card_cls}">'
             f'<div class="bs-insight-card-label">{_html.escape(T["qi_fi_style_label"])}</div>'
             f'<div class="bs-insight-card-value">{style_val}</div>'
@@ -450,20 +583,8 @@ def render_quick_insight(
             unsafe_allow_html=True,
         )
 
-        # For-you card
-        if for_you_text:
-            st.markdown(
-                f'<div class="bs-for-you">'
-                f'<div class="bs-for-you-icon">📖</div>'
-                f'<div class="bs-for-you-text">'
-                f'<strong>{_html.escape(T["qi_for_you_label"])}:</strong> '
-                f'{_html.escape(for_you_text)}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-        # Character relation graph (fiction + English books only)
-        if detected_lang == "en" and chunks is not None:
+        # Character relation graph (fiction + EN/ZH/JA books)
+        if detected_lang in ("en", "zh", "ja") and chunks is not None:
             _rel_api_key = os.environ.get("ANTHROPIC_API_KEY")
             if not _rel_api_key:
                 try:
@@ -485,6 +606,13 @@ def render_quick_insight(
                         model=_llm_model,
                     )
                 _rel_fig = render_relation_graph(_rel_graph)
+                if _rel_fig is None and len(_rel_graph.characters) < 2:
+                    _empty_msgs = {
+                        "en": "Character graph requires at least 2 identifiable characters.",
+                        "zh": "人物关系图需要至少 2 位可识别角色。",
+                        "ja": "人物関係図には少なくとも 2 人の認識可能なキャラクターが必要です。",
+                    }
+                    st.info(_empty_msgs.get(ui_lang, _empty_msgs["en"]))
                 if _rel_fig is not None:
                     _rel_label = _html.escape(
                         T.get("qi_rel_graph_label", "CHARACTER RELATIONSHIPS")
@@ -498,9 +626,9 @@ def render_quick_insight(
                     )
                     st.markdown(
                         f'<div class="bs-insight-headline" '
-                        f'style="border-left:4px solid #38bdf8;margin-top:.75rem;">'
+                        f'style="border-left:4px solid #2A5A8A;margin-top:.75rem;">'
                         f'<div class="bs-insight-headline-label">👥 {_rel_label}</div>'
-                        f'<div style="font-size:.8rem;color:#7d8590;">{_rel_caption}</div>'
+                        f'<div style="font-size:.8rem;color:#B8A898;">{_rel_caption}</div>'
                         f'</div>',
                         unsafe_allow_html=True,
                     )
@@ -653,6 +781,32 @@ def render_quick_insight(
                 unsafe_allow_html=True,
             )
 
+        # Concept relation graph (nonfiction / academic)
+        if _llm_concept_graph is not None:
+            from bookscope.viz.relation_graph_renderer import render_relation_graph
+
+            if len(_llm_concept_graph.characters) >= 2:
+                _concept_fig = render_relation_graph(
+                    _llm_concept_graph, edge_palette=_CONCEPT_EDGE_PALETTE
+                )
+                if _concept_fig is not None:
+                    _cg_label = _html.escape(T.get("qi_concept_graph_label", "CONCEPT MAP"))
+                    st.markdown(
+                        f'<div class="bs-insight-headline" '
+                        f'style="border-left:4px solid #2A5A8A;margin-top:.75rem;">'
+                        f'<div class="bs-insight-headline-label">🔗 {_cg_label}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.plotly_chart(_concept_fig, use_container_width=True)
+            else:
+                _cg_empty = {
+                    "en": "Concept graph requires at least 2 extractable concepts.",
+                    "zh": "概念图需要至少 2 个可识别概念。",
+                    "ja": "概念図には少なくとも 2 つの概念が必要です。",
+                }
+                st.info(_cg_empty.get(ui_lang, _cg_empty["en"]))
+
     # ── ESSAY / MEMOIR ────────────────────────────────────────────────────────
     else:
         fp = first_person_density(chunks, detected_lang) if chunks is not None else 0.0
@@ -696,7 +850,7 @@ def render_quick_insight(
 
         # Card 1: Author Journey (sparkline)
         spark_pts = compute_sparkline_points(valence_series)
-        spark_svg = _sparkline_svg(spark_pts, color="#22c55e")
+        spark_svg = _sparkline_svg(spark_pts, color="#2A7A5A")
         arc_as_journey = {
             "Rags to Riches": ("from darkness into light", "从黑暗走向光明", "暗闇から光へ"),
             "Riches to Rags": ("a descent into difficulty", "走向困境的历程", "困難への下降"),
@@ -815,6 +969,20 @@ def render_quick_insight(
             f'</div>',
             unsafe_allow_html=True,
         )
+
+        # Essay idea timeline (silently absent if phrases extraction failed)
+        if _llm_essay_phrases:
+            from bookscope.viz.essay_graph_renderer import render_essay_timeline
+
+            _timeline_fig = render_essay_timeline(_llm_essay_phrases, emotion_scores)
+            if _timeline_fig is not None:
+                _tl_label = _html.escape(T.get("qi_essay_timeline_label", "IDEA TIMELINE"))
+                st.markdown(
+                    f'<div class="bs-insight-headline-label" '
+                    f'style="color:#2A7A5A;margin-top:.75rem;">📍 {_tl_label}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.plotly_chart(_timeline_fig, use_container_width=True)
 
     # ── BOOK RECOMMENDATIONS (all types, gated by ENABLE_BOOK_RECS env var) ──
     _render_book_recommendations(

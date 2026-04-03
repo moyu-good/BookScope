@@ -81,7 +81,10 @@ def _tokenize_ja(text: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def _score_en(text: str) -> dict[str, float]:
-    """Score English text with nrclex."""
+    """Score English text with nrclex.
+
+    Returns proportional scores plus ``_density`` = emotional words / total words.
+    """
     from nrclex import NRCLex  # type: ignore[import]
 
     nrc = NRCLex()
@@ -90,21 +93,36 @@ def _score_en(text: str) -> dict[str, float]:
     total = sum(raw.get(f, 0.0) for f in _NRC_FIELDS)
     if total == 0:
         return {}
-    return {f: raw.get(f, 0.0) / total for f in _NRC_FIELDS}
+    result = {f: raw.get(f, 0.0) / total for f in _NRC_FIELDS}
+    # emotion_density: unique emotional word count / total alpha tokens.
+    # affect_dict keys are the unique words that matched any NRC emotion.
+    total_words = max(len([w for w in text.split() if w.isalpha()]), 1)
+    affect_dict = getattr(nrc, "affect_dict", {}) or {}
+    result["_density"] = len(affect_dict) / total_words
+    return result
 
 
 def _score_cjk(tokens: list[str], lang: str) -> dict[str, float]:
-    """Score CJK tokens against the bundled lexicon."""
+    """Score CJK tokens against the bundled lexicon.
+
+    Returns proportional scores plus ``_density`` = emotional tokens / total tokens.
+    """
     word_map = _load_word_map(lang)
     counts: dict[str, float] = {f: 0.0 for f in _NRC_FIELDS}
+    emotional_count = 0
     for token in tokens:
-        for emotion in word_map.get(token, []):
+        emotions = word_map.get(token, [])
+        if emotions:
+            emotional_count += 1
+        for emotion in emotions:
             if emotion in counts:
                 counts[emotion] += 1.0
     total = sum(counts.values())
     if total == 0:
         return {}
-    return {f: counts[f] / total for f in _NRC_FIELDS}
+    result = {f: counts[f] / total for f in _NRC_FIELDS}
+    result["_density"] = emotional_count / max(len(tokens), 1)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +160,8 @@ class LexiconAnalyzer:
         if not scores:
             return EmotionScore(chunk_index=chunk.index)
 
-        return EmotionScore(chunk_index=chunk.index, **scores)
+        density = scores.pop("_density", 0.0)
+        return EmotionScore(chunk_index=chunk.index, emotion_density=density, **scores)
 
     def analyze_book(self, chunks: list[ChunkResult]) -> list[EmotionScore]:
         """Analyze all chunks sequentially."""

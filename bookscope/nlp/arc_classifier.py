@@ -74,43 +74,44 @@ class ArcClassifier:
         Returns:
             ArcPattern enum value. Returns UNKNOWN for very short sequences.
         """
+        return self.classify_with_confidence(scores)[0]
+
+    def classify_with_confidence(
+        self, scores: list[EmotionScore]
+    ) -> tuple[ArcPattern, float]:
+        """Classify the arc and return a confidence score.
+
+        Uses Reagan et al. (2016) method: compute Mean Absolute Error between
+        the normalised valence series and each of the six canonical arc templates,
+        then return the best-matching pattern with its confidence.
+
+        Confidence is derived from the MAE of the best match:
+            MAE < 0.15  → High   (confidence > 0.85)
+            MAE < 0.30  → Moderate
+            MAE >= 0.30 → Low — arc is ambiguous
+
+        Returns:
+            (ArcPattern, confidence) where confidence ∈ [0.0, 1.0].
+            Returns (UNKNOWN, 0.0) for sequences shorter than _MIN_CHUNKS.
+        """
         if len(scores) < _MIN_CHUNKS:
-            return ArcPattern.UNKNOWN
+            return ArcPattern.UNKNOWN, 0.0
 
-        sorted_scores = sorted(scores, key=lambda s: s.chunk_index)
-        valences = np.array([_valence(s) for s in sorted_scores], dtype=float)
+        valence_series = self.valence_series(scores)
 
-        # Fit degree-3 polynomial — this acts as a global smoother without
-        # the edge-effect distortion of a convolution window.
-        x = np.linspace(0, 1, len(valences))
-        coeffs = np.polyfit(x, valences, 3)
+        # Score all six named patterns; pick the one with lowest MAE.
+        named_patterns = [p for p in ArcPattern if p != ArcPattern.UNKNOWN]
+        best_pattern = ArcPattern.UNKNOWN
+        best_mae = 1.0
+        for pattern in named_patterns:
+            mae = self.distance_to_arc(valence_series, pattern)
+            if mae < best_mae:
+                best_mae = mae
+                best_pattern = pattern
 
-        # Evaluate polynomial at 100 evenly spaced points
-        x_fine = np.linspace(0, 1, 100)
-        y_fine = np.polyval(coeffs, x_fine)
-
-        # Count direction reversals (inflection points in first derivative)
-        dy = np.diff(y_fine)
-        sign_changes = int(np.sum(np.diff(np.sign(dy)) != 0))
-
-        start, end = float(y_fine[0]), float(y_fine[-1])
-        mid = float(y_fine[50])
-
-        if sign_changes == 0:
-            return ArcPattern.RAGS_TO_RICHES if end > start else ArcPattern.RICHES_TO_RAGS
-
-        if sign_changes == 1:
-            # Single inflection: valley (U) or peak (∩)
-            return ArcPattern.MAN_IN_HOLE if mid < min(start, end) else ArcPattern.ICARUS
-
-        # Two or more inflections → three-segment arcs
-        q1 = float(y_fine[33])
-        q3 = float(y_fine[66])
-        # Cinderella: rises then falls then rises again (up-down-up)
-        if q1 > start and q3 < q1:
-            return ArcPattern.CINDERELLA
-        # Oedipus: falls then rises then falls again (down-up-down)
-        return ArcPattern.OEDIPUS
+        # Convert MAE to a 0-1 confidence score (lower MAE = higher confidence)
+        confidence = max(0.0, min(1.0, 1.0 - best_mae))
+        return best_pattern, confidence
 
     def valence_series(self, scores: list[EmotionScore]) -> list[float]:
         """Return the raw valence value for each score, sorted by chunk_index."""

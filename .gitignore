@@ -26,6 +26,10 @@ data/demo/
 # Scratch / test files
 test_book.txt
 
+# Design experiments / one-off scripts (not part of the package)
+render_gilded_library.py
+.context/
+
 # OS
 .DS_Store
 Thumbs.db

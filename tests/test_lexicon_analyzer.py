@@ -72,3 +72,31 @@ class TestAnalyzeBook:
         scores = self.analyzer.analyze_book(chunks)
         for chunk, score in zip(chunks, scores):
             assert score.chunk_index == chunk.index
+
+
+class TestEmotionDensity:
+    def setup_method(self):
+        self.analyzer = LexiconAnalyzer()
+
+    def test_empty_text_returns_zero_density(self):
+        result = self.analyzer.analyze_chunk(make_chunk(""))
+        assert result.emotion_density == pytest.approx(0.0)
+
+    def test_density_in_range(self):
+        result = self.analyzer.analyze_chunk(make_chunk("I love joy fear anger trust sadness."))
+        assert 0.0 <= result.emotion_density <= 1.0
+
+    def test_emotional_text_has_higher_density_than_neutral(self):
+        emotional = self.analyzer.analyze_chunk(
+            make_chunk("Love joy happy anger fear sadness trust anticipation surprise disgust.")
+        )
+        neutral = self.analyzer.analyze_chunk(
+            make_chunk("The cat sat on the mat near the window beside the door.")
+        )
+        assert emotional.emotion_density > neutral.emotion_density
+
+    def test_density_serializes_to_dict(self):
+        result = self.analyzer.analyze_chunk(make_chunk("I feel joy and love."))
+        d = result.model_dump()
+        assert "emotion_density" in d
+        assert isinstance(d["emotion_density"], float)

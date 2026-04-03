@@ -40,13 +40,13 @@ from app.tabs.export_tab import render_export  # noqa: E402
 from app.tabs.heatmap import render_heatmap  # noqa: E402
 from app.tabs.library import render_library_tab  # noqa: E402
 from app.tabs.overview import render_overview  # noqa: E402
-from app.tabs.quick_insight import render_quick_insight  # noqa: E402
+from app.tabs.quick_insight import _render_verdict_card, render_quick_insight  # noqa: E402
 from app.tabs.share import render_share_view  # noqa: E402
 from app.tabs.style import render_style  # noqa: E402
 from app.tabs.timeline import render_timeline  # noqa: E402
 from app.ui_constants import _EMOTION_COLORS, _EMOTION_FIELDS, _EMOTION_ICONS  # noqa: E402
 from bookscope.app_utils import get_lang, inject_fonts  # noqa: E402
-from bookscope.insights import compute_readability  # noqa: E402
+from bookscope.insights import build_reader_verdict, compute_readability  # noqa: E402
 from bookscope.nlp import ArcClassifier  # noqa: E402
 from bookscope.nlp.llm_analyzer import call_llm as _call_llm_preview  # noqa: E402
 from bookscope.store import AnalysisResult, Repository  # noqa: E402
@@ -59,7 +59,7 @@ st.set_page_config(
     page_title="BookScope",
     page_icon="📖",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ---------------------------------------------------------------------------
@@ -101,23 +101,10 @@ if uploaded is not None or url_input:
     _demo_mode = False
 
 # ---------------------------------------------------------------------------
-# Welcome screen (no input yet and nothing loaded)
+# Welcome gate — welcome screen is rendered inside render_sidebar_inputs
 # ---------------------------------------------------------------------------
 
 if uploaded is None and not url_input and _loaded_result is None and not _demo_mode:
-    st.markdown(
-        f"""
-        <div class="bs-welcome">
-            <h2>📖 {_html.escape(T['welcome_title'])}</h2>
-            <p>{T['welcome_body']}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    _, center_col, _ = st.columns([2, 1, 2])
-    if center_col.button(T["try_demo"], use_container_width=True):
-        st.session_state["_demo_mode"] = True
-        st.rerun()
     st.stop()
 
 # ---------------------------------------------------------------------------
@@ -253,7 +240,7 @@ safe_arc_display = _html.escape(arc_display_name)
 # Reading time estimate
 _WPM = {"fiction": 250, "academic": 200, "essay": 220}
 _reading_time_str = ""
-if 100 <= total_words <= 200 * 60 * 250:  # skip if too short or > 200 hr equivalent
+if 100 <= total_words <= 200 * 60 * 250:
     _readability_score, _readability_label, _read_confidence = compute_readability(
         style_scores, ui_lang
     )
@@ -273,133 +260,63 @@ if 100 <= total_words <= 200 * 60 * 250:  # skip if too short or > 200 hr equiva
             m=max(1, _total_minutes)
         )
 
-_arc_article = "an" if arc_display_name[:1].lower() in "aeiou" else "a"
-hero_sentence = T["hero_sentence"].format(
-    emotion=safe_emotion_name,
-    arc=safe_arc_display,
-    chunks=n_chunks,
-    article=_arc_article,
-)
+# ---------------------------------------------------------------------------
+# Identity Bar — slim title strip (replaces hero card)
+# ---------------------------------------------------------------------------
 
-st.markdown(
-    f"""
-    <div class="bs-hero">
-        <div class="bs-hero-title">📖 {safe_title}</div>
-        <div class="bs-hero-sentence">{hero_sentence}</div>
-        <div class="bs-metrics">
-            <div class="bs-metric">
-                <div class="bs-metric-label">{T['hero_dominant']}</div>
-                <div class="bs-metric-value" style="color:{top_emotion_color};">
-                    {top_emotion_icon} {safe_emotion_name}
-                </div>
-            </div>
-            <div class="bs-metric">
-                <div class="bs-metric-label">{T['hero_arc']}</div>
-                <div class="bs-metric-value" style="color:#a78bfa;">{safe_arc_display}</div>
-            </div>
-            <div class="bs-metric">
-                <div class="bs-metric-label">{T['hero_words']}</div>
-                <div class="bs-metric-value">{total_words:,}</div>
-            </div>
-            <div class="bs-metric">
-                <div class="bs-metric-label">{T['hero_chunks']}</div>
-                <div class="bs-metric-value">{n_chunks}</div>
-            </div>
-            {f'''<div class="bs-metric">
-                <div class="bs-metric-label">{T.get("hero_reading_time", "Reading time")}</div>
-                <div class="bs-metric-value">{_html.escape(_reading_time_str)}</div>
-            </div>''' if _reading_time_str else ''}
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+_meta_parts = [f"{total_words:,} {T.get('hero_words', 'words')}"]
+if _reading_time_str:
+    _meta_parts.append(_html.escape(_reading_time_str))
+_meta_parts.append(f"{top_emotion_icon} {safe_emotion_name}")
+_meta_parts.append(safe_arc_display)
+_meta_str = " · ".join(_meta_parts)
 
-# Demo badge + clear button
-if _demo_mode and not _from_saved:
-    badge_col, clear_col, _ = st.columns([3, 1, 2])
-    badge_col.info(T["demo_badge"])
-    if clear_col.button(T["loaded_clear"]):
-        st.session_state["_demo_mode"] = False
-        st.rerun()
-
-# Loaded badge + clear button
-if _from_saved:
-    badge_col, clear_col, _ = st.columns([2, 1, 3])
-    badge_col.info(T["loaded_badge"])
-    if clear_col.button(T["loaded_clear"]):
-        st.session_state.pop("_loaded_result", None)
-        st.rerun()
-
-# Save button (hidden when viewing a saved result)
-if not _from_saved:
-    repo = Repository()
-    author_input = st.text_input(
-        T.get("author_label", "Author name (optional)"),
-        placeholder=T.get("author_placeholder", "e.g. Jane Austen"),
-        key="_author_input",
-        label_visibility="visible",
+_id_col, _new_col = st.columns([5, 1])
+with _id_col:
+    st.markdown(
+        f'<div class="bs-identity-bar">'
+        f'<div class="bs-identity-title">📖 {safe_title}</div>'
+        f'<div class="bs-identity-meta">{_meta_str}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
     )
-    save_col, share_col, _ = st.columns([1, 1, 4])
-    if save_col.button(T["save_btn"]):
-        result = AnalysisResult.create(
-            book_title=book_title,
-            chunk_strategy=strategy,
-            total_chunks=n_chunks,
-            total_words=total_words,
-            arc_pattern=arc.value,
-            detected_lang=detected_lang,
-            author=author_input.strip(),
-            emotion_scores=emotion_scores,
-            style_scores=style_scores,
-        )
-        repo.save(result)
-        save_col.success(T["saved_ok"])
-
-    # Share button — disabled when Supabase is not configured
-    from bookscope.store.supabase_repository import SupabaseRepository as _SupabaseRepo
-    _supabase_repo = _SupabaseRepo()
-    if share_col.button(
-        T.get("share_btn", "🔗 Share analysis"),
-        disabled=not _supabase_repo.available,
-        help=(
-            None if _supabase_repo.available
-            else T.get("share_btn_disabled", "Supabase not configured")
-        ),
+with _new_col:
+    if st.button(
+        T.get("new_analysis_btn", "↩ New"),
+        key="_new_analysis_btn",
+        use_container_width=True,
+        help=T.get("new_analysis_help", "Start a new analysis"),
     ):
-        st.session_state["_share_confirm_pending"] = True
+        for _k in [
+            "_cached_file_bytes", "_cached_file_name", "_cached_url",
+            "_loaded_result", "_demo_mode",
+        ]:
+            st.session_state.pop(_k, None)
+        st.rerun()
 
-    if st.session_state.get("_share_confirm_pending"):
-        st.warning(T.get(
-            "share_confirm_warning",
-            "Once shared, this link is permanent.",
-        ))
-        confirm_col, cancel_col, _ = st.columns([1, 1, 4])
-        if confirm_col.button(T.get("share_confirm_btn", "Yes, share publicly")):
-            _share_result = AnalysisResult.create(
-                book_title=book_title,
-                chunk_strategy=strategy,
-                total_chunks=n_chunks,
-                total_words=total_words,
-                arc_pattern=arc.value,
-                detected_lang=detected_lang,
-                author=author_input.strip(),
-                emotion_scores=emotion_scores,
-                style_scores=style_scores,
-            )
-            _slug = _supabase_repo.publish(_share_result, book_type=book_type)
-            st.session_state.pop("_share_confirm_pending", None)
-            if _slug:
-                st.success(T.get("share_success", "✅ Shared! Add this to your app URL:"))
-                st.code(f"?share={_slug}")
-            else:
-                st.error(T.get("share_error", "Failed to share."))
-        if cancel_col.button(T.get("share_cancel", "Cancel")):
-            st.session_state.pop("_share_confirm_pending", None)
-            st.rerun()
+# Demo badge
+if _demo_mode and not _from_saved:
+    st.info(T["demo_badge"])
+
+# Loaded badge
+if _from_saved:
+    st.info(T["loaded_badge"])
 
 # ---------------------------------------------------------------------------
-# Layer 1: Quick Insight (always shown — pre-reader decision card)
+# Verdict Band — always visible, above tab bar
+# ---------------------------------------------------------------------------
+
+_verdict = build_reader_verdict(
+    arc_value=arc.value,
+    top_emotion_key=top_emotion_key,
+    style_scores=style_scores or [],
+    book_type=book_type,
+    ui_lang=ui_lang,
+)
+_render_verdict_card(_verdict, T, ui_lang)
+
+# ---------------------------------------------------------------------------
+# Prepare shared data for all tabs
 # ---------------------------------------------------------------------------
 
 valence_series = (
@@ -415,67 +332,179 @@ _qi_result = AnalysisResult.create(
     emotion_scores=emotion_scores,
     style_scores=style_scores,
 )
-render_quick_insight(
-    book_type=book_type,
-    book_title=book_title,
-    arc_value=arc.value,
-    arc_display_name=arc_display_name,
-    top_emotion_key=top_emotion_key,
-    top_emotion_name=top_emotion_name,
-    top_emotion_color=top_emotion_color,
-    total_words=total_words,
-    chunks=chunks,
-    emotion_scores=emotion_scores,
-    style_scores=style_scores,
-    valence_series=valence_series,
-    detected_lang=detected_lang,
-    ui_lang=ui_lang,
-    T=T,
-    analysis_result=_qi_result,
-)
 
 # ---------------------------------------------------------------------------
-# Layer 2: Deep Analysis (collapsed by default)
+# v2.0: Chapter preview helper
 # ---------------------------------------------------------------------------
 
-_expander_label = T.get("deep_analysis_expander", "▼ Deep Analysis (charts + data)")
-with st.expander(_expander_label, expanded=False):
-    (
-        tab_overview, tab_heatmap, tab_timeline, tab_style,
-        tab_arc, tab_chat, tab_library, tab_export, tab_chunks,
-    ) = st.tabs([
-        T["tab_overview"], T["tab_heatmap"], T["tab_timeline"], T["tab_style"],
-        T["tab_arc"], T.get("tab_chat", "💬 Chat"),
-        T.get("tab_library", "📚 Library"),
-        T["tab_export"], T["tab_chunks"],
-    ])
-
-    with tab_overview:
-        render_overview(emotion_scores, T, _EMOTION_FIELDS)
-
-    with tab_heatmap:
-        render_heatmap(emotion_scores, chunks, T)
-
-    with tab_timeline:
-        render_timeline(emotion_scores, T, _EMOTION_FIELDS)
-
-    with tab_style:
-        render_style(style_scores, T)
-
-    with tab_arc:
-        render_arc_pattern(emotion_scores, arc, arc_display_name, arc_classifier, T)
-
-    with tab_chat:
-        render_chat_tab(chunks, ui_lang, T)
-
-    with tab_library:
-        render_library_tab(T, ui_lang)
-
-    with tab_export:
-        render_export(
-            book_title, strategy, n_chunks, total_words,
-            arc, detected_lang, emotion_scores, style_scores, T,
+def _render_chapter_cards(chunks: list, emotion_scores_list: list, T: dict) -> None:
+    """Compact section previews — first 60 chars + dominant emotion per chunk."""
+    _label = T.get("chapter_cards_label", "SECTIONS")
+    _icons = {
+        "joy": "😊", "sadness": "😢", "anger": "😠", "fear": "😨",
+        "anticipation": "⏳", "trust": "🤝", "surprise": "😲", "disgust": "🤢",
+    }
+    rows = ""
+    display_chunks = chunks[:20]
+    for i, chunk in enumerate(display_chunks):
+        text = getattr(chunk, "text", "")
+        preview = text[:60].strip().replace("\n", " ")
+        if len(text) > 60:
+            preview += "…"
+        icon = (
+            _icons.get(emotion_scores_list[i].dominant_emotion, "")
+            if i < len(emotion_scores_list) else ""
         )
+        rows += (
+            f'<div style="display:flex;gap:.5rem;align-items:baseline;'
+            f'font-size:.8rem;color:#5A4A3A;padding:.25rem 0;'
+            f'border-bottom:1px solid #E8E4DC;">'
+            f'<span style="color:#B8A898;flex-shrink:0;width:1.6em;text-align:right;">'
+            f'{i + 1}</span>'
+            f'<span style="flex:1;line-height:1.4;">{_html.escape(preview)}</span>'
+            f'<span style="flex-shrink:0;">{icon}</span>'
+            f'</div>'
+        )
+    more_html = ""
+    if len(chunks) > 20:
+        more_html = (
+            f'<div style="font-size:.72rem;color:#B8A898;padding:.3rem 0;">'
+            f'… {len(chunks) - 20} more</div>'
+        )
+    st.markdown(
+        f'<div class="bs-insight-headline" '
+        f'style="border-left:4px solid #B8A898;margin-top:.75rem;">'
+        f'<div class="bs-insight-headline-label">📄 {_html.escape(_label)}</div>'
+        f'{rows}{more_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
-    with tab_chunks:
+
+# ---------------------------------------------------------------------------
+# v2.0: Dual-column layout — left (insight cards) + right (chat)
+# ---------------------------------------------------------------------------
+
+_left_col, _right_col = st.columns([3, 2])
+
+with _left_col:
+    render_quick_insight(
+        book_type=book_type,
+        book_title=book_title,
+        arc_value=arc.value,
+        arc_display_name=arc_display_name,
+        top_emotion_key=top_emotion_key,
+        top_emotion_name=top_emotion_name,
+        top_emotion_color=top_emotion_color,
+        total_words=total_words,
+        chunks=chunks,
+        emotion_scores=emotion_scores,
+        style_scores=style_scores,
+        valence_series=valence_series,
+        detected_lang=detected_lang,
+        ui_lang=ui_lang,
+        T=T,
+        analysis_result=_qi_result,
+        show_verdict=False,
+    )
+    if chunks:
+        _render_chapter_cards(chunks, emotion_scores, T)
+
+with _right_col:
+    render_chat_tab(chunks, ui_lang, T, book_type=book_type)
+
+# ── Library ───────────────────────────────────────────────────────────────
+with st.expander(T.get("tab_library", "📚 Library"), expanded=False):
+    render_library_tab(T, ui_lang)
+
+# ── Deep Analysis ─────────────────────────────────────────────────────────
+with st.expander(T.get("deep_analysis_expander", "📊 Deep Analysis"), expanded=False):
+    render_overview(emotion_scores, T, _EMOTION_FIELDS)
+    st.divider()
+    render_heatmap(emotion_scores, chunks, T)
+    st.divider()
+    render_timeline(emotion_scores, T, _EMOTION_FIELDS)
+    st.divider()
+    render_style(style_scores, T)
+    st.divider()
+    render_arc_pattern(emotion_scores, arc, arc_display_name, arc_classifier, T)
+
+# ── Export ────────────────────────────────────────────────────────────────
+with st.expander(T.get("tab_export", "📦 Export"), expanded=False):
+    if not _from_saved:
+        repo = Repository()
+        author_input = st.text_input(
+            T.get("author_label", "Author name (optional)"),
+            placeholder=T.get("author_placeholder", "e.g. Jane Austen"),
+            key="_author_input",
+            label_visibility="visible",
+        )
+        save_col, share_col, _ = st.columns([1, 1, 4])
+        if save_col.button(T["save_btn"]):
+            result = AnalysisResult.create(
+                book_title=book_title,
+                chunk_strategy=strategy,
+                total_chunks=n_chunks,
+                total_words=total_words,
+                arc_pattern=arc.value,
+                detected_lang=detected_lang,
+                author=author_input.strip(),
+                emotion_scores=emotion_scores,
+                style_scores=style_scores,
+            )
+            repo.save(result)
+            save_col.success(T["saved_ok"])
+
+        from bookscope.store.supabase_repository import SupabaseRepository as _SupabaseRepo
+        _supabase_repo = _SupabaseRepo()
+        if share_col.button(
+            T.get("share_btn", "🔗 Share analysis"),
+            disabled=not _supabase_repo.available,
+            help=(
+                None if _supabase_repo.available
+                else T.get("share_btn_disabled", "Share requires Supabase configuration")
+            ),
+        ):
+            st.session_state["_share_confirm_pending"] = True
+
+        if st.session_state.get("_share_confirm_pending"):
+            st.warning(T.get(
+                "share_confirm_warning",
+                "Once shared, this link is permanent.",
+            ))
+            confirm_col, cancel_col, _ = st.columns([1, 1, 4])
+            if confirm_col.button(T.get("share_confirm_btn", "Yes, share publicly")):
+                _share_result = AnalysisResult.create(
+                    book_title=book_title,
+                    chunk_strategy=strategy,
+                    total_chunks=n_chunks,
+                    total_words=total_words,
+                    arc_pattern=arc.value,
+                    detected_lang=detected_lang,
+                    author=author_input.strip(),
+                    emotion_scores=emotion_scores,
+                    style_scores=style_scores,
+                )
+                _slug = _supabase_repo.publish(_share_result, book_type=book_type)
+                st.session_state.pop("_share_confirm_pending", None)
+                if _slug:
+                    st.success(T.get("share_success", "✅ Shared! Add this to your app URL:"))
+                    st.code(f"?share={_slug}")
+                else:
+                    st.error(T.get("share_error", "Failed to share."))
+            if cancel_col.button(T.get("share_cancel", "Cancel")):
+                st.session_state.pop("_share_confirm_pending", None)
+                st.rerun()
+
+        st.divider()
+
+    render_export(
+        book_title, strategy, n_chunks, total_words,
+        arc, detected_lang, emotion_scores, style_scores, T,
+        book_type=book_type,
+        top_emotion_name=top_emotion_name,
+        ui_lang=ui_lang,
+    )
+    st.divider()
+    with st.expander(T.get("tab_chunks", "📄 Raw Chunks"), expanded=False):
         render_chunks(chunks, emotion_scores, style_scores, T)

@@ -104,6 +104,41 @@
   prompts include "Japanese" for lang='ja'. _(commit 75c555d)_
 - Tests: 299 → 379 (+80)
 
+## v1.0 Pre-dev Checklist（实现前必须完成）
+
+- [ ] **CJK prompt 质量验证** — 实现 CJK 人物关系图前，手动评测现有 EN prompt 对 3 本中文小说的效果。
+  取前 5 章，运行 `relation_extractor`，人工标注准确率。
+  通过阈值：>75% 则直接复用 EN prompt，否则加入中文说明（`"Output character names in the original Chinese/Japanese"`）。
+  _来源：CEO Review 2026-04-01，cross-model 张力决策_
+  (Human: ~30min / CC: 协助评估)
+
+- [x] **Streaming + st.expander() 兼容性测试** — `app/streaming_compat_test.py` 已创建。
+  运行 `streamlit run app/streaming_compat_test.py` 验证 Test A/C。
+  实现采用 Plan A（streaming 在 expander 外，使用 `st.write_stream()` 原生渲染）。
+  _来源：CEO Review 2026-04-01，Outside Voice 发现_
+
+- [x] **render_gilded_library.py 清理** — 已加入 `.gitignore`（commit 408ba7b）。
+  _来源：CEO Review 2026-04-01，系统审计_
+
+## v1.0 — 实现完成 2026-04-01
+
+- [x] **CJK 人物关系图** — `relation_extractor.py`: guard 改为 `lang not in ("en","zh","ja")`，
+  新增 `_presegment_cjk()` (jieba NR/NRF + janome 固有名詞)，hints 注入 prompt。
+  `quick_insight.py`: 图门控扩展至 `detected_lang in ("en","zh","ja")`，<2实体时显示多语言空状态提示。
+- [x] **非虚构概念图** — `genre_analyzer.py`: 新增 `extract_concept_relations()` (5-chunk 采样)
+  和 `_parse_concept_graph()`。`relation_graph_renderer.py`: 新增 `edge_palette` 参数，
+  contradicts→虚线，其余按色编码。`quick_insight.py`: academic 段落结尾渲染概念图。
+- [x] **流式 LLM 输出** — `llm_analyzer.py`: 新增 `generate_narrative_insight_stream()` 独立 Generator 函数。
+  `quick_insight.py` fiction 段: `_render_ai_card()` 替换为 `st.caption()` + `st.write_stream()`。
+- [x] **Book Club Pack PNG** — `models/schemas.py`: 新增 `BookClubPack` Pydantic 模型 (Literal difficulty)。
+  `llm_analyzer.py`: 新增 `generate_book_club_pack_structured()`。
+  `card_renderer.py`: 新增 `render_book_club_card()` 800×600 PNG。
+  `export_tab.py`: 新增 Book Club Pack PNG 生成 + 下载按钮。
+- [x] **Essay 随笔时间线图** — `genre_analyzer.py`: 新增 `extract_essay_phrases()` (8-chunk 采样)。
+  新文件 `viz/essay_graph_renderer.py`: `render_essay_timeline()` Plotly Scatter 平行时间线 (height=120px)。
+  `quick_insight.py` essay 段: Voice Fingerprint 卡片之后渲染时间线。
+- Tests: 399 → 399 (所有现有测试通过，无回归)
+
 ## Deferred to v1.0+
 
 - [ ] **AnalyzerProtocol for LLM** — wrap `llm_analyzer.py` in `AnalyzerProtocol` when a
@@ -114,3 +149,36 @@
 - [ ] **Server-side shareable URLs** — each analysis gets a public URL with cached results.
   Requires replacing local JSON store with server-side persistence (major architecture change).
   (Human: ~1 week / CC: ~3 hours)
+
+## v1.2 — completed 2026-04-02
+
+- [x] **Reader Verdict card** — `bookscope/insights.py`: `build_reader_verdict()` + 48-entry
+  `_VERDICT_TABLE` (6 arc × 8 emotion, EN/ZH/JA). `bookscope/models/schemas.py`: `ReaderVerdict`
+  Pydantic model. `app/tabs/quick_insight.py`: `_render_verdict_card()` helper, called before
+  book-type branch. `app/strings.py`: verdict i18n keys. `app/css.py`: 5-layer typography +
+  `.bs-verdict-card` styles.
+- [x] **Page flow reorder** — `app/main.py`: Hero lite (removed "chunks" metric) →
+  `render_quick_insight()` (Verdict first) → Deep Analysis expander → Save/Share (moved to bottom
+  with `st.divider()`). Save/Share no longer appears above content.
+- Tests: 413 → 422 (+9 `TestBuildReaderVerdict`)
+
+## Deferred from v1.1 autoplan (2026-04-02)
+
+- [ ] **v1.2 — 按书类型的风格基准线** — fiction/nonfiction/essay 三套 `_STYLE_RANGES`，按 `book_type` 选择
+- [ ] **v1.2 — Emotion Radar Y 轴改为绝对计数** — 显示情感词密度而非仅比例
+- [ ] **v1.3 — 可读性公式对齐标准** — 替换自定义权重，使用 Flesch-Kincaid 或 Dale-Chall
+- [ ] **v1.3 — Arc 分类精度验证** — 建立人工标注测试集，验证 distance_to_arc 准确率
+
+## Deferred from v1.2 autoplan (2026-04-02)
+
+- [ ] **v1.3 — Share 确认弹窗移至侧边栏** — 当前 Save/Share 移至底部后，确认对话框远离按钮（已知 UX 权衡，低优先级）
+- [ ] **v1.3 — LLM 内容摘要（Content Brief）** — 等 API key 普及率提升后，作为 Reader Verdict 的可选 LLM 增强（有 key 时加载，无 key 静默隐藏）
+- [ ] **v1.3 — Reader Verdict 个性化** — 基于用户历史分析记录，调整"适合/不适合"的表达方式
+
+## Strategic / Long-term (from CEO outside voice, 2026-04-02)
+
+- [ ] **v2.0 — NRC 多语言准确率验证** — zh/ja 翻译版 NRC 词典准确率未经验证。
+  考虑以 sentence-transformers 或 multilingual emotion model 替代 NRC 作为中日文后端。
+  _来源：CEO 外部声音，Critical 发现_
+- [ ] **v2.0 — 竞争差异化叙事** — 明确"可视化 + LLM 叙事组合"作为护城河的产品文案，
+  区分于纯 LLM chatbot 竞品（Storygraph、GPT-4o 类应用）。

@@ -108,6 +108,8 @@ def render_library_tab(T: dict, ui_lang: str) -> None:
                 use_container_width=True,
             ):
                 st.session_state["_loaded_result"] = result
+                for _k in ["_cached_file_bytes", "_cached_file_name", "_cached_url"]:
+                    st.session_state.pop(_k, None)
                 st.rerun()
 
         # Reading diary (sidecar notes)

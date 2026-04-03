@@ -205,6 +205,105 @@ def extract_nonfiction_concepts(
 
 
 # ---------------------------------------------------------------------------
+# Non-fiction: concept relation extraction (for concept graph)
+# ---------------------------------------------------------------------------
+
+def _build_concept_relation_prompt(text_block: str, lang: str) -> str:
+    lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(lang, "English")
+    return (
+        f"You are analysing a non-fiction book.\n"
+        f"Here are {text_block.count('[Excerpt')} representative excerpts:\n\n"
+        f"{text_block}\n\n"
+        f"Extract key concepts and their relationships.\n"
+        f"Return ONLY valid JSON — no markdown, no explanation:\n"
+        '{{"concepts": ["Concept A", ...], "relations": [{{"source": "A", '
+        '"target": "B", "relation": "supports|contradicts|extends|defines"}}]}}\n'
+        "Rules:\n"
+        "- Max 8 concepts, max 12 relations.\n"
+        "- relation must be one of: supports, contradicts, extends, defines.\n"
+        "  supports=A is evidence for B; contradicts=A conflicts with B;\n"
+        "  extends=A builds on B; defines=A provides definition of B.\n"
+        f"Use {lang_name} for concept names."
+    )
+
+
+def _parse_concept_graph(raw: str) -> tuple[list[str], list[dict]]:
+    """Parse LLM JSON into (concepts, raw_relations). Returns ([], []) on failure."""
+    import json
+
+    if not raw:
+        return [], []
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        text = "\n".join(line for line in lines if not line.startswith("```")).strip()
+    try:
+        data = json.loads(text)
+        concepts = [str(c).strip() for c in data.get("concepts", []) if c][:8]
+        valid_types = {"supports", "contradicts", "extends", "defines"}
+        raw_relations = []
+        for r in data.get("relations", []):
+            src = str(r.get("source", "")).strip()
+            tgt = str(r.get("target", "")).strip()
+            rel = str(r.get("relation", "")).strip().lower()
+            if src and tgt and rel in valid_types:
+                raw_relations.append({"source": src, "target": tgt, "relation": rel})
+        return concepts, raw_relations[:12]
+    except Exception:
+        return [], []
+
+
+def extract_concept_relations(
+    chunks: list,
+    lang: str,
+    book_title: str = "",
+    model: str | None = None,
+):
+    """Extract concept relationships from non-fiction text for concept graph.
+
+    Returns a RelationGraph (from relation_extractor) where characters = concepts.
+    Returns empty graph if API key absent / call fails / <2 concepts.
+    """
+    from bookscope.nlp.relation_extractor import CharacterRelation, RelationGraph
+
+    api_key = _get_api_key()
+    if not api_key:
+        return RelationGraph(characters=[], relations=[])
+
+    sampled = _sample_chunks(chunks, n=5)
+    chunk_hashes = "".join(getattr(c, "text", str(c))[:40] for c in sampled)
+    ck = _cache_key_genre(book_title, "concept_graph", chunk_hashes)
+
+    if st is not None:
+        try:
+            cached = st.session_state.get(ck)
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
+
+    text_block = _chunk_text_block(sampled)
+    prompt = _build_concept_relation_prompt(text_block, lang)
+    response = _call_llm(prompt, api_key, model=model)
+
+    concepts, raw_relations = _parse_concept_graph(response) if response else ([], [])
+    relations = [
+        CharacterRelation(source=r["source"], target=r["target"], relation=r["relation"])
+        for r in raw_relations
+        if r["source"] in concepts and r["target"] in concepts
+    ]
+    graph = RelationGraph(characters=concepts, relations=relations)
+
+    if st is not None and ck:
+        try:
+            st.session_state[ck] = graph
+        except Exception:
+            pass
+
+    return graph
+
+
+# ---------------------------------------------------------------------------
 # Essay / memoir: voice characterization
 # ---------------------------------------------------------------------------
 
@@ -269,3 +368,84 @@ def extract_essay_voice(
             pass
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Essay: key phrase extraction for timeline
+# ---------------------------------------------------------------------------
+
+def _build_essay_phrases_prompt(text_block: str, lang: str) -> str:
+    lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(lang, "English")
+    return (
+        f"You are analysing an essay or memoir.\n"
+        f"Here are {text_block.count('[Excerpt')} representative excerpts:\n\n"
+        f"{text_block}\n\n"
+        f"For each excerpt, give ONE key idea phrase (maximum 10 characters each).\n"
+        f"Return ONLY a JSON array of strings — no markdown, no explanation:\n"
+        f'["phrase1", "phrase2", ...]\n\n'
+        f"The array length must equal the number of excerpts above.\n"
+        f"Use {lang_name}."
+    )
+
+
+def _parse_essay_phrases(raw: str) -> list[str]:
+    """Parse JSON array of phrases from LLM response."""
+    import json
+
+    if not raw:
+        return []
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        text = "\n".join(line for line in lines if not line.startswith("```")).strip()
+    try:
+        data = json.loads(text)
+        if isinstance(data, list):
+            return [str(p)[:10].strip() for p in data if p]
+        return []
+    except Exception:
+        return []
+
+
+def extract_essay_phrases(
+    chunks: list,
+    lang: str,
+    book_title: str = "",
+    model: str | None = None,
+) -> list[str]:
+    """Return one key phrase per sampled chunk (≤10 chars each) for timeline.
+
+    Uses 8-chunk uniform sampling. Returns [] if API absent / call fails.
+    """
+    api_key = _get_api_key()
+    if not api_key:
+        return []
+
+    sampled = _sample_chunks(chunks, n=8)
+    if not sampled:
+        return []
+
+    chunk_hashes = "".join(getattr(c, "text", str(c))[:40] for c in sampled)
+    ck = _cache_key_genre(book_title, "essay_phrases", chunk_hashes)
+
+    if st is not None:
+        try:
+            cached = st.session_state.get(ck)
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
+
+    text_block = _chunk_text_block(sampled)
+    prompt = _build_essay_phrases_prompt(text_block, lang)
+    response = _call_llm(prompt, api_key, model=model)
+
+    phrases = _parse_essay_phrases(response) if response else []
+
+    if st is not None and ck:
+        try:
+            st.session_state[ck] = phrases
+        except Exception:
+            pass
+
+    return phrases

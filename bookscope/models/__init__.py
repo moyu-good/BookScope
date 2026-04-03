@@ -1,3 +1,10 @@
-from bookscope.models.schemas import BookText, ChunkResult, EmotionScore, StyleScore
+from bookscope.models.schemas import (
+    BookClubPack,
+    BookText,
+    ChunkResult,
+    EmotionScore,
+    ReaderVerdict,
+    StyleScore,
+)
 
-__all__ = ["BookText", "ChunkResult", "EmotionScore", "StyleScore"]
+__all__ = ["BookClubPack", "BookText", "ChunkResult", "EmotionScore", "ReaderVerdict", "StyleScore"]

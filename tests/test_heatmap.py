@@ -114,3 +114,28 @@ class TestEmotionHeatmapRenderer:
         data = ChartDataAdapter.emotion_heatmap(make_scores(3))
         fig = self.renderer.render(data)
         assert fig.data[0].customdata is None
+
+    def test_colorscale_is_blues(self):
+        """Heatmap must use the Blues colorscale (not RdYlGn which mapped anger=green).
+        Plotly expands named colorscales into (fraction, rgb_string) tuples; verify by
+        checking the characteristic first and last colours of the Blues palette."""
+        data = ChartDataAdapter.emotion_heatmap(make_scores(5))
+        fig = self.renderer.render(data)
+        colorscale = fig.data[0].colorscale
+        assert colorscale[0][1] == "rgb(247,251,255)"   # lightest Blues colour
+        assert colorscale[-1][1] == "rgb(8,48,107)"     # darkest Blues colour
+
+    def test_dynamic_zmax_reflects_data_maximum(self):
+        """zmax must be ~1.1× the actual data maximum so colors span real distribution."""
+        n = 10
+        data = ChartDataAdapter.emotion_heatmap(make_scores(n))
+        fig = self.renderer.render(data)
+        all_vals = [v for row in data.z for v in row if v is not None]
+        expected_zmax = max(all_vals) * 1.1
+        assert fig.data[0].zmax == pytest.approx(expected_zmax, rel=1e-6)
+
+    def test_empty_scores_produces_empty_figure(self):
+        data = ChartDataAdapter.emotion_heatmap([])
+        fig = self.renderer.render(data)
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) == 0

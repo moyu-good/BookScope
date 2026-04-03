@@ -99,3 +99,80 @@ class TestArcClassifier:
                 sadness = (t - 0.66) / 0.34
             scores.append(EmotionScore(chunk_index=i, sadness=sadness))
         assert self.clf.classify(scores) == ArcPattern.OEDIPUS
+
+
+class TestClassifyWithConfidence:
+    def setup_method(self):
+        self.clf = ArcClassifier()
+
+    def _cinderella_scores(self, n: int = 30) -> list[EmotionScore]:
+        """Rise → fall → rise (W-shape valence)."""
+        scores = []
+        for i in range(n):
+            t = i / (n - 1)
+            if t < 0.33:
+                joy = t / 0.33
+            elif t < 0.66:
+                joy = 1.0 - (t - 0.33) / 0.33
+            else:
+                joy = (t - 0.66) / 0.34
+            scores.append(EmotionScore(chunk_index=i, joy=joy))
+        return scores
+
+    def _oedipus_scores(self, n: int = 30) -> list[EmotionScore]:
+        """Fall → rise → fall (M-shape valence)."""
+        scores = []
+        for i in range(n):
+            t = i / (n - 1)
+            if t < 0.33:
+                sadness = t / 0.33
+            elif t < 0.66:
+                sadness = 1.0 - (t - 0.33) / 0.33
+            else:
+                sadness = (t - 0.66) / 0.34
+            scores.append(EmotionScore(chunk_index=i, sadness=sadness))
+        return scores
+
+    def test_returns_tuple_of_pattern_and_float(self):
+        pattern, conf = self.clf.classify_with_confidence(rising_scores())
+        assert isinstance(pattern, ArcPattern)
+        assert isinstance(conf, float)
+
+    def test_short_input_returns_unknown_zero(self):
+        scores = [EmotionScore(chunk_index=i) for i in range(3)]
+        pattern, conf = self.clf.classify_with_confidence(scores)
+        assert pattern == ArcPattern.UNKNOWN
+        assert conf == pytest.approx(0.0)
+
+    def test_confidence_in_range(self):
+        _, conf = self.clf.classify_with_confidence(rising_scores())
+        assert 0.0 <= conf <= 1.0
+
+    def test_confidence_high_for_clean_rags_to_riches(self):
+        """A perfectly linear rising series should match the RAGS_TO_RICHES template
+        with near-zero MAE, yielding confidence above 0.85."""
+        pattern, conf = self.clf.classify_with_confidence(rising_scores(20))
+        assert pattern == ArcPattern.RAGS_TO_RICHES
+        assert conf > 0.85
+
+    def test_cinderella_distance_lower_than_oedipus_distance(self):
+        """The distance_to_arc for a rise-fall-rise series must be lower for
+        CINDERELLA than for OEDIPUS, verifying the relative metric is sensible."""
+        series = self.clf.valence_series(self._cinderella_scores())
+        d_cin = self.clf.distance_to_arc(series, ArcPattern.CINDERELLA)
+        d_oed = self.clf.distance_to_arc(series, ArcPattern.OEDIPUS)
+        assert d_cin < d_oed
+
+    def test_oedipus_distance_lower_than_cinderella_distance(self):
+        """The distance_to_arc for a fall-rise-fall series must be lower for
+        OEDIPUS than for CINDERELLA."""
+        series = self.clf.valence_series(self._oedipus_scores())
+        d_oed = self.clf.distance_to_arc(series, ArcPattern.OEDIPUS)
+        d_cin = self.clf.distance_to_arc(series, ArcPattern.CINDERELLA)
+        assert d_oed < d_cin
+
+    def test_classify_backward_compat_still_returns_arc_pattern(self):
+        """classify() must still return a bare ArcPattern, not a tuple."""
+        result = self.clf.classify(rising_scores())
+        assert isinstance(result, ArcPattern)
+        assert not isinstance(result, tuple)

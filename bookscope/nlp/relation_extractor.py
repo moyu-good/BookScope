@@ -34,6 +34,27 @@ class RelationGraph(BaseModel):
     relations: list[CharacterRelation]
 
 
+def _presegment_cjk(text: str, lang: str) -> list[str]:
+    """Extract name candidates via jieba (zh) or janome (ja).
+
+    Returns [] if import fails or no candidates found — caller falls back to raw text.
+    """
+    if lang == "zh":
+        try:
+            import jieba.posseg as pseg  # type: ignore[import]
+            return [w.word for w in pseg.cut(text) if w.flag in ("nr", "nrf")]
+        except ImportError:
+            return []
+    elif lang == "ja":
+        try:
+            from janome.tokenizer import Tokenizer  # type: ignore[import]
+            t = Tokenizer()
+            return [tok.surface for tok in t.tokenize(text) if "固有名詞" in tok.part_of_speech]
+        except ImportError:
+            return []
+    return []
+
+
 def extract_character_relations(
     chunks: list,
     lang: str,
@@ -52,7 +73,7 @@ def extract_character_relations(
         RelationGraph with characters and relations lists.
         Returns empty graph if lang != "en", no chunks, or LLM call fails.
     """
-    if lang != "en" or not chunks or not api_key:
+    if lang not in ("en", "zh", "ja") or not chunks or not api_key:
         return RelationGraph(characters=[], relations=[])
 
     # Cache per book content (first N chunks)
@@ -68,6 +89,17 @@ def extract_character_relations(
         getattr(c, "text", str(c))[:_CHARS_PER_CHUNK] for c in sample
     )
 
+    # CJK pre-segmentation: inject name hints to assist Claude
+    hints_section = ""
+    if lang in ("zh", "ja"):
+        sample_text = " ".join(getattr(c, "text", str(c))[:200] for c in sample)
+        name_hints = _presegment_cjk(sample_text, lang)
+        if name_hints:
+            hints_section = (
+                f"\nName candidates from pre-segmentation (use as hints only): "
+                f"{', '.join(name_hints[:20])}\n"
+            )
+
     prompt = (
         "You are extracting character relationships from book excerpts.\n"
         "Given these excerpts from a fiction book, identify the 3-6 most "
@@ -76,8 +108,9 @@ def extract_character_relations(
         '{"characters": ["Name1", "Name2", ...], '
         '"relations": [{"source": "A", "target": "B", "relation": "label"}, ...]}\n'
         "Each relation label must be <=10 characters (e.g. rivals, lovers, mentor, allies).\n"
-        "Include only relations clearly supported by the text.\n\n"
-        f"Excerpts (first {len(sample)} chapter(s)):\n{text}"
+        "Include only relations clearly supported by the text.\n"
+        + hints_section
+        + f"\nExcerpts (first {len(sample)} chapter(s)):\n{text}"
     )
 
     raw = call_llm(prompt, api_key=api_key, model=model, max_tokens=400) or ""

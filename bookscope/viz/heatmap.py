@@ -39,14 +39,22 @@ class EmotionHeatmapRenderer(BaseRenderer):
             customdata = None
             hovertemplate = "Chunk %{x}<br>%{y}: %{z:.3f}<extra></extra>"
 
+        # Dynamic range: use actual data maximum so colors span the real
+        # distribution.  NRC per-emotion values typically sit in 0.03–0.30,
+        # so a fixed zmax=1.0 would leave most cells near-zero and grey.
+        # Blues is a single-hue scale with no positive/negative connotation
+        # (RdYlGn mapped anger=green which was visually misleading).
+        all_vals = [v for row in data.z for v in row if v is not None]
+        dynamic_zmax = max(all_vals) * 1.1 if all_vals else 1.0
+
         fig.add_trace(
             go.Heatmap(
                 z=data.z,
                 x=data.x,
                 y=[label.capitalize() for label in data.y],
-                colorscale="RdYlGn",
+                colorscale="Blues",
                 zmin=0.0,
-                zmax=1.0,
+                zmax=dynamic_zmax,
                 customdata=customdata,
                 hovertemplate=hovertemplate,
                 colorbar=dict(

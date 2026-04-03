@@ -16,6 +16,10 @@ def render_export(
     emotion_scores,
     style_scores,
     T: dict,
+    book_type: str = "fiction",
+    top_emotion_name: str = "",
+    ai_narrative: str = "",
+    ui_lang: str = "en",
 ) -> None:
     st.subheader(T["export_title"])
 
@@ -69,3 +73,40 @@ def render_export(
         file_name=f"{result.book_title}_card.png",
         mime="image/png",
     )
+
+    # ── Book Club Pack PNG ─────────────────────────────────────────────────────
+    st.divider()
+    bc_btn_label = T.get("export_book_club_pack", "📚 Generate Book Club Pack PNG")
+    bc_ck = f"bc_export_{book_title}_{arc.value}_{book_type}_{ui_lang}"
+    bc_pack = st.session_state.get(bc_ck)
+
+    if st.button(bc_btn_label, key=f"bc_export_btn_{bc_ck}"):
+        from bookscope.nlp.llm_analyzer import generate_book_club_pack_structured
+
+        with st.spinner(T.get("export_book_club_spinner", "Generating Book Club Pack…")):
+            bc_pack = generate_book_club_pack_structured(
+                book_title=book_title,
+                arc_value=arc.value,
+                top_emotion_name=top_emotion_name or "joy",
+                book_type=book_type,
+                ai_narrative=ai_narrative,
+                lang=ui_lang,
+            )
+        if bc_pack is None:
+            st.warning(T.get(
+                "export_book_club_error",
+                "Could not generate Book Club Pack — check your API key.",
+            ))
+        else:
+            st.session_state[bc_ck] = bc_pack
+
+    if bc_pack is not None:
+        from bookscope.viz.card_renderer import render_book_club_card
+
+        bc_png = render_book_club_card(bc_pack)
+        st.download_button(
+            label=T.get("export_book_club_download", "⬇️ Download Book Club Pack PNG"),
+            data=bc_png,
+            file_name=f"{book_title}_book_club_pack.png",
+            mime="image/png",
+        )

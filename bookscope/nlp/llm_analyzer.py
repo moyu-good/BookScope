@@ -48,7 +48,14 @@ def _cache_key(result, genre_type: str = "fiction") -> str:
     under different genre lenses.  "academic" is normalised to "nonfiction" so
     that UI-layer book_type values produce the same key as the canonical name.
     """
-    normalized = "nonfiction" if genre_type == "academic" else genre_type
+    if genre_type in ("academic", "technical", "self_help"):
+        normalized = "nonfiction"
+    elif genre_type in ("biography", "poetry"):
+        normalized = "essay"
+    elif genre_type == "short_stories":
+        normalized = "fiction"
+    else:
+        normalized = genre_type
     emotion_hash = hashlib.md5(
         str(result.emotion_scores).encode()
     ).hexdigest()[:8]
@@ -237,11 +244,11 @@ def _build_prompt(result, lang: str, genre_type: str = "fiction") -> str:
     Accepts "academic" as a UI-layer alias for "nonfiction" so that the
     sidebar book_type value can be passed directly without mapping.
     """
-    if genre_type in ("nonfiction", "academic"):
+    if genre_type in ("nonfiction", "academic", "technical", "self_help"):
         return _build_prompt_nonfiction(result, lang)
-    elif genre_type == "essay":
+    elif genre_type in ("essay", "biography", "poetry"):
         return _build_prompt_essay(result, lang)
-    else:
+    else:  # fiction, short_stories, and anything else
         return _build_prompt_fiction(result, lang)
 
 
@@ -321,6 +328,148 @@ def generate_narrative_insight(
     except Exception as exc:
         _warn_user(exc)
         return ""
+
+
+def generate_narrative_insight_stream(
+    result,
+    lang: str,
+    genre_type: str = "fiction",
+):
+    """Streaming variant of generate_narrative_insight.
+
+    Cache hit → yields the cached string once and returns (no API cost).
+    Cache miss → streams tokens from Claude API, then writes to cache.
+    API key absent or any error → empty generator (yields nothing).
+
+    Usage in quick_insight.py:
+        st.caption("🧬 BOOK DNA")
+        st.write_stream(generate_narrative_insight_stream(result, ui_lang, "fiction"))
+    """
+    api_key = _get_api_key()
+    if not api_key:
+        return
+        yield  # Makes this a generator function; unreachable but required by Python
+
+    ck = ""
+    if st is not None:
+        try:
+            ck = _cache_key(result, genre_type)
+            cached = st.session_state.get(ck)
+            if cached is not None:
+                yield cached
+                return
+        except Exception:
+            ck = ""
+
+    prompt = _build_prompt(result, lang, genre_type)
+
+    _default_model = "claude-haiku-4-5"
+    if st is not None:
+        try:
+            model_id = st.session_state.get("llm_model", _default_model)
+        except Exception:
+            model_id = _default_model
+    else:
+        model_id = _default_model
+
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=api_key)
+        accumulated: list[str] = []
+        with client.messages.stream(
+            model=model_id,
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            for text_chunk in stream.text_stream:
+                accumulated.append(text_chunk)
+                yield text_chunk
+
+        full = "".join(accumulated)
+        if full and full[-1] not in ".!?。！？":
+            full = full + " …"
+        if full and ck and st is not None:
+            try:
+                st.session_state[ck] = full
+            except Exception:
+                pass
+
+    except Exception as exc:
+        _warn_user(exc)
+        return
+
+
+def generate_book_club_pack_structured(
+    book_title: str,
+    arc_value: str,
+    top_emotion_name: str,
+    book_type: str,
+    ai_narrative: str = "",
+    lang: str = "en",
+):
+    """Generate a structured BookClubPack via LLM.
+
+    Returns a BookClubPack instance, or None if API unavailable / parse fails.
+    """
+    from bookscope.models.schemas import BookClubPack
+
+    api_key = _get_api_key()
+    if not api_key:
+        return None
+
+    lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(lang, "English")
+    type_label = {"fiction": "fiction", "academic": "non-fiction", "essay": "essay/memoir"}.get(
+        book_type, book_type
+    )
+
+    prompt = (
+        f"You are preparing a book club pack for '{book_title}', "
+        f"a {type_label} with a {arc_value} arc, dominant emotion: {top_emotion_name}.\n"
+    )
+    if ai_narrative:
+        prompt += f"About the book: {ai_narrative}\n"
+    prompt += (
+        f"\nReturn ONLY valid JSON — no markdown, no explanation:\n"
+        f'{{"questions": ["Q1", "Q2", "Q3"], '
+        f'"difficulty": "Easy|Medium|Challenging", '
+        f'"target_audience": "≤60 chars", '
+        f'"arc_summary": "≤120 chars, 2-3 sentences about the emotional arc"}}\n'
+        f"Rules:\n"
+        f"- 3 to 5 discussion questions that explore themes, not just plot.\n"
+        f"- difficulty: Easy (accessible prose), Medium (some complexity), "
+        f"Challenging (dense / specialist).\n"
+        f"- Use {lang_name} for all text values."
+    )
+
+    _default_model = "claude-haiku-4-5"
+    if st is not None:
+        try:
+            model_id = st.session_state.get("llm_model", _default_model)
+        except Exception:
+            model_id = _default_model
+    else:
+        model_id = _default_model
+
+    try:
+        import json
+
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model=model_id,
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = message.content[0].text.strip() if message.content else ""
+        if raw.startswith("```"):
+            lines = raw.splitlines()
+            raw = "\n".join(line for line in lines if not line.startswith("```")).strip()
+        data = json.loads(raw)
+        return BookClubPack(**data)
+    except Exception:
+        return None
 
 
 def call_llm(
