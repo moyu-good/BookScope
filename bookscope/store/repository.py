@@ -22,7 +22,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from bookscope.models import EmotionScore, StyleScore
+from bookscope.models import BookKnowledgeGraph, EmotionScore, StyleScore
 
 _DEFAULT_SAVE_DIR = Path("data") / "analyses"
 
@@ -40,6 +40,7 @@ class AnalysisResult(BaseModel):
     author: str = ""             # optional author name; defaults to "" for old saves
     emotion_scores: list[EmotionScore]
     style_scores: list[StyleScore]
+    knowledge_graph: BookKnowledgeGraph | None = None
 
     @classmethod
     def create(

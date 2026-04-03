@@ -12,7 +12,10 @@ import hashlib
 import json
 import logging
 
-import streamlit as st
+try:
+    import streamlit as st
+except ImportError:
+    st = None  # type: ignore[assignment]
 from pydantic import BaseModel
 
 from bookscope.nlp.llm_analyzer import call_llm
@@ -81,9 +84,10 @@ def extract_character_relations(
     combined = "".join(getattr(c, "text", str(c))[:40] for c in sample)
     cache_key = "rel_graph_" + hashlib.md5(combined.encode()).hexdigest()[:8]
 
-    cached = st.session_state.get(cache_key)
-    if cached is not None:
-        return cached
+    if st is not None:
+        cached = st.session_state.get(cache_key)
+        if cached is not None:
+            return cached
 
     text = "\n\n".join(
         getattr(c, "text", str(c))[:_CHARS_PER_CHUNK] for c in sample
@@ -115,7 +119,8 @@ def extract_character_relations(
 
     raw = call_llm(prompt, api_key=api_key, model=model, max_tokens=400) or ""
     graph = _parse_relation_graph(raw)
-    st.session_state[cache_key] = graph
+    if st is not None:
+        st.session_state[cache_key] = graph
     return graph
 
 

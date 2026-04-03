@@ -182,3 +182,58 @@
   _来源：CEO 外部声音，Critical 发现_
 - [ ] **v2.0 — 竞争差异化叙事** — 明确"可视化 + LLM 叙事组合"作为护城河的产品文案，
   区分于纯 LLM chatbot 竞品（Storygraph、GPT-4o 类应用）。
+
+## v3 — 书籍灵魂引擎（FastAPI + React）
+
+_Eng Review 已完成 2026-04-03。技术栈决策：FastAPI + Vite+React，立即全面切换。_
+
+### Pre-migration 修复（实现 Stage 1 前必须完成）
+
+- [ ] **[CQ1] `relation_extractor.py:15` Streamlit 硬 import 修复** — 将
+  `import streamlit as st` 包进 `try/except ImportError: st = None`（同 `llm_analyzer.py` 模式）。
+  FastAPI 迁移阻塞项。(Human: 2min / CC: 即刻)
+
+### Stage 1 — 知识图谱提取引擎
+
+- [ ] **schemas.py — v3 Pydantic models** —
+  新增 `ChapterSummary`、`CharacterProfile`（含 `voice_style`、`motivations`、`key_chapter_indices`、`arc_summary`、`multi_book_persona: bool = False`）、`BookKnowledgeGraph`。
+  将 `AnalysisResult` 从 `repository.py` 移至 `schemas.py`，新增 `knowledge_graph: BookKnowledgeGraph | None = None`。
+  更新 `repository.py` 改为 import。(Human: 1h / CC: 10min)
+
+- [ ] **`bookscope/nlp/knowledge_extractor.py`** —
+  Step A：逐 chunk 提取 `ChapterSummary`（Haiku，JSON mode，retry once → fallback 空白）。
+  Step B：全书人物合并（单次 LLM 调用，输出 `CharacterProfile` 列表）。
+  进度回调接口（供 FastAPI SSE 和未来 UI 使用）。
+  纯 Python，无 Streamlit 依赖。(Human: 1d / CC: 20min)
+
+- [ ] **`tests/test_knowledge_extractor.py`** —
+  mock `call_llm`，验证 JSON parse + retry + fallback；验证人物合并；验证别名处理。
+  目标：≥15 tests。(Human: 4h / CC: 10min)
+
+- [ ] **FastAPI skeleton** — `bookscope/api/main.py`：uvicorn app，CORS，
+  `POST /upload`、`POST /extract`（触发 knowledge_extractor，SSE 进度）、
+  `POST /chat/stream`（StreamingResponse，text/event-stream）。
+  (Human: 2d / CC: 30min)
+
+- [ ] **`tests/test_api_endpoints.py`** —
+  `httpx.AsyncClient` fixture，测试 `/upload`、`/extract`、`/chat/stream`。(Human: 4h / CC: 15min)
+
+- [ ] **Vite+React scaffold** — `bookscope-frontend/`：Upload 页，Characters 页（卡片网格），
+  Chat 页（SSE 流式对话）。`vite.config.ts` proxy `/api` → FastAPI `:8000`。
+  (Human: 1w / CC: 45min)
+
+### Stage 2 — 人物灵魂引擎（后续会话）
+
+- [ ] FastAPI `/characters` endpoint（返回 `CharacterProfile` 列表）
+- [ ] React Characters 页：人物档案卡片 + `voice_style` 展示
+- [ ] 人物角色扮演对话（`voice_style` 注入 system prompt）
+- [ ] 场景人物内心解析（章节 × 人物 × 为什么）
+
+### Stage 3 — FAISS + RAG（后续会话）
+
+- [ ] `bookscope/store/vector_store.py`（FAISS，per-session，`paraphrase-multilingual-MiniLM-L12-v2`）
+- [ ] 升级 `/chat/stream` 使用 RAG 检索替代随机采样
+
+### 依赖清理（FastAPI 迁移完成后）
+
+- [ ] `pyproject.toml` — 将 `streamlit` 移至 `[project.optional-dependencies].streamlit`

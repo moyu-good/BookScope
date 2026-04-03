@@ -34,3 +34,5 @@ render_gilded_library.py
 .DS_Store
 Thumbs.db
 .gstack/
+node_modules/
+test*.epub

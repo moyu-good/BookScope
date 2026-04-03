@@ -152,3 +152,39 @@ class BookClubPack(BaseModel):
     difficulty: Literal["Easy", "Medium", "Challenging"]
     target_audience: str = Field(..., max_length=60)
     arc_summary: str = Field(..., max_length=120)
+
+
+# ── v3: Book Soul Engine schemas ────────────────────────────────────────────
+
+
+class ChapterSummary(BaseModel):
+    """LLM-generated summary for a single chunk / chapter segment."""
+
+    chunk_index: int
+    title: str = ""              # 推断的章节标题（如无则为空）
+    summary: str = ""            # 本段主要内容概述
+    key_events: list[str] = Field(default_factory=list)   # 关键事件列表
+    characters_mentioned: list[str] = Field(default_factory=list)  # 出现的人物名
+
+
+class CharacterProfile(BaseModel):
+    """Merged character profile across all chunks."""
+
+    name: str                                  # 主名称
+    aliases: list[str] = Field(default_factory=list)  # 别名/昵称
+    description: str = ""                      # 一句话描述
+    voice_style: str = ""                      # 说话风格特征
+    motivations: list[str] = Field(default_factory=list)  # 核心动机
+    key_chapter_indices: list[int] = Field(default_factory=list)  # 主要出场章节
+    arc_summary: str = ""                      # 人物弧光概述
+
+
+class BookKnowledgeGraph(BaseModel):
+    """Aggregated knowledge graph for a single book."""
+
+    book_title: str
+    language: str = "zh"
+    chapter_summaries: list[ChapterSummary] = Field(default_factory=list)
+    characters: list[CharacterProfile] = Field(default_factory=list)
+    overall_summary: str = ""                  # 全书内容概述
+    themes: list[str] = Field(default_factory=list)  # 主题标签
