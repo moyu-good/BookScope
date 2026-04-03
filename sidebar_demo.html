@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BookScope Sidebar 方案对比</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Source+Serif+4:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Source Serif 4', serif;
+  background: #F0EBE3;
+  color: #1C1208;
+  padding: 2rem;
+}
+h1 {
+  font-family: 'Playfair Display', serif;
+  text-align: center;
+  font-size: 1.6rem;
+  color: #1C1208;
+  margin-bottom: .4rem;
+}
+.subtitle {
+  text-align: center;
+  font-size: .85rem;
+  color: #7A6A5A;
+  margin-bottom: 2.5rem;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.option {
+  background: #FAF7F2;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 16px rgba(0,0,0,.08);
+  display: flex;
+  flex-direction: column;
+}
+.option-header {
+  padding: 1rem 1.2rem .8rem;
+  border-bottom: 1px solid #E8E4DC;
+}
+.option-label {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #C8781A;
+  margin-bottom: .3rem;
+}
+.option-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+}
+.option-desc {
+  font-size: .78rem;
+  color: #7A6A5A;
+  margin-top: .3rem;
+  line-height: 1.5;
+}
+.preview {
+  display: flex;
+  height: 520px;
+  flex: 1;
+}
+
+/* ── OPTION A: Slim rail sidebar ── */
+.rail {
+  width: 52px;
+  background: #1C1208;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: .8rem 0;
+  gap: 1.2rem;
+}
+.rail-logo {
+  font-size: 1.1rem;
+  color: #C8781A;
+}
+.rail-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .9rem;
+  cursor: pointer;
+  transition: background .15s;
+}
+.rail-icon:hover { background: rgba(255,255,255,.1); }
+.rail-icon.active { background: rgba(200,120,26,.25); }
+.rail-divider { width: 24px; height: 1px; background: rgba(255,255,255,.15); }
+.main-a {
+  flex: 1;
+  padding: 1.2rem;
+  background: #FAF7F2;
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+}
+.upload-zone-a {
+  border: 1.5px dashed #C8781A;
+  border-radius: 10px;
+  padding: 1.5rem;
+  text-align: center;
+  background: rgba(200,120,26,.04);
+}
+.upload-zone-a .icon { font-size: 1.8rem; margin-bottom: .4rem; }
+.upload-zone-a .label { font-size: .8rem; color: #7A6A5A; }
+.upload-zone-a .btn {
+  margin-top: .7rem;
+  background: #C8781A;
+  color: white;
+  border: none;
+  padding: .4rem 1rem;
+  border-radius: 6px;
+  font-size: .78rem;
+  cursor: pointer;
+  font-family: 'Source Serif 4', serif;
+}
+.type-chips {
+  display: flex;
+  gap: .5rem;
+}
+.chip {
+  flex: 1;
+  padding: .5rem .4rem;
+  border-radius: 8px;
+  border: 1.5px solid #E8E4DC;
+  text-align: center;
+  font-size: .72rem;
+  cursor: pointer;
+  background: white;
+  transition: all .15s;
+}
+.chip.active {
+  border-color: #C8781A;
+  background: rgba(200,120,26,.08);
+  color: #C8781A;
+  font-weight: 600;
+}
+.chip-icon { font-size: 1.1rem; display: block; margin-bottom: .2rem; }
+.lang-row {
+  display: flex;
+  gap: .4rem;
+  margin-top: auto;
+}
+.lang-btn {
+  flex: 1;
+  padding: .3rem;
+  border-radius: 6px;
+  border: 1px solid #E8E4DC;
+  background: white;
+  font-size: .7rem;
+  text-align: center;
+  cursor: pointer;
+}
+.lang-btn.active {
+  background: #1C1208;
+  color: #FAF7F2;
+  border-color: #1C1208;
+}
+
+/* ── OPTION B: Clean panel ── */
+.panel-b {
+  width: 200px;
+  background: #FFFFFF;
+  border-right: 1px solid #E8E4DC;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+.brand-b {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding-bottom: .8rem;
+  border-bottom: 1px solid #F0EBE3;
+}
+.brand-b .logo { font-size: 1.2rem; }
+.brand-b .name {
+  font-family: 'Playfair Display', serif;
+  font-size: .95rem;
+  font-weight: 700;
+}
+.section-label-b {
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #B8A898;
+  margin-bottom: .4rem;
+}
+.type-card-b {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .45rem .6rem;
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  font-size: .78rem;
+  transition: all .15s;
+}
+.type-card-b.active {
+  border-color: #C8781A;
+  background: rgba(200,120,26,.08);
+  color: #8C4E08;
+  font-weight: 600;
+}
+.type-card-b:not(.active):hover {
+  background: #F4F0E8;
+}
+.type-card-b .icon { font-size: 1rem; }
+.upload-b {
+  background: #F4F0E8;
+  border-radius: 8px;
+  padding: .8rem;
+  text-align: center;
+  cursor: pointer;
+}
+.upload-b .up-icon { font-size: 1.4rem; margin-bottom: .3rem; }
+.upload-b .up-text { font-size: .72rem; color: #5A4A3A; line-height: 1.4; }
+.upload-b .up-btn {
+  margin-top: .5rem;
+  display: block;
+  background: #1C1208;
+  color: #FAF7F2;
+  border: none;
+  border-radius: 6px;
+  padding: .35rem .8rem;
+  font-size: .72rem;
+  cursor: pointer;
+  font-family: 'Source Serif 4', serif;
+  width: 100%;
+}
+.url-input-b {
+  background: white;
+  border: 1px solid #E8E4DC;
+  border-radius: 6px;
+  padding: .4rem .6rem;
+  font-size: .72rem;
+  font-family: 'Source Serif 4', serif;
+  color: #B8A898;
+  width: 100%;
+  outline: none;
+}
+.lang-b {
+  display: flex;
+  gap: .3rem;
+  margin-top: auto;
+}
+.lang-pill {
+  flex: 1;
+  text-align: center;
+  padding: .25rem;
+  border-radius: 20px;
+  font-size: .65rem;
+  border: 1px solid #E8E4DC;
+  cursor: pointer;
+  background: white;
+}
+.lang-pill.active {
+  background: #C8781A;
+  color: white;
+  border-color: #C8781A;
+}
+.main-b {
+  flex: 1;
+  padding: 1rem;
+  background: #FAF7F2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .8rem;
+  color: #B8A898;
+}
+
+/* ── OPTION C: No sidebar, top nav ── */
+.main-c {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #FAF7F2;
+}
+.topnav {
+  background: #1C1208;
+  padding: .6rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.topnav-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: .9rem;
+  color: #FAF7F2;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.topnav-lang {
+  display: flex;
+  gap: .3rem;
+  margin-left: auto;
+}
+.topnav-lang span {
+  font-size: .65rem;
+  color: rgba(250,247,242,.5);
+  padding: .2rem .5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.topnav-lang span.active {
+  color: #C8781A;
+  background: rgba(200,120,26,.15);
+}
+.topnav-btn {
+  background: #C8781A;
+  color: white;
+  border: none;
+  padding: .35rem .8rem;
+  border-radius: 6px;
+  font-size: .72rem;
+  cursor: pointer;
+  font-family: 'Source Serif 4', serif;
+}
+.body-c {
+  flex: 1;
+  padding: 1.5rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.welcome-c {
+  text-align: center;
+  padding: .5rem 0 .8rem;
+}
+.welcome-c h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  margin-bottom: .3rem;
+}
+.welcome-c p {
+  font-size: .78rem;
+  color: #7A6A5A;
+}
+.type-row-c {
+  display: flex;
+  gap: .6rem;
+}
+.type-tile {
+  flex: 1;
+  background: white;
+  border: 1.5px solid #E8E4DC;
+  border-radius: 10px;
+  padding: .7rem .5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all .15s;
+}
+.type-tile.active {
+  border-color: #C8781A;
+  background: rgba(200,120,26,.06);
+}
+.type-tile .t-icon { font-size: 1.4rem; display: block; margin-bottom: .3rem; }
+.type-tile .t-name { font-size: .72rem; font-weight: 600; color: #1C1208; }
+.type-tile .t-desc { font-size: .62rem; color: #B8A898; margin-top: .15rem; }
+.upload-zone-c {
+  border: 1.5px dashed #C8781A;
+  border-radius: 10px;
+  padding: 1.2rem;
+  text-align: center;
+  background: rgba(200,120,26,.03);
+  cursor: pointer;
+}
+.upload-zone-c .icon { font-size: 1.6rem; }
+.upload-zone-c .label { font-size: .75rem; color: #7A6A5A; margin-top: .3rem; }
+.url-row-c {
+  display: flex;
+  gap: .5rem;
+}
+.url-input-c {
+  flex: 1;
+  background: white;
+  border: 1px solid #E8E4DC;
+  border-radius: 6px;
+  padding: .45rem .7rem;
+  font-size: .75rem;
+  font-family: 'Source Serif 4', serif;
+  color: #B8A898;
+  outline: none;
+}
+.url-go {
+  background: #1C1208;
+  color: #FAF7F2;
+  border: none;
+  border-radius: 6px;
+  padding: .45rem .9rem;
+  font-size: .75rem;
+  cursor: pointer;
+  font-family: 'Source Serif 4', serif;
+}
+
+/* tags */
+.tag {
+  display: inline-block;
+  margin-top: .6rem;
+  padding: .2rem .6rem;
+  border-radius: 20px;
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+.tag-recommend { background: #2A7A5A22; color: #2A7A5A; border: 1px solid #2A7A5A44; }
+.tag-best { background: #C8781A22; color: #C8781A; border: 1px solid #C8781A44; }
+</style>
+</head>
+<body>
+
+<h1>📖 BookScope — Sidebar 方案对比</h1>
+<p class="subtitle">三个方向，选你觉得最舒服的</p>
+
+<div class="grid">
+
+  <!-- ── Option A ── -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-label">方案 A</div>
+      <div class="option-title">极简图标 Rail + 展开面板</div>
+      <div class="option-desc">左侧收为细条图标栏，点击后弹出上传面板。主内容区最大化，最不干扰阅读。</div>
+      <span class="tag tag-recommend">最简洁</span>
+    </div>
+    <div class="preview">
+      <div class="rail">
+        <div class="rail-logo">📖</div>
+        <div class="rail-divider"></div>
+        <div class="rail-icon active" title="上传">📂</div>
+        <div class="rail-icon" title="书库">📚</div>
+        <div class="rail-icon" title="设置">⚙️</div>
+      </div>
+      <div class="main-a">
+        <div style="font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#B8A898;">书籍类型</div>
+        <div class="type-chips">
+          <div class="chip active"><span class="chip-icon">📖</span>小说</div>
+          <div class="chip"><span class="chip-icon">🎓</span>学术</div>
+          <div class="chip"><span class="chip-icon">✍️</span>散文</div>
+        </div>
+        <div class="upload-zone-a">
+          <div class="icon">📄</div>
+          <div class="label">拖入 .txt / .epub / .pdf</div>
+          <button class="btn">选择文件</button>
+        </div>
+        <input class="url-input-b" placeholder="或粘贴 URL…" style="margin-top:-.2rem;">
+        <div class="lang-row">
+          <div class="lang-btn active">EN</div>
+          <div class="lang-btn">中文</div>
+          <div class="lang-btn">日本語</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Option B ── -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-label">方案 B</div>
+      <div class="option-title">精致卡片 Sidebar</div>
+      <div class="option-desc">保留侧栏位置，但用卡片+视觉层级重新排版，与 Paper & Ink 主题一致。</div>
+      <span class="tag tag-best">最易实现</span>
+    </div>
+    <div class="preview">
+      <div class="panel-b">
+        <div class="brand-b">
+          <span class="logo">📖</span>
+          <span class="name">BookScope</span>
+        </div>
+
+        <div>
+          <div class="section-label-b">书籍类型</div>
+          <div class="type-card-b active"><span class="icon">📖</span> 小说 / Fiction</div>
+          <div class="type-card-b" style="margin-top:.3rem"><span class="icon">🎓</span> 学术 / Academic</div>
+          <div class="type-card-b" style="margin-top:.3rem"><span class="icon">✍️</span> 散文 / Essay</div>
+        </div>
+
+        <div>
+          <div class="section-label-b">上传书籍</div>
+          <div class="upload-b">
+            <div class="up-icon">📄</div>
+            <div class="up-text">拖入文件或点击选择<br>.txt · .epub · .pdf</div>
+            <button class="up-btn">选择文件</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label-b">或粘贴 URL</div>
+          <input class="url-input-b" placeholder="https://…">
+        </div>
+
+        <div style="margin-top:auto;">
+          <div class="section-label-b">语言</div>
+          <div class="lang-b">
+            <div class="lang-pill active">EN</div>
+            <div class="lang-pill">中</div>
+            <div class="lang-pill">日</div>
+          </div>
+        </div>
+      </div>
+      <div class="main-b">← 分析结果显示在这里</div>
+    </div>
+  </div>
+
+  <!-- ── Option C ── -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-label">方案 C</div>
+      <div class="option-title">无 Sidebar — 顶部导航 + 主区上传</div>
+      <div class="option-desc">完全去掉侧栏，顶部深色 nav bar，书籍类型作为视觉卡片摆在主区域。</div>
+      <span class="tag tag-recommend">最现代</span>
+    </div>
+    <div class="preview">
+      <div class="main-c">
+        <div class="topnav">
+          <div class="topnav-logo">📖 BookScope</div>
+          <div class="topnav-lang">
+            <span class="active">EN</span>
+            <span>中文</span>
+            <span>日本語</span>
+          </div>
+          <button class="topnav-btn">📂 上传书籍</button>
+        </div>
+        <div class="body-c">
+          <div class="welcome-c">
+            <h2>📖 Your book, decoded.</h2>
+            <p>选择书籍类型，上传或粘贴 URL</p>
+          </div>
+
+          <div>
+            <div style="font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#B8A898;margin-bottom:.5rem;">书籍类型</div>
+            <div class="type-row-c">
+              <div class="type-tile active">
+                <span class="t-icon">📖</span>
+                <div class="t-name">小说</div>
+                <div class="t-desc">Fiction</div>
+              </div>
+              <div class="type-tile">
+                <span class="t-icon">🎓</span>
+                <div class="t-name">学术</div>
+                <div class="t-desc">Academic</div>
+              </div>
+              <div class="type-tile">
+                <span class="t-icon">✍️</span>
+                <div class="t-name">散文</div>
+                <div class="t-desc">Essay</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="upload-zone-c">
+            <div class="icon">📄</div>
+            <div class="label">拖入 .txt / .epub / .pdf 文件，或粘贴 URL</div>
+          </div>
+
+          <div class="url-row-c">
+            <input class="url-input-c" placeholder="https://…">
+            <button class="url-go">分析 →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="text-align:center;margin-top:2rem;font-size:.8rem;color:#B8A898;">
+  方案 A / B 都在 Streamlit 侧栏内实现 &nbsp;·&nbsp; 方案 C 需要去掉 st.sidebar，改用 st.container
+</div>
+
+</body>
+</html>

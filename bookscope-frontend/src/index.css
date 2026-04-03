@@ -1,0 +1,51 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0e0c08;
+  --surface: #1a150e;
+  --border: rgba(212, 165, 116, 0.12);
+  --text: #e0d8c8;
+  --text-dim: #8a7a62;
+  --accent: #d4a574;
+  --accent-glow: #e8c49a;
+  --success: #7ab89a;
+  --danger: #c23b22;
+}
+
+/*
+ * Font override: prevent system CJK fonts from taking over.
+ * Every element defaults to our chosen stack; individual components
+ * override with specific display fonts as needed.
+ */
+body {
+  font-family:
+    "Noto Serif SC",
+    "ZCOOL XiaoWei",
+    "Zhi Mang Xing",
+    Georgia,
+    "Times New Roman",
+    serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Prevent browser from applying system emoji / CJK substitution */
+h1, h2, h3, p, span, div {
+  font-synthesis: none;
+}
