@@ -201,6 +201,43 @@ def render_sidebar_inputs(ui_lang: str, T: dict) -> tuple:
         )
         st.session_state["llm_model"] = selected_model
 
+        # ── Embedding provider selector ──────────────────────────
+        _emb_label = T.get("embedding_label", "Embedding Provider")
+        _emb_opts = ["auto", "siliconflow", "local-bge-m3", "local-qwen3"]
+        _emb_labels = {
+            "auto": T.get("emb_auto", "Auto-detect"),
+            "siliconflow": T.get("emb_siliconflow", "SiliconFlow API (free)"),
+            "local-bge-m3": T.get("emb_bge_m3", "Local BGE-M3 (2.2 GB)"),
+            "local-qwen3": T.get("emb_qwen3", "Local Qwen3 (1.2 GB)"),
+        }
+        _current_emb = st.session_state.get("embedding_provider", "auto")
+        _selected_emb = st.radio(
+            _emb_label,
+            options=_emb_opts,
+            format_func=lambda x: _emb_labels[x],
+            index=_emb_opts.index(_current_emb) if _current_emb in _emb_opts else 0,
+            key="embedding_provider_radio",
+        )
+        st.session_state["embedding_provider"] = _selected_emb
+
+        if _selected_emb in ("auto", "siliconflow"):
+            _sf_key = os.environ.get("SILICONFLOW_API_KEY", "")
+            if not _sf_key:
+                _input_key = st.text_input(
+                    "SiliconFlow API Key",
+                    type="password",
+                    help=T.get("sf_key_help", "Free at siliconflow.cn"),
+                    key="sf_api_key_input",
+                )
+                if _input_key:
+                    os.environ["SILICONFLOW_API_KEY"] = _input_key
+
+        # Sync to env var for get_embedding_provider()
+        if _selected_emb != "auto":
+            os.environ["BOOKSCOPE_EMBEDDING_PROVIDER"] = _selected_emb
+        else:
+            os.environ.pop("BOOKSCOPE_EMBEDDING_PROVIDER", None)
+
         st.divider()
 
         st.subheader(T["saved_header"])

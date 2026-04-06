@@ -1,0 +1,27 @@
+[
+  {
+    "question": "朱元璋是谁？他的出身背景是什么？",
+    "expected_answer": "朱元璋原名朱重八，出身贫寒农家，后来推翻元朝建立了明朝。",
+    "relevant_chunk_indices": [0, 5]
+  },
+  {
+    "question": "徐达在明朝建国中扮演了什么角色？",
+    "expected_answer": "徐达是明朝建国第一名将，率军北伐中原。",
+    "relevant_chunk_indices": [1, 3]
+  },
+  {
+    "question": "刘伯温对明朝建立有什么贡献？",
+    "expected_answer": "刘伯温精通兵法谋略，辅佐朱元璋建立明朝。",
+    "relevant_chunk_indices": [2, 4]
+  },
+  {
+    "question": "朱元璋和陈友谅之间发生了什么？",
+    "expected_answer": "陈友谅是朱元璋争天下的主要对手，鄱阳湖大战是两人的决战。",
+    "relevant_chunk_indices": [1, 6]
+  },
+  {
+    "question": "明朝是如何建立的？",
+    "expected_answer": "朱元璋推翻元朝，在刘伯温等人辅佐下建立大明王朝。",
+    "relevant_chunk_indices": [0, 2, 5]
+  }
+]

@@ -11,6 +11,7 @@ from bookscope.nlp.narrative_protocol import (
     OllamaBackend,
     OpenAIBackend,
 )
+from bookscope.nlp.ner_extractor import extract_character_candidates
 from bookscope.nlp.style_analyzer import StyleAnalyzer
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     "ArcPattern",
     "ClaudeBackend",
     "detect_language",
+    "extract_character_candidates",
     "extract_essay_voice",
     "extract_knowledge_graph",
     "extract_nonfiction_concepts",

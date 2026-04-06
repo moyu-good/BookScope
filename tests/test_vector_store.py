@@ -17,17 +17,19 @@ def _make_chunks(texts: list[str]) -> list[ChunkResult]:
     return [ChunkResult(index=i, text=t) for i, t in enumerate(texts)]
 
 
-def _mock_model(dim: int = 1024):
-    """Return a mock SentenceTransformer whose encode() yields deterministic vectors."""
-    model = MagicMock()
+def _mock_provider(dim: int = 1024):
+    """Return a mock EmbeddingProvider whose encode methods yield deterministic vectors."""
+    provider = MagicMock()
+    provider.name = "Mock/test-model"
+    provider.dim = dim
 
-    def _encode(texts, **_kwargs):
+    def _encode(texts):
         rng = np.random.RandomState(42)
-        vecs = rng.randn(len(texts), dim).astype(np.float32)
-        return vecs
+        return rng.randn(len(texts), dim).astype(np.float32)
 
-    model.encode.side_effect = _encode
-    return model
+    provider.encode_documents.side_effect = _encode
+    provider.encode_queries.side_effect = _encode
+    return provider
 
 
 # ---------------------------------------------------------------------------
@@ -105,9 +107,9 @@ class TestBM25:
 
 class TestVectorSearch:
 
-    @patch("bookscope.store.vector_store._get_model")
+    @patch("bookscope.store.vector_store._get_provider")
     def test_vector_basic(self, mock_get):
-        mock_get.return_value = _mock_model()
+        mock_get.return_value = _mock_provider()
         from bookscope.store.vector_store import SessionVectorStore
 
         chunks = _make_chunks(["alpha", "beta", "gamma"])
@@ -115,9 +117,9 @@ class TestVectorSearch:
         assert vs.chunk_count == 3
         assert vs.has_vector
 
-    @patch("bookscope.store.vector_store._get_model")
+    @patch("bookscope.store.vector_store._get_provider")
     def test_vector_search_returns_correct_type(self, mock_get):
-        mock_get.return_value = _mock_model()
+        mock_get.return_value = _mock_provider()
         from bookscope.store.vector_store import SessionVectorStore
 
         vs = SessionVectorStore(_make_chunks(["a", "b", "c"]))
@@ -128,46 +130,47 @@ class TestVectorSearch:
             assert isinstance(item[0], ChunkResult)
             assert isinstance(item[1], float)
 
-    @patch("bookscope.store.vector_store._get_model")
+    @patch("bookscope.store.vector_store._get_provider")
     def test_vector_search_top_k(self, mock_get):
-        mock_get.return_value = _mock_model()
+        mock_get.return_value = _mock_provider()
         from bookscope.store.vector_store import SessionVectorStore
 
         vs = SessionVectorStore(_make_chunks(["a", "b", "c", "d", "e"]))
         results = vs.search_vector("query", top_k=2)
         assert len(results) <= 2
 
-    @patch("bookscope.store.vector_store._get_model")
+    @patch("bookscope.store.vector_store._get_provider")
     def test_vector_empty_store(self, mock_get):
-        mock_get.return_value = _mock_model()
+        mock_get.return_value = _mock_provider()
         from bookscope.store.vector_store import SessionVectorStore
 
         vs = SessionVectorStore([])
         assert vs.search_vector("anything") == []
 
-    @patch("bookscope.store.vector_store._get_model")
+    @patch("bookscope.store.vector_store._get_provider")
     def test_vector_relevance_ordering(self, mock_get):
         """A query identical to one chunk's embedding should rank it first."""
         dim = 1024
-        model = MagicMock()
+        provider = MagicMock()
+        provider.name = "Mock/relevance"
+        provider.dim = dim
 
         chunk_vecs = np.zeros((3, dim), dtype=np.float32)
         chunk_vecs[0, 0] = 1.0
         chunk_vecs[1, 1] = 1.0
         chunk_vecs[2, 2] = 1.0
 
-        call_count = {"n": 0}
+        def _encode_docs(texts):
+            return chunk_vecs[: len(texts)]
 
-        def _encode(texts, **_kw):
-            call_count["n"] += 1
-            if call_count["n"] == 1:
-                return chunk_vecs[: len(texts)]
-            q = np.zeros((1, dim), dtype=np.float32)
+        def _encode_queries(texts):
+            q = np.zeros((len(texts), dim), dtype=np.float32)
             q[0, 1] = 1.0
             return q
 
-        model.encode.side_effect = _encode
-        mock_get.return_value = model
+        provider.encode_documents.side_effect = _encode_docs
+        provider.encode_queries.side_effect = _encode_queries
+        mock_get.return_value = provider
 
         from bookscope.store.vector_store import SessionVectorStore
 
@@ -177,9 +180,9 @@ class TestVectorSearch:
         assert results[0][0].index == 1
         assert results[0][1] == pytest.approx(1.0, abs=0.01)
 
-    @patch("bookscope.store.vector_store._get_model")
+    @patch("bookscope.store.vector_store._get_provider")
     def test_vector_scores_are_finite(self, mock_get):
-        mock_get.return_value = _mock_model()
+        mock_get.return_value = _mock_provider()
         from bookscope.store.vector_store import SessionVectorStore
 
         vs = SessionVectorStore(_make_chunks(["one", "two", "three"]))
@@ -194,9 +197,9 @@ class TestVectorSearch:
 
 class TestHybridSearch:
 
-    @patch("bookscope.store.vector_store._get_model")
+    @patch("bookscope.store.vector_store._get_provider")
     def test_hybrid_returns_results(self, mock_get):
-        mock_get.return_value = _mock_model()
+        mock_get.return_value = _mock_provider()
         from bookscope.store.vector_store import SessionVectorStore
 
         chunks = _make_chunks(["朱元璋建立明朝", "徐达北伐中原", "刘伯温运筹帷幄"])
@@ -207,9 +210,9 @@ class TestHybridSearch:
         results = vs.search("朱元璋")
         assert len(results) > 0
 
-    @patch("bookscope.store.vector_store._get_model")
+    @patch("bookscope.store.vector_store._get_provider")
     def test_hybrid_top_k(self, mock_get):
-        mock_get.return_value = _mock_model()
+        mock_get.return_value = _mock_provider()
         from bookscope.store.vector_store import SessionVectorStore
 
         chunks = _make_chunks([f"内容{i}的描述" for i in range(20)])
@@ -288,18 +291,18 @@ class TestRRFFusion:
 # Singleton model loader
 # ---------------------------------------------------------------------------
 
-def test_get_model_singleton():
-    """_get_model returns the cached instance when already set."""
+def test_get_provider_singleton():
+    """_get_provider returns the cached instance when already set."""
     import bookscope.store.vector_store as mod
 
-    old = mod._model
+    old = mod._provider
     try:
-        sentinel = MagicMock(name="cached-model")
-        mod._model = sentinel
-        result = mod._get_model()
+        sentinel = MagicMock(name="cached-provider")
+        mod._provider = sentinel
+        result = mod._get_provider()
         assert result is sentinel
     finally:
-        mod._model = old
+        mod._provider = old
 
 
 # ---------------------------------------------------------------------------
@@ -315,9 +318,9 @@ def test_properties_bm25_only():
     assert not vs.has_vector
 
 
-@patch("bookscope.store.vector_store._get_model")
+@patch("bookscope.store.vector_store._get_provider")
 def test_properties_hybrid(mock_get):
-    mock_get.return_value = _mock_model()
+    mock_get.return_value = _mock_provider()
     from bookscope.store.vector_store import SessionVectorStore
 
     vs = SessionVectorStore(_make_chunks(["text"]))

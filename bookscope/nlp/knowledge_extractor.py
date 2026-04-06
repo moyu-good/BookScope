@@ -23,6 +23,7 @@ from bookscope.models.schemas import (
     CharacterProfile,
 )
 from bookscope.nlp.llm_analyzer import call_llm
+from bookscope.nlp.ner_extractor import extract_character_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -109,12 +110,21 @@ def _merge_characters(
     language: str,
     api_key: str,
     model: str,
+    ner_candidates: dict[str, list[int]] | None = None,
 ) -> list[CharacterProfile]:
     """Merge all mentioned characters into deduplicated profiles via a single LLM call."""
     all_names: dict[str, list[int]] = {}
     for s in summaries:
         for name in s.characters_mentioned:
             all_names.setdefault(name, []).append(s.chunk_index)
+
+    # Merge NER candidates (may include names from non-sampled chunks)
+    if ner_candidates:
+        for name, indices in ner_candidates.items():
+            if name in all_names:
+                all_names[name] = sorted(set(all_names[name] + indices))
+            else:
+                all_names[name] = indices
 
     if not all_names:
         return []
@@ -266,6 +276,14 @@ def extract_knowledge_graph(
         extract_count, total,
     )
 
+    # Step 0: fast local NER on ALL chunks (no LLM)
+    ner_candidates: dict[str, list[int]] = {}
+    try:
+        ner_candidates = extract_character_candidates(chunks, language)
+        logger.info("NER found %d character candidates across all chunks", len(ner_candidates))
+    except Exception:
+        logger.warning("NER extraction failed, continuing with LLM-only")
+
     # Step A: extract per-chunk summaries (sampled)
     summaries: list[ChapterSummary] = []
     progress_done = 0
@@ -295,6 +313,7 @@ def extract_knowledge_graph(
         language=language,
         api_key=api_key,
         model=model,
+        ner_candidates=ner_candidates,
     )
 
     return BookKnowledgeGraph(

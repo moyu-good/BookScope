@@ -4,16 +4,17 @@ Combines two retrieval strategies via Reciprocal Rank Fusion (RRF):
 
 1. **BM25** (keyword) — jieba tokenization + BM25Okapi scoring.
    Zero model dependency; excels at exact name/term matching.
-2. **Vector** (semantic) — BAAI/bge-m3 (1024-dim, 8192-token context).
+2. **Vector** (semantic) — pluggable embedding provider (1024-dim).
    Catches paraphrases and semantic similarity.
 
-BM25 is always available.  Vector search is optional — when the embedding
-model is not loaded (or deps are missing), search falls back to BM25-only.
+BM25 is always available.  Vector search is optional — when no embedding
+provider is configured (or deps are missing), search falls back to BM25-only.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING
 
 import jieba
@@ -26,30 +27,53 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Model configuration
+# Configuration
 # ---------------------------------------------------------------------------
 
-_MODEL_NAME = "BAAI/bge-m3"
 _EMBED_DIM = 1024
-_ENCODE_BATCH_SIZE = 32
 _RRF_K = 60  # RRF constant (standard value used by Elasticsearch et al.)
 
+_RERANKER_NAME = os.environ.get(
+    "BOOKSCOPE_RERANKER_MODEL", "BAAI/bge-reranker-v2-m3",
+)
+_RERANKER_CHAR_LIMIT = 2048  # approx 512 tokens for the cross-encoder
+
 # ---------------------------------------------------------------------------
-# Lazy singleton for the embedding model
+# Lazy singleton for the embedding provider
 # ---------------------------------------------------------------------------
 
-_model = None
+_UNSET = object()
+_provider = _UNSET
 
 
-def _get_model():
-    """Return (and cache) the SentenceTransformer model."""
-    global _model  # noqa: PLW0603
-    if _model is None:
-        from sentence_transformers import SentenceTransformer
+def _get_provider():
+    """Return (and cache) the embedding provider, or *None* for BM25-only."""
+    global _provider  # noqa: PLW0603
+    if _provider is _UNSET:
+        from bookscope.store.embedding_provider import get_embedding_provider
 
-        _model = SentenceTransformer(_MODEL_NAME)
-        logger.info("Loaded embedding model: %s", _MODEL_NAME)
-    return _model
+        _provider = get_embedding_provider()
+        if _provider is not None:
+            logger.info("Embedding provider ready: %s", _provider.name)
+    return _provider
+
+
+# ---------------------------------------------------------------------------
+# Lazy singleton for the cross-encoder reranker
+# ---------------------------------------------------------------------------
+
+_reranker = None
+
+
+def _get_reranker():
+    """Return (and cache) the CrossEncoder reranker model."""
+    global _reranker  # noqa: PLW0603
+    if _reranker is None:
+        from sentence_transformers import CrossEncoder
+
+        _reranker = CrossEncoder(_RERANKER_NAME)
+        logger.info("Loaded reranker model: %s", _RERANKER_NAME)
+    return _reranker
 
 
 # ---------------------------------------------------------------------------
@@ -93,15 +117,12 @@ class SessionVectorStore:
         """Encode chunks and build FAISS IndexFlatIP."""
         import faiss
 
-        model = _get_model()
+        provider = _get_provider()
+        if provider is None:
+            raise RuntimeError("No embedding provider available")
+
         texts = [c.text for c in self._chunks]
-        embeddings = model.encode(
-            texts,
-            show_progress_bar=False,
-            convert_to_numpy=True,
-            batch_size=_ENCODE_BATCH_SIZE,
-        )
-        embeddings = np.asarray(embeddings, dtype=np.float32)
+        embeddings = provider.encode_documents(texts)
 
         # L2-normalise so inner-product == cosine similarity
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
@@ -140,9 +161,11 @@ class SessionVectorStore:
         if self._index is None or self._index.ntotal == 0:
             return []
 
-        model = _get_model()
-        q_vec = model.encode([query], show_progress_bar=False, convert_to_numpy=True)
-        q_vec = np.asarray(q_vec, dtype=np.float32)
+        provider = _get_provider()
+        if provider is None:
+            return []
+
+        q_vec = provider.encode_queries([query])
         norm = np.linalg.norm(q_vec)
         if norm > 0:
             q_vec = q_vec / norm
@@ -157,18 +180,45 @@ class SessionVectorStore:
             results.append((self._chunks[idx], float(score)))
         return results
 
-    def search(
-        self, query: str, top_k: int = 5,
+    def rerank(
+        self,
+        query: str,
+        candidates: list[tuple[ChunkResult, float]],
+        top_k: int = 5,
     ) -> list[tuple[ChunkResult, float]]:
-        """Hybrid search: RRF fusion of BM25 + vector when both available."""
+        """Re-score *candidates* using the cross-encoder reranker."""
+        if not candidates:
+            return []
+
+        reranker = _get_reranker()
+        pairs = [
+            (query, chunk.text[:_RERANKER_CHAR_LIMIT])
+            for chunk, _score in candidates
+        ]
+        scores = reranker.predict(pairs)
+
+        ranked = sorted(
+            zip(candidates, scores), key=lambda x: x[1], reverse=True,
+        )
+        return [
+            (chunk, float(score))
+            for (chunk, _old_score), score in ranked[:top_k]
+        ]
+
+    def search(
+        self, query: str, top_k: int = 5, *, enable_rerank: bool = True,
+    ) -> list[tuple[ChunkResult, float]]:
+        """Hybrid search: RRF fusion of BM25 + vector, optional cross-encoder rerank."""
         has_vector = self._index is not None and self._index.ntotal > 0
         has_bm25 = self._bm25 is not None
 
         # Single-source fallbacks
         if has_vector and not has_bm25:
-            return self.search_vector(query, top_k)
+            results = self.search_vector(query, top_k * 3 if enable_rerank else top_k)
+            return self._maybe_rerank(query, results, top_k, enable_rerank)
         if has_bm25 and not has_vector:
-            return self.search_bm25(query, top_k)
+            results = self.search_bm25(query, top_k * 3 if enable_rerank else top_k)
+            return self._maybe_rerank(query, results, top_k, enable_rerank)
         if not has_vector and not has_bm25:
             return []
 
@@ -177,7 +227,24 @@ class SessionVectorStore:
         bm25_results = self.search_bm25(query, fetch_k)
         vector_results = self.search_vector(query, fetch_k)
 
-        return _rrf_fusion(bm25_results, vector_results, top_k)
+        fused = _rrf_fusion(bm25_results, vector_results, fetch_k)
+        return self._maybe_rerank(query, fused, top_k, enable_rerank)
+
+    def _maybe_rerank(
+        self,
+        query: str,
+        candidates: list[tuple[ChunkResult, float]],
+        top_k: int,
+        enable_rerank: bool,
+    ) -> list[tuple[ChunkResult, float]]:
+        """Apply cross-encoder reranking if enabled, with graceful fallback."""
+        if not enable_rerank or not candidates:
+            return candidates[:top_k]
+        try:
+            return self.rerank(query, candidates, top_k)
+        except Exception:
+            logger.warning("Reranker unavailable, falling back to RRF-only")
+            return candidates[:top_k]
 
     # ------------------------------------------------------------------
     # Properties
