@@ -118,6 +118,59 @@ export interface ChatMessage {
   content?: string;
 }
 
+// ── Insight types ───────────────────────────────────────────────────────────
+
+export interface NarrativeToken {
+  type: "token" | "done" | "error";
+  text?: string;
+  message?: string;
+}
+
+export interface EmotionalStage {
+  stage: string;
+  emotion: string;
+  event: string;
+}
+
+export interface SoulCharacter {
+  name: string;
+  aliases: string[];
+  description: string;
+  voice_style: string;
+  motivations: string[];
+  key_chapter_indices: number[];
+  arc_summary: string;
+  personality_type: string;
+  key_quotes: string[];
+  values: string[];
+  emotional_stages: EmotionalStage[];
+}
+
+export interface SoulEnrichProgress {
+  type: "progress" | "done";
+  current?: number;
+  total?: number;
+  character?: string;
+  characters?: SoulCharacter[];
+}
+
+export interface BookClubPack {
+  questions: string[];
+  difficulty: "Easy" | "Medium" | "Challenging";
+  target_audience: string;
+  arc_summary: string;
+}
+
+export interface BookRecommendation {
+  title: string;
+  author: string;
+  reason: string;
+}
+
+export interface RecommendationsResponse {
+  recommendations: BookRecommendation[];
+}
+
 // ── Upload ───────────────────────────────────────────────────────────────────
 
 export async function uploadFile(file: File): Promise<UploadResponse> {
@@ -306,4 +359,143 @@ export function chatSSE(
     });
 
   return controller;
+}
+
+// ── Insights (LLM) ─────────────────────────────────────────────────────────
+
+export function narrativeSSE(
+  sessionId: string,
+  bookType: string,
+  uiLang: string,
+  onToken: (text: string) => void,
+  onDone: (fullText: string) => void,
+  onError: (err: Error) => void
+): AbortController {
+  const controller = new AbortController();
+
+  fetch(`${BASE}/insights/narrative`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: sessionId,
+      book_type: bookType,
+      ui_lang: uiLang,
+    }),
+    signal: controller.signal,
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`Narrative failed: ${res.status}`);
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data: NarrativeToken = JSON.parse(line.slice(6));
+            if (data.type === "token" && data.text) onToken(data.text);
+            else if (data.type === "done" && data.text) onDone(data.text);
+            else if (data.type === "error") onError(new Error(data.message || "LLM error"));
+          } catch {
+            // skip
+          }
+        }
+      }
+    })
+    .catch((err) => {
+      if (err.name !== "AbortError") onError(err);
+    });
+
+  return controller;
+}
+
+export function soulEnrichSSE(
+  sessionId: string,
+  onProgress: (data: SoulEnrichProgress) => void,
+  onDone: (characters: SoulCharacter[]) => void,
+  onError: (err: Error) => void
+): AbortController {
+  const controller = new AbortController();
+
+  fetch(`${BASE}/insights/soul-enrich`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+    signal: controller.signal,
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`Soul enrich failed: ${res.status}`);
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data: SoulEnrichProgress = JSON.parse(line.slice(6));
+            if (data.type === "progress") onProgress(data);
+            else if (data.type === "done" && data.characters) onDone(data.characters);
+          } catch {
+            // skip
+          }
+        }
+      }
+    })
+    .catch((err) => {
+      if (err.name !== "AbortError") onError(err);
+    });
+
+  return controller;
+}
+
+export async function fetchBookClubPack(
+  sessionId: string,
+  bookType: string,
+  uiLang: string
+): Promise<BookClubPack> {
+  const res = await fetch(`${BASE}/insights/book-club-pack`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: sessionId,
+      book_type: bookType,
+      ui_lang: uiLang,
+    }),
+  });
+  if (!res.ok) throw new Error(`Book club pack failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchRecommendations(
+  sessionId: string,
+  bookType: string,
+  uiLang: string
+): Promise<RecommendationsResponse> {
+  const res = await fetch(`${BASE}/insights/recommendations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: sessionId,
+      book_type: bookType,
+      ui_lang: uiLang,
+    }),
+  });
+  if (!res.ok) throw new Error(`Recommendations failed: ${res.status}`);
+  return res.json();
 }

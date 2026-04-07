@@ -1,22 +1,33 @@
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { BookOpen, BarChart3, MessageCircle, Search } from "lucide-react";
+import { BookOpen, Sparkles, MessageCircle, Search } from "lucide-react";
 import type { AnalysisResult } from "../lib/api";
 import VerdictCard from "../components/VerdictCard";
 import EmotionRadar from "../components/EmotionRadar";
 import ArcChart from "../components/ArcChart";
+import NarrativeCard from "../components/NarrativeCard";
+import SoulCards from "../components/SoulCards";
+import BookClubCard from "../components/BookClubCard";
+import RecommendationsCard from "../components/RecommendationsCard";
 import ChatPanel from "../components/ChatPanel";
 import SearchPanel from "../components/SearchPanel";
 
-type Tab = "overview" | "depth" | "chat" | "search";
+type Tab = "overview" | "insights" | "chat" | "search";
 
 export default function BookPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state as { analysis?: AnalysisResult; title?: string } | null;
+  const state = location.state as {
+    analysis?: AnalysisResult;
+    title?: string;
+    bookType?: string;
+    hasKnowledgeGraph?: boolean;
+  } | null;
   const analysis = state?.analysis;
   const title = state?.title ?? "Untitled";
+  const bookType = state?.bookType ?? "fiction";
+  const [hasKG, setHasKG] = useState(state?.hasKnowledgeGraph ?? false);
 
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
@@ -60,7 +71,7 @@ export default function BookPage() {
       <nav className="max-w-5xl mx-auto px-4 pt-4 flex gap-1">
         {([
           { key: "overview", label: "Overview", icon: BookOpen },
-          { key: "depth", label: "Deep Analysis", icon: BarChart3 },
+          { key: "insights", label: "Insights", icon: Sparkles },
           { key: "chat", label: "Chat", icon: MessageCircle },
           { key: "search", label: "Search", icon: Search },
         ] as const).map(({ key, label, icon: Icon }) => (
@@ -101,11 +112,34 @@ export default function BookPage() {
           </div>
         )}
 
-        {activeTab === "depth" && (
-          <div className="text-center py-20 text-[var(--bs-text-muted)]">
-            <BarChart3 className="mx-auto w-12 h-12 mb-4 opacity-30" />
-            <p>Deep analysis charts — coming in Phase 2</p>
-            <p className="text-sm mt-1">Heatmap, timeline, style radar, and more</p>
+        {activeTab === "insights" && (
+          <div className="space-y-6">
+            {/* Narrative DNA — auto-streams on mount */}
+            <NarrativeCard
+              sessionId={sessionId}
+              bookType={bookType}
+              uiLang="en"
+            />
+
+            {/* Character Souls — requires KG */}
+            <SoulCards
+              sessionId={sessionId}
+              hasKnowledgeGraph={hasKG}
+            />
+
+            {/* On-demand LLM cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <BookClubCard
+                sessionId={sessionId}
+                bookType={bookType}
+                uiLang="en"
+              />
+              <RecommendationsCard
+                sessionId={sessionId}
+                bookType={bookType}
+                uiLang="en"
+              />
+            </div>
           </div>
         )}
 

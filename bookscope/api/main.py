@@ -476,6 +476,220 @@ async def insight_themes(req: InsightThemesRequest):
     return {"themes": themes, "first_person_density": round(fp_density, 4)}
 
 
+# ── LLM Insight endpoints (Phase 2) ─────────────────────────────────────────
+
+class NarrativeRequest(BaseModel):
+    session_id: str
+    book_type: str = "fiction"
+    ui_lang: str = "en"
+    model: str = "claude-haiku-4-5"
+
+
+@app.post("/api/insights/narrative")
+async def insight_narrative(req: NarrativeRequest):
+    """Generate streaming narrative insight (2-3 sentences about the reading experience).
+
+    SSE stream: yields token chunks, then a final done event.
+    """
+    session = _get_session(req.session_id)
+    emotion_scores, style_scores = _require_analysis(session)
+    api_key = _get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=422, detail="ANTHROPIC_API_KEY not set")
+
+    prompt = _build_narrative_prompt(
+        emotion_scores, style_scores,
+        session.get("arc_pattern", "Unknown"),
+        req.book_type, req.ui_lang,
+    )
+
+    def event_stream():
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=api_key)
+            accumulated: list[str] = []
+            with client.messages.stream(
+                model=req.model, max_tokens=250,
+                messages=[{"role": "user", "content": prompt}],
+            ) as stream:
+                for chunk in stream.text_stream:
+                    accumulated.append(chunk)
+                    yield _sse({"type": "token", "text": chunk})
+            full = "".join(accumulated)
+            yield _sse({"type": "done", "text": full})
+        except Exception as exc:
+            yield _sse({"type": "error", "message": str(exc)})
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+class SoulEnrichRequest(BaseModel):
+    session_id: str
+    model: str = "claude-haiku-4-5"
+    top_n: int = 4
+
+
+@app.post("/api/insights/soul-enrich")
+async def insight_soul_enrich(req: SoulEnrichRequest):
+    """Enrich top characters with Soul Engine (MBTI, quotes, values, emotional arc).
+
+    SSE stream: progress per character, then done with enriched profiles.
+    Requires knowledge graph extraction to have been run first.
+    """
+    session = _get_session(req.session_id)
+    api_key = _get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=422, detail="ANTHROPIC_API_KEY not set")
+
+    graph: BookKnowledgeGraph | None = session.get("knowledge_graph")
+    if not graph or not graph.characters:
+        raise HTTPException(
+            status_code=409,
+            detail="Knowledge graph not extracted. Call POST /api/extract first.",
+        )
+
+    from bookscope.nlp.soul_engine import enrich_soul_profile
+
+    characters = graph.characters[: req.top_n]
+    chunks = session["chunks"]
+    book = session["book"]
+
+    def event_stream():
+        total = len(characters)
+        enriched = []
+        for i, char in enumerate(characters):
+            yield _sse({
+                "type": "progress", "current": i, "total": total,
+                "character": char.name,
+            })
+            profile = enrich_soul_profile(
+                profile=char,
+                chunks=chunks,
+                chunk_indices=char.key_chapter_indices,
+                book_title=book.title,
+                language=book.language,
+                api_key=api_key,
+                model=req.model,
+            )
+            enriched.append(profile.model_dump())
+
+        # Update the graph's characters with enriched profiles
+        for i, profile_data in enumerate(enriched):
+            from bookscope.models.schemas import CharacterProfile
+            graph.characters[i] = CharacterProfile(**profile_data)
+
+        yield _sse({
+            "type": "done",
+            "characters": enriched,
+        })
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+class BookClubRequest(BaseModel):
+    session_id: str
+    book_type: str = "fiction"
+    ui_lang: str = "en"
+    model: str = "claude-haiku-4-5"
+
+
+@app.post("/api/insights/book-club-pack")
+async def insight_book_club_pack(req: BookClubRequest):
+    """Generate a structured book club discussion pack (questions, difficulty, audience)."""
+    session = _get_session(req.session_id)
+    emotion_scores, _ = _require_analysis(session)
+    api_key = _get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=422, detail="ANTHROPIC_API_KEY not set")
+
+    dominants = Counter(s.dominant_emotion for s in emotion_scores) if emotion_scores else Counter()
+    top_emotion = dominants.most_common(1)[0][0] if dominants else "joy"
+    arc_value = session.get("arc_pattern", "Unknown")
+    title = session["title"]
+
+    lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(req.ui_lang, "English")
+    type_label = {
+        "fiction": "fiction", "nonfiction": "non-fiction", "academic": "non-fiction",
+        "essay": "essay/memoir", "biography": "biography", "poetry": "poetry",
+    }.get(req.book_type, req.book_type)
+
+    prompt = (
+        f"You are preparing a book club pack for '{title}', "
+        f"a {type_label} with a {arc_value} arc, dominant emotion: {top_emotion}.\n"
+        f"\nReturn ONLY valid JSON — no markdown, no explanation:\n"
+        f'{{"questions": ["Q1", "Q2", "Q3"], '
+        f'"difficulty": "Easy|Medium|Challenging", '
+        f'"target_audience": "≤60 chars", '
+        f'"arc_summary": "≤120 chars, 2-3 sentences about the emotional arc"}}\n'
+        f"Rules:\n"
+        f"- 3 to 5 discussion questions that explore themes, not just plot.\n"
+        f"- difficulty: Easy (accessible prose), Medium (some complexity), "
+        f"Challenging (dense / specialist).\n"
+        f"- Use {lang_name} for all text values."
+    )
+
+    raw = call_llm(prompt, api_key=api_key, model=req.model, max_tokens=400)
+    data = _parse_json_response(raw)
+    if data is None:
+        raise HTTPException(status_code=502, detail="LLM returned unparseable response")
+
+    return data
+
+
+class RecommendationsRequest(BaseModel):
+    session_id: str
+    book_type: str = "fiction"
+    ui_lang: str = "en"
+    model: str = "claude-haiku-4-5"
+
+
+@app.post("/api/insights/recommendations")
+async def insight_recommendations(req: RecommendationsRequest):
+    """Generate 3-5 similar book recommendations based on analysis data."""
+    session = _get_session(req.session_id)
+    emotion_scores, style_scores = _require_analysis(session)
+    api_key = _get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=422, detail="ANTHROPIC_API_KEY not set")
+
+    title = session["title"]
+    arc_value = session.get("arc_pattern", "Unknown")
+    dominants = Counter(s.dominant_emotion for s in emotion_scores) if emotion_scores else Counter()
+    top_emotion = dominants.most_common(1)[0][0] if dominants else "joy"
+
+    n_style = len(style_scores)
+    avg_ttr = round(sum(s.ttr for s in style_scores) / n_style, 2) if n_style else 0.5
+    avg_sent = round(
+        sum(s.avg_sentence_length for s in style_scores) / n_style, 2
+    ) if n_style else 15.0
+
+    lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(req.ui_lang, "English")
+
+    prompt = (
+        f"Based on a book titled '{title}' with these characteristics:\n"
+        f"- Type: {req.book_type}\n"
+        f"- Dominant emotion: {top_emotion}\n"
+        f"- Story arc: {arc_value}\n"
+        f"- Writing style: TTR={avg_ttr}, avg sentence length={avg_sent}\n\n"
+        f"Return ONLY valid JSON — no markdown, no explanation:\n"
+        f'{{"recommendations": [\n'
+        f'  {{"title": "Book Title", "author": "Author Name", "reason": "≤80 chars why similar"}},\n'
+        f'  ...\n'
+        f"]}}\n"
+        f"Rules:\n"
+        f"- 3 to 5 recommendations of REAL, well-known books.\n"
+        f"- Match based on emotional tone, writing style, and arc pattern.\n"
+        f"- Use {lang_name} for the reason field."
+    )
+
+    raw = call_llm(prompt, api_key=api_key, model=req.model, max_tokens=500)
+    data = _parse_json_response(raw)
+    if data is None:
+        raise HTTPException(status_code=502, detail="LLM returned unparseable response")
+
+    return data
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # KNOWLEDGE GRAPH EXTRACTION (SSE)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -713,3 +927,94 @@ async def health():
 def _sse(data: dict) -> str:
     """Format a dict as an SSE data line."""
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _build_narrative_prompt(
+    emotion_scores: list[EmotionScore],
+    style_scores: list[StyleScore],
+    arc_pattern: str,
+    book_type: str,
+    ui_lang: str,
+) -> str:
+    """Build a narrative insight prompt from analysis data.
+
+    Distilled from llm_analyzer.py's genre-specific builders but decoupled
+    from Streamlit and AnalysisResult objects.
+    """
+    lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(ui_lang, "English")
+    n = len(emotion_scores)
+
+    # Top 3 emotions
+    if n > 0:
+        avg_emotions = {
+            f: round(sum(getattr(s, f) for s in emotion_scores) / n, 2)
+            for f in _EMOTION_FIELDS
+        }
+    else:
+        avg_emotions = {}
+    top_3 = sorted(avg_emotions.items(), key=lambda x: -x[1])[:3]
+    top_3_str = ", ".join(f"{e}={v}" for e, v in top_3)
+
+    # Style summary
+    n_style = len(style_scores)
+    avg_ttr = round(sum(s.ttr for s in style_scores) / n_style, 2) if n_style else 0.5
+    avg_sent = round(
+        sum(s.avg_sentence_length for s in style_scores) / n_style, 2
+    ) if n_style else 15.0
+
+    arc_desc_map = {
+        "Rags to Riches": "sustained emotional rise toward hope",
+        "Riches to Rags": "sustained emotional fall toward darkness",
+        "Man in a Hole": "fall then rise — protagonist recovers",
+        "Icarus": "rise then fall — early success gives way to tragedy",
+        "Cinderella": "rise, fall, then ultimate triumph",
+        "Oedipus": "fall, brief rise, then fall again",
+        "Unknown": "no clear arc detected",
+    }
+    arc_desc = arc_desc_map.get(arc_pattern, arc_pattern)
+
+    if book_type in ("nonfiction", "academic", "technical", "self_help"):
+        return (
+            f"You are a reading advisor. Given this non-fiction book's data:\n"
+            f"- Top emotions: {top_3_str}\n"
+            f"- Argument trajectory: {arc_pattern} — {arc_desc}\n"
+            f"- Style: TTR={avg_ttr}, avg_sentence_length={avg_sent}\n"
+            f"Write 2-3 sentences about the reading experience: how dense it is, "
+            f"what it demands from the reader, and a practical reading strategy. "
+            f"Be specific. Use {lang_name}. No generic praise."
+        )
+    if book_type in ("essay", "biography", "poetry"):
+        return (
+            f"You are a literary companion. Given this essay/memoir's data:\n"
+            f"- Emotional atmosphere: {top_3_str}\n"
+            f"- Personal arc: {arc_pattern} — {arc_desc}\n"
+            f"- Voice: TTR={avg_ttr}, avg_sentence_length={avg_sent}\n"
+            f"Write 2-3 sentences on the author's voice, the emotional atmosphere, "
+            f"and who would find it resonant. Be specific. Use {lang_name}. No generic praise."
+        )
+    return (
+        f"You are a literary analyst. Given this fiction book's data:\n"
+        f"- Top emotions: {top_3_str}\n"
+        f"- Arc pattern: {arc_pattern} ({arc_desc})\n"
+        f"- Style: TTR={avg_ttr}, avg_sentence_length={avg_sent}\n"
+        f"Write 2-3 sentences describing the emotional experience of reading this book. "
+        f"Be specific about what it FEELS like to read. "
+        f"Use {lang_name}. No generic praise."
+    )
+
+
+def _parse_json_response(raw: str) -> dict | None:
+    """Parse JSON from LLM response, stripping markdown fences."""
+    if not raw:
+        return None
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        text = "\n".join(line for line in lines if not line.startswith("```")).strip()
+    # Strip trailing ellipsis from call_llm truncation guard
+    if text.endswith(" …"):
+        text = text[:-2].strip()
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return None

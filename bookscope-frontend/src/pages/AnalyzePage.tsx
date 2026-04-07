@@ -13,7 +13,7 @@ export default function AnalyzePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const meta = location.state as { title?: string; total_chunks?: number } | null;
+  const meta = location.state as { title?: string; total_chunks?: number; bookType?: string } | null;
 
   const [stage, setStage] = useState("emotion");
   const [current, setCurrent] = useState(0);
@@ -35,7 +35,9 @@ export default function AnalyzePage() {
       },
       (_result: AnalysisResult) => {
         // Navigate to results with the analysis data
-        navigate(`/book/${sessionId}`, { state: { analysis: _result, title: meta?.title } });
+        navigate(`/book/${sessionId}`, {
+          state: { analysis: _result, title: meta?.title, bookType: meta?.bookType ?? "fiction" },
+        });
       },
       (err: Error) => setError(err.message)
     );
