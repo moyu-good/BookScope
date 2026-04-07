@@ -2,9 +2,12 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+path = "bookscope/__init__.py"
+
 [project]
 name = "bookscope"
-version = "0.7.0"
+dynamic = ["version"]
 description = "Multi-dimensional book text analysis and visualization"
 readme = "README.md"
 requires-python = ">=3.11"

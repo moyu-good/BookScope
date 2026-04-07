@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, Send, Loader2 } from "lucide-react";
-import { chatStream } from "../lib/api";
+import { characterChat } from "../lib/api";
 import type { SSEEvent } from "../lib/types";
 
 interface ChatMessage {
@@ -8,11 +8,15 @@ interface ChatMessage {
   content: string;
 }
 
-interface ChatPanelProps {
+interface CharacterChatProps {
   sessionId: string;
+  characterName: string;
 }
 
-export default function ChatPanel({ sessionId }: ChatPanelProps) {
+export default function CharacterChat({
+  sessionId,
+  characterName,
+}: CharacterChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -33,9 +37,10 @@ export default function ChatPanel({ sessionId }: ChatPanelProps) {
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setStreaming(true);
 
+    // Append an empty assistant message that we'll stream into
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
-    const sse = chatStream(sessionId, text, "zh");
+    const sse = characterChat(sessionId, characterName, text, "zh");
     sse.onEvent((event: SSEEvent) => {
       if (event.type === "message") {
         const chunk = (event as { content?: string }).content ?? "";
@@ -87,17 +92,22 @@ export default function ChatPanel({ sessionId }: ChatPanelProps) {
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden">
+      {/* Header */}
       <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border)]">
         <MessageCircle className="w-4 h-4 text-[var(--accent)]" />
         <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-          关于本书提问
+          与{characterName}对话
         </h2>
       </div>
 
-      <div ref={scrollRef} className="h-80 overflow-y-auto p-4 space-y-3">
+      {/* Messages */}
+      <div
+        ref={scrollRef}
+        className="h-80 overflow-y-auto p-4 space-y-3"
+      >
         {messages.length === 0 && (
           <p className="text-center text-xs text-[var(--text-secondary)] py-8">
-            关于本书的任何问题都可以问。回答基于全文 RAG 检索。
+            向{characterName}提问关于故事、动机或经历的任何问题。
           </p>
         )}
 
@@ -121,6 +131,7 @@ export default function ChatPanel({ sessionId }: ChatPanelProps) {
         ))}
       </div>
 
+      {/* Input */}
       <div className="border-t border-[var(--border)] p-3 flex items-center gap-2">
         <input
           type="text"
@@ -132,7 +143,7 @@ export default function ChatPanel({ sessionId }: ChatPanelProps) {
               handleSend();
             }
           }}
-          placeholder="输入你的问题..."
+          placeholder={`向${characterName}提问...`}
           disabled={streaming}
           className="flex-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-secondary)]/50 focus:outline-none focus:border-[var(--accent)]/50 disabled:opacity-50 transition-colors duration-200"
         />

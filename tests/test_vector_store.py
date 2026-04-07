@@ -335,7 +335,7 @@ def test_properties_hybrid(mock_get):
 
 def test_build_context_with_rag():
     """RAG path includes retrieved chunk text in context."""
-    from bookscope.api.main import _build_chat_context
+    from bookscope.nlp.chat_context import build_chat_context as _build_chat_context
 
     book = MagicMock()
     book.title = "测试书"
@@ -350,14 +350,14 @@ def test_build_context_with_rag():
     vs.search.return_value = [(chunk, 0.92)]
 
     ctx = _build_chat_context(book, graph, vs, "朱元璋是谁")
-    assert "相关段落" in ctx
+    assert "Relevant passages" in ctx
     assert "朱元璋" in ctx
     assert "0.92" in ctx
 
 
 def test_build_context_without_rag_falls_back_to_kg():
     """Without vector store, falls back to chapter summaries."""
-    from bookscope.api.main import _build_chat_context
+    from bookscope.nlp.chat_context import build_chat_context as _build_chat_context
 
     book = MagicMock()
     book.title = "测试"
@@ -374,12 +374,12 @@ def test_build_context_without_rag_falls_back_to_kg():
 
     ctx = _build_chat_context(book, graph, None, "测试问题")
     assert "第一章摘要" in ctx
-    assert "相关段落" not in ctx
+    assert "Relevant passages" not in ctx
 
 
 def test_build_context_no_graph_no_rag():
     """Minimal context when neither graph nor vector store is available."""
-    from bookscope.api.main import _build_chat_context
+    from bookscope.nlp.chat_context import build_chat_context as _build_chat_context
 
     book = MagicMock()
     book.title = "空书"

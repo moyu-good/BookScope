@@ -1,58 +1,87 @@
+import { useMemo } from "react";
 import {
   AreaChart,
   Area,
   XAxis,
   YAxis,
   ResponsiveContainer,
-  ReferenceLine,
+  CartesianGrid,
 } from "recharts";
 
 interface ArcChartProps {
   valenceSeries: number[];
-  arcPattern: string;
+  arcPattern?: string;
 }
 
 export default function ArcChart({ valenceSeries, arcPattern }: ArcChartProps) {
-  if (!valenceSeries.length) return null;
-
-  const data = valenceSeries.map((v, i) => ({
-    index: i,
-    valence: v,
-  }));
+  const chartData = useMemo(
+    () =>
+      valenceSeries.map((v, i) => ({
+        index: i + 1,
+        valence: Math.round(v * 1000) / 1000,
+      })),
+    [valenceSeries],
+  );
 
   return (
-    <div className="bg-[var(--bs-surface)] rounded-2xl border border-[var(--bs-border)] p-6">
-      <h3 className="text-sm font-medium text-[var(--bs-text-muted)] mb-1 uppercase tracking-wider">
-        Story Shape
-      </h3>
-      <p className="text-xs text-[var(--bs-text-muted)] mb-4">{arcPattern}</p>
-      <ResponsiveContainer width="100%" height={250}>
-        <AreaChart data={data}>
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+          叙事弧线
+        </h2>
+        {arcPattern && (
+          <span className="px-2.5 py-1 text-xs rounded-full bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">
+            {arcPattern}
+          </span>
+        )}
+      </div>
+
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={chartData}>
           <defs>
-            <linearGradient id="valenceGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--bs-joy)" stopOpacity={0.3} />
-              <stop offset="50%" stopColor="var(--bs-trust)" stopOpacity={0.05} />
-              <stop offset="100%" stopColor="var(--bs-sadness)" stopOpacity={0.3} />
+            <linearGradient id="valenceGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="0%"
+                stopColor="var(--accent)"
+                stopOpacity={0.3}
+              />
+              <stop
+                offset="100%"
+                stopColor="var(--accent)"
+                stopOpacity={0}
+              />
             </linearGradient>
           </defs>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="var(--border)"
+            vertical={false}
+          />
           <XAxis
             dataKey="index"
-            tick={false}
-            axisLine={{ stroke: "var(--bs-border)" }}
+            tick={{ fill: "var(--text-secondary)", fontSize: 10 }}
+            axisLine={{ stroke: "var(--border)" }}
+            tickLine={false}
+            label={{
+              value: "章节",
+              position: "insideBottomRight",
+              offset: -5,
+              style: { fill: "var(--text-secondary)", fontSize: 10 },
+            }}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "var(--bs-text-muted)" }}
-            axisLine={false}
+            domain={[0, 1]}
+            tick={{ fill: "var(--text-secondary)", fontSize: 10 }}
+            axisLine={{ stroke: "var(--border)" }}
             tickLine={false}
             width={30}
           />
-          <ReferenceLine y={0} stroke="var(--bs-border)" strokeDasharray="3 3" />
           <Area
             type="monotone"
             dataKey="valence"
-            stroke="var(--bs-accent)"
+            stroke="var(--accent)"
             strokeWidth={2}
-            fill="url(#valenceGrad)"
+            fill="url(#valenceGradient)"
           />
         </AreaChart>
       </ResponsiveContainer>

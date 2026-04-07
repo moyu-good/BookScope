@@ -1,114 +1,150 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Library, Trash2, Loader2, Clock, Globe } from "lucide-react";
-import { fetchLibrary, deleteFromLibrary, type LibraryItem } from "../lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Library,
+  Trash2,
+  Loader2,
+  BookOpen,
+  ArrowLeft,
+  Tag,
+} from "lucide-react";
+import { fetchLibrary, deleteLibraryItem } from "../lib/api";
+
+interface LibraryItem {
+  filename: string;
+  title: string;
+  arc_pattern: string;
+  total_chunks: number;
+  total_words: number;
+  language: string;
+  analyzed_at: string;
+  tags: string[];
+}
+
+interface LibraryResponse {
+  items: LibraryItem[];
+  total: number;
+}
 
 export default function LibraryPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<LibraryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+  const [deleting, setDeleting] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchLibrary();
-      setItems(data.items);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load library");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);
+  const { data, isLoading, error } = useQuery<LibraryResponse>({
+    queryKey: ["library"],
+    queryFn: () => fetchLibrary() as Promise<LibraryResponse>,
+  });
 
   const handleDelete = async (filename: string) => {
+    if (deleting) return;
+    setDeleting(filename);
     try {
-      await deleteFromLibrary(filename);
-      setItems((prev) => prev.filter((i) => i.filename !== filename));
-    } catch {
-      // silent
+      await deleteLibraryItem(filename);
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+    } finally {
+      setDeleting(null);
     }
   };
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 bg-[var(--bs-bg)]/95 backdrop-blur border-b border-[var(--bs-border)]">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div className="min-h-svh bg-[var(--bg)]">
+      <header className="sticky top-0 z-40 bg-[var(--bg)]/80 backdrop-blur-md border-b border-[var(--border)]">
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Library className="w-5 h-5 text-[var(--bs-accent)]" strokeWidth={1.5} />
-            <h1 className="text-lg font-medium">Library</h1>
+            <Library className="w-5 h-5 text-[var(--accent)]" />
+            <h1 className="text-sm font-semibold">书库</h1>
           </div>
           <button
             onClick={() => navigate("/")}
-            className="text-sm text-[var(--bs-text-muted)] hover:text-[var(--bs-accent)] transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors duration-200"
           >
-            New analysis
+            <ArrowLeft className="w-3.5 h-3.5" />
+            新建分析
           </button>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 text-[var(--bs-accent)] animate-spin" />
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        {isLoading && (
+          <div className="flex items-center justify-center h-40">
+            <Loader2 className="w-6 h-6 animate-spin text-[var(--accent)]" />
           </div>
-        ) : error ? (
-          <p className="text-center text-red-400 py-10">{error}</p>
-        ) : items.length === 0 ? (
-          <div className="text-center py-20">
-            <BookOpen className="mx-auto w-12 h-12 mb-4 text-[var(--bs-text-muted)] opacity-30" />
-            <p className="text-[var(--bs-text-muted)]">No saved analyses yet</p>
-            <p className="text-sm text-[var(--bs-text-muted)] mt-1">
-              Analyze a book and save it to build your library
+        )}
+
+        {error && (
+          <p className="text-center text-sm text-red-400">
+            {error instanceof Error ? error.message : "加载书库失败"}
+          </p>
+        )}
+
+        {data && data.items.length === 0 && (
+          <div className="text-center py-16">
+            <Library className="w-10 h-10 text-[var(--border)] mx-auto mb-3" />
+            <p className="text-sm text-[var(--text-secondary)] mb-4">
+              暂无已保存的分析。
             </p>
+            <button
+              onClick={() => navigate("/")}
+              className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)] transition-colors duration-200"
+            >
+              分析一本书
+            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((item) => (
+        )}
+
+        {data && data.items.length > 0 && (
+          <div className="space-y-3">
+            {data.items.map((item) => (
               <div
                 key={item.filename}
-                onClick={() => navigate(`/book/lib:${item.filename}`)}
-                className="bg-[var(--bs-surface)] border border-[var(--bs-border)] rounded-2xl p-5
-                           hover:border-[var(--bs-accent)]/30 transition-colors group cursor-pointer"
+                className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 hover:border-[var(--accent)]/30 transition-all duration-200"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-medium text-[var(--bs-text)] line-clamp-2 pr-2">
-                    {item.title}
-                  </h3>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <BookOpen className="w-4 h-4 text-[var(--accent)] shrink-0" />
+                      <h3 className="text-sm font-medium text-[var(--text)] truncate">
+                        {item.title}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px] text-[var(--text-secondary)] mb-2">
+                      <span>{item.total_chunks} 段</span>
+                      <span>{item.total_words.toLocaleString()} 字</span>
+                      <span className="uppercase">{item.language}</span>
+                      {item.arc_pattern && (
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--surface-hover)]">
+                          {item.arc_pattern}
+                        </span>
+                      )}
+                    </div>
+                    {item.tags.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Tag className="w-3 h-3 text-[var(--text-secondary)]" />
+                        {item.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-1.5 py-0.5 text-[10px] rounded bg-[var(--accent)]/10 text-[var(--accent)]"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(item.filename); }}
-                    className="text-[var(--bs-text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Delete"
+                    onClick={() => handleDelete(item.filename)}
+                    disabled={deleting === item.filename}
+                    className="shrink-0 p-2 rounded-lg text-[var(--text-secondary)] hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                    title="删除"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    {deleting === item.filename ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
                   </button>
-                </div>
-
-                <div className="space-y-1.5 text-xs text-[var(--bs-text-muted)]">
-                  <div className="flex items-center gap-1.5">
-                    <Globe className="w-3 h-3" />
-                    {item.language.toUpperCase()} · {item.total_words.toLocaleString()} words · {item.total_chunks} chunks
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3" />
-                    {new Date(item.analyzed_at).toLocaleDateString()}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bs-accent)]/10 text-[var(--bs-accent)]">
-                    {item.arc_pattern}
-                  </span>
-                  {item.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="text-xs px-2 py-0.5 rounded-full bg-[var(--bs-border)] text-[var(--bs-text-muted)]"
-                    >
-                      {tag}
-                    </span>
-                  ))}
                 </div>
               </div>
             ))}

@@ -27,7 +27,8 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture()
 def client():
-    from bookscope.api.main import _sessions, app
+    from bookscope.api.app import app
+    from bookscope.api.session_store import _sessions
 
     _sessions.clear()
     return TestClient(app)
@@ -97,7 +98,7 @@ class TestE2EPipeline:
         assert data["title"]  # non-empty title
 
         # Verify session has vector store
-        from bookscope.api.main import _sessions
+        from bookscope.api.session_store import _sessions
 
         session = _sessions[data["session_id"]]
         vs = session.get("vector_store")
@@ -223,7 +224,7 @@ class TestE2EPipeline:
             upload = client.post("/api/upload", files={"file": ("明朝那些事儿.epub", f)})
         sid = upload.json()["session_id"]
 
-        from bookscope.api.main import _sessions
+        from bookscope.api.session_store import _sessions
 
         vs = _sessions[sid]["vector_store"]
         results = vs.search("朱元璋当皇帝", top_k=3)

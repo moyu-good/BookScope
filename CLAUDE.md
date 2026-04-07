@@ -3,52 +3,69 @@
 ## Project overview
 
 Multi-dimensional book text analysis and visualization tool.
-Stack: Python 3.11+, Streamlit, Plotly, Pydantic v2, nrclex, NLTK, numpy.
+Stack: Python 3.11+, FastAPI, React (Vite+TS+Tailwind v4), Pydantic v2, nrclex, NLTK, numpy.
 
-## Architecture
+## Architecture (v5 — Progressive Disclosure)
 
 ```
 bookscope/
-  ingest/          loader → cleaner → chunker
-  models/          BookText, ChunkResult, EmotionScore, StyleScore, AnalysisResult
-  nlp/             LexiconAnalyzer, StyleAnalyzer, ArcClassifier, AnalyzerProtocol
-  store/           Repository (JSON persistence)
+  api/
+    app.py             FastAPI entry point (v5)
+    session_store.py   Typed SessionData + in-memory registry
+    sse_utils.py       SSE formatting helper
+    dependencies.py    Shared FastAPI deps (require_session, require_api_key)
+    routers/           11 router modules (upload, extraction, book, character,
+                       chat, search, charts, library, export, share, session)
+  services/
+    extraction_pipeline.py   Parallel KG + emotion/style extraction
+    derived_fields.py        Compute readability, verdict, valence from scores
+  ingest/          loader → cleaner → chunker → book_chunker
+  models/          BookText, ChunkResult, EmotionScore, StyleScore, BookKnowledgeGraph,
+                   CharacterProfile, ReaderVerdict, BookClubPack, AnalysisResult
+  nlp/             LexiconAnalyzer, StyleAnalyzer, ArcClassifier, knowledge_extractor,
+                   soul_engine, ner_extractor, relation_extractor, llm_analyzer,
+                   chat_context, prompt_builders, llm_utils, AnalyzerProtocol
+  store/           Repository (JSON persistence), SessionVectorStore (FAISS+BM25)
   utils/           ensure_nltk_data()
-  viz/             ChartDataAdapter, EmotionTimelineRenderer, EmotionHeatmapRenderer,
-                   StyleRadarRenderer, BaseRenderer, BookScopeTheme
-app/main.py        Streamlit entry (7 tabs)
-tests/             250 pytest tests (unit + hypothesis property tests)
+bookscope-frontend/   React (Vite + TypeScript + Tailwind v4)
+tests/                pytest tests
+```
+
+## User flow
+
+```
+Upload → Extract (KG + analysis parallel) → Book Overview → Character Deep Dive → Chat
 ```
 
 ## Key invariants
 
-- **ChartDataAdapter** is the ONLY place that imports both domain models and Plotly.
-  Renderers receive `*Data` dataclasses only — they never import from `bookscope.models`.
-- **AnalyzerProtocol** — new NLP backends must implement `analyze_chunk` + `analyze_book`.
-- **NLTK corpora** — call `ensure_nltk_data()` before any nrclex/NLTK usage.
-  This is called automatically at `app/main.py` startup.
-- All scores are normalized to `[0.0, 1.0]`.
+- **Progressive disclosure**: KG extraction (structure) comes first, not emotion analysis
+- **Parallel extraction**: KG (LLM, I/O-bound) runs alongside emotion/style (CPU-bound)
+- **On-demand soul enrichment**: Characters are enriched only when user clicks into them
+- **AnalyzerProtocol** — new NLP backends must implement `analyze_chunk` + `analyze_book`
+- **NLTK corpora** — call `ensure_nltk_data()` before nrclex/NLTK usage
+- All scores normalized to `[0.0, 1.0]`
 
 ## Setup
 
 ```bash
 pip install -e ".[dev]"
 python -m textblob.download_corpora   # one-time NLTK download
-streamlit run app/main.py
+uvicorn bookscope.api.app:app --reload --port 8000
 ```
 
 ## Tests
 
 ```bash
-pytest                        # all 250 tests
+pytest                        # all tests
 pytest tests/test_models.py   # single module
 ```
 
 ## Lint
 
 ```bash
-ruff check bookscope app tests
-ruff check bookscope app tests --fix   # auto-fix
+ruff check bookscope tests
+ruff check bookscope tests --fix   # auto-fix
 ```
 
 ## GitHub Push
@@ -61,17 +78,3 @@ git push https://<TOKEN>@github.com/moyu-good/BookScope.git main
 ```
 
 The token is in Claude memory under `reference_github_token.md`.
-
-## Adding a new emotion backend (Phase 2+)
-
-1. Implement `AnalyzerProtocol` in `bookscope/nlp/your_analyzer.py`
-2. Export from `bookscope/nlp/__init__.py`
-3. Add tests in `tests/test_your_analyzer.py`
-4. Wire into `app/main.py` via a sidebar toggle
-
-## Adding a new chart
-
-1. Add `*Data` dataclass + static method to `bookscope/viz/chart_data_adapter.py`
-2. Create `bookscope/viz/your_renderer.py` extending `BaseRenderer`
-3. Export from `bookscope/viz/__init__.py`
-4. Add tests in `tests/test_your_renderer.py`
