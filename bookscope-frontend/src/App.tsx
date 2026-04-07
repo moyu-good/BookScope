@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import UploadPage from "./pages/UploadPage";
 import AnalyzePage from "./pages/AnalyzePage";
 import BookPage from "./pages/BookPage";
+import LibraryPage from "./pages/LibraryPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/" element={<UploadPage />} />
           <Route path="/analyze/:sessionId" element={<AnalyzePage />} />
           <Route path="/book/:sessionId" element={<BookPage />} />
+          <Route path="/library" element={<LibraryPage />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

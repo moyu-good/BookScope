@@ -171,6 +171,30 @@ export interface RecommendationsResponse {
   recommendations: BookRecommendation[];
 }
 
+// ── Library types ───────────────────────────────────────────────────────────
+
+export interface LibraryItem {
+  filename: string;
+  path: string;
+  title: string;
+  arc_pattern: string;
+  total_chunks: number;
+  total_words: number;
+  language: string;
+  analyzed_at: string;
+  tags: string[];
+}
+
+export interface LibraryListResponse {
+  items: LibraryItem[];
+  total: number;
+}
+
+export interface ShareResponse {
+  token: string;
+  url: string;
+}
+
 // ── Upload ───────────────────────────────────────────────────────────────────
 
 export async function uploadFile(file: File): Promise<UploadResponse> {
@@ -498,4 +522,54 @@ export async function fetchRecommendations(
   });
   if (!res.ok) throw new Error(`Recommendations failed: ${res.status}`);
   return res.json();
+}
+
+// ── Library ─────────────────────────────────────────────────────────────────
+
+export async function saveToLibrary(
+  sessionId: string,
+  tags: string[] = []
+): Promise<{ saved: boolean; filename: string }> {
+  const res = await fetch(`${BASE}/library/save`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, tags }),
+  });
+  if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchLibrary(): Promise<LibraryListResponse> {
+  const res = await fetch(`${BASE}/library`);
+  if (!res.ok) throw new Error(`Library fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteFromLibrary(filename: string): Promise<void> {
+  const res = await fetch(`${BASE}/library/${filename}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+}
+
+// ── Share ────────────────────────────────────────────────────────────────────
+
+export async function createShareLink(
+  sessionId: string
+): Promise<ShareResponse> {
+  const res = await fetch(`${BASE}/share/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  if (!res.ok) throw new Error(`Share failed: ${res.status}`);
+  return res.json();
+}
+
+// ── Export ───────────────────────────────────────────────────────────────────
+
+export function getExportJsonUrl(sessionId: string): string {
+  return `${BASE}/export/${sessionId}/json`;
+}
+
+export function getExportMarkdownUrl(sessionId: string): string {
+  return `${BASE}/export/${sessionId}/markdown`;
 }

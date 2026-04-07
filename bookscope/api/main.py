@@ -912,6 +912,217 @@ async def search(req: SearchRequest):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# LIBRARY (Phase 3 — persist analysis snapshots to disk)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from bookscope.store.repository import AnalysisResult as StoredAnalysis, Repository
+
+_repo = Repository()  # default: data/analyses/
+
+# Share tokens → file paths (in-memory; survives as long as the server is up)
+_share_tokens: dict[str, Path] = {}
+
+
+class LibrarySaveRequest(BaseModel):
+    session_id: str
+    tags: list[str] = Field(default_factory=list)
+
+
+@app.post("/api/library/save")
+async def library_save(req: LibrarySaveRequest):
+    """Save current session's analysis to persistent library."""
+    session = _get_session(req.session_id)
+    emotion_scores, style_scores = _require_analysis(session)
+
+    stored = StoredAnalysis.create(
+        book_title=session["title"],
+        chunk_strategy="fixed_500",
+        total_chunks=len(session["chunks"]),
+        total_words=session["total_words"],
+        arc_pattern=session.get("arc_pattern", "Unknown"),
+        detected_lang=session["language"],
+        emotion_scores=emotion_scores,
+        style_scores=style_scores,
+    )
+    stored.knowledge_graph = session.get("knowledge_graph")
+
+    path = _repo.save(stored)
+
+    # Persist tags as sidecar notes
+    if req.tags:
+        _repo.save_notes(path, {"tags": req.tags})
+
+    return {
+        "saved": True,
+        "filename": path.name,
+        "path": str(path),
+    }
+
+
+@app.get("/api/library")
+async def library_list():
+    """List all saved analyses, newest first."""
+    paths = _repo.list_results()
+    items = []
+    for p in paths:
+        try:
+            result = _repo.load(p)
+            notes = _repo.load_notes(p)
+            items.append({
+                "filename": p.name,
+                "path": str(p),
+                "title": result.book_title,
+                "arc_pattern": result.arc_pattern,
+                "total_chunks": result.total_chunks,
+                "total_words": result.total_words,
+                "language": result.detected_lang,
+                "analyzed_at": result.analyzed_at,
+                "tags": notes.get("tags", []),
+            })
+        except Exception:
+            continue
+    return {"items": items, "total": len(items)}
+
+
+@app.get("/api/library/{filename}")
+async def library_get(filename: str):
+    """Load a saved analysis by filename."""
+    paths = _repo.list_results()
+    match = next((p for p in paths if p.name == filename), None)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Analysis not found in library")
+    result = _repo.load(match)
+    notes = _repo.load_notes(match)
+    return {
+        "filename": match.name,
+        "analysis": result.model_dump(),
+        "notes": notes,
+    }
+
+
+@app.delete("/api/library/{filename}")
+async def library_delete(filename: str):
+    """Delete a saved analysis from library."""
+    paths = _repo.list_results()
+    match = next((p for p in paths if p.name == filename), None)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Analysis not found in library")
+    _repo.delete(match)
+    # Also delete sidecar notes
+    notes_path = match.with_name(match.stem + "_notes.json")
+    if notes_path.exists():
+        notes_path.unlink()
+    return {"deleted": True}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SHARE (Phase 3 — shareable link via short token)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class ShareCreateRequest(BaseModel):
+    session_id: str
+
+
+@app.post("/api/share/create")
+async def share_create(req: ShareCreateRequest):
+    """Save session analysis to library and return a share token."""
+    session = _get_session(req.session_id)
+    emotion_scores, style_scores = _require_analysis(session)
+
+    stored = StoredAnalysis.create(
+        book_title=session["title"],
+        chunk_strategy="fixed_500",
+        total_chunks=len(session["chunks"]),
+        total_words=session["total_words"],
+        arc_pattern=session.get("arc_pattern", "Unknown"),
+        detected_lang=session["language"],
+        emotion_scores=emotion_scores,
+        style_scores=style_scores,
+    )
+    stored.knowledge_graph = session.get("knowledge_graph")
+    path = _repo.save(stored)
+
+    token = uuid.uuid4().hex[:8]
+    _share_tokens[token] = path
+
+    return {"token": token, "url": f"/share/{token}"}
+
+
+@app.get("/api/share/{token}")
+async def share_get(token: str):
+    """Retrieve a shared analysis by token."""
+    path = _share_tokens.get(token)
+    if path is None or not path.exists():
+        raise HTTPException(status_code=404, detail="Share link expired or not found")
+    result = _repo.load(path)
+    return {"analysis": result.model_dump()}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EXPORT (Phase 3 — download analysis as JSON / Markdown)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@app.get("/api/export/{session_id}/json")
+async def export_json(session_id: str):
+    """Export current session analysis as downloadable JSON."""
+    session = _get_session(session_id)
+    emotion_scores, style_scores = _require_analysis(session)
+
+    stored = StoredAnalysis.create(
+        book_title=session["title"],
+        chunk_strategy="fixed_500",
+        total_chunks=len(session["chunks"]),
+        total_words=session["total_words"],
+        arc_pattern=session.get("arc_pattern", "Unknown"),
+        detected_lang=session["language"],
+        emotion_scores=emotion_scores,
+        style_scores=style_scores,
+    )
+    stored.knowledge_graph = session.get("knowledge_graph")
+
+    from fastapi.responses import Response
+
+    return Response(
+        content=stored.model_dump_json(indent=2),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{session["title"]}_analysis.json"'
+        },
+    )
+
+
+@app.get("/api/export/{session_id}/markdown")
+async def export_markdown(session_id: str):
+    """Export current session analysis as downloadable Markdown report."""
+    session = _get_session(session_id)
+    emotion_scores, style_scores = _require_analysis(session)
+
+    stored = StoredAnalysis.create(
+        book_title=session["title"],
+        chunk_strategy="fixed_500",
+        total_chunks=len(session["chunks"]),
+        total_words=session["total_words"],
+        arc_pattern=session.get("arc_pattern", "Unknown"),
+        detected_lang=session["language"],
+        emotion_scores=emotion_scores,
+        style_scores=style_scores,
+    )
+    stored.knowledge_graph = session.get("knowledge_graph")
+
+    from fastapi.responses import Response
+
+    return Response(
+        content=stored.to_markdown_report(),
+        media_type="text/markdown",
+        headers={
+            "Content-Disposition": f'attachment; filename="{session["title"]}_report.md"'
+        },
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # HEALTH
 # ═══════════════════════════════════════════════════════════════════════════════
 
