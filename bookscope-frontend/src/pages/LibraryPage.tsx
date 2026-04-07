@@ -6,8 +6,10 @@ import {
   Trash2,
   Loader2,
   BookOpen,
-  ArrowLeft,
+  Plus,
   Tag,
+  Clock,
+  ChevronRight,
 } from "lucide-react";
 import { fetchLibrary, deleteLibraryItem } from "../lib/api";
 
@@ -27,6 +29,19 @@ interface LibraryResponse {
   total: number;
 }
 
+function formatDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
 export default function LibraryPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -37,7 +52,8 @@ export default function LibraryPage() {
     queryFn: () => fetchLibrary() as Promise<LibraryResponse>,
   });
 
-  const handleDelete = async (filename: string) => {
+  const handleDelete = async (filename: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (deleting) return;
     setDeleting(filename);
     try {
@@ -60,7 +76,7 @@ export default function LibraryPage() {
             onClick={() => navigate("/")}
             className="inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors duration-200"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5" />
             新建分析
           </button>
         </div>
@@ -99,15 +115,21 @@ export default function LibraryPage() {
             {data.items.map((item) => (
               <div
                 key={item.filename}
-                className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 hover:border-[var(--accent)]/30 transition-all duration-200"
+                onClick={() =>
+                  navigate(
+                    `/library/${encodeURIComponent(item.filename)}`,
+                  )
+                }
+                className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 hover:border-[var(--accent)]/30 hover:bg-[var(--surface-hover)] transition-all duration-200 cursor-pointer group"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <BookOpen className="w-4 h-4 text-[var(--accent)] shrink-0" />
-                      <h3 className="text-sm font-medium text-[var(--text)] truncate">
+                      <h3 className="text-sm font-medium text-[var(--text)] truncate group-hover:text-[var(--accent)] transition-colors duration-200">
                         {item.title}
                       </h3>
+                      <ChevronRight className="w-3.5 h-3.5 text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0" />
                     </div>
                     <div className="flex items-center gap-3 text-[10px] text-[var(--text-secondary)] mb-2">
                       <span>{item.total_chunks} 段</span>
@@ -116,6 +138,12 @@ export default function LibraryPage() {
                       {item.arc_pattern && (
                         <span className="px-1.5 py-0.5 rounded bg-[var(--surface-hover)]">
                           {item.arc_pattern}
+                        </span>
+                      )}
+                      {item.analyzed_at && (
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" />
+                          {formatDate(item.analyzed_at)}
                         </span>
                       )}
                     </div>
@@ -134,7 +162,7 @@ export default function LibraryPage() {
                     )}
                   </div>
                   <button
-                    onClick={() => handleDelete(item.filename)}
+                    onClick={(e) => handleDelete(item.filename, e)}
                     disabled={deleting === item.filename}
                     className="shrink-0 p-2 rounded-lg text-[var(--text-secondary)] hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
                     title="删除"

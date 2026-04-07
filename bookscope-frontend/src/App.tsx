@@ -6,6 +6,7 @@ import OverviewPage from "./pages/OverviewPage";
 import CharacterPage from "./pages/CharacterPage";
 import ExplorePage from "./pages/ExplorePage";
 import LibraryPage from "./pages/LibraryPage";
+import LibraryDetailPage from "./pages/LibraryDetailPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="explore" element={<ExplorePage />} />
         </Route>
         <Route path="/library" element={<LibraryPage />} />
+        <Route path="/library/:filename" element={<LibraryDetailPage />} />
       </Routes>
     </QueryClientProvider>
   );

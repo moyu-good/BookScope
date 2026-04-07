@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Upload, FileText, ChevronDown } from "lucide-react";
+import { Upload, FileText, ChevronDown, Library } from "lucide-react";
 import clsx from "clsx";
 import { uploadFile } from "../lib/api";
 
@@ -190,6 +190,15 @@ export default function UploadPage() {
           )}
         </button>
       </div>
+
+      {/* Library entry */}
+      <button
+        onClick={() => navigate("/library")}
+        className="mt-6 inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors duration-200"
+      >
+        <Library className="w-4 h-4" />
+        查看书库
+      </button>
     </div>
   );
 }

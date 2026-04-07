@@ -13,7 +13,6 @@ import {
   Library,
   Plus,
   Save,
-  Download,
 } from "lucide-react";
 import clsx from "clsx";
 import { fetchSessionStatus, startExtraction, saveToLibrary } from "../lib/api";
@@ -55,6 +54,7 @@ export default function BookLayout() {
   const [isExtracting, setIsExtracting] = useState(false);
   const extractionStartedRef = useRef(false);
   const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   // Poll session status
   const { data: sessionStatus } = useQuery({
@@ -110,8 +110,14 @@ export default function BookLayout() {
   const handleSave = async () => {
     if (!sessionId || saving) return;
     setSaving(true);
+    setSaveMsg(null);
     try {
       await saveToLibrary(sessionId);
+      setSaveMsg("已保存到书库");
+      setTimeout(() => setSaveMsg(null), 2500);
+    } catch {
+      setSaveMsg("保存失败");
+      setTimeout(() => setSaveMsg(null), 2500);
     } finally {
       setSaving(false);
     }
@@ -141,7 +147,7 @@ export default function BookLayout() {
               )}
             </div>
 
-            {/* Center: nav */}
+            {/* Center: nav (desktop) */}
             <nav className="hidden sm:flex items-center gap-1">
               <NavLink
                 to={`/book/${sessionId}`}
@@ -183,16 +189,10 @@ export default function BookLayout() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all duration-200"
+                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all duration-200 relative"
                 title="保存到书库"
               >
                 <Save className="w-4 h-4" />
-              </button>
-              <button
-                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all duration-200"
-                title="导出"
-              >
-                <Download className="w-4 h-4" />
               </button>
               <button
                 onClick={() => navigate("/library")}
@@ -210,10 +210,52 @@ export default function BookLayout() {
               </button>
             </div>
           </div>
+
+          {/* Save toast */}
+          {saveMsg && (
+            <div className="absolute top-14 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--text)] shadow-lg animate-[fadeIn_0.2s_ease-out]">
+              {saveMsg}
+            </div>
+          )}
         </header>
 
+        {/* Mobile bottom nav */}
+        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg)]/90 backdrop-blur-md border-t border-[var(--border)]">
+          <div className="flex items-center justify-around h-12">
+            <NavLink
+              to={`/book/${sessionId}`}
+              end
+              className={({ isActive }) =>
+                clsx(
+                  "flex flex-col items-center gap-0.5 px-4 py-1.5 text-[10px] font-medium transition-colors duration-200",
+                  isActive
+                    ? "text-[var(--accent)]"
+                    : "text-[var(--text-secondary)]",
+                )
+              }
+            >
+              <BookOpen className="w-4 h-4" />
+              总览
+            </NavLink>
+            <NavLink
+              to={`/book/${sessionId}/explore`}
+              className={({ isActive }) =>
+                clsx(
+                  "flex flex-col items-center gap-0.5 px-4 py-1.5 text-[10px] font-medium transition-colors duration-200",
+                  isActive
+                    ? "text-[var(--accent)]"
+                    : "text-[var(--text-secondary)]",
+                )
+              }
+            >
+              <Compass className="w-4 h-4" />
+              探索
+            </NavLink>
+          </div>
+        </nav>
+
         {/* Content */}
-        <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
+        <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 pb-16 sm:pb-6">
           <Outlet />
         </main>
       </div>
