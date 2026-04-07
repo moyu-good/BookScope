@@ -273,8 +273,9 @@ def generate_narrative_insight(
     Appends ' …' if the response appears truncated (no sentence-ending punctuation).
     Uses st.session_state as the cache store (key includes genre_type).
     """
-    api_key = _get_api_key()
-    if not api_key:
+    from bookscope.config import get_llm_settings
+
+    if not get_llm_settings().is_configured():
         return ""
 
     # Check session-state cache first
@@ -291,33 +292,10 @@ def generate_narrative_insight(
     prompt = _build_prompt(result, lang, genre_type)
 
     try:
-        import anthropic
-
-        # Model: read from st.session_state["llm_model"] (set by sidebar selector).
-        # Falls back to claude-haiku-4-5 when running outside Streamlit.
-        _default_model = "claude-haiku-4-5"
-        if st is not None:
-            try:
-                model_id = st.session_state.get("llm_model", _default_model)
-            except Exception:
-                model_id = _default_model
-        else:
-            model_id = _default_model
-
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model=model_id,
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = message.content[0].text.strip() if message.content else ""
-
-        # Truncation guard: append ' …' if response doesn't end with sentence punctuation
-        if text and text[-1] not in ".!?。！？":
-            text = text + " …"
+        text = call_llm(prompt, max_tokens=200)
 
         # Cache in session state
-        if st is not None and ck:
+        if st is not None and ck and text:
             try:
                 st.session_state[ck] = text
             except Exception:
@@ -345,8 +323,9 @@ def generate_narrative_insight_stream(
         st.caption("🧬 BOOK DNA")
         st.write_stream(generate_narrative_insight_stream(result, ui_lang, "fiction"))
     """
-    api_key = _get_api_key()
-    if not api_key:
+    from bookscope.config import get_llm_settings
+
+    if not get_llm_settings().is_configured():
         return
         yield  # Makes this a generator function; unreachable but required by Python
 
@@ -363,28 +342,13 @@ def generate_narrative_insight_stream(
 
     prompt = _build_prompt(result, lang, genre_type)
 
-    _default_model = "claude-haiku-4-5"
-    if st is not None:
-        try:
-            model_id = st.session_state.get("llm_model", _default_model)
-        except Exception:
-            model_id = _default_model
-    else:
-        model_id = _default_model
-
     try:
-        import anthropic
+        from bookscope.nlp.llm_provider import call_llm_stream
 
-        client = anthropic.Anthropic(api_key=api_key)
         accumulated: list[str] = []
-        with client.messages.stream(
-            model=model_id,
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}],
-        ) as stream:
-            for text_chunk in stream.text_stream:
-                accumulated.append(text_chunk)
-                yield text_chunk
+        for text_chunk in call_llm_stream(prompt, max_tokens=200):
+            accumulated.append(text_chunk)
+            yield text_chunk
 
         full = "".join(accumulated)
         if full and full[-1] not in ".!?。！？":
@@ -414,8 +378,9 @@ def generate_book_club_pack_structured(
     """
     from bookscope.models.schemas import BookClubPack
 
-    api_key = _get_api_key()
-    if not api_key:
+    from bookscope.config import get_llm_settings
+
+    if not get_llm_settings().is_configured():
         return None
 
     lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(lang, "English")
@@ -442,30 +407,18 @@ def generate_book_club_pack_structured(
         f"- Use {lang_name} for all text values."
     )
 
-    _default_model = "claude-haiku-4-5"
-    if st is not None:
-        try:
-            model_id = st.session_state.get("llm_model", _default_model)
-        except Exception:
-            model_id = _default_model
-    else:
-        model_id = _default_model
-
     try:
         import json
 
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model=model_id,
-            max_tokens=400,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = message.content[0].text.strip() if message.content else ""
+        raw = call_llm(prompt, max_tokens=400)
+        if not raw:
+            return None
         if raw.startswith("```"):
             lines = raw.splitlines()
             raw = "\n".join(line for line in lines if not line.startswith("```")).strip()
+        # Remove trailing ' …' truncation guard before JSON parse
+        if raw.endswith(" …"):
+            raw = raw[:-2]
         data = json.loads(raw)
         return BookClubPack(**data)
     except Exception:
@@ -479,44 +432,29 @@ def call_llm(
     max_tokens: int = 500,
     system: str | None = None,
 ) -> str:
-    """Public single-call LLM wrapper for use by Chat Tab and other modules.
+    """Public single-call LLM wrapper — delegates to multi-provider llm_provider.
 
-    Thread-safe: constructs a per-call Anthropic client; never reads session_state.
-    Callers must resolve api_key and model in the main Streamlit thread and pass
-    them as arguments if calling from a worker thread.
+    Thread-safe. Supports Anthropic and OpenAI-compatible providers via BYOK config.
 
     Args:
         prompt:     The user prompt to send.
-        api_key:    Anthropic API key.  If None, resolved via _get_api_key().
-        model:      Model ID.  If None, falls back to claude-haiku-4-5.
+        api_key:    LLM API key.  If None, resolved via BYOK settings → env vars.
+        model:      Model ID.  If None, resolved via BYOK settings → provider default.
         max_tokens: Max tokens in the LLM response.
         system:     Optional system prompt for persona / instruction framing.
 
     Returns:
         Stripped response text, or "" on any error / missing key.
     """
-    resolved_key = api_key or _get_api_key()
-    if not resolved_key:
-        return ""
-    resolved_model = model or "claude-haiku-4-5"
-    try:
-        import anthropic
+    from bookscope.nlp.llm_provider import call_llm as _provider_call
 
-        client = anthropic.Anthropic(api_key=resolved_key)
-        kwargs: dict = dict(
-            model=resolved_model,
-            max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        if system:
-            kwargs["system"] = system
-        message = client.messages.create(**kwargs)
-        text = message.content[0].text.strip() if message.content else ""
-        if text and text[-1] not in ".!?。！？":
-            text = text + " …"
-        return text
-    except Exception:
-        return ""
+    return _provider_call(
+        prompt,
+        api_key=api_key,
+        model=model,
+        max_tokens=max_tokens,
+        system=system,
+    )
 
 
 def _warn_user(exc: Exception) -> None:

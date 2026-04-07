@@ -32,8 +32,11 @@ def require_knowledge_graph(session: SessionData) -> None:
 
 
 def get_api_key() -> str | None:
-    """Resolve Anthropic API key from environment."""
-    return os.environ.get("ANTHROPIC_API_KEY")
+    """Resolve LLM API key from BYOK settings, then environment."""
+    from bookscope.config import get_llm_settings
+
+    settings = get_llm_settings()
+    return settings.resolved_api_key()
 
 
 def require_api_key() -> str:
@@ -42,6 +45,6 @@ def require_api_key() -> str:
     if not key:
         raise HTTPException(
             status_code=422,
-            detail="ANTHROPIC_API_KEY environment variable not set",
+            detail="未配置 API 密钥 — 请在「设置」页面配置你的 LLM 供应商和密钥",
         )
     return key

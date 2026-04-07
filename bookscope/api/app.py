@@ -21,6 +21,7 @@ from bookscope.api.routers import (
     library,
     search,
     session,
+    settings,
     share,
     upload,
 )
@@ -47,6 +48,7 @@ app.include_router(charts.router)
 app.include_router(library.router)
 app.include_router(export.router)
 app.include_router(share.router)
+app.include_router(settings.router)
 
 
 @app.get("/api/health")

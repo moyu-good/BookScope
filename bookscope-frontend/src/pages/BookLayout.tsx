@@ -13,6 +13,7 @@ import {
   Library,
   Plus,
   Save,
+  Settings,
 } from "lucide-react";
 import clsx from "clsx";
 import { fetchSessionStatus, startExtraction, saveToLibrary } from "../lib/api";
@@ -200,6 +201,13 @@ export default function BookLayout() {
                 title="书库"
               >
                 <Library className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => navigate("/settings")}
+                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all duration-200"
+                title="设置"
+              >
+                <Settings className="w-4 h-4" />
               </button>
               <button
                 onClick={() => navigate("/")}

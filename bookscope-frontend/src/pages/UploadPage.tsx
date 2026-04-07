@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload, FileText, ChevronDown, Library } from "lucide-react";
+import { Upload, FileText, ChevronDown, Library, Settings } from "lucide-react";
 import clsx from "clsx";
 import { uploadFile } from "../lib/api";
+import { useSettings } from "../lib/settings";
 
 const BOOK_TYPES = [
   { value: "fiction", label: "小说" },
@@ -20,6 +21,7 @@ const ACCEPTED_EXTENSIONS = ".txt,.epub,.pdf";
 export default function UploadPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isConfigured } = useSettings();
 
   const [bookType, setBookType] = useState<string>("fiction");
   const [dragActive, setDragActive] = useState(false);
@@ -191,14 +193,35 @@ export default function UploadPage() {
         </button>
       </div>
 
-      {/* Library entry */}
-      <button
-        onClick={() => navigate("/library")}
-        className="mt-6 inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors duration-200"
-      >
-        <Library className="w-4 h-4" />
-        查看书库
-      </button>
+      {/* Bottom links */}
+      <div className="mt-6 flex items-center gap-4">
+        <button
+          onClick={() => navigate("/library")}
+          className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors duration-200"
+        >
+          <Library className="w-4 h-4" />
+          书库
+        </button>
+        <span className="text-[var(--border)]">·</span>
+        <button
+          onClick={() => navigate("/settings")}
+          className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors duration-200"
+        >
+          <Settings className="w-4 h-4" />
+          设置
+        </button>
+      </div>
+
+      {/* API not configured warning */}
+      {!isConfigured && (
+        <button
+          onClick={() => navigate("/settings")}
+          className="mt-4 max-w-lg w-full px-4 py-3 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-xl text-sm text-[var(--accent)] text-left hover:bg-[var(--accent)]/15 transition-all duration-200"
+        >
+          <strong>未配置 API 密钥</strong> — 知识图谱、角色深潜和 AI
+          对话需要 LLM 支持。点击前往设置页面配置你的供应商。
+        </button>
+      )}
     </div>
   );
 }
