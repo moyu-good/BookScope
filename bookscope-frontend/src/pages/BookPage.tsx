@@ -1,7 +1,7 @@
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import {
-  BookOpen, Sparkles, MessageCircle, Search,
+  BookOpen, Sparkles, MessageCircle, Search, BarChart3,
   Save, Share2, Download, Check, Link, Library,
 } from "lucide-react";
 import type { AnalysisResult } from "../lib/api";
@@ -19,7 +19,12 @@ import RecommendationsCard from "../components/RecommendationsCard";
 import ChatPanel from "../components/ChatPanel";
 import SearchPanel from "../components/SearchPanel";
 
-type Tab = "overview" | "insights" | "chat" | "search";
+// Lazy-loaded deep analysis charts (Recharts heavy)
+const EmotionHeatmap = lazy(() => import("../components/EmotionHeatmap"));
+const EmotionTimeline = lazy(() => import("../components/EmotionTimeline"));
+const StyleRadarFull = lazy(() => import("../components/StyleRadarFull"));
+
+type Tab = "overview" | "depth" | "insights" | "chat" | "search";
 
 export default function BookPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -172,6 +177,7 @@ export default function BookPage() {
       <nav className="max-w-5xl mx-auto px-4 pt-4 flex gap-1">
         {([
           { key: "overview", label: "Overview", icon: BookOpen },
+          { key: "depth", label: "Deep Analysis", icon: BarChart3 },
           { key: "insights", label: "Insights", icon: Sparkles },
           { key: "chat", label: "Chat", icon: MessageCircle },
           { key: "search", label: "Search", icon: Search },
@@ -208,6 +214,18 @@ export default function BookPage() {
               <ArcChart valenceSeries={valence_series} arcPattern={arc_pattern} />
             </div>
           </div>
+        )}
+
+        {activeTab === "depth" && (
+          <Suspense fallback={
+            <div className="text-center py-10 text-sm text-[var(--bs-text-muted)]">Loading charts...</div>
+          }>
+            <div className="space-y-6">
+              <EmotionHeatmap sessionId={sessionId} />
+              <EmotionTimeline sessionId={sessionId} />
+              <StyleRadarFull sessionId={sessionId} />
+            </div>
+          </Suspense>
         )}
 
         {activeTab === "insights" && (
