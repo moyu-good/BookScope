@@ -477,6 +477,7 @@ def call_llm(
     api_key: str | None = None,
     model: str | None = None,
     max_tokens: int = 500,
+    system: str | None = None,
 ) -> str:
     """Public single-call LLM wrapper for use by Chat Tab and other modules.
 
@@ -489,6 +490,7 @@ def call_llm(
         api_key:    Anthropic API key.  If None, resolved via _get_api_key().
         model:      Model ID.  If None, falls back to claude-haiku-4-5.
         max_tokens: Max tokens in the LLM response.
+        system:     Optional system prompt for persona / instruction framing.
 
     Returns:
         Stripped response text, or "" on any error / missing key.
@@ -501,11 +503,14 @@ def call_llm(
         import anthropic
 
         client = anthropic.Anthropic(api_key=resolved_key)
-        message = client.messages.create(
+        kwargs: dict = dict(
             model=resolved_model,
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
+        if system:
+            kwargs["system"] = system
+        message = client.messages.create(**kwargs)
         text = message.content[0].text.strip() if message.content else ""
         if text and text[-1] not in ".!?。！？":
             text = text + " …"

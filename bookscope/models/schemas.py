@@ -167,6 +167,14 @@ class ChapterSummary(BaseModel):
     characters_mentioned: list[str] = Field(default_factory=list)  # 出现的人物名
 
 
+class EmotionalStage(BaseModel):
+    """A single stage in a character's emotional arc."""
+
+    stage: str = ""      # "early" / "middle" / "late"
+    emotion: str = ""    # "fearful" / "determined"
+    event: str = ""      # "orphaned at age 5"
+
+
 class CharacterProfile(BaseModel):
     """Merged character profile across all chunks."""
 
@@ -177,6 +185,11 @@ class CharacterProfile(BaseModel):
     motivations: list[str] = Field(default_factory=list)  # 核心动机
     key_chapter_indices: list[int] = Field(default_factory=list)  # 主要出场章节
     arc_summary: str = ""                      # 人物弧光概述
+    # ── Soul Engine (Stage 2) ──
+    personality_type: str = ""                 # "INTJ — 策略家"
+    key_quotes: list[str] = Field(default_factory=list)  # 3-5 条代表性语录
+    values: list[str] = Field(default_factory=list)      # 核心价值观/信念
+    emotional_stages: list[EmotionalStage] = Field(default_factory=list)
 
 
 class BookKnowledgeGraph(BaseModel):

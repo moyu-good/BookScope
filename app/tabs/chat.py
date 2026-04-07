@@ -1,15 +1,16 @@
-"""BookScope — Chat Tab.
+"""BookScope — Chat Tab (Dual-Mode: Book Analyst + Character Persona).
 
 Lets users ask questions about their book using LLM + sampled text chunks.
+Also allows "Talk to Character" mode — role-play chat with book characters.
+
 Context is built once and cached in session_state; history is a rolling
 window of the last 10 turns.
 
 Also provides a full-text keyword search over all chunks (no LLM required).
 
-Architecture (from v0.9 plan):
-  - render_chat_tab(chunks, ui_lang, T) -> None
+Architecture:
+  - render_chat_tab(chunks, ui_lang, T, book_type, characters) -> None
   - _build_context(chunks) -> str      (cached in session_state by chunk MD5)
-  - _ask_llm(question, context, history, model, api_key) -> str
   - Uses st.text_input + button pattern (not st.chat_input, avoids UI freezes)
   - chunks=None guard: show info when loaded from saved analysis
 """
@@ -113,6 +114,22 @@ _SUGGEST_PROMPTS: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
+# Character-specific suggested prompts (per-language)
+_CHAR_SUGGEST: dict[str, list[tuple[str, str]]] = {
+    "zh": [
+        ("chat_char_suggest_1", "你最大的遗憾是什么？"),
+        ("chat_char_suggest_2", "你的人生信条是什么？"),
+    ],
+    "en": [
+        ("chat_char_suggest_1", "What is your greatest regret?"),
+        ("chat_char_suggest_2", "What drives you forward?"),
+    ],
+    "ja": [
+        ("chat_char_suggest_1", "あなたの最大の後悔は何ですか？"),
+        ("chat_char_suggest_2", "あなたを突き動かすものは何ですか？"),
+    ],
+}
+
 
 def _build_context(chunks: list) -> str:
     """Build a text context block from up to 8 uniformly-sampled chunks.
@@ -145,18 +162,56 @@ def _context_cache_key(chunks: list) -> str:
     return "chat_ctx_" + hashlib.md5(combined.encode()).hexdigest()[:8]
 
 
+def _discover_characters(chunks: list, detected_lang: str, ctx_key: str) -> list:
+    """Auto-discover characters from NER and cache as lightweight profiles."""
+    cache_key = f"_chat_characters_{ctx_key}"
+    if cache_key in st.session_state:
+        return st.session_state[cache_key]
+
+    try:
+        from bookscope.models.schemas import CharacterProfile
+        from bookscope.nlp.ner_extractor import extract_character_candidates
+
+        candidates = extract_character_candidates(chunks, detected_lang, min_chunk_spread=2)
+        # Build lightweight CharacterProfile stubs sorted by frequency
+        profiles = []
+        for name, indices in sorted(
+            candidates.items(), key=lambda x: len(x[1]), reverse=True
+        )[:8]:
+            profiles.append(
+                CharacterProfile(
+                    name=name,
+                    key_chapter_indices=indices,
+                )
+            )
+        st.session_state[cache_key] = profiles
+        return profiles
+    except Exception:
+        st.session_state[cache_key] = []
+        return []
+
+
 def render_chat_tab(
-    chunks, ui_lang: str, T: dict, book_type: str = "fiction"
+    chunks,
+    ui_lang: str,
+    T: dict,
+    book_type: str = "fiction",
+    characters: list | None = None,
+    detected_lang: str | None = None,
 ) -> None:
-    """Render the Chat tab UI.
+    """Render the Chat tab UI with dual-mode: Book Analyst + Character Persona.
 
     Args:
-        chunks:    list[ChunkResult] from the analysis pipeline, or None if
-                   the user is viewing a saved analysis (no raw text stored).
-        ui_lang:   UI language code ("en" / "zh" / "ja").
-        T:         Localised string dictionary.
-        book_type: "fiction" | "academic" | "essay" — selects suggested prompts.
+        chunks:        list[ChunkResult] from the analysis pipeline, or None if
+                       the user is viewing a saved analysis (no raw text stored).
+        ui_lang:       UI language code ("en" / "zh" / "ja").
+        T:             Localised string dictionary.
+        book_type:     "fiction" | "academic" | "essay" — selects suggested prompts.
+        characters:    Optional list of CharacterProfile for persona mode.
+        detected_lang: Detected book language. Falls back to ui_lang.
     """
+    book_lang = detected_lang or ui_lang
+
     # ── Full-text search (no LLM required) ───────────────────────────────────
     if chunks is not None:
         s_col, b_col = st.columns([3, 1])
@@ -237,8 +292,46 @@ def render_chat_tab(
         context = _build_context(chunks)
         st.session_state[ctx_key] = context
 
-    # Chat history keyed per book (ctx_key is unique per book's content)
-    hist_key = f"_chat_history_{ctx_key}"
+    # ── Mode selector (Book Analyst vs Character Persona) ────────────────────
+    # Auto-discover characters if not provided and book is fiction-ish
+    if characters is None and book_type in ("fiction", "biography", "short_stories"):
+        characters = _discover_characters(chunks, book_lang, ctx_key)
+
+    # Check for external mode switch (e.g. from Soul Card button)
+    _external_mode = st.session_state.pop("chat_mode_select", None)
+
+    chat_options = [T.get("chat_mode_analyst", "Book Analyst")]
+    char_map: dict[str, object] = {}  # display_name -> CharacterProfile
+    if characters:
+        for c in characters[:8]:
+            label = f"\U0001f4ac {c.name}"
+            chat_options.append(label)
+            char_map[label] = c
+
+    # Determine default index from external switch
+    default_idx = 0
+    if _external_mode and _external_mode in chat_options:
+        default_idx = chat_options.index(_external_mode)
+
+    selected_mode = chat_options[0]
+    if len(chat_options) > 1:
+        selected_mode = st.selectbox(
+            T.get("chat_mode_label", "Chat with"),
+            chat_options,
+            index=default_idx,
+            key="chat_mode_selector",
+            label_visibility="collapsed",
+        )
+
+    is_character_mode = selected_mode in char_map
+    active_char = char_map.get(selected_mode)
+
+    # ── Chat history (separate per mode) ─────────────────────────────────────
+    if is_character_mode and active_char is not None:
+        hist_key = f"_char_chat_{ctx_key}_{active_char.name}"
+    else:
+        hist_key = f"_chat_history_{ctx_key}"
+
     if hist_key not in st.session_state:
         st.session_state[hist_key] = []
     history: list[dict] = st.session_state[hist_key]
@@ -246,7 +339,10 @@ def render_chat_tab(
     # ── Suggested prompts (shown when conversation is empty) ─────────────────
     _pending_q: str = st.session_state.pop("_chat_pending_q", "")
     if not history:
-        _prompts = _SUGGEST_PROMPTS.get(book_type, _SUGGEST_PROMPTS["fiction"])
+        if is_character_mode:
+            _prompts = _CHAR_SUGGEST.get(ui_lang, _CHAR_SUGGEST["en"])
+        else:
+            _prompts = _SUGGEST_PROMPTS.get(book_type, _SUGGEST_PROMPTS["fiction"])
         _pcols = st.columns(len(_prompts))
         for i, (_str_key, _llm_prompt) in enumerate(_prompts):
             _btn_label = T.get(_str_key, _llm_prompt)
@@ -259,15 +355,23 @@ def render_chat_tab(
     for turn in history:
         role = turn["role"]
         content = turn["content"]
-        with st.chat_message(role):
+        avatar = turn.get("avatar")
+        with st.chat_message(role, avatar=avatar):
             st.markdown(content)
 
     # Input area (st.text_input + button — avoids chat_input re-run freeze)
+    if is_character_mode and active_char is not None:
+        _placeholder = T.get(
+            "chat_char_placeholder", "Ask {name} a question..."
+        ).format(name=active_char.name)
+    else:
+        _placeholder = T.get("chat_input_placeholder", "What themes appear most often?")
+
     input_col, btn_col = st.columns([3, 1])
     with input_col:
         question = st.text_input(
             label=T.get("chat_input_label", "Ask a question about this book"),
-            placeholder=T.get("chat_input_placeholder", "What themes appear most often?"),
+            placeholder=_placeholder,
             label_visibility="collapsed",
             key="chat_question_input",
         )
@@ -291,30 +395,31 @@ def render_chat_tab(
         # Prune history to rolling window before sending to LLM
         recent = history[-(_MAX_HISTORY_TURNS * 2):]  # 10 turns = 20 entries
 
-        # Build prompt
+        # Build prompt differently based on mode
         history_text = "\n".join(
             f"{'User' if h['role'] == 'user' else 'Assistant'}: {h['content']}"
             for h in recent[:-1]  # exclude the current question (already in q)
         )
-        prompt = (
-            f"You are a literary analyst helping a reader understand a book. "
-            f"Use ONLY the excerpts below to answer. "
-            f"If the answer is not in the excerpts, say so. "
-            f"Respond in {lang_name}.\n\n"
-            f"--- Book Excerpts ---\n{context}\n\n"
-        )
-        if history_text:
-            prompt += f"--- Prior conversation ---\n{history_text}\n\n"
-        prompt += f"--- Question ---\n{q}"
 
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="\U0001f3ad" if is_character_mode else None):
             with st.spinner(""):
-                answer = call_llm(prompt, api_key=api_key, model=model, max_tokens=500)
+                if is_character_mode and active_char is not None:
+                    answer = _handle_character_chat(
+                        active_char, chunks, q, history_text, lang_name,
+                        api_key, model,
+                    )
+                else:
+                    answer = _handle_analyst_chat(
+                        context, q, history_text, lang_name, api_key, model,
+                    )
             if not answer:
                 answer = T.get("chat_error", "Sorry, I couldn't generate a response. Try again.")
             st.markdown(answer)
 
-        history.append({"role": "assistant", "content": answer})
+        assistant_entry: dict = {"role": "assistant", "content": answer}
+        if is_character_mode:
+            assistant_entry["avatar"] = "\U0001f3ad"
+        history.append(assistant_entry)
         st.session_state[hist_key] = history
 
         # Clear the input field by re-running
@@ -325,3 +430,67 @@ def render_chat_tab(
         if st.button(T.get("chat_clear_btn", "Clear conversation"), key="chat_clear"):
             st.session_state[hist_key] = []
             st.rerun()
+
+
+def _handle_analyst_chat(
+    context: str,
+    question: str,
+    history_text: str,
+    lang_name: str,
+    api_key: str,
+    model: str,
+) -> str:
+    """Handle a question in Book Analyst mode (original behavior)."""
+    prompt = (
+        f"You are a literary analyst helping a reader understand a book. "
+        f"Use ONLY the excerpts below to answer. "
+        f"If the answer is not in the excerpts, say so. "
+        f"Respond in {lang_name}.\n\n"
+        f"--- Book Excerpts ---\n{context}\n\n"
+    )
+    if history_text:
+        prompt += f"--- Prior conversation ---\n{history_text}\n\n"
+    prompt += f"--- Question ---\n{question}"
+
+    return call_llm(prompt, api_key=api_key, model=model, max_tokens=500)
+
+
+def _handle_character_chat(
+    character,
+    chunks: list,
+    question: str,
+    history_text: str,
+    lang_name: str,
+    api_key: str,
+    model: str,
+) -> str:
+    """Handle a question in Character Persona mode."""
+    from bookscope.nlp.soul_engine import build_character_context, build_persona_prompt
+
+    # Detect language from lang_name
+    lang_code = {"English": "en", "Chinese": "zh", "Japanese": "ja"}.get(lang_name, "en")
+
+    # Build persona system prompt
+    book_title = st.session_state.get("book_title", "")
+    system_prompt = build_persona_prompt(character, book_title, lang_code)
+
+    # Build character-specific context
+    char_context = build_character_context(
+        chunks, character.key_chapter_indices, question, max_chars=2000,
+    )
+
+    # Build user prompt with context + history
+    prompt_parts = []
+    if char_context:
+        prompt_parts.append(f"[Story context for reference]\n{char_context}\n")
+    if history_text:
+        prompt_parts.append(f"[Prior conversation]\n{history_text}\n")
+    prompt_parts.append(question)
+
+    return call_llm(
+        "\n".join(prompt_parts),
+        api_key=api_key,
+        model=model,
+        max_tokens=500,
+        system=system_prompt,
+    )

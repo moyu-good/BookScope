@@ -212,6 +212,9 @@ if uploaded is not None and not url_input and _loaded_result is None and not _de
     strategy, chunk_size, min_words, T,
 )
 
+# Store book_title in session_state for cross-tab access (e.g. character chat)
+st.session_state["book_title"] = book_title
+
 # Show detected language in sidebar
 render_sidebar_detected_lang(detected_lang, T)
 
@@ -411,7 +414,7 @@ with _left_col:
         _render_chapter_cards(chunks, emotion_scores, T)
 
 with _right_col:
-    render_chat_tab(chunks, ui_lang, T, book_type=book_type)
+    render_chat_tab(chunks, ui_lang, T, book_type=book_type, detected_lang=detected_lang)
 
 # ── Library ───────────────────────────────────────────────────────────────
 with st.expander(T.get("tab_library", "📚 Library"), expanded=False):

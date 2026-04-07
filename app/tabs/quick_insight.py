@@ -283,6 +283,139 @@ def _render_book_club_pack(
         )
 
 
+def _render_soul_cards(
+    chunks,
+    detected_lang: str,
+    ui_lang: str,
+    T: dict,
+    type_color: str,
+) -> None:
+    """Render Character Soul Cards for characters that have soul data.
+
+    Auto-discovers characters via NER if no enriched profiles are cached,
+    and shows a lightweight card (name + top quote + "Talk to Character" button).
+    Full soul data (MBTI, values, emotional arc) is shown when available.
+    """
+    if chunks is None:
+        return
+
+    # Discover characters from NER (cached in session_state)
+    ctx_combined = "".join(getattr(c, "text", str(c))[:40] for c in chunks)
+    ctx_key = "chat_ctx_" + hashlib.md5(ctx_combined.encode()).hexdigest()[:8]
+    cache_key = f"_soul_characters_{ctx_key}"
+
+    if cache_key not in st.session_state:
+        try:
+            from bookscope.models.schemas import CharacterProfile
+            from bookscope.nlp.ner_extractor import extract_character_candidates
+            from bookscope.nlp.soul_engine import extract_character_dialogues
+
+            candidates = extract_character_candidates(
+                chunks, detected_lang, min_chunk_spread=2,
+            )
+            profiles = []
+            for name, indices in sorted(
+                candidates.items(), key=lambda x: len(x[1]), reverse=True,
+            )[:6]:
+                # Extract a few representative quotes
+                quotes = extract_character_dialogues(
+                    chunks, name, language=detected_lang, max_quotes=3,
+                )
+                profiles.append(
+                    CharacterProfile(
+                        name=name,
+                        key_chapter_indices=indices,
+                        key_quotes=quotes,
+                    )
+                )
+            st.session_state[cache_key] = profiles
+        except Exception:
+            st.session_state[cache_key] = []
+
+    characters = st.session_state[cache_key]
+    if not characters:
+        return
+
+    # Section header
+    label = _html.escape(T.get("qi_soul_label", "CHARACTER SOULS"))
+    st.markdown(
+        f'<div class="bs-insight-headline" '
+        f'style="border-left:4px solid {type_color};margin-top:.75rem;">'
+        f'<div class="bs-insight-headline-label">\U0001f3ad {label}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    for char in characters[:6]:
+        _render_one_soul_card(char, ui_lang, T)
+
+
+def _render_one_soul_card(char, ui_lang: str, T: dict) -> None:
+    """Render a single character soul card."""
+    name_safe = _html.escape(char.name)
+
+    # MBTI badge
+    mbti_html = ""
+    if char.personality_type:
+        mbti_safe = _html.escape(char.personality_type)
+        mbti_html = (
+            f'<span style="background:#2A5A8A;color:#FFF;padding:2px 8px;'
+            f'border-radius:4px;font-size:.75rem;margin-left:.5rem;">'
+            f'{mbti_safe}</span>'
+        )
+
+    # Representative quote
+    quote_html = ""
+    if char.key_quotes:
+        q = _html.escape(char.key_quotes[0][:80])
+        quote_html = (
+            f'<div style="font-style:italic;color:#6A5A4A;font-size:.85rem;'
+            f'margin:.3rem 0;">\u201c{q}\u201d</div>'
+        )
+
+    # Values tags
+    values_html = ""
+    if char.values:
+        tags = "".join(
+            f'<span style="background:#F5EDE0;color:#5A4A3A;padding:1px 6px;'
+            f'border-radius:3px;font-size:.72rem;margin-right:4px;">'
+            f'{_html.escape(v)}</span>'
+            for v in char.values[:4]
+        )
+        values_html = f'<div style="margin:.3rem 0;">{tags}</div>'
+
+    # Arc summary line
+    arc_html = ""
+    if char.emotional_stages:
+        stages = " \u2192 ".join(
+            _html.escape(s.emotion) for s in char.emotional_stages if s.emotion
+        )
+        if stages:
+            arc_html = (
+                f'<div style="font-size:.78rem;color:#8A7A6A;margin-top:.2rem;">'
+                f'\U0001f4c8 {stages}</div>'
+            )
+
+    st.markdown(
+        f'<div style="background:#FDFAF5;border:1px solid #E8DED0;'
+        f'border-radius:8px;padding:.6rem .8rem;margin-bottom:.5rem;">'
+        f'<div style="font-weight:600;color:#3A2A1A;">{name_safe}{mbti_html}</div>'
+        f'{quote_html}{values_html}{arc_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # "Talk to character" button
+    btn_label = T.get("qi_soul_talk_btn", "Talk to {name}").format(name=char.name)
+    if st.button(
+        f"\U0001f4ac {btn_label}",
+        key=f"soul_talk_{char.name}",
+        use_container_width=True,
+    ):
+        st.session_state["chat_mode_select"] = f"\U0001f4ac {char.name}"
+        st.rerun()
+
+
 def render_quick_insight(
     book_type: str,
     book_title: str,
@@ -633,6 +766,9 @@ def render_quick_insight(
                         unsafe_allow_html=True,
                     )
                     st.plotly_chart(_rel_fig, use_container_width=True)
+
+        # ── Soul Cards (characters with soul data) ──────────────────────────
+        _render_soul_cards(chunks, detected_lang, ui_lang, T, type_color)
 
     # ── ACADEMIC ─────────────────────────────────────────────────────────────
     elif book_type == "academic":

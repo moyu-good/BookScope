@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/* BookScope design tokens */
+:root {
+  --bs-bg: #faf9f7;
+  --bs-surface: #ffffff;
+  --bs-text: #1a1a1a;
+  --bs-text-muted: #6b6b6b;
+  --bs-border: #e5e2dc;
+  --bs-accent: #c8781a;
+  --bs-accent-hover: #a85f0a;
+
+  /* Emotion palette */
+  --bs-joy: #f59e0b;
+  --bs-sadness: #3b82f6;
+  --bs-anger: #ef4444;
+  --bs-fear: #8b5cf6;
+  --bs-trust: #10b981;
+  --bs-anticipation: #f97316;
+  --bs-surprise: #ec4899;
+  --bs-disgust: #84cc16;
+}
+
+body {
+  margin: 0;
+  background: var(--bs-bg);
+  color: var(--bs-text);
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100svh;
+}

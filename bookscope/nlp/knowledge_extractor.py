@@ -248,6 +248,7 @@ def extract_knowledge_graph(
     model: str = "claude-haiku-4-5",
     progress_callback: Callable[[int, int], None] | None = None,
     max_extract: int = _MAX_EXTRACT_CHUNKS,
+    enrich_souls: bool = False,
 ) -> BookKnowledgeGraph:
     """Extract a BookKnowledgeGraph from chunked book text.
 
@@ -259,6 +260,8 @@ def extract_knowledge_graph(
         model: Claude model ID.
         progress_callback: Optional (current, total) progress reporter.
         max_extract: Max chunks to LLM-extract (others get empty summaries).
+        enrich_souls: If True, enrich top 5 characters with soul profiles
+                      (MBTI, quotes, values, emotional arc) via extra LLM calls.
 
     Returns:
         BookKnowledgeGraph with chapter summaries and character profiles.
@@ -315,6 +318,33 @@ def extract_knowledge_graph(
         model=model,
         ner_candidates=ner_candidates,
     )
+
+    # Step C (optional): enrich top characters with soul profiles
+    if enrich_souls and characters:
+        from bookscope.nlp.soul_engine import enrich_soul_profile
+
+        # Sort by number of chapter appearances, enrich top 5
+        ranked = sorted(
+            characters,
+            key=lambda c: len(c.key_chapter_indices),
+            reverse=True,
+        )
+        for char in ranked[:5]:
+            try:
+                enriched = enrich_soul_profile(
+                    profile=char,
+                    chunks=chunks,
+                    chunk_indices=char.key_chapter_indices,
+                    book_title=book_title,
+                    language=language,
+                    api_key=api_key,
+                    model=model,
+                )
+                # Replace in list
+                idx = characters.index(char)
+                characters[idx] = enriched
+            except Exception:
+                logger.warning("Soul enrichment failed for %s", char.name)
 
     return BookKnowledgeGraph(
         book_title=book_title,

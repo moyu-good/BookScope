@@ -1,9 +1,16 @@
-"""BookScope v3 — FastAPI backend.
+"""BookScope v4 — Unified FastAPI backend.
 
-Endpoints:
-    POST /api/upload    — Upload a text file, returns session_id
-    POST /api/extract   — Trigger knowledge extraction (SSE progress stream)
-    POST /api/chat/stream — Chat with the book (SSE streaming)
+Serves as the single backend for the React frontend.
+Endpoints grouped by domain:
+    Session:   /api/upload, /api/session/{id}
+    Analysis:  /api/analyze (SSE), /api/preview
+    Charts:    /api/charts/{id}/*
+    Insights:  /api/insights/*
+    KG:        /api/extract (SSE)
+    Chat:      /api/chat/stream (SSE), /api/search
+    Library:   /api/library/*
+    Export:    /api/export/*
+    Share:     /api/share/*
 
 Run:
     uvicorn bookscope.api.main:app --reload --port 8000
@@ -13,17 +20,35 @@ import json
 import os
 import tempfile
 import uuid
+from collections import Counter
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from bookscope.ingest import chunk_book, clean, load_text
-from bookscope.models import BookKnowledgeGraph
-from bookscope.nlp.knowledge_extractor import extract_knowledge_graph
-from bookscope.nlp.lang_detect import detect_language
+from bookscope.insights import (
+    build_reader_verdict,
+    compute_readability,
+    extract_character_names,
+    extract_key_themes,
+    first_person_density,
+)
+from bookscope.models import (
+    BookKnowledgeGraph,
+    EmotionScore,
+    StyleScore,
+)
+from bookscope.nlp import (
+    ArcClassifier,
+    LexiconAnalyzer,
+    StyleAnalyzer,
+    detect_language,
+    extract_character_candidates,
+    extract_knowledge_graph,
+)
 from bookscope.nlp.llm_analyzer import call_llm
 
 try:
@@ -31,7 +56,7 @@ try:
 except ImportError:
     SessionVectorStore = None  # type: ignore[assignment,misc]
 
-app = FastAPI(title="BookScope API", version="3.0.0")
+app = FastAPI(title="BookScope API", version="4.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,33 +66,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory session store (single worker)
+# In-memory session store (single worker; TTL cleanup planned for Phase 2)
 _sessions: dict[str, dict] = {}
+
+_EMOTION_FIELDS = (
+    "anger", "anticipation", "disgust", "fear",
+    "joy", "sadness", "surprise", "trust",
+)
 
 
 def _get_api_key() -> str | None:
     return os.environ.get("ANTHROPIC_API_KEY")
 
 
-# ---------------------------------------------------------------------------
-# POST /api/upload
-# ---------------------------------------------------------------------------
+def _get_session(session_id: str) -> dict:
+    session = _sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SESSION & UPLOAD
+# ═══════════════════════════════════════════════════════════════════════════════
+
 
 class UploadResponse(BaseModel):
     session_id: str
     title: str
     language: str
     total_chunks: int
+    total_words: int
 
 
 @app.post("/api/upload", response_model=UploadResponse)
 async def upload_file(file: UploadFile = File(...)):
-    """Upload a text file and prepare chunks for analysis."""
+    """Upload a text file, chunk it, detect language, build vector index."""
     content = await file.read()
     title = Path(file.filename or "untitled").stem
     suffix = Path(file.filename or "file.txt").suffix.lower() or ".txt"
 
-    # Save to temp file so load_text can handle .txt/.epub/.pdf
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = Path(tmp.name)
@@ -82,22 +120,30 @@ async def upload_file(file: UploadFile = File(...)):
     book.language = lang
 
     chunks = chunk_book(book)
+    total_words = sum(c.word_count for c in chunks)
 
-    # Build FAISS vector index for RAG (graceful fallback if deps missing)
+    # Build FAISS vector index for RAG
     vector_store = None
     if SessionVectorStore is not None:
         try:
             vector_store = SessionVectorStore(chunks)
         except Exception:
-            pass  # degrade to KG-only chat
+            pass
 
     session_id = uuid.uuid4().hex[:12]
     _sessions[session_id] = {
         "title": title,
         "book": book,
         "chunks": chunks,
+        "total_words": total_words,
+        "language": lang,
         "knowledge_graph": None,
         "vector_store": vector_store,
+        "emotion_scores": None,
+        "style_scores": None,
+        "arc_pattern": None,
+        "arc_confidence": None,
+        "valence_series": None,
     }
 
     return UploadResponse(
@@ -105,31 +151,349 @@ async def upload_file(file: UploadFile = File(...)):
         title=title,
         language=lang,
         total_chunks=len(chunks),
+        total_words=total_words,
     )
 
 
-# ---------------------------------------------------------------------------
-# POST /api/extract
-# ---------------------------------------------------------------------------
+class SessionResponse(BaseModel):
+    session_id: str
+    title: str
+    language: str
+    total_chunks: int
+    total_words: int
+    has_analysis: bool
+    has_knowledge_graph: bool
+
+
+@app.get("/api/session/{session_id}", response_model=SessionResponse)
+async def get_session(session_id: str):
+    """Get session metadata and status flags."""
+    s = _get_session(session_id)
+    return SessionResponse(
+        session_id=session_id,
+        title=s["title"],
+        language=s["language"],
+        total_chunks=len(s["chunks"]),
+        total_words=s["total_words"],
+        has_analysis=s["emotion_scores"] is not None,
+        has_knowledge_graph=s["knowledge_graph"] is not None,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ANALYSIS PIPELINE (SSE)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class AnalyzeRequest(BaseModel):
+    session_id: str
+    book_type: str = "fiction"
+    ui_lang: str = "en"
+
+
+@app.post("/api/analyze")
+async def analyze(req: AnalyzeRequest):
+    """Run emotion + style + arc analysis. Returns SSE progress stream.
+
+    Final event contains the full analysis result.
+    """
+    session = _get_session(req.session_id)
+    chunks = session["chunks"]
+    lang = session["language"]
+
+    def event_stream():
+        n = len(chunks)
+
+        # Stage 1: Emotion analysis
+        yield _sse({"type": "progress", "stage": "emotion", "current": 0, "total": n})
+        lexicon = LexiconAnalyzer()
+        emotion_scores: list[EmotionScore] = []
+        for i, chunk in enumerate(chunks):
+            scores = lexicon.analyze_chunk(chunk)
+            emotion_scores.extend(scores if isinstance(scores, list) else [scores])
+            if (i + 1) % max(1, n // 10) == 0 or i == n - 1:
+                yield _sse({"type": "progress", "stage": "emotion", "current": i + 1, "total": n})
+
+        # Stage 2: Style analysis
+        yield _sse({"type": "progress", "stage": "style", "current": 0, "total": n})
+        style_analyzer = StyleAnalyzer()
+        style_scores: list[StyleScore] = []
+        for i, chunk in enumerate(chunks):
+            scores = style_analyzer.analyze_chunk(chunk)
+            style_scores.extend(scores if isinstance(scores, list) else [scores])
+            if (i + 1) % max(1, n // 10) == 0 or i == n - 1:
+                yield _sse({"type": "progress", "stage": "style", "current": i + 1, "total": n})
+
+        # Stage 3: Arc classification
+        yield _sse({"type": "progress", "stage": "arc", "current": 0, "total": 1})
+        arc_classifier = ArcClassifier()
+        arc = arc_classifier.classify(emotion_scores)
+        valence_series = (
+            arc_classifier.valence_series(emotion_scores)
+            if len(emotion_scores) >= 2
+            else []
+        )
+        yield _sse({"type": "progress", "stage": "arc", "current": 1, "total": 1})
+
+        # Stage 4: Derived insights
+        readability_score, readability_label, read_confidence = compute_readability(
+            style_scores, req.ui_lang,
+        )
+
+        dominants = Counter(
+            s.dominant_emotion for s in emotion_scores
+        ) if emotion_scores else Counter()
+        top_emotion = dominants.most_common(1)[0][0] if dominants else "joy"
+
+        verdict = build_reader_verdict(
+            arc_value=arc.value,
+            top_emotion_key=top_emotion,
+            style_scores=style_scores,
+            book_type=req.book_type,
+            ui_lang=req.ui_lang,
+        )
+
+        # Store in session for chart endpoints
+        session["emotion_scores"] = emotion_scores
+        session["style_scores"] = style_scores
+        session["arc_pattern"] = arc.value
+        session["valence_series"] = valence_series
+
+        # Build final result
+        result = {
+            "type": "done",
+            "emotion_scores": [s.model_dump() for s in emotion_scores],
+            "style_scores": [s.model_dump() for s in style_scores],
+            "arc_pattern": arc.value,
+            "dominant_emotion": top_emotion,
+            "valence_series": valence_series,
+            "readability": {
+                "score": readability_score,
+                "label": readability_label,
+                "confidence": read_confidence,
+            },
+            "reader_verdict": verdict.model_dump() if hasattr(verdict, "model_dump") else {
+                "sentence": getattr(verdict, "sentence", ""),
+                "for_you": getattr(verdict, "for_you", ""),
+                "not_for_you": getattr(verdict, "not_for_you", ""),
+                "confidence": getattr(verdict, "confidence", 0.0),
+            },
+        }
+        yield _sse(result)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# QUICK PREVIEW (LLM)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class PreviewRequest(BaseModel):
+    session_id: str
+    language: str = "en"
+    model: str = "claude-haiku-4-5"
+
+
+class PreviewResponse(BaseModel):
+    preview_text: str
+
+
+@app.post("/api/preview", response_model=PreviewResponse)
+async def preview(req: PreviewRequest):
+    """Generate a 3-sentence LLM summary from the first 5 chunks."""
+    session = _get_session(req.session_id)
+    api_key = _get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=422, detail="ANTHROPIC_API_KEY not set")
+
+    chunks = session["chunks"]
+    lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(
+        req.language, "English",
+    )
+    sample = "\n\n".join(c.text[:800] for c in chunks[:5])
+    prompt = (
+        f"Based on these opening passages of a book:\n\n{sample}\n\n"
+        f"Answer in 3 sentences, in {lang_name}:\n"
+        f"1. What is this book about?\n"
+        f"2. How does it feel to read?\n"
+        f"3. Who is it for?"
+    )
+    text = call_llm(prompt, api_key=api_key, model=req.model, max_tokens=300) or ""
+    return PreviewResponse(preview_text=text)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHART DATA ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _require_analysis(session: dict) -> tuple[list[EmotionScore], list[StyleScore]]:
+    e = session.get("emotion_scores")
+    s = session.get("style_scores")
+    if e is None or s is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Analysis not yet run. Call POST /api/analyze first.",
+        )
+    return e, s
+
+
+@app.get("/api/charts/{session_id}/emotion-overview")
+async def chart_emotion_overview(session_id: str):
+    """Average emotion scores across all chunks (radar chart data)."""
+    session = _get_session(session_id)
+    emotion_scores, _ = _require_analysis(session)
+    n = len(emotion_scores)
+    avgs = {}
+    for field in _EMOTION_FIELDS:
+        avgs[field] = sum(getattr(s, field) for s in emotion_scores) / n
+
+    dominants = Counter(s.dominant_emotion for s in emotion_scores)
+    dominant = dominants.most_common(1)[0][0] if dominants else "joy"
+    density_avg = sum(s.emotion_density for s in emotion_scores) / n
+
+    return {
+        "emotions": avgs,
+        "dominant_emotion": dominant,
+        "emotion_density_avg": round(density_avg, 4),
+    }
+
+
+@app.get("/api/charts/{session_id}/emotion-heatmap")
+async def chart_emotion_heatmap(session_id: str):
+    """Per-chunk emotion matrix for heatmap visualization."""
+    session = _get_session(session_id)
+    emotion_scores, _ = _require_analysis(session)
+    matrix = []
+    for s in emotion_scores:
+        row = [getattr(s, f) for f in _EMOTION_FIELDS]
+        matrix.append(row)
+
+    return {
+        "chunk_labels": [f"Chunk {s.chunk_index + 1}" for s in emotion_scores],
+        "emotion_labels": list(_EMOTION_FIELDS),
+        "matrix": matrix,
+    }
+
+
+@app.get("/api/charts/{session_id}/emotion-timeline")
+async def chart_emotion_timeline(session_id: str):
+    """Per-chunk emotion values for line chart (timeline view)."""
+    session = _get_session(session_id)
+    emotion_scores, _ = _require_analysis(session)
+    series: dict[str, list[float]] = {f: [] for f in _EMOTION_FIELDS}
+    indices = []
+    for s in emotion_scores:
+        indices.append(s.chunk_index)
+        for f in _EMOTION_FIELDS:
+            series[f].append(getattr(s, f))
+
+    return {"chunk_indices": indices, "series": series}
+
+
+@app.get("/api/charts/{session_id}/style-radar")
+async def chart_style_radar(session_id: str):
+    """Aggregated style metrics for radar chart."""
+    session = _get_session(session_id)
+    _, style_scores = _require_analysis(session)
+    n = len(style_scores)
+    fields = ("avg_sentence_length", "ttr", "noun_ratio", "verb_ratio", "adj_ratio", "adv_ratio")
+    metrics = {}
+    for f in fields:
+        metrics[f] = round(sum(getattr(s, f) for s in style_scores) / n, 4)
+
+    return {"metrics": metrics}
+
+
+@app.get("/api/charts/{session_id}/arc-pattern")
+async def chart_arc_pattern(session_id: str):
+    """Valence series + arc classification for arc visualization."""
+    session = _get_session(session_id)
+    emotion_scores, _ = _require_analysis(session)
+    arc_pattern = session.get("arc_pattern", "Unknown")
+    valence_series = session.get("valence_series", [])
+
+    return {
+        "arc_pattern": arc_pattern,
+        "valence_series": valence_series,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# INSIGHT ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class InsightCharactersRequest(BaseModel):
+    session_id: str
+    top_n: int = 8
+
+
+@app.post("/api/insights/characters")
+async def insight_characters(req: InsightCharactersRequest):
+    """Extract character names via NER."""
+    session = _get_session(req.session_id)
+    chunks = session["chunks"]
+    lang = session["language"]
+
+    # NER extractor (returns dict[name, chunk_indices])
+    candidates = extract_character_candidates(chunks, language=lang)
+    # Also try simpler extraction
+    names = extract_character_names(chunks, top_n=req.top_n, lang=lang)
+
+    characters = []
+    seen = set()
+    # Prefer NER candidates (have chunk indices)
+    for name, indices in sorted(candidates.items(), key=lambda x: -len(x[1])):
+        if len(characters) >= req.top_n:
+            break
+        characters.append({"name": name, "chunk_indices": indices[:20]})
+        seen.add(name)
+
+    # Fill from simpler extraction
+    for name in names:
+        if name not in seen and len(characters) < req.top_n:
+            characters.append({"name": name, "chunk_indices": []})
+
+    return {"characters": characters}
+
+
+class InsightThemesRequest(BaseModel):
+    session_id: str
+    book_type: str = "fiction"
+    top_n: int = 6
+
+
+@app.post("/api/insights/themes")
+async def insight_themes(req: InsightThemesRequest):
+    """Extract key themes (heuristic)."""
+    session = _get_session(req.session_id)
+    chunks = session["chunks"]
+    _, style_scores = _require_analysis(session)
+    themes = extract_key_themes(chunks, style_scores, top_n=req.top_n)
+    fp_density = first_person_density(chunks, lang=session["language"])
+    return {"themes": themes, "first_person_density": round(fp_density, 4)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# KNOWLEDGE GRAPH EXTRACTION (SSE)
+# ═══════════════════════════════════════════════════════════════════════════════
+
 
 class ExtractRequest(BaseModel):
     session_id: str
     model: str = "claude-haiku-4-5"
+    enrich_souls: bool = True
 
 
 @app.post("/api/extract")
 async def extract(req: ExtractRequest):
     """Extract knowledge graph from uploaded book. Returns SSE progress stream."""
-    session = _sessions.get(req.session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
-
+    session = _get_session(req.session_id)
     api_key = _get_api_key()
     if not api_key:
-        raise HTTPException(
-            status_code=422,
-            detail="请设置环境变量 ANTHROPIC_API_KEY 后重启后端",
-        )
+        raise HTTPException(status_code=422, detail="ANTHROPIC_API_KEY not set")
 
     chunks = session["chunks"]
     book = session["book"]
@@ -139,7 +503,7 @@ async def extract(req: ExtractRequest):
 
         def collect_progress(current: int, total: int):
             progress_events.append(
-                f"data: {json.dumps({'type': 'progress', 'current': current, 'total': total})}\n\n"
+                _sse({"type": "progress", "current": current, "total": total})
             )
 
         graph = extract_knowledge_graph(
@@ -149,22 +513,19 @@ async def extract(req: ExtractRequest):
             api_key=api_key,
             model=req.model,
             progress_callback=collect_progress,
+            enrich_souls=req.enrich_souls,
         )
         session["knowledge_graph"] = graph
 
-        # Yield all collected progress events
         yield from progress_events
-
-        # Final result
-        result_data = json.dumps({"type": "done", "graph": graph.model_dump()})
-        yield f"data: {result_data}\n\n"
+        yield _sse({"type": "done", "graph": graph.model_dump()})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-# ---------------------------------------------------------------------------
-# RAG context builder
-# ---------------------------------------------------------------------------
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHAT & SEARCH
+# ═══════════════════════════════════════════════════════════════════════════════
 
 _CHUNK_CHAR_LIMIT = 600
 _RAG_TOP_K = 5
@@ -172,12 +533,11 @@ _RAG_TOP_K = 5
 
 def _build_chat_context(book, graph, vector_store, message: str) -> str:
     """Build hybrid context: RAG-retrieved chunks + condensed knowledge graph."""
-    parts = [f"书名: {book.title}", f"语言: {book.language}"]
+    parts = [f"Book: {book.title}", f"Language: {book.language}"]
 
-    # Layer 1: Knowledge graph summary (condensed)
     if graph:
         if graph.overall_summary:
-            parts.append(f"\n--- 书籍概要 ---\n{graph.overall_summary}")
+            parts.append(f"\n--- Book Summary ---\n{graph.overall_summary}")
         chars_desc = []
         for c in graph.characters[:4]:
             line = c.name
@@ -185,76 +545,171 @@ def _build_chat_context(book, graph, vector_store, message: str) -> str:
                 line += f" — {c.description[:80]}"
             chars_desc.append(line)
         if chars_desc:
-            parts.append("主要人物: " + "; ".join(chars_desc))
+            parts.append("Main characters: " + "; ".join(chars_desc))
 
-    # Layer 2: RAG-retrieved chunks (primary evidence)
     if vector_store is not None:
         retrieved = vector_store.search(message, top_k=_RAG_TOP_K)
         if retrieved:
-            parts.append("\n--- 相关段落 ---")
+            parts.append("\n--- Relevant passages ---")
             for chunk_result, score in retrieved:
                 text = chunk_result.text[:_CHUNK_CHAR_LIMIT]
-                parts.append(f"[段落 {chunk_result.index + 1} (相关度: {score:.2f})]\n{text}")
+                parts.append(
+                    f"[Passage {chunk_result.index + 1} (relevance: {score:.2f})]\n{text}"
+                )
     elif graph:
-        # Fallback: chapter summaries when no vector store
         for ch in graph.chapter_summaries[:10]:
             if ch.summary:
-                parts.append(f"段落{ch.chunk_index}: {ch.summary}")
+                parts.append(f"Section {ch.chunk_index}: {ch.summary}")
 
     return "\n".join(parts)
 
-
-# ---------------------------------------------------------------------------
-# POST /api/chat/stream
-# ---------------------------------------------------------------------------
 
 class ChatRequest(BaseModel):
     session_id: str
     message: str
     model: str = "claude-haiku-4-5"
+    character_name: str | None = None
+    ui_lang: str = "en"
 
 
 @app.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest):
-    """Chat about the book using extracted knowledge. Returns SSE stream."""
-    session = _sessions.get(req.session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+    """Chat about the book using RAG. Returns SSE stream.
 
+    character_name switches to Character Persona mode.
+    """
+    session = _get_session(req.session_id)
     api_key = _get_api_key()
     if not api_key:
-        raise HTTPException(
-            status_code=422,
-            detail="请设置环境变量 ANTHROPIC_API_KEY 后重启后端",
-        )
+        raise HTTPException(status_code=422, detail="ANTHROPIC_API_KEY not set")
 
     graph: BookKnowledgeGraph | None = session.get("knowledge_graph")
     book = session["book"]
     vector_store = session.get("vector_store")
 
-    context = _build_chat_context(book, graph, vector_store, req.message)
+    lang_name = {"en": "English", "zh": "Chinese", "ja": "Japanese"}.get(
+        req.ui_lang, "English",
+    )
 
+    # Character Persona mode
+    if req.character_name and graph:
+        char = next(
+            (c for c in graph.characters if c.name == req.character_name), None,
+        )
+        if char is not None:
+            from bookscope.nlp.soul_engine import (
+                build_character_context,
+                build_persona_prompt,
+            )
+
+            system_prompt = build_persona_prompt(char, book.title, book.language)
+            char_context = build_character_context(
+                session["chunks"],
+                char.key_chapter_indices,
+                req.message,
+                max_chars=2000,
+            )
+            prompt = ""
+            if char_context:
+                prompt += f"[Story context]\n{char_context}\n\n"
+            prompt += req.message
+
+            def char_event_stream():
+                response = call_llm(
+                    prompt, api_key=api_key, model=req.model,
+                    max_tokens=800, system=system_prompt,
+                ) or ""
+                yield _sse({"type": "message", "content": response})
+                yield _sse({"type": "done"})
+
+            return StreamingResponse(
+                char_event_stream(), media_type="text/event-stream",
+            )
+
+    # Book Analyst mode (default)
+    context = _build_chat_context(book, graph, vector_store, req.message)
     prompt = (
-        f"你是一个书籍分析助手。根据以下书籍信息和相关段落回答用户问题。\n"
-        f"如果信息不足以回答，请如实说明。\n\n"
+        f"You are a book analysis assistant. Based on the book information and "
+        f"relevant passages below, answer the user's question. "
+        f"Respond in {lang_name}. "
+        f"If information is insufficient, say so honestly.\n\n"
         f"{context}\n\n"
-        f"用户问题: {req.message}"
+        f"User question: {req.message}"
     )
 
     def event_stream():
-        # For now, single-shot response (streaming will be added with Anthropic streaming API)
-        response = call_llm(prompt, api_key=api_key, model=req.model, max_tokens=800) or ""
-        data = json.dumps({"type": "message", "content": response})
-        yield f"data: {data}\n\n"
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        response = call_llm(
+            prompt, api_key=api_key, model=req.model, max_tokens=800,
+        ) or ""
+        yield _sse({"type": "message", "content": response})
+        yield _sse({"type": "done"})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-# ---------------------------------------------------------------------------
-# GET /api/health
-# ---------------------------------------------------------------------------
+class SearchRequest(BaseModel):
+    session_id: str
+    query: str
+    max_results: int = 20
+
+
+@app.post("/api/search")
+async def search(req: SearchRequest):
+    """Full-text keyword search across all chunks."""
+    session = _get_session(req.session_id)
+    chunks = session["chunks"]
+    query_lower = req.query.lower()
+    results = []
+
+    for chunk in chunks:
+        text_lower = chunk.text.lower()
+        if query_lower in text_lower:
+            # Find highlight positions
+            positions = []
+            start = 0
+            while True:
+                idx = text_lower.find(query_lower, start)
+                if idx == -1:
+                    break
+                positions.append([idx, idx + len(req.query)])
+                start = idx + 1
+
+            # Build preview (context around first match)
+            first_idx = positions[0][0] if positions else 0
+            preview_start = max(0, first_idx - 60)
+            preview_end = min(len(chunk.text), first_idx + 120)
+            preview = chunk.text[preview_start:preview_end]
+            if preview_start > 0:
+                preview = "..." + preview
+            if preview_end < len(chunk.text):
+                preview = preview + "..."
+
+            results.append({
+                "chunk_index": chunk.index,
+                "text_preview": preview,
+                "highlight_positions": positions[:10],
+                "match_count": len(positions),
+            })
+
+            if len(results) >= req.max_results:
+                break
+
+    return {"total_matches": len(results), "results": results}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HEALTH
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "3.0.0"}
+    return {"status": "ok", "version": "4.0.0"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HELPERS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _sse(data: dict) -> str:
+    """Format a dict as an SSE data line."""
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"

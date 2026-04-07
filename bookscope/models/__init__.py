@@ -5,6 +5,7 @@ from bookscope.models.schemas import (
     ChapterSummary,
     CharacterProfile,
     ChunkResult,
+    EmotionalStage,
     EmotionScore,
     ReaderVerdict,
     StyleScore,
@@ -18,6 +19,7 @@ __all__ = [
     "CharacterProfile",
     "ChunkResult",
     "EmotionScore",
+    "EmotionalStage",
     "ReaderVerdict",
     "StyleScore",
 ]

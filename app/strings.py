@@ -226,6 +226,15 @@ _STRINGS: dict[str, dict] = {
         "qi_rel_graph_label": "CHARACTER RELATIONSHIPS",
         "qi_rel_graph_caption": "Based on first {n} chapter(s)",
         "qi_rel_graph_spinner": "Mapping character relationships\u2026",
+        # Soul cards
+        "qi_soul_label": "CHARACTER SOULS",
+        "qi_soul_talk_btn": "Talk to {name}",
+        # Chat dual-mode
+        "chat_mode_analyst": "Book Analyst",
+        "chat_mode_label": "Chat with",
+        "chat_char_placeholder": "Ask {name} a question...",
+        "chat_char_suggest_1": "What is your greatest regret?",
+        "chat_char_suggest_2": "What drives you forward?",
         # Writer mode pacing
         "draft_diag_pacing_label": "PACING ALERTS",
         "draft_diag_flatline": (
@@ -557,6 +566,15 @@ _STRINGS: dict[str, dict] = {
         "qi_rel_graph_label": "人物关系图",
         "qi_rel_graph_caption": "基于前 {n} 章",
         "qi_rel_graph_spinner": "分析人物关系\u2026",
+        # Soul cards
+        "qi_soul_label": "人物灵魂",
+        "qi_soul_talk_btn": "与{name}对话",
+        # Chat dual-mode
+        "chat_mode_analyst": "书籍分析师",
+        "chat_mode_label": "聊天对象",
+        "chat_char_placeholder": "向{name}提问……",
+        "chat_char_suggest_1": "你最大的遗憾是什么？",
+        "chat_char_suggest_2": "你的人生信条是什么？",
         # Writer mode pacing
         "draft_diag_pacing_label": "节奏预警",
         "draft_diag_flatline": (
@@ -880,6 +898,15 @@ _STRINGS: dict[str, dict] = {
         "qi_rel_graph_label": "登場人物の関係図",
         "qi_rel_graph_caption": "最初の {n} 章に基づく",
         "qi_rel_graph_spinner": "登場人物の関係を分析中\u2026",
+        # Soul cards
+        "qi_soul_label": "キャラクターソウル",
+        "qi_soul_talk_btn": "{name}と話す",
+        # Chat dual-mode
+        "chat_mode_analyst": "ブックアナリスト",
+        "chat_mode_label": "チャット相手",
+        "chat_char_placeholder": "{name}に質問する…",
+        "chat_char_suggest_1": "あなたの最大の後悔は何ですか？",
+        "chat_char_suggest_2": "あなたを突き動かすものは何ですか？",
         # Writer mode pacing
         "draft_diag_pacing_label": "ペーシングアラート",
         "draft_diag_flatline": (
