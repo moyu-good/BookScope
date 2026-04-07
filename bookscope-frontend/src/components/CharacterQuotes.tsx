@@ -8,10 +8,10 @@ export default function CharacterQuotes({ quotes }: CharacterQuotesProps) {
   if (quotes.length === 0) return null;
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
+    <div className="ink-card bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <Quote className="w-4 h-4 text-[var(--accent)]" />
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+        <h2 className="text-xl text-[var(--accent)]">
           经典语录
         </h2>
       </div>

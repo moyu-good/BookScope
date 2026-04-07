@@ -131,8 +131,9 @@ export default function BookLayout() {
           <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
             {/* Left: branding + title */}
             <div className="flex items-center gap-3 min-w-0">
-              <BookOpen className="w-5 h-5 text-[var(--accent)] shrink-0" />
-              <h1 className="text-sm font-semibold truncate">{title}</h1>
+              <span className="text-lg text-[var(--accent)] shrink-0" style={{ fontFamily: "var(--font-display)" }}>书鉴</span>
+              <span className="text-xs text-[var(--border)]">|</span>
+              <h1 className="text-base truncate text-[var(--text)]" style={{ fontFamily: "var(--font-display)", letterSpacing: "0.08em" }}>{title}</h1>
               {isExtracting && (
                 <span className="shrink-0 ml-2 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider bg-[var(--accent)]/15 text-[var(--accent)] rounded-full">
                   提取中

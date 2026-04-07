@@ -95,7 +95,7 @@ export default function CharacterChat({
       {/* Header */}
       <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border)]">
         <MessageCircle className="w-4 h-4 text-[var(--accent)]" />
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+        <h2 className="text-xl text-[var(--accent)]">
           与{characterName}对话
         </h2>
       </div>

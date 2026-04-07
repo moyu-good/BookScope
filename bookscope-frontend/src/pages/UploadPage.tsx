@@ -78,13 +78,19 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-svh flex flex-col items-center justify-center px-4 py-12">
-      {/* Branding */}
-      <div className="flex items-center gap-3 mb-2">
-        <BookOpen className="w-8 h-8 text-[var(--accent)]" />
-        <h1 className="text-3xl font-bold tracking-tight">BookScope</h1>
-      </div>
-      <p className="text-[var(--text-secondary)] mb-10 text-center max-w-md">
-        多维度书籍分析 — 上传文本，探索情感脉络、人物群像与叙事弧线。
+      {/* Branding — 中文为主，英文从属 */}
+      <h1 className="text-7xl sm:text-8xl mb-3 text-[var(--accent)]" style={{ fontFamily: "var(--font-display)" }}>
+        书鉴
+      </h1>
+      <p className="text-xl sm:text-2xl mb-1 text-[var(--text)]" style={{ fontFamily: "var(--font-display)", letterSpacing: "0.2em" }}>
+        解 构 每 一 本 书
+      </p>
+      <p className="text-xs tracking-[0.35em] text-[var(--text-secondary)] mb-2" style={{ fontFamily: "var(--font-mono)" }}>
+        BOOKSCOPE
+      </p>
+      <div className="ink-divider w-48 mb-6" />
+      <p className="text-[var(--text-secondary)] mb-10 text-center max-w-md text-sm leading-relaxed">
+        上传文本，探索情感脉络、人物群像与叙事弧线
       </p>
 
       {/* Upload card */}

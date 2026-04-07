@@ -1,24 +1,43 @@
 @import "tailwindcss";
 
+/* ================================================================
+   BookScope  ·  "墨韵" (Ink Resonance) Theme
+   ──────────────────────────────────────────
+   Calligraphy headings (Ma Shan Zheng / Zhi Mang Xing)
+   Literary serif body (Noto Serif SC)
+   Deep ink background with warm amber accents
+================================================================ */
+
 :root {
-  --bg: #0a0a0f;
-  --surface: #12121a;
-  --surface-hover: #1a1a25;
-  --border: #2a2a3a;
-  --text: #e8e8ed;
-  --text-secondary: #8888a0;
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
+  /* Surfaces */
+  --bg: #0c0b10;
+  --surface: #141318;
+  --surface-hover: #1c1a22;
+  --border: #2a2738;
+
+  /* Text */
+  --text: #ece8e1;
+  --text-secondary: #9a9486;
+
+  /* Accent — warm amber/gold (墨金) */
+  --accent: #c8941a;
+  --accent-hover: #daa832;
+  --accent-subtle: rgba(200, 148, 26, 0.12);
 
   /* Emotion palette */
-  --joy: #f59e0b;
-  --sadness: #3b82f6;
-  --anger: #ef4444;
-  --fear: #8b5cf6;
-  --trust: #10b981;
-  --anticipation: #f97316;
-  --surprise: #ec4899;
-  --disgust: #6b7280;
+  --joy: #e8b84b;
+  --sadness: #5b8fd4;
+  --anger: #d4503a;
+  --fear: #8b6cc6;
+  --trust: #4db88a;
+  --anticipation: #d47b2e;
+  --surprise: #c75a8a;
+  --disgust: #7a7568;
+
+  /* Typography */
+  --font-display: "Ma Shan Zheng", "Zhi Mang Xing", cursive;
+  --font-body: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-mono: "Courier New", monospace;
 }
 
 * { box-sizing: border-box; }
@@ -27,12 +46,67 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  line-height: 1.7;
 }
 
 #root { min-height: 100svh; }
 
+/* ── Calligraphy headings ────────────────────────── */
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+}
+
+/* ── Scrollbar ───────────────────────────────────── */
+
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Ink decorative elements ─────────────────────── */
+
+.ink-heading {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.ink-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border) 20%,
+    var(--accent) 50%,
+    var(--border) 80%,
+    transparent 100%
+  );
+}
+
+/* ── Section card subtle ink wash edge ───────────── */
+
+.ink-card {
+  position: relative;
+  overflow: hidden;
+}
+.ink-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 30%,
+    var(--accent) 70%,
+    transparent 100%
+  );
+  opacity: 0.5;
+}

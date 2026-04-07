@@ -54,7 +54,7 @@ export default function LibraryPage() {
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Library className="w-5 h-5 text-[var(--accent)]" />
-            <h1 className="text-sm font-semibold">书库</h1>
+            <h1 className="text-xl text-[var(--accent)]">书库</h1>
           </div>
           <button
             onClick={() => navigate("/")}

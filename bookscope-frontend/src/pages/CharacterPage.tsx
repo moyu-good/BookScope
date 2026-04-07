@@ -102,10 +102,10 @@ export default function CharacterPage() {
       </button>
 
       {/* Character header */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-6">
+      <div className="ink-card bg-[var(--surface)] border border-[var(--border)] rounded-xl p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-[var(--text)] mb-1">
+            <h1 className="text-3xl text-[var(--text)] mb-1">
               {character.name}
             </h1>
             {character.aliases.length > 0 && (

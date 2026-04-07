@@ -7,10 +7,10 @@ interface SoulProfileCardProps {
 
 export default function SoulProfileCard({ character }: SoulProfileCardProps) {
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 space-y-5">
+    <div className="ink-card bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 space-y-5">
       <div className="flex items-center gap-2">
         <Brain className="w-4 h-4 text-[var(--accent)]" />
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+        <h2 className="text-xl text-[var(--accent)]">
           灵魂档案
         </h2>
       </div>

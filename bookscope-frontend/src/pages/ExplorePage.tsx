@@ -24,7 +24,7 @@ export default function ExplorePage() {
           onClick={() => setShowAdvanced((v) => !v)}
           className="w-full px-5 py-3 flex items-center justify-between text-left hover:bg-[var(--surface-hover)] transition-colors duration-200"
         >
-          <span className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+          <span className="text-xl text-[var(--accent)]" style={{ fontFamily: "var(--font-display)" }}>
             高级分析
           </span>
           {showAdvanced ? (

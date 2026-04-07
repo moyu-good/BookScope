@@ -9,8 +9,8 @@ export default function VerdictCard({ verdict }: VerdictCardProps) {
   const lowConfidence = verdict.confidence < 0.3;
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 border-l-4 border-l-[var(--accent)]">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-3">
+    <div className="ink-card bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 border-l-4 border-l-[var(--accent)]">
+      <h2 className="text-xl text-[var(--accent)] mb-3">
         读者判断
       </h2>
 

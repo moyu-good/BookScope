@@ -46,7 +46,7 @@ export default function SearchPanel({ sessionId }: SearchPanelProps) {
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border)]">
         <Search className="w-4 h-4 text-[var(--accent)]" />
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+        <h2 className="text-xl text-[var(--accent)]">
           全文搜索
         </h2>
       </div>

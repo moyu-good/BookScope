@@ -24,9 +24,9 @@ export default function ArcChart({ valenceSeries, arcPattern }: ArcChartProps) {
   );
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
+    <div className="ink-card bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+        <h2 className="text-xl text-[var(--accent)]">
           叙事弧线
         </h2>
         {arcPattern && (

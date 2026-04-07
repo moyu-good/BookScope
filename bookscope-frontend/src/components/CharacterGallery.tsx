@@ -14,11 +14,11 @@ export default function CharacterGallery({
   const navigate = useNavigate();
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
+    <div className="ink-card bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <Users className="w-4 h-4 text-[var(--accent)]" />
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-          人物
+        <h2 className="text-xl text-[var(--accent)]">
+          人物群像
         </h2>
       </div>
 
