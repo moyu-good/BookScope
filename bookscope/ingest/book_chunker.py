@@ -43,8 +43,9 @@ _CHAPTER_RE = re.compile(
     re.MULTILINE,
 )
 
-# Chinese sentence-ending punctuation for splitting
-_CN_SENT_END = re.compile(r"(?<=[。！？；\n])")
+# Chinese sentence-ending / clause-ending punctuation for splitting
+# Includes full stops, exclamation, question, semicolons, colons, ellipsis, commas
+_CN_SENT_END = re.compile(r"(?<=[。！？；：…\u2026，、\n])")
 
 
 # ---------------------------------------------------------------------------

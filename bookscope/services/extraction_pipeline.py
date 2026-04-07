@@ -47,11 +47,21 @@ def run_extraction(
 
             n = len(chunks)
 
-            # Emotion analysis
-            lex = LexiconAnalyzer(language=lang)
+            # Emotion analysis — try Transformer first, fall back to Lexicon
+            analyzer = None
+            try:
+                from bookscope.nlp.transformer_analyzer import TransformerAnalyzer
+                analyzer = TransformerAnalyzer(language=lang)
+                # Test model loading
+                analyzer._get_classifier()
+                logger.info("Using TransformerAnalyzer for emotion analysis")
+            except Exception as e:
+                logger.warning("TransformerAnalyzer unavailable (%s), falling back to LexiconAnalyzer", e)
+                analyzer = LexiconAnalyzer(language=lang)
+
             emotion_scores = []
             for i, chunk in enumerate(chunks):
-                score = lex.analyze_chunk(chunk)
+                score = analyzer.analyze_chunk(chunk)
                 emotion_scores.append(score)
                 if (i + 1) % max(1, n // 10) == 0 or i == n - 1:
                     q.put({"type": "progress", "stage": "emotion",
