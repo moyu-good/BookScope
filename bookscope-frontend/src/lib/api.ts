@@ -215,6 +215,21 @@ export async function getSession(
   return res.json();
 }
 
+export interface SessionAnalysis extends AnalysisResult {
+  title: string;
+  language: string;
+  book_type: string;
+  has_knowledge_graph: boolean;
+}
+
+export async function fetchSessionAnalysis(
+  sessionId: string
+): Promise<SessionAnalysis> {
+  const res = await fetch(`${BASE}/session/${sessionId}/analysis`);
+  if (!res.ok) throw new Error(`No analysis: ${res.status}`);
+  return res.json();
+}
+
 // ── Analysis (SSE) ───────────────────────────────────────────────────────────
 
 export function analyzeSSE(
@@ -488,6 +503,53 @@ export function soulEnrichSSE(
   return controller;
 }
 
+export function kgExtractSSE(
+  sessionId: string,
+  onProgress: (current: number, total: number) => void,
+  onDone: () => void,
+  onError: (err: Error) => void
+): AbortController {
+  const controller = new AbortController();
+
+  fetch(`${BASE}/extract`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+    signal: controller.signal,
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`KG extract failed: ${res.status}`);
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === "progress") onProgress(data.current ?? 0, data.total ?? 0);
+            else if (data.type === "done") onDone();
+          } catch {
+            // skip
+          }
+        }
+      }
+    })
+    .catch((err) => {
+      if (err.name !== "AbortError") onError(err);
+    });
+
+  return controller;
+}
+
 export async function fetchBookClubPack(
   sessionId: string,
   bookType: string,
@@ -550,6 +612,14 @@ export async function deleteFromLibrary(filename: string): Promise<void> {
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 }
 
+export async function fetchLibraryAnalysis(
+  filename: string
+): Promise<SessionAnalysis> {
+  const res = await fetch(`${BASE}/library/${filename}/analysis`);
+  if (!res.ok) throw new Error(`Library item not found: ${res.status}`);
+  return res.json();
+}
+
 // ── Share ────────────────────────────────────────────────────────────────────
 
 export async function createShareLink(
@@ -561,6 +631,14 @@ export async function createShareLink(
     body: JSON.stringify({ session_id: sessionId }),
   });
   if (!res.ok) throw new Error(`Share failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchShareAnalysis(
+  token: string
+): Promise<SessionAnalysis> {
+  const res = await fetch(`${BASE}/share/${token}/analysis`);
+  if (!res.ok) throw new Error(`Share not found: ${res.status}`);
   return res.json();
 }
 

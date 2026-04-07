@@ -1,13 +1,25 @@
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload, BookOpen } from "lucide-react";
+import { Upload, BookOpen, ChevronDown } from "lucide-react";
 import { uploadFile } from "../lib/api";
+
+const BOOK_TYPES = [
+  { value: "fiction", label: "Fiction" },
+  { value: "non-fiction", label: "Non-Fiction" },
+  { value: "poetry", label: "Poetry" },
+  { value: "drama", label: "Drama" },
+  { value: "academic", label: "Academic" },
+  { value: "biography", label: "Biography" },
+  { value: "children", label: "Children's" },
+  { value: "philosophy", label: "Philosophy" },
+] as const;
 
 export default function UploadPage() {
   const navigate = useNavigate();
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bookType, setBookType] = useState("fiction");
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -16,7 +28,13 @@ export default function UploadPage() {
       try {
         const res = await uploadFile(file);
         navigate(`/analyze/${res.session_id}`, {
-          state: { title: res.title, language: res.language, total_chunks: res.total_chunks, total_words: res.total_words },
+          state: {
+            title: res.title,
+            language: res.language,
+            total_chunks: res.total_chunks,
+            total_words: res.total_words,
+            bookType,
+          },
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Upload failed");
@@ -24,7 +42,7 @@ export default function UploadPage() {
         setUploading(false);
       }
     },
-    [navigate]
+    [navigate, bookType],
   );
 
   const onDrop = useCallback(
@@ -34,7 +52,7 @@ export default function UploadPage() {
       const file = e.dataTransfer.files[0];
       if (file) handleFile(file);
     },
-    [handleFile]
+    [handleFile],
   );
 
   const onFileInput = useCallback(
@@ -42,7 +60,7 @@ export default function UploadPage() {
       const file = e.target.files?.[0];
       if (file) handleFile(file);
     },
-    [handleFile]
+    [handleFile],
   );
 
   return (
@@ -57,6 +75,24 @@ export default function UploadPage() {
           <p className="text-[var(--bs-text-muted)] text-lg">
             Upload a book. Understand what it says, how it feels, and who lives in it.
           </p>
+        </div>
+
+        {/* Book Type Selector */}
+        <div className="mb-6 flex justify-center">
+          <div className="relative">
+            <select
+              value={bookType}
+              onChange={(e) => setBookType(e.target.value)}
+              className="appearance-none bg-[var(--bs-surface)] border border-[var(--bs-border)]
+                         rounded-xl px-4 py-2.5 pr-10 text-sm text-[var(--bs-text)]
+                         focus:border-[var(--bs-accent)] outline-none transition-colors cursor-pointer"
+            >
+              {BOOK_TYPES.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--bs-text-muted)] pointer-events-none" />
+          </div>
         </div>
 
         {/* Drop Zone */}

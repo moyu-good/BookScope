@@ -13,7 +13,12 @@ export default function AnalyzePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const meta = location.state as { title?: string; total_chunks?: number; bookType?: string } | null;
+  const meta = location.state as {
+    title?: string;
+    language?: string;
+    total_chunks?: number;
+    bookType?: string;
+  } | null;
 
   const [stage, setStage] = useState("emotion");
   const [current, setCurrent] = useState(0);
@@ -21,31 +26,38 @@ export default function AnalyzePage() {
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
+  const bookType = meta?.bookType ?? "fiction";
+  const language = meta?.language ?? "en";
+
   useEffect(() => {
     if (!sessionId) return;
 
     controllerRef.current = analyzeSSE(
       sessionId,
-      "fiction", // default; can be extended later
-      "en",
+      bookType,
+      language,
       (progress: AnalysisProgress) => {
         setStage(progress.stage);
         setCurrent(progress.current);
         setTotal(progress.total);
       },
       (_result: AnalysisResult) => {
-        // Navigate to results with the analysis data
         navigate(`/book/${sessionId}`, {
-          state: { analysis: _result, title: meta?.title, bookType: meta?.bookType ?? "fiction" },
+          state: {
+            analysis: _result,
+            title: meta?.title,
+            bookType,
+            language,
+          },
         });
       },
-      (err: Error) => setError(err.message)
+      (err: Error) => setError(err.message),
     );
 
     return () => {
       controllerRef.current?.abort();
     };
-  }, [sessionId, navigate, meta?.title]);
+  }, [sessionId, navigate, meta?.title, bookType, language]);
 
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
   const stageLabel = STAGE_LABELS[stage] || stage;

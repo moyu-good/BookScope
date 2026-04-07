@@ -69,8 +69,9 @@ export default function LibraryPage() {
             {items.map((item) => (
               <div
                 key={item.filename}
+                onClick={() => navigate(`/book/lib:${item.filename}`)}
                 className="bg-[var(--bs-surface)] border border-[var(--bs-border)] rounded-2xl p-5
-                           hover:border-[var(--bs-accent)]/30 transition-colors group"
+                           hover:border-[var(--bs-accent)]/30 transition-colors group cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="font-medium text-[var(--bs-text)] line-clamp-2 pr-2">

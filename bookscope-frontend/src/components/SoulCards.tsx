@@ -1,19 +1,23 @@
 import { useState, useEffect, useRef } from "react";
-import { Users, Brain, Quote, Heart, ChevronDown, ChevronUp } from "lucide-react";
-import { soulEnrichSSE, type SoulCharacter } from "../lib/api";
+import { Users, Brain, Quote, Heart, ChevronDown, ChevronUp, Sparkles, Loader2 } from "lucide-react";
+import { soulEnrichSSE, kgExtractSSE, type SoulCharacter } from "../lib/api";
 
 interface SoulCardsProps {
   sessionId: string;
   hasKnowledgeGraph: boolean;
+  onKGReady?: () => void;
 }
 
-export default function SoulCards({ sessionId, hasKnowledgeGraph }: SoulCardsProps) {
+export default function SoulCards({ sessionId, hasKnowledgeGraph, onKGReady }: SoulCardsProps) {
   const [characters, setCharacters] = useState<SoulCharacter[]>([]);
   const [loading, setLoading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractProgress, setExtractProgress] = useState({ current: 0, total: 0 });
   const [progress, setProgress] = useState({ current: 0, total: 0, name: "" });
   const [error, setError] = useState("");
   const controllerRef = useRef<AbortController | null>(null);
 
+  // Auto-trigger soul enrichment when KG becomes available
   useEffect(() => {
     if (!hasKnowledgeGraph) return;
     setLoading(true);
@@ -39,13 +43,56 @@ export default function SoulCards({ sessionId, hasKnowledgeGraph }: SoulCardsPro
     return () => controllerRef.current?.abort();
   }, [sessionId, hasKnowledgeGraph]);
 
+  const handleExtract = () => {
+    setExtracting(true);
+    setError("");
+    controllerRef.current = kgExtractSSE(
+      sessionId,
+      (current, total) => setExtractProgress({ current, total }),
+      () => {
+        setExtracting(false);
+        onKGReady?.();
+      },
+      (err) => {
+        setExtracting(false);
+        setError(err.message);
+      },
+    );
+  };
+
+  if (extracting) {
+    return (
+      <div className="bg-[var(--bs-surface)] border border-[var(--bs-border)] rounded-2xl p-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Users className="w-4 h-4 text-violet-500" strokeWidth={1.5} />
+          <h3 className="text-sm font-semibold tracking-wide uppercase text-[var(--bs-text-muted)]">
+            Knowledge Graph
+          </h3>
+        </div>
+        <div className="flex items-center gap-3 text-sm text-[var(--bs-text-muted)]">
+          <Loader2 className="w-4 h-4 text-violet-500 animate-spin" />
+          Extracting knowledge graph... ({extractProgress.current}/{extractProgress.total})
+        </div>
+      </div>
+    );
+  }
+
   if (!hasKnowledgeGraph) {
     return (
       <div className="bg-[var(--bs-surface)] border border-[var(--bs-border)] rounded-2xl p-6 text-center">
-        <Users className="mx-auto w-8 h-8 mb-2 text-[var(--bs-text-muted)] opacity-40" />
-        <p className="text-sm text-[var(--bs-text-muted)]">
-          Extract knowledge graph first to see character souls
+        <Users className="mx-auto w-8 h-8 mb-3 text-[var(--bs-text-muted)] opacity-40" />
+        <p className="text-sm text-[var(--bs-text-muted)] mb-4">
+          Extract knowledge graph to unlock character soul profiles
         </p>
+        <button
+          onClick={handleExtract}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm
+                     bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors"
+        >
+          <Sparkles className="w-4 h-4" />
+          Extract Knowledge Graph
+        </button>
+        {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
       </div>
     );
   }

@@ -9,29 +9,51 @@ interface Message {
 
 interface ChatPanelProps {
   sessionId: string;
+  uiLang?: string;
+  history?: Message[];
+  onHistoryChange?: (msgs: Message[]) => void;
 }
 
-export default function ChatPanel({ sessionId }: ChatPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function ChatPanel({
+  sessionId,
+  uiLang = "en",
+  history,
+  onHistoryChange,
+}: ChatPanelProps) {
+  const [localMsgs, setLocalMsgs] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Controlled (parent owns state) or uncontrolled (local state)
+  const messages = history ?? localMsgs;
+
+  const updateMessages = useCallback(
+    (updater: (prev: Message[]) => Message[]) => {
+      if (onHistoryChange) {
+        onHistoryChange(updater(history ?? []));
+      } else {
+        setLocalMsgs(updater);
+      }
+    },
+    [history, onHistoryChange],
+  );
 
   const send = useCallback(() => {
     const q = input.trim();
     if (!q || loading) return;
 
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: q }]);
+    updateMessages((prev) => [...prev, { role: "user", content: q }]);
     setLoading(true);
 
     controllerRef.current = chatSSE(
       sessionId,
       q,
-      "en",
+      uiLang,
       (content) => {
-        setMessages((prev) => {
+        updateMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant") {
             return [...prev.slice(0, -1), { role: "assistant", content: last.content + content }];
@@ -42,14 +64,14 @@ export default function ChatPanel({ sessionId }: ChatPanelProps) {
       },
       () => setLoading(false),
       (err) => {
-        setMessages((prev) => [
+        updateMessages((prev) => [
           ...prev,
           { role: "assistant", content: `Error: ${err.message}` },
         ]);
         setLoading(false);
-      }
+      },
     );
-  }, [sessionId, input, loading]);
+  }, [sessionId, input, loading, uiLang, updateMessages]);
 
   return (
     <div className="bg-[var(--bs-surface)] rounded-2xl border border-[var(--bs-border)] flex flex-col h-[600px]">

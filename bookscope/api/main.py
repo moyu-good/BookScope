@@ -180,6 +180,62 @@ async def get_session(session_id: str):
     )
 
 
+@app.get("/api/session/{session_id}/analysis")
+async def get_session_analysis(session_id: str):
+    """Return cached analysis result (same shape as SSE done event).
+
+    Used by the frontend to recover state after a page refresh.
+    Returns 409 if analysis hasn't been run yet.
+    """
+    session = _get_session(session_id)
+    emotion_scores, style_scores = _require_analysis(session)
+
+    dominants = Counter(
+        s.dominant_emotion for s in emotion_scores
+    ) if emotion_scores else Counter()
+    top_emotion = dominants.most_common(1)[0][0] if dominants else "joy"
+
+    # Reconstruct readability + verdict from cached data
+    book_type = session.get("book_type", "fiction")
+    ui_lang = session.get("ui_lang", "en")
+
+    readability_score, readability_label, read_confidence = compute_readability(
+        style_scores, ui_lang,
+    )
+    verdict = build_reader_verdict(
+        arc_value=session.get("arc_pattern", "Unknown"),
+        top_emotion_key=top_emotion,
+        style_scores=style_scores,
+        book_type=book_type,
+        ui_lang=ui_lang,
+    )
+
+    return {
+        "type": "done",
+        "emotion_scores": [s.model_dump() for s in emotion_scores],
+        "style_scores": [s.model_dump() for s in style_scores],
+        "arc_pattern": session.get("arc_pattern", "Unknown"),
+        "dominant_emotion": top_emotion,
+        "valence_series": session.get("valence_series", []),
+        "readability": {
+            "score": readability_score,
+            "label": readability_label,
+            "confidence": read_confidence,
+        },
+        "reader_verdict": verdict.model_dump() if hasattr(verdict, "model_dump") else {
+            "sentence": getattr(verdict, "sentence", ""),
+            "for_you": getattr(verdict, "for_you", ""),
+            "not_for_you": getattr(verdict, "not_for_you", ""),
+            "confidence": getattr(verdict, "confidence", 0.0),
+        },
+        # Extra metadata for frontend recovery
+        "title": session["title"],
+        "language": session["language"],
+        "book_type": book_type,
+        "has_knowledge_graph": session.get("knowledge_graph") is not None,
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # ANALYSIS PIPELINE (SSE)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -253,11 +309,13 @@ async def analyze(req: AnalyzeRequest):
             ui_lang=req.ui_lang,
         )
 
-        # Store in session for chart endpoints
+        # Store in session for chart endpoints + refresh recovery
         session["emotion_scores"] = emotion_scores
         session["style_scores"] = style_scores
         session["arc_pattern"] = arc.value
         session["valence_series"] = valence_series
+        session["book_type"] = req.book_type
+        session["ui_lang"] = req.ui_lang
 
         # Build final result
         result = {
@@ -1015,6 +1073,70 @@ async def library_delete(filename: str):
     return {"deleted": True}
 
 
+@app.get("/api/library/{filename}/analysis")
+async def library_analysis(filename: str):
+    """Return a library item in the same shape as GET /api/session/{id}/analysis.
+
+    Recomputes derived fields (readability, verdict, valence) from stored scores.
+    """
+    paths = _repo.list_results()
+    match = next((p for p in paths if p.name == filename), None)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Analysis not found in library")
+    result = _repo.load(match)
+
+    emotion_scores = result.emotion_scores
+    style_scores = result.style_scores
+
+    dominants = Counter(
+        s.dominant_emotion for s in emotion_scores
+    ) if emotion_scores else Counter()
+    top_emotion = dominants.most_common(1)[0][0] if dominants else "joy"
+
+    lang = result.detected_lang or "en"
+    readability_score, readability_label, read_confidence = compute_readability(
+        style_scores, lang,
+    )
+    verdict = build_reader_verdict(
+        arc_value=result.arc_pattern,
+        top_emotion_key=top_emotion,
+        style_scores=style_scores,
+        book_type="fiction",
+        ui_lang=lang,
+    )
+
+    # Recompute valence series: positive - negative per chunk
+    valence_series = []
+    for s in sorted(emotion_scores, key=lambda x: x.chunk_index):
+        pos = s.joy + s.anticipation + s.trust
+        neg = s.anger + s.fear + s.sadness + s.disgust
+        valence_series.append(round(pos - neg, 4))
+
+    return {
+        "type": "done",
+        "emotion_scores": [s.model_dump() for s in emotion_scores],
+        "style_scores": [s.model_dump() for s in style_scores],
+        "arc_pattern": result.arc_pattern,
+        "dominant_emotion": top_emotion,
+        "valence_series": valence_series,
+        "readability": {
+            "score": readability_score,
+            "label": readability_label,
+            "confidence": read_confidence,
+        },
+        "reader_verdict": verdict.model_dump() if hasattr(verdict, "model_dump") else {
+            "sentence": getattr(verdict, "sentence", ""),
+            "for_you": getattr(verdict, "for_you", ""),
+            "not_for_you": getattr(verdict, "not_for_you", ""),
+            "confidence": getattr(verdict, "confidence", 0.0),
+        },
+        "title": result.book_title,
+        "language": lang,
+        "book_type": "fiction",
+        "has_knowledge_graph": result.knowledge_graph is not None,
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SHARE (Phase 3 — shareable link via short token)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1057,6 +1179,65 @@ async def share_get(token: str):
         raise HTTPException(status_code=404, detail="Share link expired or not found")
     result = _repo.load(path)
     return {"analysis": result.model_dump()}
+
+
+@app.get("/api/share/{token}/analysis")
+async def share_analysis(token: str):
+    """Return shared analysis in the same shape as session analysis endpoint."""
+    path = _share_tokens.get(token)
+    if path is None or not path.exists():
+        raise HTTPException(status_code=404, detail="Share link expired or not found")
+    result = _repo.load(path)
+
+    emotion_scores = result.emotion_scores
+    style_scores = result.style_scores
+
+    dominants = Counter(
+        s.dominant_emotion for s in emotion_scores
+    ) if emotion_scores else Counter()
+    top_emotion = dominants.most_common(1)[0][0] if dominants else "joy"
+
+    lang = result.detected_lang or "en"
+    readability_score, readability_label, read_confidence = compute_readability(
+        style_scores, lang,
+    )
+    verdict = build_reader_verdict(
+        arc_value=result.arc_pattern,
+        top_emotion_key=top_emotion,
+        style_scores=style_scores,
+        book_type="fiction",
+        ui_lang=lang,
+    )
+
+    valence_series = []
+    for s in sorted(emotion_scores, key=lambda x: x.chunk_index):
+        pos = s.joy + s.anticipation + s.trust
+        neg = s.anger + s.fear + s.sadness + s.disgust
+        valence_series.append(round(pos - neg, 4))
+
+    return {
+        "type": "done",
+        "emotion_scores": [s.model_dump() for s in emotion_scores],
+        "style_scores": [s.model_dump() for s in style_scores],
+        "arc_pattern": result.arc_pattern,
+        "dominant_emotion": top_emotion,
+        "valence_series": valence_series,
+        "readability": {
+            "score": readability_score,
+            "label": readability_label,
+            "confidence": read_confidence,
+        },
+        "reader_verdict": verdict.model_dump() if hasattr(verdict, "model_dump") else {
+            "sentence": getattr(verdict, "sentence", ""),
+            "for_you": getattr(verdict, "for_you", ""),
+            "not_for_you": getattr(verdict, "not_for_you", ""),
+            "confidence": getattr(verdict, "confidence", 0.0),
+        },
+        "title": result.book_title,
+        "language": lang,
+        "book_type": "fiction",
+        "has_knowledge_graph": result.knowledge_graph is not None,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
