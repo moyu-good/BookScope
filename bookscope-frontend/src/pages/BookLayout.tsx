@@ -5,18 +5,15 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Library,
   Plus,
   Save,
   Settings,
-  MessageCircle,
 } from "lucide-react";
-import clsx from "clsx";
 import { fetchSessionStatus, fetchOverview, startExtraction, saveToLibrary } from "../lib/api";
 import type { SSEEvent, SessionStatus, CharacterBrief } from "../lib/types";
-import ChatDrawer from "../components/ChatDrawer";
 
 /* ------------------------------------------------------------------ */
 /*  Extraction context — shared with child pages                      */
@@ -48,6 +45,7 @@ export default function BookLayout() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const locationState = location.state as
     | { bookType?: string; uiLang?: string; title?: string }
     | undefined;
@@ -57,7 +55,6 @@ export default function BookLayout() {
   const extractionStartedRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
 
   // Poll session status
   const { data: sessionStatus } = useQuery({
@@ -90,6 +87,15 @@ export default function BookLayout() {
     const sse = startExtraction(sessionId);
     sse.onEvent((event) => {
       setSSEEvents((prev) => [...prev, event]);
+      // Immediately refetch overview when a tier completes
+      if (
+        event.type === "tier1_ready" ||
+        event.type === "analysis_ready" ||
+        event.type === "kg_ready"
+      ) {
+        queryClient.invalidateQueries({ queryKey: ["overview", sessionId] });
+        queryClient.invalidateQueries({ queryKey: ["session-status", sessionId] });
+      }
     });
     sse.onError((err) => {
       setSSEEvents((prev) => [
@@ -222,29 +228,7 @@ export default function BookLayout() {
           <Outlet />
         </main>
 
-        {/* Floating chat button */}
-        <button
-          onClick={() => setChatOpen(true)}
-          className={clsx(
-            "fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full shadow-lg transition-all duration-300",
-            "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] hover:scale-105",
-            "active:scale-95",
-            chatOpen && "opacity-0 pointer-events-none",
-          )}
-        >
-          <MessageCircle className="w-5 h-5" />
-          <span className="text-sm font-medium hidden sm:inline">问书</span>
-        </button>
-
-        {/* Chat drawer */}
-        {sessionId && (
-          <ChatDrawer
-            open={chatOpen}
-            onClose={() => setChatOpen(false)}
-            sessionId={sessionId}
-            characters={characters}
-          />
-        )}
+        {/* Chat is now handled by ImperialBrush inside OverviewPage */}
       </div>
     </ExtractionContext.Provider>
   );

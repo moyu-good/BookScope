@@ -11,51 +11,63 @@ interface Stage {
   key: string;
   label: string;
   done: boolean;
+  progress?: string;
 }
 
 export default function ExtractionProgress({
   events,
 }: ExtractionProgressProps) {
   const stages = useMemo<Stage[]>(() => {
-    const completedTypes = new Set(
-      events
-        .filter(
-          (e) => e.type === "stage_complete" || e.type === "kg_complete" || e.type === "analysis_complete",
-        )
-        .map((e) => String(e.stage ?? e.type)),
-    );
+    // Collect event types seen
+    const seenTypes = new Set(events.map((e) => e.type));
+    const isDone = seenTypes.has("done");
 
-    const currentType =
-      events.length > 0 ? events[events.length - 1].type : "";
+    // Track per-stage progress from progress events
+    const stageProgress: Record<string, { current: number; total: number }> = {};
+    for (const e of events) {
+      if (e.type === "progress" && e.stage) {
+        stageProgress[String(e.stage)] = {
+          current: Number(e.current ?? 0),
+          total: Number(e.total ?? 0),
+        };
+      }
+    }
+
+    // Tier 1 complete when tier1_ready or analysis_ready seen
+    const tier1Done = seenTypes.has("tier1_ready") || seenTypes.has("analysis_ready") || isDone;
+    // Tier 2 complete when kg_ready seen
+    const tier2Done = seenTypes.has("kg_ready") || isDone;
+
+    const emotionP = stageProgress["emotion"];
+    const styleP = stageProgress["style"];
+    const kgP = stageProgress["kg"];
 
     return [
       {
-        key: "kg",
-        label: "正在提取知识图谱...",
-        done:
-          completedTypes.has("kg") ||
-          completedTypes.has("kg_complete"),
-      },
-      {
-        key: "emotions",
-        label: "正在分析情绪...",
-        done:
-          completedTypes.has("emotions") ||
-          completedTypes.has("analysis_complete"),
+        key: "emotion",
+        label: tier1Done ? "情感分析完成" : "正在分析情感...",
+        done: tier1Done,
+        progress: emotionP && !tier1Done
+          ? `${emotionP.current}/${emotionP.total}`
+          : undefined,
       },
       {
         key: "style",
-        label: "正在分析文风...",
-        done:
-          completedTypes.has("style") ||
-          completedTypes.has("analysis_complete"),
+        label: tier1Done ? "文风分析完成" : "正在分析文风...",
+        done: tier1Done,
+        progress: styleP && !tier1Done
+          ? `${styleP.current}/${styleP.total}`
+          : undefined,
       },
-    ].map((s) => ({
-      ...s,
-      done:
-        s.done ||
-        (currentType === "done" || currentType === "complete"),
-    }));
+      {
+        key: "kg",
+        label: tier2Done ? "知识图谱提取完成" : "正在提取知识图谱...",
+        done: tier2Done,
+        progress: kgP && !tier2Done
+          ? `${kgP.current}/${kgP.total}`
+          : undefined,
+      },
+    ];
   }, [events]);
 
   const doneCount = stages.filter((s) => s.done).length;
@@ -98,7 +110,10 @@ export default function ExtractionProgress({
                   ○
                 </span>
               )}
-              {stage.label}
+              <span>{stage.label}</span>
+              {stage.progress && (
+                <span className="ml-1 text-xs opacity-60">({stage.progress})</span>
+              )}
             </div>
           );
         })}

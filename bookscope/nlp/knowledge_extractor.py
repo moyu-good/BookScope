@@ -1,16 +1,18 @@
-"""BookScope v5 — Full MapReduce knowledge graph extractor.
+"""BookScope v6 — Smart-sampling knowledge graph extractor.
 
-Extracts chapter summaries and character profiles from ALL book chunks using LLM.
-Uses batch processing (multiple chunks per LLM call) and concurrent execution
-for full coverage at comparable cost to the old sampling approach.
+Replaces the old full MapReduce approach (377 LLM calls for a 1069-chunk book)
+with intelligent volume/arc grouping + budget-filling chunk selection (~19 calls).
 
 Architecture:
-    Map:    Chunks batched (5/call) → LLM → per-chunk summaries
-    Reduce: Merge characters + generate overall summary
+    1. Detect volumes from chapter-number resets (第一章 reappearing)
+    2. Group chapters into 10-15 narrative arcs
+    3. Budget-fill each arc with chunks up to 25K chars (matching v5 depth)
+    4. Arc-level deep analysis (one LLM call per arc)
+    5. Character merge + outline + rhythm in parallel
 
-Performance (300-chunk book with DeepSeek):
-    - Old: 60 sequential calls, 20% coverage, ~$0.50, ~2 min
-    - New: 60 concurrent calls (4 workers), 100% coverage, ~$0.30-0.80, ~30s
+Performance (1069-chunk / 159-chapter book):
+    - Old v5: 376 LLM calls, 3.1M chars → ~20-40 min
+    - New v6: ~19 LLM calls, ~375K chars → ~1-2 min (95% fewer calls)
 
 Pure Python module — no Streamlit dependency.
 
@@ -315,6 +317,204 @@ def _group_chunks_by_chapter(
     return [(key, chapters[key]) for key in order]
 
 
+# ---------------------------------------------------------------------------
+#  Smart grouping: volumes → arcs → representative chunks
+# ---------------------------------------------------------------------------
+
+_CH_NUM_RE = _re.compile(r"^第一章\s")
+
+
+def _detect_volumes(
+    chapter_groups: list[tuple[str, list[int]]],
+) -> list[list[tuple[str, list[int]]]]:
+    """Detect volume boundaries by chapter-number resets.
+
+    When '第一章' appears again, it marks the start of a new volume.
+    Returns a list of volumes, each being a list of (title, chunk_indices).
+    """
+    if not chapter_groups:
+        return []
+
+    volumes: list[list[tuple[str, list[int]]]] = [[chapter_groups[0]]]
+
+    for title, indices in chapter_groups[1:]:
+        if _CH_NUM_RE.match(title):
+            volumes.append([])
+        volumes[-1].append((title, indices))
+
+    # Merge tiny first volume (e.g. 序章 alone) into next volume
+    if len(volumes) > 1 and len(volumes[0]) <= 2:
+        volumes[1] = volumes[0] + volumes[1]
+        volumes.pop(0)
+
+    return volumes
+
+
+def _split_volume_into_arcs(
+    volume: list[tuple[str, list[int]]],
+    max_chapters_per_arc: int = 8,
+    min_chapters_per_arc: int = 3,
+) -> list[list[tuple[str, list[int]]]]:
+    """Split a volume into narrative arcs of manageable size.
+
+    Each arc has min_chapters_per_arc..max_chapters_per_arc chapters.
+    """
+    n = len(volume)
+    if n <= max_chapters_per_arc:
+        return [volume]
+
+    # Calculate how many arcs we need
+    n_arcs = max(2, (n + max_chapters_per_arc - 1) // max_chapters_per_arc)
+    arc_size = n // n_arcs
+
+    arcs: list[list[tuple[str, list[int]]]] = []
+    start = 0
+    for i in range(n_arcs):
+        end = start + arc_size if i < n_arcs - 1 else n
+        # Ensure last arc gets remaining chapters
+        if i == n_arcs - 1:
+            end = n
+        arcs.append(volume[start:end])
+        start = end
+
+    return [a for a in arcs if a]
+
+
+def _build_arcs(
+    chunks: list,
+    target_arcs: int = 12,
+) -> list[dict]:
+    """Build narrative arcs from chapters via volume detection + splitting.
+
+    Returns list of arc dicts:
+        {
+            "arc_index": int,
+            "title": str,           # derived from first-last chapter titles
+            "chapter_titles": [str],
+            "all_chunk_indices": [int],
+            "representative_chunks": [int],  # budget-filled chunks (~25K chars)
+        }
+    """
+    chapter_groups = _group_chunks_by_chapter(chunks)
+    if not chapter_groups:
+        return []
+
+    volumes = _detect_volumes(chapter_groups)
+    logger.info("Detected %d volumes from %d chapters", len(volumes), len(chapter_groups))
+
+    # Determine max arc size to hit target
+    total_chapters = len(chapter_groups)
+    max_per_arc = max(3, total_chapters // target_arcs + 1)
+
+    all_arcs: list[list[tuple[str, list[int]]]] = []
+    for volume in volumes:
+        arcs = _split_volume_into_arcs(volume, max_chapters_per_arc=max_per_arc)
+        all_arcs.extend(arcs)
+
+    # Build arc descriptors with representative chunk selection
+    result = []
+    for arc_idx, arc_chapters in enumerate(all_arcs):
+        titles = [t for t, _ in arc_chapters]
+        all_indices: list[int] = []
+        for _, indices in arc_chapters:
+            all_indices.extend(indices)
+
+        # Select representative chunks: first + last + longest middle
+        rep_chunks = _select_representative_chunks(all_indices, chunks)
+
+        # Build arc title from first and last chapter
+        if len(titles) == 1:
+            arc_title = titles[0]
+        else:
+            arc_title = f"{titles[0]} — {titles[-1]}"
+
+        result.append({
+            "arc_index": arc_idx,
+            "title": arc_title,
+            "chapter_titles": titles,
+            "all_chunk_indices": all_indices,
+            "representative_chunks": rep_chunks,
+        })
+
+    logger.info(
+        "Built %d arcs from %d chapters, %d representative chunks total",
+        len(result), total_chapters,
+        sum(len(a["representative_chunks"]) for a in result),
+    )
+    return result
+
+
+_MIN_CONTENT_LEN = 500  # Skip chunks shorter than this (likely TOC/headers)
+_MAX_ARC_CHARS = 25000  # Text budget per arc (matches v5's per-chapter cap)
+
+
+def _select_representative_chunks(
+    indices: list[int],
+    chunks: list,
+    char_budget: int = _MAX_ARC_CHARS,
+) -> list[int]:
+    """Pick chunk indices to fill a character budget for an arc.
+
+    Strategy (budget-filling):
+      1. Filter out TOC/header-only chunks (< 500 chars)
+      2. Seed with first + last + evenly-spaced anchors (coverage skeleton)
+      3. Fill remaining budget by adding longest unselected chunks
+      4. Stop when total selected text >= char_budget
+
+    This ensures each arc gets ~25K chars of context (matching v5 depth)
+    regardless of how many chunks the arc contains.
+    """
+    if not indices:
+        return []
+
+    # Score chunks by content length (skip headers)
+    scored: list[tuple[int, int]] = []
+    for idx in indices:
+        if idx < len(chunks):
+            text = getattr(chunks[idx], "text", str(chunks[idx]))
+            content = _HEADER_RE.sub("", text, count=1).strip()
+            scored.append((idx, len(content)))
+
+    # Filter out tiny chunks (TOC/section headers)
+    meaningful = [(idx, length) for idx, length in scored if length >= _MIN_CONTENT_LEN]
+    if not meaningful:
+        meaningful = scored[:3] if scored else []
+
+    total_meaningful_chars = sum(length for _, length in meaningful)
+
+    # If all meaningful chunks fit in budget, return all
+    if total_meaningful_chars <= char_budget:
+        return [idx for idx, _ in meaningful]
+
+    # Seed: first + last + evenly-spaced anchors for structural coverage
+    n = len(meaningful)
+    n_anchors = min(5, n)  # 5 evenly-spaced anchor points
+    anchor_positions = {0, n - 1}
+    if n_anchors > 2:
+        step = (n - 1) / (n_anchors - 1)
+        for i in range(1, n_anchors - 1):
+            anchor_positions.add(round(i * step))
+
+    selected_set: set[int] = set()
+    used_chars = 0
+    for pos in sorted(anchor_positions):
+        idx, length = meaningful[pos]
+        selected_set.add(idx)
+        used_chars += length
+
+    # Fill remaining budget with longest unselected chunks
+    remaining = [(idx, length) for idx, length in meaningful if idx not in selected_set]
+    remaining.sort(key=lambda x: x[1], reverse=True)  # longest first
+
+    for idx, length in remaining:
+        if used_chars >= char_budget:
+            break
+        selected_set.add(idx)
+        used_chars += length
+
+    return sorted(selected_set)
+
+
 def _get_chapter_text(chunks: list, indices: list[int]) -> str:
     """Concatenate chunk texts for a chapter, stripping headers."""
     parts = []
@@ -415,6 +615,120 @@ def _analyze_chapter_deep(
     return ChapterAnalysis(
         chapter_index=chapter_index,
         title=chapter_title,
+        analysis=str(data.get("analysis", "")),
+        key_points=[str(p) for p in data.get("key_points", []) if p],
+        characters_involved=[str(c) for c in data.get("characters_involved", []) if c],
+        significance=str(data.get("significance", "")),
+    )
+
+
+def _analyze_arc(
+    arc: dict,
+    chunks: list,
+    book_title: str,
+    language: str,
+    api_key: str,
+    model: str,
+    book_type: str = "fiction",
+) -> ChapterAnalysis | None:
+    """Analyze a narrative arc using its representative chunks.
+
+    Sends 2-3 representative chunks (not the full arc text) to the LLM,
+    plus chapter titles for context. Much faster than per-chapter analysis.
+    """
+    rep_indices = arc["representative_chunks"]
+    chapter_titles = arc["chapter_titles"]
+
+    # Build context from representative chunks (no per-chunk cap, arc-level budget)
+    rep_text_parts = []
+    total_text_chars = 0
+    for idx in rep_indices:
+        if idx < len(chunks):
+            text = getattr(chunks[idx], "text", str(chunks[idx]))
+            text = _HEADER_RE.sub("", text, count=1).strip()
+            if total_text_chars + len(text) > _MAX_ARC_CHARS:
+                # Truncate last chunk to fit budget
+                remaining = _MAX_ARC_CHARS - total_text_chars
+                if remaining > 200:
+                    rep_text_parts.append(text[:remaining])
+                    total_text_chars += remaining
+                break
+            rep_text_parts.append(text)
+            total_text_chars += len(text)
+
+    rep_text = "\n\n---\n\n".join(rep_text_parts)
+    n_chapters = len(chapter_titles)
+
+    is_nonfiction = book_type in ("nonfiction", "academic", "technical", "self_help")
+    is_essay = book_type in ("essay", "biography", "poetry")
+
+    # Build chapter title listing for structural context
+    titles_numbered = "\n".join(f"  {i+1}. {t}" for i, t in enumerate(chapter_titles))
+
+    if language == "zh":
+        if is_nonfiction:
+            focus = "分析重点：核心论点/史实、论据/证据链、知识结构。"
+        elif is_essay:
+            focus = "分析重点：作者观点、叙事策略、写作手法。"
+        else:
+            focus = "分析重点：情节发展、角色塑造与弧线、冲突/矛盾、叙事手法。"
+
+        prompt = (
+            "你是一位资深书籍分析专家。以下是一本书中某段叙事弧的代表性片段和章节列表。\n"
+            "请结合章节标题（提供整体结构）和代表性片段（提供具体内容），\n"
+            "对这段叙事弧进行深度分析。即使代表性片段无法覆盖所有章节，\n"
+            "也请根据章节标题推断整体叙事脉络。\n"
+            f"{focus}\n"
+            "严格返回合法JSON，不要返回markdown或其他文字。\n\n"
+            "JSON schema:\n"
+            "{\n"
+            '  "analysis": "300-800字的深度分析，涵盖这段叙事弧的核心内容和意义",\n'
+            '  "key_points": ["要点1（1-2句话）", "要点2", "要点3", "要点4"],\n'
+            '  "characters_involved": ["人物名1", "人物名2"],\n'
+            '  "significance": "1-2句话：这段叙事弧在全书中的位置和作用"\n'
+            "}\n\n"
+            f"书名：{book_title}\n"
+            f"本弧涵盖{n_chapters}个章节：\n{titles_numbered}\n\n"
+            f"【代表性片段（{len(rep_indices)}个）】\n{rep_text}"
+        )
+    else:
+        if is_nonfiction:
+            focus = "Focus: core arguments/facts, evidence chains, knowledge structure."
+        elif is_essay:
+            focus = "Focus: author's viewpoint, narrative strategy, writing techniques."
+        else:
+            focus = "Focus: plot development, character arcs, conflicts, narrative techniques."
+
+        titles_numbered_en = "\n".join(f"  {i+1}. {t}" for i, t in enumerate(chapter_titles))
+        prompt = (
+            "You are an expert book analyst. Below are chapter titles (for structure) "
+            "and representative excerpts (for detail) from a narrative arc.\n"
+            "Use both chapter titles and excerpts to produce a deep analysis. "
+            "Infer the overall narrative arc even from partial excerpts.\n"
+            f"{focus}\n"
+            "Return ONLY valid JSON, no markdown or explanation.\n\n"
+            "JSON schema:\n"
+            "{\n"
+            '  "analysis": "300-800 word deep analysis of this narrative arc",\n'
+            '  "key_points": ["point 1", "point 2", "point 3", "point 4"],\n'
+            '  "characters_involved": ["person1", "person2"],\n'
+            '  "significance": "1-2 sentences: role of this arc in the overall book"\n'
+            "}\n\n"
+            f"Book: {book_title}\n"
+            f"This arc covers {n_chapters} chapters:\n{titles_numbered_en}\n\n"
+            f"[REPRESENTATIVE EXCERPTS ({len(rep_indices)})]\n{rep_text}"
+        )
+
+    raw = call_llm(prompt, api_key=api_key, model=model, max_tokens=2000) or ""
+    data = _parse_json(raw)
+
+    if data is None or not isinstance(data, dict):
+        return None
+
+    return ChapterAnalysis(
+        chapter_index=arc["arc_index"],
+        title=arc["title"],
+        chunk_indices=arc["all_chunk_indices"],
         analysis=str(data.get("analysis", "")),
         key_points=[str(p) for p in data.get("key_points", []) if p],
         characters_involved=[str(c) for c in data.get("characters_involved", []) if c],
@@ -655,16 +969,24 @@ def extract_knowledge_graph(
     api_key: str | None = None,
     model: str = "claude-haiku-4-5",
     progress_callback: Callable[[int, int], None] | None = None,
-    max_extract: int = 0,  # 0 = all chunks (no sampling)
+    max_extract: int = 0,  # ignored in v6, kept for API compat
     enrich_souls: bool = False,
     batch_size: int = _BATCH_SIZE,
     max_workers: int = _MAX_WORKERS,
     book_type: str = "fiction",
 ) -> BookKnowledgeGraph:
-    """Extract a BookKnowledgeGraph from ALL book chunks using MapReduce.
+    """Extract a BookKnowledgeGraph using smart arc-based sampling (v6).
 
-    Map phase:  Chunks batched (batch_size per LLM call) → concurrent extraction
-    Reduce phase: Merge characters + build overall summary
+    Instead of processing every chunk (377 LLM calls for 1069 chunks),
+    groups chapters into ~10-15 narrative arcs and samples 2-3 representative
+    chunks per arc, reducing to ~25-30 LLM calls total.
+
+    Pipeline:
+        1. Local NER (no LLM) — character candidates
+        2. Smart grouping: chapters → volumes → arcs
+        3. Arc-level deep analysis (concurrent, ~10-15 calls)
+        4. Character merge from arc analyses (1 call)
+        5. Book outline + narrative rhythm + summary (3 calls, concurrent)
 
     Args:
         chunks: list[ChunkResult] from the analysis pipeline.
@@ -673,101 +995,193 @@ def extract_knowledge_graph(
         api_key: LLM API key (from BYOK settings).
         model: LLM model ID.
         progress_callback: Optional (current, total) progress reporter.
-        max_extract: Max chunks to process (0 = all, for backward compat).
         enrich_souls: If True, enrich top 5 characters with soul profiles.
-        batch_size: Number of chunks per LLM call (default 5).
         max_workers: Concurrent LLM call threads (default 4).
+        book_type: "fiction" / "nonfiction" / "essay" etc.
 
     Returns:
-        BookKnowledgeGraph with chapter summaries and character profiles.
+        BookKnowledgeGraph with arc analyses, characters, outline, rhythm.
     """
     if not chunks or not api_key:
         return BookKnowledgeGraph(book_title=book_title, language=language)
 
     total = len(chunks)
 
-    # Step 0: fast local NER on ALL chunks (no LLM)
+    # ── Step 1+2: NER + Smart grouping (parallel) ────────────────────
+    # NER is CPU-intensive (~87s for 1069 chunks). Run it alongside
+    # arc grouping and arc analysis instead of blocking.
     ner_candidates: dict[str, list[int]] = {}
+    ner_future = None
+
+    def _run_ner():
+        return extract_character_candidates(chunks, language)
+
+    # Start NER in background — results used later at character merge
+    ner_executor = ThreadPoolExecutor(max_workers=1)
     try:
-        ner_candidates = extract_character_candidates(chunks, language)
-        logger.info("NER found %d character candidates across all chunks", len(ner_candidates))
+        ner_future = ner_executor.submit(_run_ner)
     except Exception:
-        logger.warning("NER extraction failed, continuing with LLM-only")
+        logger.warning("Failed to start NER thread")
 
-    # Step A: prepare batches
-    if max_extract > 0 and max_extract < total:
-        # Backward compat: if explicitly limited, sample
-        sample_set = set(_sample_indices(total, max_extract))
-        process_indices = sorted(sample_set)
-    else:
-        process_indices = list(range(total))
-
-    batches: list[list[tuple[int, str]]] = []
-    current_batch: list[tuple[int, str]] = []
-    for idx in process_indices:
-        text = getattr(chunks[idx], "text", str(chunks[idx]))
-        current_batch.append((idx, text))
-        if len(current_batch) >= batch_size:
-            batches.append(current_batch)
-            current_batch = []
-    if current_batch:
-        batches.append(current_batch)
-
-    total_to_process = len(process_indices)
+    arcs = _build_arcs(chunks, target_arcs=12)
+    n_arcs = len(arcs)
+    total_rep = sum(len(a["representative_chunks"]) for a in arcs)
     logger.info(
-        "MapReduce KG: %d chunks in %d batches (%d workers)",
-        total_to_process, len(batches), max_workers,
+        "Smart grouping: %d chunks → %d arcs, %d representative chunks "
+        "(%.0f%% of original, ~%d LLM calls vs ~%d old)",
+        total, n_arcs, total_rep,
+        total_rep / max(total, 1) * 100,
+        n_arcs + 4,  # arcs + merge + outline + rhythm + summary
+        total // batch_size + len(_group_chunks_by_chapter(chunks)) + 4,
     )
 
-    # Step B: Map phase — concurrent batch extraction
-    summaries_map: dict[int, ChapterSummary] = {}
-    progress_done = 0
+    # Total steps for progress: arcs + 3 (merge + outline + rhythm&summary)
+    total_steps = n_arcs + 3
+    steps_done = 0
 
-    def _process_batch(batch: list[tuple[int, str]]) -> list[ChapterSummary]:
-        return _extract_batch_summaries(batch, language, api_key, model)
+    def _report(done: int):
+        nonlocal steps_done
+        steps_done = done
+        if progress_callback:
+            progress_callback(min(steps_done, total_steps), total_steps)
+
+    # ── Step 3: Arc-level deep analysis (concurrent) ──────────────────
+    chapter_analyses: list[ChapterAnalysis] = []
+
+    def _analyze_one_arc(arc: dict) -> ChapterAnalysis | None:
+        return _analyze_arc(
+            arc=arc,
+            chunks=chunks,
+            book_title=book_title,
+            language=language,
+            api_key=api_key,
+            model=model,
+            book_type=book_type,
+        )
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_batch = {
-            executor.submit(_process_batch, batch): batch
-            for batch in batches
+        future_to_arc = {
+            executor.submit(_analyze_one_arc, arc): arc
+            for arc in arcs
         }
-        for future in as_completed(future_to_batch):
-            batch = future_to_batch[future]
+        for future in as_completed(future_to_arc):
+            arc = future_to_arc[future]
             try:
-                batch_results = future.result()
-                for summary in batch_results:
-                    summaries_map[summary.chunk_index] = summary
+                result = future.result()
+                if result:
+                    chapter_analyses.append(result)
             except Exception:
-                logger.exception("Batch extraction failed")
-                for idx, _ in batch:
-                    summaries_map[idx] = ChapterSummary(chunk_index=idx)
+                logger.warning("Arc analysis failed: %s", arc["title"])
+            steps_done += 1
+            _report(steps_done)
 
-            progress_done += len(batch)
-            if progress_callback is not None:
-                progress_callback(min(progress_done, total), total)
+    chapter_analyses.sort(key=lambda ca: ca.chapter_index)
+    logger.info("Completed arc-level analysis for %d arcs", len(chapter_analyses))
 
-    # Build ordered summary list (all chunks, including non-processed ones)
-    summaries: list[ChapterSummary] = []
-    for i in range(total):
-        if i in summaries_map:
-            summaries.append(summaries_map[i])
-        else:
-            summaries.append(ChapterSummary(chunk_index=i))
+    # ── Collect NER results (started in parallel with Step 2+3) ────────
+    if ner_future is not None:
+        try:
+            ner_candidates = ner_future.result(timeout=120)
+            logger.info("NER found %d character candidates", len(ner_candidates))
+        except Exception:
+            logger.warning("NER extraction failed, continuing with LLM-only")
+    ner_executor.shutdown(wait=False)
 
-    # Step C: Reduce — merge characters
-    rich_summaries = [s for s in summaries if s.summary]
-    logger.info("Rich summaries: %d / %d", len(rich_summaries), total)
+    # ── Step 4: Character merge ───────────────────────────────────────
+    # Build pseudo-summaries from arc analyses for character merging
+    arc_summaries = [
+        ChapterSummary(
+            chunk_index=ca.chapter_index,
+            title=ca.title,
+            summary=ca.analysis[:300] if ca.analysis else "",
+            characters_mentioned=ca.characters_involved,
+        )
+        for ca in chapter_analyses
+    ]
 
     characters = _merge_characters(
-        summaries=rich_summaries,
+        summaries=arc_summaries,
         book_title=book_title,
         language=language,
         api_key=api_key,
         model=model,
         ner_candidates=ner_candidates,
     )
+    _report(steps_done + 1)
+    logger.info("Merged %d characters", len(characters))
 
-    # Step D (optional): enrich top characters with soul profiles
+    # ── Step 5: Outline + Rhythm + Summary (concurrent) ───────────────
+    book_outline = ""
+    theme_analyses: list[ThemeDescription] = []
+    narrative_rhythm: list[NarrativePoint] = []
+    overall_summary = ""
+
+    def _do_outline():
+        return _generate_book_outline(
+            chapter_analyses=chapter_analyses,
+            book_title=book_title,
+            language=language,
+            api_key=api_key,
+            model=model,
+            book_type=book_type,
+        )
+
+    def _do_rhythm():
+        return _generate_narrative_rhythm(
+            chapter_analyses=chapter_analyses,
+            book_title=book_title,
+            language=language,
+            api_key=api_key,
+            model=model,
+            book_type=book_type,
+        )
+
+    def _do_summary():
+        summary_parts = [
+            f"{ca.title}: {ca.analysis[:150]}"
+            for ca in chapter_analyses if ca.analysis
+        ]
+        if not summary_parts:
+            return ""
+        context = "\n".join(summary_parts)
+        prompt = (
+            "根据以下书籍各段叙事弧分析，生成一段200-400字的全书总体概述。"
+            "严格返回纯文本，不要返回JSON或markdown。\n\n"
+            f"书名：{book_title}\n\n{context}"
+        ) if language == "zh" else (
+            "Based on the following narrative arc analyses, write a 200-400 word "
+            "overall summary. Return plain text only.\n\n"
+            f"Book: {book_title}\n\n{context}"
+        )
+        return call_llm(prompt, api_key=api_key, model=model, max_tokens=800) or ""
+
+    if chapter_analyses:
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            f_outline = executor.submit(_do_outline)
+            f_rhythm = executor.submit(_do_rhythm)
+            f_summary = executor.submit(_do_summary)
+
+            try:
+                book_outline, theme_analyses = f_outline.result()
+            except Exception:
+                logger.warning("Outline generation failed")
+            try:
+                narrative_rhythm = f_rhythm.result()
+            except Exception:
+                logger.warning("Rhythm generation failed")
+            try:
+                overall_summary = f_summary.result()
+            except Exception:
+                logger.warning("Summary generation failed")
+
+    _report(total_steps)
+    logger.info(
+        "KG complete: %d arcs, %d chars, outline=%d chars, rhythm=%d pts",
+        len(chapter_analyses), len(characters),
+        len(book_outline), len(narrative_rhythm),
+    )
+
+    # ── Optional: enrich top characters ───────────────────────────────
     if enrich_souls and characters:
         from bookscope.nlp.soul_engine import enrich_soul_profile
 
@@ -792,102 +1206,10 @@ def extract_knowledge_graph(
             except Exception:
                 logger.warning("Soul enrichment failed for %s", char.name)
 
-    # Generate overall summary from chapter summaries (legacy, kept for compat)
-    overall_summary = ""
-    if rich_summaries:
-        summary_texts = [s.summary for s in rich_summaries[:20] if s.summary]
-        if summary_texts:
-            summary_prompt = (
-                "根据以下书籍各章节摘要，生成一段100-200字的全书总体概述。"
-                "严格返回纯文本，不要返回JSON或markdown。\n\n"
-                f"书名：{book_title}\n\n"
-                + "\n".join(f"- {s}" for s in summary_texts)
-            ) if language == "zh" else (
-                "Based on the following chapter summaries, write a 100-200 word "
-                "overall summary of the book. Return plain text only.\n\n"
-                f"Book: {book_title}\n\n"
-                + "\n".join(f"- {s}" for s in summary_texts)
-            )
-            overall_summary = call_llm(
-                summary_prompt, api_key=api_key, model=model, max_tokens=400
-            ) or ""
-
-    # ── Deep chapter analysis (new) ─────────────────────────────────────
-    chapter_groups = _group_chunks_by_chapter(chunks)
-    logger.info("Detected %d real chapters for deep analysis", len(chapter_groups))
-
-    chapter_analyses: list[ChapterAnalysis] = []
-
-    def _deep_analyze_one(
-        ch_idx: int, ch_title: str, ch_chunk_indices: list[int],
-    ) -> ChapterAnalysis | None:
-        ch_text = _get_chapter_text(chunks, ch_chunk_indices)
-        if not ch_text.strip():
-            return None
-        result = _analyze_chapter_deep(
-            chapter_title=ch_title,
-            chapter_text=ch_text,
-            chapter_index=ch_idx,
-            book_title=book_title,
-            language=language,
-            api_key=api_key,
-            model=model,
-            book_type=book_type,
-        )
-        if result:
-            result.chunk_indices = ch_chunk_indices
-        return result
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_ch = {
-            executor.submit(_deep_analyze_one, i + 1, title, indices): title
-            for i, (title, indices) in enumerate(chapter_groups)
-        }
-        for future in as_completed(future_to_ch):
-            ch_title = future_to_ch[future]
-            try:
-                result = future.result()
-                if result:
-                    chapter_analyses.append(result)
-            except Exception:
-                logger.warning("Deep analysis failed for chapter: %s", ch_title)
-
-    # Sort by chapter index
-    chapter_analyses.sort(key=lambda ca: ca.chapter_index)
-    logger.info("Completed deep analysis for %d chapters", len(chapter_analyses))
-
-    # ── Book outline (new) ──────────────────────────────────────────────
-    book_outline = ""
-    theme_analyses: list[ThemeDescription] = []
-    if chapter_analyses:
-        book_outline, theme_analyses = _generate_book_outline(
-            chapter_analyses=chapter_analyses,
-            book_title=book_title,
-            language=language,
-            api_key=api_key,
-            model=model,
-            book_type=book_type,
-        )
-        logger.info("Generated book outline (%d chars) with %d themes",
-                     len(book_outline), len(theme_analyses))
-
-    # ── Narrative rhythm annotations (new) ─────────────────────────────
-    narrative_rhythm: list[NarrativePoint] = []
-    if chapter_analyses:
-        narrative_rhythm = _generate_narrative_rhythm(
-            chapter_analyses=chapter_analyses,
-            book_title=book_title,
-            language=language,
-            api_key=api_key,
-            model=model,
-            book_type=book_type,
-        )
-        logger.info("Generated narrative rhythm with %d points", len(narrative_rhythm))
-
     return BookKnowledgeGraph(
         book_title=book_title,
         language=language,
-        chapter_summaries=summaries,
+        chapter_summaries=[],  # v6: skip per-chunk summaries for speed
         chapter_analyses=chapter_analyses,
         characters=characters,
         overall_summary=overall_summary,
