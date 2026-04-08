@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from bookscope.api.dependencies import require_api_key, require_session
+from bookscope.api.session_store import ensure_vector_store
 from bookscope.api.sse_utils import sse
 from bookscope.nlp.chat_context import build_chat_context
 
@@ -37,7 +38,7 @@ async def chat_stream(req: ChatRequest):
     context = build_chat_context(
         book=session.book,
         graph=session.knowledge_graph,
-        vector_store=session.vector_store,
+        vector_store=ensure_vector_store(session),
         message=req.message,
     )
 

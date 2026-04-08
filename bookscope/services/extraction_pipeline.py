@@ -116,6 +116,7 @@ def run_extraction(
                 model=model,
                 progress_callback=progress_cb,
                 enrich_souls=False,  # on-demand in v5
+                book_type=session.book_type,
             )
             session.knowledge_graph = graph
             q.put({
@@ -155,6 +156,13 @@ def run_extraction(
         yield event
 
     session.extraction_status = "error" if has_error else "done"
+
+    # Persist final session state (analysis results + status)
+    from bookscope.api.session_store import persist_session
+    try:
+        persist_session(session)
+    except Exception:
+        logger.warning("Failed to persist session after extraction", exc_info=True)
 
     if not has_error:
         yield {"type": "done"}

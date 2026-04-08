@@ -233,3 +233,21 @@ export function fetchLibraryAnalysis(
     `${BASE}/library/${encodeURIComponent(filename)}/analysis`,
   );
 }
+
+export function fetchActiveSessions(): Promise<{
+  sessions: ActiveSession[];
+}> {
+  return jsonFetch(`${BASE}/sessions`);
+}
+
+export interface ActiveSession {
+  session_id: string;
+  title: string;
+  language: string;
+  total_words: number;
+  total_chunks: number;
+  extraction_status: string;
+  has_knowledge_graph: boolean;
+  has_analysis: boolean;
+  book_type: string;
+}

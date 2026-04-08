@@ -4,20 +4,19 @@ import {
   useParams,
   useLocation,
   useNavigate,
-  NavLink,
 } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  BookOpen,
-  Compass,
   Library,
   Plus,
   Save,
   Settings,
+  MessageCircle,
 } from "lucide-react";
 import clsx from "clsx";
-import { fetchSessionStatus, startExtraction, saveToLibrary } from "../lib/api";
-import type { SSEEvent, SessionStatus } from "../lib/types";
+import { fetchSessionStatus, fetchOverview, startExtraction, saveToLibrary } from "../lib/api";
+import type { SSEEvent, SessionStatus, CharacterBrief } from "../lib/types";
+import ChatDrawer from "../components/ChatDrawer";
 
 /* ------------------------------------------------------------------ */
 /*  Extraction context — shared with child pages                      */
@@ -27,12 +26,14 @@ interface ExtractionContextValue {
   sseEvents: SSEEvent[];
   isExtracting: boolean;
   sessionStatus: SessionStatus | undefined;
+  characters: CharacterBrief[];
 }
 
 const ExtractionContext = createContext<ExtractionContextValue>({
   sseEvents: [],
   isExtracting: false,
   sessionStatus: undefined,
+  characters: [],
 });
 
 export function useExtraction(): ExtractionContextValue {
@@ -56,6 +57,7 @@ export default function BookLayout() {
   const extractionStartedRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   // Poll session status
   const { data: sessionStatus } = useQuery({
@@ -64,6 +66,16 @@ export default function BookLayout() {
     enabled: !!sessionId,
     refetchInterval: isExtracting ? 2000 : false,
   });
+
+  // Fetch overview for character list (used by ChatDrawer)
+  const { data: overview } = useQuery({
+    queryKey: ["overview", sessionId],
+    queryFn: () => fetchOverview(sessionId!),
+    enabled: !!sessionId,
+    refetchInterval: isExtracting ? 2000 : false,
+  });
+
+  const characters: CharacterBrief[] = overview?.characters_brief ?? [];
 
   // Auto-start extraction when status is "idle"
   useEffect(() => {
@@ -106,7 +118,7 @@ export default function BookLayout() {
     }
   }, [sessionStatus]);
 
-  const title = locationState?.title ?? "书籍分析";
+  const title = locationState?.title ?? overview?.title ?? "书籍分析";
 
   const handleSave = async () => {
     if (!sessionId || saving) return;
@@ -128,6 +140,7 @@ export default function BookLayout() {
     sseEvents,
     isExtracting,
     sessionStatus,
+    characters,
   };
 
   return (
@@ -138,9 +151,23 @@ export default function BookLayout() {
           <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
             {/* Left: branding + title */}
             <div className="flex items-center gap-3 min-w-0">
-              <span className="text-lg text-[var(--accent)] shrink-0" style={{ fontFamily: "var(--font-display)" }}>书鉴</span>
+              <button
+                onClick={() => navigate("/")}
+                className="text-lg text-[var(--accent)] shrink-0 hover:opacity-80 transition-opacity"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                书鉴
+              </button>
               <span className="text-xs text-[var(--border)]">|</span>
-              <h1 className="text-base truncate text-[var(--text)]" style={{ fontFamily: "var(--font-display)", letterSpacing: "0.08em" }}>{title}</h1>
+              <h1
+                className="text-base truncate text-[var(--text)]"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                {title}
+              </h1>
               {isExtracting && (
                 <span className="shrink-0 ml-2 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider bg-[var(--accent)]/15 text-[var(--accent)] rounded-full">
                   提取中
@@ -148,70 +175,33 @@ export default function BookLayout() {
               )}
             </div>
 
-            {/* Center: nav (desktop) */}
-            <nav className="hidden sm:flex items-center gap-1">
-              <NavLink
-                to={`/book/${sessionId}`}
-                end
-                className={({ isActive }) =>
-                  clsx(
-                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200",
-                    isActive
-                      ? "bg-[var(--accent)]/15 text-[var(--accent)]"
-                      : "text-[var(--text-secondary)] hover:text-[var(--text)]",
-                  )
-                }
-              >
-                <span className="flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5" />
-                  总览
-                </span>
-              </NavLink>
-              <NavLink
-                to={`/book/${sessionId}/explore`}
-                className={({ isActive }) =>
-                  clsx(
-                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200",
-                    isActive
-                      ? "bg-[var(--accent)]/15 text-[var(--accent)]"
-                      : "text-[var(--text-secondary)] hover:text-[var(--text)]",
-                  )
-                }
-              >
-                <span className="flex items-center gap-1.5">
-                  <Compass className="w-3.5 h-3.5" />
-                  探索
-                </span>
-              </NavLink>
-            </nav>
-
             {/* Right: actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all duration-200 relative"
+                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all relative"
                 title="保存到书库"
               >
                 <Save className="w-4 h-4" />
               </button>
               <button
                 onClick={() => navigate("/library")}
-                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all duration-200"
+                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all"
                 title="书库"
               >
                 <Library className="w-4 h-4" />
               </button>
               <button
                 onClick={() => navigate("/settings")}
-                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all duration-200"
+                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all"
                 title="设置"
               >
                 <Settings className="w-4 h-4" />
               </button>
               <button
                 onClick={() => navigate("/")}
-                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all duration-200"
+                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-all"
                 title="新建分析"
               >
                 <Plus className="w-4 h-4" />
@@ -227,45 +217,34 @@ export default function BookLayout() {
           )}
         </header>
 
-        {/* Mobile bottom nav */}
-        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg)]/90 backdrop-blur-md border-t border-[var(--border)]">
-          <div className="flex items-center justify-around h-12">
-            <NavLink
-              to={`/book/${sessionId}`}
-              end
-              className={({ isActive }) =>
-                clsx(
-                  "flex flex-col items-center gap-0.5 px-4 py-1.5 text-[10px] font-medium transition-colors duration-200",
-                  isActive
-                    ? "text-[var(--accent)]"
-                    : "text-[var(--text-secondary)]",
-                )
-              }
-            >
-              <BookOpen className="w-4 h-4" />
-              总览
-            </NavLink>
-            <NavLink
-              to={`/book/${sessionId}/explore`}
-              className={({ isActive }) =>
-                clsx(
-                  "flex flex-col items-center gap-0.5 px-4 py-1.5 text-[10px] font-medium transition-colors duration-200",
-                  isActive
-                    ? "text-[var(--accent)]"
-                    : "text-[var(--text-secondary)]",
-                )
-              }
-            >
-              <Compass className="w-4 h-4" />
-              探索
-            </NavLink>
-          </div>
-        </nav>
-
         {/* Content */}
-        <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 pb-16 sm:pb-6">
+        <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 pb-20">
           <Outlet />
         </main>
+
+        {/* Floating chat button */}
+        <button
+          onClick={() => setChatOpen(true)}
+          className={clsx(
+            "fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full shadow-lg transition-all duration-300",
+            "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] hover:scale-105",
+            "active:scale-95",
+            chatOpen && "opacity-0 pointer-events-none",
+          )}
+        >
+          <MessageCircle className="w-5 h-5" />
+          <span className="text-sm font-medium hidden sm:inline">问书</span>
+        </button>
+
+        {/* Chat drawer */}
+        {sessionId && (
+          <ChatDrawer
+            open={chatOpen}
+            onClose={() => setChatOpen(false)}
+            sessionId={sessionId}
+            characters={characters}
+          />
+        )}
       </div>
     </ExtractionContext.Provider>
   );

@@ -192,12 +192,51 @@ class CharacterProfile(BaseModel):
     emotional_stages: list[EmotionalStage] = Field(default_factory=list)
 
 
+class ChapterAnalysis(BaseModel):
+    """Deep analysis of a real chapter (may span multiple chunks)."""
+
+    chapter_index: int                         # 1-based chapter number
+    title: str = ""                            # 章节标题
+    chunk_indices: list[int] = Field(default_factory=list)  # 属于此章的 chunk indices
+    analysis: str = ""                         # 300-800 字深度分析
+    key_points: list[str] = Field(default_factory=list)     # 3-5 个核心要点
+    characters_involved: list[str] = Field(default_factory=list)
+    significance: str = ""                     # 本章在全书中的意义
+
+
+class ThemeDescription(BaseModel):
+    """A theme with description, not just a label."""
+
+    theme: str = ""
+    description: str = ""
+
+
+class NarrativePoint(BaseModel):
+    """A single point on the narrative rhythm chart.
+
+    Replaces abstract valence numbers with concrete event annotations.
+    Generated from chapter analyses by LLM.
+    """
+
+    chapter_index: int                         # 1-based chapter number
+    title: str = ""                            # 章节标题
+    intensity: float = 0.5                     # 0.0-1.0 叙事张力/重要性
+    event_label: str = ""                      # 具体事件标注 ("靖难之役", "宝黛初会")
+    point_type: str = "narrative"              # setup / rising / climax / turning / falling / resolution
+
+
 class BookKnowledgeGraph(BaseModel):
     """Aggregated knowledge graph for a single book."""
 
     book_title: str
     language: str = "zh"
+    # Chunk-level summaries (kept for RAG retrieval)
     chapter_summaries: list[ChapterSummary] = Field(default_factory=list)
+    # Deep chapter-level analysis (new)
+    chapter_analyses: list[ChapterAnalysis] = Field(default_factory=list)
     characters: list[CharacterProfile] = Field(default_factory=list)
-    overall_summary: str = ""                  # 全书内容概述
-    themes: list[str] = Field(default_factory=list)  # 主题标签
+    overall_summary: str = ""                  # 旧字段，保留兼容
+    book_outline: str = ""                     # 500-1000 字结构化全书大纲
+    themes: list[str] = Field(default_factory=list)  # 旧字段，简单标签
+    theme_analyses: list[ThemeDescription] = Field(default_factory=list)  # 主题深度描述
+    narrative_rhythm: list[NarrativePoint] = Field(default_factory=list)  # 叙事节奏标注

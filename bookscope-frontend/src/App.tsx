@@ -5,7 +5,6 @@ import UploadPage from "./pages/UploadPage";
 import BookLayout from "./pages/BookLayout";
 import OverviewPage from "./pages/OverviewPage";
 import CharacterPage from "./pages/CharacterPage";
-import ExplorePage from "./pages/ExplorePage";
 import LibraryPage from "./pages/LibraryPage";
 import LibraryDetailPage from "./pages/LibraryDetailPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -25,7 +24,6 @@ export default function App() {
           <Route path="/book/:sessionId" element={<BookLayout />}>
             <Route index element={<OverviewPage />} />
             <Route path="character/:name" element={<CharacterPage />} />
-            <Route path="explore" element={<ExplorePage />} />
           </Route>
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/library/:filename" element={<LibraryDetailPage />} />

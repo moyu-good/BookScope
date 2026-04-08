@@ -28,7 +28,12 @@ async def book_overview(session_id: str):
     if s.knowledge_graph:
         kg = s.knowledge_graph
         result["overall_summary"] = kg.overall_summary
+        result["book_outline"] = kg.book_outline
         result["themes"] = kg.themes
+        result["theme_analyses"] = [
+            {"theme": t.theme, "description": t.description}
+            for t in kg.theme_analyses
+        ]
         result["chapter_summaries"] = [
             {
                 "chunk_index": ch.chunk_index,
@@ -39,6 +44,18 @@ async def book_overview(session_id: str):
             }
             for ch in kg.chapter_summaries
         ]
+        result["chapter_analyses"] = [
+            {
+                "chapter_index": ca.chapter_index,
+                "title": ca.title,
+                "chunk_indices": ca.chunk_indices,
+                "analysis": ca.analysis,
+                "key_points": ca.key_points,
+                "characters_involved": ca.characters_involved,
+                "significance": ca.significance,
+            }
+            for ca in kg.chapter_analyses
+        ]
         result["characters_brief"] = [
             {
                 "name": c.name,
@@ -48,6 +65,16 @@ async def book_overview(session_id: str):
                 "has_soul": bool(c.personality_type),
             }
             for c in kg.characters
+        ]
+        result["narrative_rhythm"] = [
+            {
+                "chapter_index": p.chapter_index,
+                "title": p.title,
+                "intensity": p.intensity,
+                "event_label": p.event_label,
+                "point_type": p.point_type,
+            }
+            for p in kg.narrative_rhythm
         ]
 
     # Analysis fields (available after emotion/style analysis)

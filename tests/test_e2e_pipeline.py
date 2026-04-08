@@ -26,11 +26,12 @@ pytestmark = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()
-def client():
+def client(tmp_path, monkeypatch):
+    from bookscope.api import session_store
     from bookscope.api.app import app
-    from bookscope.api.session_store import _sessions
 
-    _sessions.clear()
+    session_store._sessions.clear()
+    monkeypatch.setattr(session_store, "_SESSIONS_DIR", tmp_path / "sessions")
     return TestClient(app)
 
 
@@ -101,7 +102,7 @@ class TestE2EPipeline:
         from bookscope.api.session_store import _sessions
 
         session = _sessions[data["session_id"]]
-        vs = session.get("vector_store")
+        vs = session.vector_store
         assert vs is not None, "Vector store should be created at upload"
         assert vs.chunk_count == data["total_chunks"]
 

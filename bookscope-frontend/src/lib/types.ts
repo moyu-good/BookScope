@@ -23,6 +23,21 @@ export interface ChapterSummary {
   characters_mentioned: string[];
 }
 
+export interface ChapterAnalysis {
+  chapter_index: number;
+  title: string;
+  chunk_indices: number[];
+  analysis: string;
+  key_points: string[];
+  characters_involved: string[];
+  significance: string;
+}
+
+export interface ThemeAnalysis {
+  theme: string;
+  description: string;
+}
+
 export interface CharacterBrief {
   name: string;
   description: string;
@@ -57,6 +72,14 @@ export interface EmotionScore {
   emotion_density: number;
 }
 
+export interface NarrativePoint {
+  chapter_index: number;
+  title: string;
+  intensity: number;
+  event_label: string;
+  point_type: string;
+}
+
 export interface BookOverview {
   title: string;
   language: string;
@@ -66,9 +89,13 @@ export interface BookOverview {
   extraction_status: string;
   // KG fields (optional, appear when KG ready)
   overall_summary?: string;
+  book_outline?: string;
   themes?: string[];
+  theme_analyses?: ThemeAnalysis[];
   chapter_summaries?: ChapterSummary[];
+  chapter_analyses?: ChapterAnalysis[];
   characters_brief?: CharacterBrief[];
+  narrative_rhythm?: NarrativePoint[];
   // Analysis fields (optional, appear when analysis ready)
   arc_pattern?: string;
   dominant_emotion?: string;

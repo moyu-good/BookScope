@@ -6,13 +6,18 @@ interface CharacterGalleryProps {
   characters: CharacterBrief[];
   sessionId?: string;
   readOnly?: boolean;
+  bookType?: string;
 }
+
+const NONFICTION_TYPES = new Set(["nonfiction", "academic", "technical", "self_help", "essay", "biography"]);
 
 export default function CharacterGallery({
   characters,
   sessionId,
   readOnly = false,
+  bookType = "fiction",
 }: CharacterGalleryProps) {
+  const isNonfiction = NONFICTION_TYPES.has(bookType);
   const navigate = useNavigate();
 
   const handleClick = (name: string) => {
@@ -25,7 +30,7 @@ export default function CharacterGallery({
       <div className="flex items-center gap-2 mb-4">
         <Users className="w-4 h-4 text-[var(--accent)]" />
         <h2 className="text-xl text-[var(--accent)]">
-          人物群像
+          {isNonfiction ? "关键人物" : "人物群像"}
         </h2>
       </div>
 
@@ -52,7 +57,7 @@ export default function CharacterGallery({
                 >
                   {ch.name}
                 </h3>
-                {ch.has_soul && (
+                {ch.has_soul && !isNonfiction && (
                   <span
                     className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--accent)]/10 text-[var(--accent)]"
                     title="灵魂档案已生成"

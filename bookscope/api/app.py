@@ -7,10 +7,13 @@ Run:
     uvicorn bookscope.api.app:app --reload --port 8000
 """
 
-from bookscope import __version__
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from bookscope import __version__
 from bookscope.api.routers import (
     book,
     character,
@@ -26,7 +29,21 @@ from bookscope.api.routers import (
     upload,
 )
 
-app = FastAPI(title="BookScope API", version=__version__)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Restore persisted sessions on startup."""
+    from bookscope.api.session_store import load_all_sessions
+
+    count = load_all_sessions()
+    if count:
+        logger.info("Restored %d persisted session(s)", count)
+    yield
+
+
+app = FastAPI(title="BookScope API", version=__version__, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
