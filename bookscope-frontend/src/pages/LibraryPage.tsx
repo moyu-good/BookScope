@@ -15,6 +15,7 @@ import { fetchLibrary, deleteLibraryItem } from "../lib/api";
 
 interface LibraryItem {
   filename: string;
+  session_id: string;
   title: string;
   arc_pattern: string;
   total_chunks: number;
@@ -114,10 +115,12 @@ export default function LibraryPage() {
           <div className="space-y-3">
             {data.items.map((item) => (
               <div
-                key={item.filename}
+                key={item.session_id || item.filename}
                 onClick={() =>
                   navigate(
-                    `/library/${encodeURIComponent(item.filename)}`,
+                    item.session_id
+                      ? `/book/${item.session_id}`
+                      : `/library/${encodeURIComponent(item.filename)}`,
                   )
                 }
                 className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 hover:border-[var(--accent)]/30 hover:bg-[var(--surface-hover)] transition-all duration-200 cursor-pointer group"

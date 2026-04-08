@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from bookscope.api.dependencies import require_session
+from bookscope.api.session_store import all_sessions
 from bookscope.services.derived_fields import compute_derived_fields
 from bookscope.store.repository import AnalysisResult, Repository
 
@@ -48,12 +49,34 @@ async def library_save(req: LibrarySaveRequest):
 @router.get("/api/library")
 async def library_list():
     items = []
+    seen_titles: set[str] = set()
+
+    # 1. Active sessions with completed analysis
+    for s in all_sessions().values():
+        if s.extraction_status == "done":
+            seen_titles.add(s.title)
+            items.append({
+                "filename": "",
+                "session_id": s.session_id,
+                "title": s.title,
+                "arc_pattern": s.arc_pattern or "",
+                "total_chunks": len(s.chunks),
+                "total_words": s.total_words,
+                "language": s.language,
+                "analyzed_at": "",
+                "tags": [],
+            })
+
+    # 2. Archived analyses (skip duplicates already shown from sessions)
     for p in _repo.list_results():
         try:
             r = _repo.load(p)
+            if r.book_title in seen_titles:
+                continue
             notes = _repo.load_notes(p)
             items.append({
                 "filename": p.name,
+                "session_id": "",
                 "title": r.book_title,
                 "arc_pattern": r.arc_pattern,
                 "total_chunks": r.total_chunks,

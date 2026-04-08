@@ -38,6 +38,17 @@
   --font-display: "Ma Shan Zheng", "Zhi Mang Xing", cursive;
   --font-body: "Noto Serif SC", "Songti SC", "SimSun", serif;
   --font-mono: "Courier New", monospace;
+
+  /* ── 御览 (Imperial Review) tokens ─────────────── */
+  --parchment: #f5f0e8;
+  --parchment-dark: #e8e0d0;
+  --parchment-text: #1a1a1a;
+  --parchment-text-secondary: #4a4540;
+  --vermillion: #c94043;
+  --vermillion-light: rgba(201, 64, 67, 0.08);
+  --vermillion-border: rgba(201, 64, 67, 0.3);
+  --fold-line: #d5cfc4;
+  --seal-shadow: rgba(201, 64, 67, 0.25);
 }
 
 * { box-sizing: border-box; }
@@ -121,6 +132,145 @@ h1, h2, h3 {
 @keyframes fadeSlideIn {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── 御览 Memorial System ──────────────────────── */
+
+@keyframes memorialUnfold {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: scaleY(0.3);
+    transform-origin: top center;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
+    transform: scaleY(1);
+    transform-origin: top center;
+  }
+}
+
+@keyframes stampPress {
+  0%   { transform: rotate(-6deg) scale(1.6); opacity: 0; }
+  50%  { transform: rotate(-4deg) scale(0.95); opacity: 1; }
+  100% { transform: rotate(-5deg) scale(1); opacity: 1; }
+}
+
+@keyframes brushStroke {
+  from { width: 0; opacity: 0.5; }
+  to   { width: 100%; opacity: 1; }
+}
+
+@keyframes annotationSlide {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.memorial-section {
+  background: var(--parchment);
+  color: var(--parchment-text);
+  position: relative;
+  border-radius: 4px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.04);
+
+  /* Override dark-theme variables so nested child components
+     (EmotionRadar, VerdictCard, CharacterGallery, etc.)
+     automatically use parchment-compatible colors */
+  --surface: var(--parchment-dark);
+  --bg: var(--parchment);
+  --text: var(--parchment-text);
+  --text-secondary: var(--parchment-text-secondary);
+  --border: var(--fold-line);
+}
+
+.memorial-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 28px,
+      rgba(0, 0, 0, 0.015) 28px,
+      rgba(0, 0, 0, 0.015) 29px
+    );
+}
+
+.memorial-body {
+  font-family: var(--font-body);
+  color: var(--parchment-text);
+  line-height: 2;
+  font-size: 0.9rem;
+}
+
+.memorial-body h1,
+.memorial-body h2,
+.memorial-body h3 {
+  color: var(--parchment-text);
+}
+
+.fold-crease {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  user-select: none;
+}
+.fold-crease::before,
+.fold-crease::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--fold-line) 20%,
+    var(--fold-line) 80%,
+    transparent
+  );
+}
+.fold-crease-text {
+  font-size: 10px;
+  color: var(--fold-line);
+  letter-spacing: 0.3em;
+}
+
+.seal-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--vermillion);
+  color: var(--vermillion);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  transform: rotate(-5deg);
+  box-shadow: 0 0 6px var(--seal-shadow);
+  letter-spacing: 0.1em;
+}
+
+.seal-stamp-animated {
+  animation: stampPress 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.vermillion-text {
+  color: var(--vermillion);
+  font-family: var(--font-body);
+}
+
+.annotation-card {
+  border-left: 3px solid var(--vermillion);
+  background: var(--vermillion-light);
+  border-radius: 0 4px 4px 0;
+  padding: 12px 16px;
+  animation: annotationSlide 0.3s ease-out both;
 }
 
 /* ── Scrollbar hide utility ─────────────────────── */

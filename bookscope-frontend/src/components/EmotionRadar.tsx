@@ -70,7 +70,7 @@ export default function EmotionRadar({ emotionScores, bookType }: EmotionRadarPr
             dataKey="value"
             stroke="var(--accent)"
             fill="var(--accent)"
-            fillOpacity={0.2}
+            fillOpacity={0.45}
             strokeWidth={2}
           />
         </RadarChart>
