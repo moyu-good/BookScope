@@ -55,16 +55,7 @@ def run_extraction(
             _style_result: list = []
 
             def _do_emotion():
-                analyzer = None
-                try:
-                    from bookscope.nlp.transformer_analyzer import TransformerAnalyzer
-                    analyzer = TransformerAnalyzer(language=lang)
-                    analyzer._get_classifier()
-                    logger.info("Using TransformerAnalyzer for emotion analysis")
-                except Exception as e:
-                    logger.warning("TransformerAnalyzer unavailable (%s), falling back to LexiconAnalyzer", e)
-                    analyzer = LexiconAnalyzer(language=lang)
-
+                analyzer = LexiconAnalyzer(language=lang)
                 scores = []
                 for i, chunk in enumerate(chunks):
                     score = analyzer.analyze_chunk(chunk)

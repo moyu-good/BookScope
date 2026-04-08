@@ -19,7 +19,6 @@ from bookscope.nlp.soul_engine import (
     extract_character_dialogues,
 )
 from bookscope.nlp.style_analyzer import StyleAnalyzer
-from bookscope.nlp.transformer_analyzer import TransformerAnalyzer
 
 __all__ = [
     "AnalyzerProtocol",
@@ -41,5 +40,4 @@ __all__ = [
     "OllamaBackend",
     "OpenAIBackend",
     "StyleAnalyzer",
-    "TransformerAnalyzer",
 ]

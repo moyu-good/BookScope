@@ -1,11 +1,10 @@
 """Pluggable analyzer interface.
 
-Any backend (lexicon, transformer, …) must satisfy this Protocol.
+Any backend must satisfy this Protocol.
 Swapping backends requires zero changes to the pipeline or viz layer.
 
-Plug-in contract:
-    Phase 1  →  LexiconAnalyzer   (nrclex, fast, no GPU)
-    Phase 2  →  TransformerAnalyzer (HuggingFace, higher accuracy)
+Production backend:
+    LexiconAnalyzer  (nrclex, fast, CPU-only, no GPU required)
 """
 
 from typing import Protocol, runtime_checkable
