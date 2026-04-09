@@ -24,31 +24,21 @@
   --accent-hover: #daa832;
   --accent-subtle: rgba(200, 148, 26, 0.12);
 
-  /* Emotion palette */
-  --joy: #e8b84b;
-  --sadness: #5b8fd4;
-  --anger: #d4503a;
-  --fear: #8b6cc6;
-  --trust: #4db88a;
-  --anticipation: #d47b2e;
-  --surprise: #c75a8a;
-  --disgust: #7a7568;
-
   /* Typography */
   --font-display: "Ma Shan Zheng", "Zhi Mang Xing", cursive;
   --font-body: "Noto Serif SC", "Songti SC", "SimSun", serif;
   --font-mono: "Courier New", monospace;
 
-  /* ── 御览 (Imperial Review) tokens ─────────────── */
-  --parchment: #f5f0e8;
-  --parchment-dark: #e8e0d0;
-  --parchment-text: #1a1a1a;
-  --parchment-text-secondary: #4a4540;
+  /* ── 御览 (Imperial Review) tokens — 深色宣纸 ──── */
+  --parchment: #1e1c16;
+  --parchment-dark: #16140f;
+  --parchment-text: #c8b89a;
+  --parchment-text-secondary: #8a7e6a;
   --vermillion: #c94043;
-  --vermillion-light: rgba(201, 64, 67, 0.08);
-  --vermillion-border: rgba(201, 64, 67, 0.3);
-  --fold-line: #d5cfc4;
-  --seal-shadow: rgba(201, 64, 67, 0.25);
+  --vermillion-light: rgba(201, 64, 67, 0.1);
+  --vermillion-border: rgba(201, 64, 67, 0.35);
+  --fold-line: rgba(200, 184, 154, 0.2);
+  --seal-shadow: rgba(201, 64, 67, 0.3);
 }
 
 * { box-sizing: border-box; }
@@ -139,15 +129,11 @@ h1, h2, h3 {
 @keyframes memorialUnfold {
   from {
     opacity: 0;
-    max-height: 0;
-    transform: scaleY(0.3);
-    transform-origin: top center;
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
-    max-height: 2000px;
-    transform: scaleY(1);
-    transform-origin: top center;
+    transform: translateY(0);
   }
 }
 
@@ -172,12 +158,13 @@ h1, h2, h3 {
   color: var(--parchment-text);
   position: relative;
   border-radius: 4px;
+  border: 1px solid rgba(200, 184, 154, 0.12);
   box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.08),
-    0 4px 12px rgba(0, 0, 0, 0.04);
+    0 1px 4px rgba(0, 0, 0, 0.2),
+    0 4px 16px rgba(0, 0, 0, 0.1);
 
   /* Override dark-theme variables so nested child components
-     (EmotionRadar, VerdictCard, CharacterGallery, etc.)
+     (VerdictCard, CharacterGallery, etc.)
      automatically use parchment-compatible colors */
   --surface: var(--parchment-dark);
   --bg: var(--parchment);
@@ -197,8 +184,8 @@ h1, h2, h3 {
       0deg,
       transparent 0px,
       transparent 28px,
-      rgba(0, 0, 0, 0.015) 28px,
-      rgba(0, 0, 0, 0.015) 29px
+      rgba(200, 184, 154, 0.04) 28px,
+      rgba(200, 184, 154, 0.04) 29px
     );
 }
 

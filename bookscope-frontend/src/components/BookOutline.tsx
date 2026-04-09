@@ -15,7 +15,13 @@ export default function BookOutline({
   legacySummary,
   legacyThemes,
 }: BookOutlineProps) {
-  const displayText = outline || legacySummary || "";
+  const rawText = outline || legacySummary || "";
+  // Sanitize technical chunk identifiers that may leak from LLM output
+  const displayText = rawText
+    .replace(/chunk\s*\d+[-–]?\d*/gi, "")
+    .replace(/片段\s*#?\d+/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   if (!displayText) return null;
 
   const hasDeepThemes = themes && themes.length > 0;

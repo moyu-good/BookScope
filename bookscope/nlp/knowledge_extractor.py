@@ -85,17 +85,21 @@ def _build_batch_prompt(
     language: str,
 ) -> str:
     """Build a prompt for summarizing a batch of chunks."""
+    # Build index mapping for internal use; don't expose indices to LLM
     chunks_text = ""
-    for idx, text in batch:
+    idx_map = {}  # position -> original chunk index
+    for pos, (idx, text) in enumerate(batch):
         truncated = text[:_CHARS_PER_CHUNK]
-        chunks_text += f"\n--- 片段 #{idx + 1} ---\n{truncated}\n"
+        chunks_text += f"\n--- 以下内容 ---\n{truncated}\n"
+        idx_map[pos] = idx
 
     if language == "zh":
         return (
             "你是一个书籍内容分析助手。请分析以下多个书籍片段，为每个片段返回摘要。\n"
+            "所有输出内容必须使用中文，包括字段值。不允许英文单词或短语。\n"
             "严格返回合法JSON数组，不要返回markdown或其他文字。\n"
             "每个元素的schema:\n"
-            '{"chunk_index": 片段编号(从0开始), "title": "推断的章节标题", '
+            '{"chunk_index": 片段序号(从0开始，按出现顺序), "title": "推断的章节标题", '
             '"summary": "50-100字概述", '
             '"key_events": ["事件1", "事件2"], '
             '"characters_mentioned": ["人物名1", "人物名2"]}\n\n'
@@ -205,50 +209,56 @@ def _merge_characters(
         return []
 
     names_info = ", ".join(
-        f"{name}(出现在段落{idxs})" for name, idxs in all_names.items()
+        f"{name}(多处出现)" for name in all_names.keys()
     )
 
     context_lines = []
     for s in summaries:
         if s.summary:
-            context_lines.append(f"段落{s.chunk_index}: {s.summary}")
+            context_lines.append(s.summary)
     context = "\n".join(context_lines[:30])  # cap context length
 
     prompt = (
         "你是一个书籍人物分析专家。根据以下信息，合并重复人物（同一人物的不同称呼），"
         "输出去重后的人物档案列表。\n"
+        "所有输出内容必须使用中文，包括字段值。不允许英文单词或短语。\n"
+        "要求：提取所有有名字的重要人物，至少8个（含配角和次要角色）。\n"
         "严格返回合法JSON数组，不要返回markdown或其他文字。\n"
         "每个人物的JSON schema:\n"
         '{"name": "主名称", "aliases": ["别名1"], '
-        '"description": "一句话描述", "voice_style": "说话风格", '
+        '"description": "至少50字的人物描述，包含身份背景、性格特征、关键行为、在故事中的作用", '
+        '"voice_style": "具体描述说话风格，给出示例性语句", '
         '"motivations": ["动机1"], '
         '"key_chapter_indices": [0, 1], '
-        '"arc_summary": "人物弧光概述"}\n\n'
+        '"arc_summary": "描述人物在全书中的变化轨迹"}\n\n'
         f"书名: {book_title}\n"
-        f"出现的人物及段落: {names_info}\n\n"
-        f"各段落摘要:\n{context}"
+        f"出现的人物: {names_info}\n\n"
+        f"内容摘要:\n{context}"
     )
     if language == "en":
         names_info_en = ", ".join(
-            f"{name}(appears in chunks {idxs})" for name, idxs in all_names.items()
+            f"{name}(appears multiple times)" for name in all_names.keys()
         )
         context_en = "\n".join(
-            f"Chunk {s.chunk_index}: {s.summary}" for s in summaries[:30] if s.summary
+            s.summary for s in summaries[:30] if s.summary
         )
         prompt = (
             "You are a book character analyst. Merge duplicate characters "
             "(same person with different names/titles) and produce deduplicated "
             "character profiles.\n"
+            "Extract all named important characters, at least 8 (including supporting roles).\n"
             "Return ONLY a valid JSON array, no markdown or explanation.\n"
             "Each character schema:\n"
             '{"name": "primary name", "aliases": ["alias1"], '
-            '"description": "one-line description", "voice_style": "speech style", '
+            '"description": "at least 50 words: background, personality, '
+            'key actions, role in story", '
+            '"voice_style": "specific speech style with example phrases", '
             '"motivations": ["motivation1"], '
             '"key_chapter_indices": [0, 1], '
-            '"arc_summary": "character arc summary"}\n\n'
+            '"arc_summary": "character arc across the book"}\n\n'
             f"Book: {book_title}\n"
-            f"Characters and chunks: {names_info_en}\n\n"
-            f"Chunk summaries:\n{context_en}"
+            f"Characters: {names_info_en}\n\n"
+            f"Content summaries:\n{context_en}"
         )
 
     raw = call_llm(prompt, api_key=api_key, model=model, max_tokens=2000) or ""
@@ -560,14 +570,16 @@ def _analyze_chapter_deep(
             )
         prompt = (
             "你是一位资深书籍分析专家。请对以下章节进行深度分析。\n"
+            "所有输出内容必须使用中文，包括字段值。不允许英文单词或短语。\n"
             f"{focus}\n"
             "严格返回合法JSON，不要返回markdown或其他文字。\n\n"
             "JSON schema:\n"
             "{\n"
-            '  "analysis": "300-800字的深度分析",\n'
-            '  "key_points": ["要点1（1-2句话）", "要点2", "要点3"],\n'
+            '  "analysis": "至少300字的深度分析，包含：核心情节推进、'
+            '人物发展变化、主题意义。要具体引用原文细节，避免笼统概括",\n'
+            '  "key_points": ["要点1（2-3句话，不要泛泛而谈）", "要点2", "要点3"],\n'
             '  "characters_involved": ["人物名1", "人物名2"],\n'
-            '  "significance": "1-2句话：本章在全书中的意义和作用"\n'
+            '  "significance": "具体说明本章对全书的作用，不要空泛"\n'
             "}\n\n"
             f"书名：{book_title}\n"
             f"章节：{chapter_title}\n\n"
@@ -595,10 +607,12 @@ def _analyze_chapter_deep(
             "Return ONLY valid JSON, no markdown or explanation.\n\n"
             "JSON schema:\n"
             "{\n"
-            '  "analysis": "300-800 word deep analysis",\n'
-            '  "key_points": ["point 1 (1-2 sentences)", "point 2", "point 3"],\n'
+            '  "analysis": "at least 300 words: plot progression, '
+            'character development, thematic significance. '
+            'Be specific, cite details, avoid generic statements",\n'
+            '  "key_points": ["point 1 (2-3 sentences, be specific)", "point 2", "point 3"],\n'
             '  "characters_involved": ["person1", "person2"],\n'
-            '  "significance": "1-2 sentences: significance of this chapter in the book"\n'
+            '  "significance": "specific contribution of this chapter to the book, not vague"\n'
             "}\n\n"
             f"Book: {book_title}\n"
             f"Chapter: {chapter_title}\n\n"
@@ -678,14 +692,15 @@ def _analyze_arc(
             "请结合章节标题（提供整体结构）和代表性片段（提供具体内容），\n"
             "对这段叙事弧进行深度分析。即使代表性片段无法覆盖所有章节，\n"
             "也请根据章节标题推断整体叙事脉络。\n"
+            "所有输出内容必须使用中文，包括字段值。不允许英文单词或短语。\n"
             f"{focus}\n"
             "严格返回合法JSON，不要返回markdown或其他文字。\n\n"
             "JSON schema:\n"
             "{\n"
-            '  "analysis": "300-800字的深度分析，涵盖这段叙事弧的核心内容和意义",\n'
-            '  "key_points": ["要点1（1-2句话）", "要点2", "要点3", "要点4"],\n'
+            '  "analysis": "至少300字的深度分析，要具体、有深度，引用原文细节，避免笼统概括",\n'
+            '  "key_points": ["要点1（2-3句话，不要泛泛而谈）", "要点2", "要点3", "要点4"],\n'
             '  "characters_involved": ["人物名1", "人物名2"],\n'
-            '  "significance": "1-2句话：这段叙事弧在全书中的位置和作用"\n'
+            '  "significance": "具体说明这段叙事弧在全书中的位置和作用"\n'
             "}\n\n"
             f"书名：{book_title}\n"
             f"本弧涵盖{n_chapters}个章节：\n{titles_numbered}\n\n"
@@ -777,6 +792,7 @@ def _generate_book_outline(
             theme_desc = "核心主题"
         prompt = (
             "你是一位资深书籍分析专家。根据以下各章节分析，撰写全书大纲。\n"
+            "所有输出内容必须使用中文，包括字段值。不允许英文单词或短语。\n"
             "严格返回合法JSON，不要返回markdown或其他文字。\n\n"
             "JSON schema:\n"
             "{\n"
@@ -901,6 +917,7 @@ def _generate_narrative_rhythm(
             )
         prompt = (
             "你是叙事分析专家。根据以下各章节分析，为每章标注叙事节奏。\n"
+            "所有输出内容必须使用中文，包括title和event_label。不允许英文单词或短语。\n"
             "严格返回合法JSON数组，不要返回markdown或其他文字。\n\n"
             "每个元素的schema:\n"
             "{\n"
@@ -925,7 +942,8 @@ def _generate_narrative_rhythm(
             '  "chapter_index": chapter number (integer),\n'
             '  "title": "chapter title",\n'
             '  "intensity": 0.0-1.0 narrative tension/importance score,\n'
-            '  "event_label": "the single most important event/argument (5-15 words, specific not abstract)",\n'
+            '  "event_label": "the single most important event/argument '
+            '(5-15 words, specific not abstract)",\n'
             '  "point_type": "one of: setup/rising/climax/turning/falling/resolution"\n'
             "}\n\n"
             f"Book: {book_title}\n"
@@ -1146,7 +1164,7 @@ def extract_knowledge_graph(
         context = "\n".join(summary_parts)
         prompt = (
             "根据以下书籍各段叙事弧分析，生成一段200-400字的全书总体概述。"
-            "严格返回纯文本，不要返回JSON或markdown。\n\n"
+            "所有输出必须使用中文。严格返回纯文本，不要返回JSON或markdown。\n\n"
             f"书名：{book_title}\n\n{context}"
         ) if language == "zh" else (
             "Based on the following narrative arc analyses, write a 200-400 word "

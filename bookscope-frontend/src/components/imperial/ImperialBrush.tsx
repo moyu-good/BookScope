@@ -64,6 +64,8 @@ interface BrushMessage {
   characterName?: string;
 }
 
+const INTRO_SEEN_KEY = "bookscope-brush-intro-seen";
+
 export default function ImperialBrush({
   sessionId,
   characters,
@@ -72,8 +74,16 @@ export default function ImperialBrush({
   const [activeCharacter, setActiveCharacter] = useState<string | null>(null);
   const [messages, setMessages] = useState<BrushMessage[]>([]);
   const [expanded, setExpanded] = useState(false);
+  const [showIntro, setShowIntro] = useState(
+    () => !localStorage.getItem(INTRO_SEEN_KEY),
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const dismissIntro = () => {
+    setShowIntro(false);
+    localStorage.setItem(INTRO_SEEN_KEY, "1");
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -187,6 +197,23 @@ export default function ImperialBrush({
         </div>
       )}
 
+      {/* Onboarding guide */}
+      {showIntro && (
+        <div className="bg-[var(--surface)] border-t border-[var(--accent)]/20">
+          <div className="max-w-3xl mx-auto px-4 py-2.5 flex items-center justify-between">
+            <span className="text-xs text-[var(--accent)] tracking-wide" style={{ fontFamily: "var(--font-body)" }}>
+              在此与书中人物对话，或对任何章节留下朱批
+            </span>
+            <button
+              onClick={dismissIntro}
+              className="text-[var(--text-secondary)] hover:text-[var(--text)] text-xs cursor-pointer ml-3 shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Summon strip + input */}
       <div className="bg-[var(--bg)] border-t border-[var(--border)]">
         <div className="max-w-3xl mx-auto">
@@ -210,7 +237,7 @@ export default function ImperialBrush({
               placeholder={
                 activeCharacter
                   ? `传召${activeCharacter}回话...`
-                  : "御笔批示..."
+                  : "传召书中人物对话，或输入朱批..."
               }
               className={clsx(
                 "flex-1 bg-[var(--surface)] border rounded-lg px-4 py-2.5 text-sm",

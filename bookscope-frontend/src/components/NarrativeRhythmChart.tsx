@@ -25,6 +25,11 @@ const TYPE_LABELS: Record<string, string> = {
   resolution: "收束",
 };
 
+/** Sanitize point_type from backend to known Chinese labels */
+function localizeType(raw: string): string {
+  return TYPE_LABELS[raw] ?? raw;
+}
+
 const TYPE_COLORS: Record<string, string> = {
   setup: "var(--text-secondary)",
   rising: "var(--accent)",

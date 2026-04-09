@@ -169,14 +169,15 @@ export function AnnotateButton({ onClick, disabled }: AnnotateButtonProps) {
     <button
       onClick={onClick}
       disabled={disabled}
+      title="对此内容留下朱批评注"
       className={clsx(
-        "text-xs px-3 py-1.5 rounded border transition-colors cursor-pointer",
+        "text-sm px-4 py-2 rounded border transition-colors cursor-pointer",
         "border-[var(--vermillion-border)] text-[var(--vermillion)]",
         "hover:bg-[var(--vermillion-light)] hover:border-[var(--vermillion)]",
         disabled && "opacity-40 cursor-not-allowed",
       )}
     >
-      朱批 ✏️
+      御笔朱批
     </button>
   );
 }

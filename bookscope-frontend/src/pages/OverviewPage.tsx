@@ -20,9 +20,7 @@ import VerdictCard from "../components/VerdictCard";
 import ChapterDeepView from "../components/ChapterDeepView";
 import ChapterTimeline from "../components/ChapterTimeline";
 import CharacterGallery from "../components/CharacterGallery";
-import EmotionRadar from "../components/EmotionRadar";
 import NarrativeRhythmChart from "../components/NarrativeRhythmChart";
-import ArcChart from "../components/ArcChart";
 import SearchPanel from "../components/SearchPanel";
 
 /* ------------------------------------------------------------------ */
@@ -157,65 +155,15 @@ export default function OverviewPage() {
   if (!sessionId) return null;
 
   return (
-    <div className="pb-36">
+    <div className="pb-48">
       {/* Extraction progress */}
       {isExtracting && <ExtractionProgress events={sseEvents} />}
 
       {/* ── Memorial Fold Stack ──────────────────────── */}
       {hasAnyData && (
         <div className="space-y-0">
-          {/* ── Tier 1: Immediate results (emotion/style/verdict) ── */}
-
-          {/* 1. Reader Verdict (Tier 1) */}
-          {hasAnalysis && overview?.reader_verdict && (
-            <>
-              <AnnotatedMemorial
-                sectionKey="verdict"
-                title="阅读判断"
-                preview={overview.reader_verdict.sentence}
-                sessionId={sessionId}
-                annotations={annotations}
-              >
-                <VerdictCard verdict={overview.reader_verdict} />
-              </AnnotatedMemorial>
-              <FoldCrease />
-            </>
-          )}
-
-          {/* 2. Emotion / Style Analysis (Tier 1) */}
-          {hasAnalysis && (
-            <>
-              <AnnotatedMemorial
-                sectionKey="emotion"
-                title="情感基调"
-                preview={overview?.dominant_emotion ? `主导情绪：${overview.dominant_emotion}` : "全书情感分布"}
-                defaultOpen={!hasKG}
-                sessionId={sessionId}
-                annotations={annotations}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {overview?.emotion_scores &&
-                    overview.emotion_scores.length > 0 && (
-                      <EmotionRadar
-                        emotionScores={overview.emotion_scores}
-                        bookType={overview.book_type}
-                      />
-                    )}
-                  {overview?.valence_series &&
-                    overview.valence_series.length > 0 && (
-                      <ArcChart
-                        valenceSeries={overview.valence_series}
-                        arcPattern={overview.arc_pattern}
-                      />
-                    )}
-                </div>
-              </AnnotatedMemorial>
-              <FoldCrease />
-            </>
-          )}
-
           {/* ── Tier 2 loading placeholder ── */}
-          {kgLoading && hasAnalysis && (
+          {kgLoading && (
             <div className="memorial-section px-6 py-8 text-center">
               <div className="flex items-center justify-center gap-3 text-[var(--parchment-text-secondary)]">
                 <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
@@ -229,9 +177,7 @@ export default function OverviewPage() {
             </div>
           )}
 
-          {/* ── Tier 2: KG results (outline/chapters/characters/rhythm) ── */}
-
-          {/* 3. Book Outline / Summary (Tier 2) */}
+          {/* ── 1. Book Outline / Summary (Tier 2) ── */}
           {(overview?.book_outline || overview?.overall_summary) && (
             <>
               <AnnotatedMemorial
@@ -263,7 +209,7 @@ export default function OverviewPage() {
             </>
           )}
 
-          {/* 4. Chapter Deep Analysis (Tier 2) */}
+          {/* ── 2. Chapter Deep Analysis (Tier 2) ── */}
           {((overview?.chapter_analyses?.length ?? 0) > 0 ||
             (overview?.chapter_summaries?.length ?? 0) > 0) && (
             <>
@@ -286,7 +232,7 @@ export default function OverviewPage() {
             </>
           )}
 
-          {/* 5. Character Gallery (Tier 2) */}
+          {/* ── 3. Character Gallery (Tier 2) ── */}
           {(overview?.characters_brief?.length ?? 0) > 0 && (
             <>
               <AnnotatedMemorial
@@ -309,7 +255,7 @@ export default function OverviewPage() {
             </>
           )}
 
-          {/* 6. Narrative Rhythm (Tier 2) */}
+          {/* ── 4. Narrative Rhythm (Tier 2) ── */}
           {(overview?.narrative_rhythm?.length ?? 0) > 0 && (
             <>
               <AnnotatedMemorial
@@ -325,7 +271,23 @@ export default function OverviewPage() {
             </>
           )}
 
-          {/* 7. Search */}
+          {/* ── 5. Reader Verdict (Tier 1) ── */}
+          {hasAnalysis && overview?.reader_verdict && (
+            <>
+              <AnnotatedMemorial
+                sectionKey="verdict"
+                title="阅读判断"
+                preview={overview.reader_verdict.sentence}
+                sessionId={sessionId}
+                annotations={annotations}
+              >
+                <VerdictCard verdict={overview.reader_verdict} />
+              </AnnotatedMemorial>
+              <FoldCrease />
+            </>
+          )}
+
+          {/* ── 6. Search ── */}
           <div className="memorial-section">
             <button
               onClick={() => setSearchOpen((v) => !v)}

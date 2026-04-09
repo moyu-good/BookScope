@@ -6,8 +6,6 @@ import BookSummaryCard from "../components/BookSummaryCard";
 import VerdictCard from "../components/VerdictCard";
 import ChapterTimeline from "../components/ChapterTimeline";
 import CharacterGallery from "../components/CharacterGallery";
-import EmotionRadar from "../components/EmotionRadar";
-import ArcChart from "../components/ArcChart";
 
 export default function LibraryDetailPage() {
   const { filename } = useParams<{ filename: string }>();
@@ -181,21 +179,6 @@ export default function LibraryDetailPage() {
               readOnly
             />
           )}
-
-        {/* Charts */}
-        {hasAnalysis && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {overview.emotion_scores && overview.emotion_scores.length > 0 && (
-              <EmotionRadar emotionScores={overview.emotion_scores} />
-            )}
-            {overview.valence_series && overview.valence_series.length > 0 && (
-              <ArcChart
-                valenceSeries={overview.valence_series}
-                arcPattern={overview.arc_pattern}
-              />
-            )}
-          </div>
-        )}
 
         {/* Back to library */}
         <div className="pt-4 flex justify-center">
