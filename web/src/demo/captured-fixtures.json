@@ -1,0 +1,1688 @@
+{
+  "json": {
+    "GET /api/sessions": {
+      "sessions": [
+        {
+          "session_id": "a33b576dd0ce4afb",
+          "book_title": "三国演义",
+          "language": "zh",
+          "created_at": "2026-06-17T07:18:19Z",
+          "last_accessed_at": "2026-06-17T07:18:19Z"
+        },
+        {
+          "session_id": "cb20abc218fd49fe",
+          "book_title": "三国演义",
+          "language": "zh",
+          "created_at": "2026-06-17T07:25:10Z",
+          "last_accessed_at": "2026-06-17T07:25:10Z"
+        }
+      ]
+    },
+    "POST /api/agent/suggest-questions": {
+      "questions": [
+        {
+          "type": "伏笔回收",
+          "question": "第三十七回司马徽说‘卧龙虽得其主，不得其时’，这一预言在第一百零四回五丈原诸葛亮病逝时如何应验？请结合书中的星象描写和临终场景具体说明。"
+        },
+        {
+          "type": "人物弧线",
+          "question": "关羽在第二十五回‘屯土山约三事’时承诺‘但知皇叔去向，便当辞去’，到第二十七回‘千里走单骑’时他是否始终坚守这一承诺？请分析关羽从降曹到寻兄过程中‘义’的观念是否发生过动摇。"
+        },
+        {
+          "type": "设定一致性",
+          "question": "第四十九回诸葛亮‘借东风’时自称能呼风唤雨，但第八十四回他在鱼腹浦布八阵图时却只是‘取石排成阵势’并未用法术，这两种‘神通’的运用是否存在设定上的不统一？请结合书中对诸葛亮‘玄学’能力的描写讨论。"
+        },
+        {
+          "type": "节奏张力",
+          "question": "第九十五回‘空城计’中，司马懿引十五万大军至西城，而孔明仅剩二千五百兵，这一情节的紧张感是如何通过细节（如焚香操琴、洒扫城门）营造出来的？请分析罗贯中在此处的节奏控制手法。"
+        },
+        {
+          "type": "人物关系",
+          "question": "曹操与荀彧的关系在第六十一回至第六十六回发生了怎样的转折？荀彧反对曹操称魏公并最终服毒自尽，这一结局是否与他早年‘吾之子房’的定位相冲突？请结合具体章节说明。"
+        }
+      ],
+      "book_session_id": "a33b576dd0ce4afb",
+      "trace": {
+        "input_tokens": 549859,
+        "output_tokens": 1406,
+        "chars": 649896,
+        "duration_ms": 31875
+      }
+    },
+    "POST /api/agent/character-graph": {
+      "nodes": [
+        "刘备",
+        "关羽",
+        "张飞",
+        "诸葛亮",
+        "曹操",
+        "孙权",
+        "周瑜",
+        "吕布",
+        "董卓",
+        "袁绍",
+        "司马懿",
+        "赵云",
+        "刘禅",
+        "庞统",
+        "姜维",
+        "曹丕",
+        "孙策",
+        "许褚",
+        "荀彧",
+        "马谡",
+        "曹植",
+        "貂蝉",
+        "孙夫人",
+        "司马师",
+        "司马昭",
+        "袁术",
+        "汉献帝"
+      ],
+      "edges": [
+        {
+          "source": "刘备",
+          "target": "关羽",
+          "relation": "结义兄弟",
+          "strength": 5,
+          "evidence": "念刘备、关羽、张飞，虽然异姓，既结为兄弟，则同心协力，救困扶危，上报国家，下安黎庶，不求同年同月同日生，只愿同年同月同日死。",
+          "verified": true,
+          "chapter": 58,
+          "match_score": 0.96
+        },
+        {
+          "source": "刘备",
+          "target": "张飞",
+          "relation": "结义兄弟",
+          "strength": 5,
+          "evidence": "念刘备、关羽、张飞，虽然异姓，既结为兄弟，则同心协力，救困扶危，上报国家，下安黎庶，不求同年同月同日生，只愿同年同月同日死。",
+          "verified": true,
+          "chapter": 58,
+          "match_score": 0.96
+        },
+        {
+          "source": "关羽",
+          "target": "张飞",
+          "relation": "结义兄弟",
+          "strength": 5,
+          "evidence": "念刘备、关羽、张飞，虽然异姓，既结为兄弟，则同心协力，救困扶危，上报国家，下安黎庶，不求同年同月同日生，只愿同年同月同日死。",
+          "verified": true,
+          "chapter": 58,
+          "match_score": 0.96
+        },
+        {
+          "source": "刘备",
+          "target": "诸葛亮",
+          "relation": "君臣/师徒",
+          "strength": 5,
+          "evidence": "玄德待孔明如师，食则同桌，寝则同榻，终日共论天下之事。",
+          "verified": true,
+          "chapter": 95,
+          "match_score": 1.0
+        },
+        {
+          "source": "诸葛亮",
+          "target": "刘禅",
+          "relation": "托孤君臣",
+          "strength": 5,
+          "evidence": "先主泣曰：'君才十倍曹丕，必能安邦定国，终定大事。若嗣子可辅则辅之，如其不才，君可自为成都之主。'",
+          "verified": true,
+          "chapter": 206,
+          "match_score": 0.91
+        },
+        {
+          "source": "刘备",
+          "target": "赵云",
+          "relation": "君臣",
+          "strength": 5,
+          "evidence": "赵云见夫人已死，恐曹军盗尸，便将土墙推倒，掩盖枯井。掩讫，解开勒甲绦，放下掩心镜，将阿斗抱护在怀，绰枪上马。",
+          "verified": true,
+          "chapter": 98,
+          "match_score": 0.96
+        },
+        {
+          "source": "刘备",
+          "target": "孙夫人",
+          "relation": "夫妻",
+          "strength": 5,
+          "evidence": "权曰：'吾愿将小妹招赘玄德，并无异心。'",
+          "verified": true,
+          "chapter": 111,
+          "match_score": 0.78
+        },
+        {
+          "source": "刘备",
+          "target": "庞统",
+          "relation": "君臣",
+          "strength": 4,
+          "evidence": "遂拜庞统为副军师中郎将，与孔明共赞方略，教练军士，听候征伐。",
+          "verified": true,
+          "chapter": 178,
+          "match_score": 1.0
+        },
+        {
+          "source": "曹操",
+          "target": "关羽",
+          "relation": "君臣",
+          "strength": 3,
+          "evidence": "操待之甚厚，小宴三日，大宴五日，又送美女十人，使侍关公。",
+          "verified": true,
+          "chapter": 82,
+          "match_score": 1.0
+        },
+        {
+          "source": "曹操",
+          "target": "荀彧",
+          "relation": "君臣",
+          "strength": 4,
+          "evidence": "荀彧曰：'昔晋文公纳周襄王，而诸侯服从；汉高祖为义帝发丧，而天下归心。今天子蒙尘，将军诚因此时首倡义兵，奉天子以从众望，不世之略也。'",
+          "verified": true,
+          "chapter": 71,
+          "match_score": 0.85
+        },
+        {
+          "source": "曹操",
+          "target": "许褚",
+          "relation": "君臣",
+          "strength": 4,
+          "evidence": "操曰：'此古之恶来也！'遂命为帐前都尉，解上身锦袄，及骏马雕鞍赐之。",
+          "verified": true,
+          "chapter": 67,
+          "match_score": 0.75
+        },
+        {
+          "source": "曹操",
+          "target": "汉献帝",
+          "relation": "君臣/挟持",
+          "strength": 2,
+          "evidence": "自此大权皆归于曹操：朝廷大务，先禀曹操，然后方奏天子。",
+          "verified": true,
+          "chapter": 71,
+          "match_score": 1.0
+        },
+        {
+          "source": "曹操",
+          "target": "刘备",
+          "relation": "敌对",
+          "strength": 2,
+          "evidence": "操曰：'夫英雄者，胸怀大志，腹有良谋，有包藏宇宙之机，吞吐天地之志者也。'玄德曰：'谁能当之？'操以手指玄德，后自指，曰：'今天下英雄，惟使君与操耳！'",
+          "verified": true,
+          "chapter": 78,
+          "match_score": 0.82
+        },
+        {
+          "source": "曹操",
+          "target": "吕布",
+          "relation": "敌对",
+          "strength": 1,
+          "evidence": "曹操入城，即传令退了所决之水，出榜安民。一面与玄德同坐白门楼上，关、张侍立于侧，提过擒获一干人来。吕布虽然长大，却被绳索捆作一团。",
+          "verified": true,
+          "chapter": 76,
+          "match_score": 1.0
+        },
+        {
+          "source": "曹操",
+          "target": "袁绍",
+          "relation": "盟友/敌对",
+          "strength": 2,
+          "evidence": "袁绍得操矫诏，乃聚麾下文武，引兵三万，离渤海来与曹操会盟。",
+          "verified": true,
+          "chapter": 62,
+          "match_score": 1.0
+        },
+        {
+          "source": "曹操",
+          "target": "曹丕",
+          "relation": "父子",
+          "strength": 5,
+          "evidence": "操长叹一声，泪如雨下。须臾，气绝而死。……曹丕闻知父丧，放声痛哭，率大小官员出城十里，伏道迎榇入城。",
+          "verified": true,
+          "chapter": 199,
+          "match_score": 0.9
+        },
+        {
+          "source": "孙权",
+          "target": "周瑜",
+          "relation": "君臣",
+          "strength": 5,
+          "evidence": "权曰：'公瑾，卿言当伐，甚合孤意。此天以卿授我也。'遂拔佩剑砍面前奏案一角曰：'诸官将有再言降操者，与此案同！'言罢，便将此剑赐周瑜。",
+          "verified": true,
+          "chapter": 101,
+          "match_score": 0.75
+        },
+        {
+          "source": "孙权",
+          "target": "刘备",
+          "relation": "姻亲/敌对",
+          "strength": 3,
+          "evidence": "权曰：'吾愿将小妹招赘玄德，并无异心。'",
+          "verified": true,
+          "chapter": 111,
+          "match_score": 0.78
+        },
+        {
+          "source": "周瑜",
+          "target": "诸葛亮",
+          "relation": "同僚/对手",
+          "strength": 2,
+          "evidence": "周瑜曰：'此人见识胜吾十倍，今不除之，后必为我国之祸！'",
+          "verified": true,
+          "chapter": 102,
+          "match_score": 0.81
+        },
+        {
+          "source": "孙策",
+          "target": "周瑜",
+          "relation": "结义兄弟",
+          "strength": 5,
+          "evidence": "瑜与孙策同年，交情甚密，因结为昆仲。",
+          "verified": true,
+          "chapter": 72,
+          "match_score": 0.94
+        },
+        {
+          "source": "吕布",
+          "target": "董卓",
+          "relation": "义父子",
+          "strength": 5,
+          "evidence": "布纳卓坐而拜之曰：'公若不弃，布请拜为义父。'",
+          "verified": true,
+          "chapter": 60,
+          "match_score": 0.81
+        },
+        {
+          "source": "吕布",
+          "target": "貂蝉",
+          "relation": "情人/夫妻",
+          "strength": 4,
+          "evidence": "允曰：'吾欲将此女送与将军为妾，还肯纳否？'布出席谢曰：'若得如此，布当效犬马之报！'",
+          "verified": true,
+          "chapter": 65,
+          "match_score": 0.8
+        },
+        {
+          "source": "袁绍",
+          "target": "袁术",
+          "relation": "兄弟/敌对",
+          "strength": 2,
+          "evidence": "袁术在南阳，闻袁绍新得冀州，遣使来求马千匹。绍不与，术怒，自此兄弟不睦。",
+          "verified": true,
+          "chapter": 64,
+          "match_score": 1.0
+        },
+        {
+          "source": "司马懿",
+          "target": "诸葛亮",
+          "relation": "敌对",
+          "strength": 1,
+          "evidence": "司马懿受巾帼女衣，……懿佯笑曰：'孔明视我为妇人耶！'即受之，令重待来使。",
+          "verified": true,
+          "chapter": 224,
+          "match_score": 0.66
+        },
+        {
+          "source": "诸葛亮",
+          "target": "马谡",
+          "relation": "君臣/上下级",
+          "strength": 4,
+          "evidence": "孔明挥泪曰：'吾与汝义同兄弟，汝之子即吾之子也，不必多嘱。'左右推出马谡于辕门之外，将斩。",
+          "verified": true,
+          "chapter": 217,
+          "match_score": 0.88
+        },
+        {
+          "source": "诸葛亮",
+          "target": "姜维",
+          "relation": "师徒/君臣",
+          "strength": 5,
+          "evidence": "孔明曰：'吾自出茅庐以来，遍求贤者，欲传授平生之学，恨未得其人。今遇伯约，吾愿足矣。'",
+          "verified": true,
+          "chapter": 214,
+          "match_score": 0.9
+        },
+        {
+          "source": "曹丕",
+          "target": "曹植",
+          "relation": "兄弟/迫害",
+          "strength": 2,
+          "evidence": "丕曰：'吾与汝乃兄弟也。以此为题。亦不许犯着兄弟字样。'植略不思索，即口占一首曰：'煮豆燃豆萁，豆在釜中泣。本是同根生，相煎何太急！'",
+          "verified": true,
+          "chapter": 200,
+          "match_score": 0.8
+        },
+        {
+          "source": "司马师",
+          "target": "司马昭",
+          "relation": "兄弟",
+          "strength": 5,
+          "evidence": "师遗言曰：'吾今权重，虽欲卸肩，不可得也。汝继我为之，大事切不可轻托他人，自取灭族之祸。'言讫，以印绶付之，泪流满面。",
+          "verified": true,
+          "chapter": 231,
+          "match_score": 0.89
+        }
+      ],
+      "book_session_id": "a33b576dd0ce4afb",
+      "trace": {
+        "duration_ms": 59652,
+        "input_tokens": 549972,
+        "output_tokens": 3923,
+        "chars": 649896,
+        "total_edges": 28,
+        "verified_edges": 28
+      }
+    },
+    "POST /api/agent/timeline": {
+      "events": [
+        {
+          "order": 1,
+          "time": "中平元年正月",
+          "event": "黄巾起义",
+          "chapter": 58,
+          "evidence": "中平元年正月内，疫气流行，张角散施符水，为人治病，自称“大贤良师”。",
+          "verified": true
+        },
+        {
+          "order": 2,
+          "time": "中平元年",
+          "event": "刘关张桃园结义",
+          "chapter": 58,
+          "evidence": "次日，于桃园中，备下乌牛白马祭礼等项，三人焚香再拜而说誓曰：“念刘备、关羽、张飞，虽然异姓，既结为兄弟，则同心协力，救困扶危；上报国家，下安黎庶。”",
+          "verified": true
+        },
+        {
+          "order": 3,
+          "time": "中平六年夏四月",
+          "event": "何进召董卓进京",
+          "chapter": 3,
+          "evidence": "中平六年夏四月，灵帝病笃，召大将军何进入宫，商议后事。……进乃暗差使命，赍密诏星夜往各镇去。",
+          "verified": false
+        },
+        {
+          "order": 4,
+          "time": "初平元年九月",
+          "event": "董卓废少帝立献帝",
+          "chapter": 61,
+          "evidence": "九月朔，请帝升嘉德殿，大会文武。董卓拔剑在手，对众曰：“天子暗弱，不足以君天下。今有策文一道，宜为宣读。”",
+          "verified": true
+        },
+        {
+          "order": 5,
+          "time": "初平元年（约190年）",
+          "event": "曹操献刀刺董卓未遂",
+          "chapter": 61,
+          "evidence": "次日，曹操佩着宝刀来至相府，问：“丞相何在？”从人云：“在小阁中。”操径入，见董卓坐于床上，吕布侍立于侧。",
+          "verified": true
+        },
+        {
+          "order": 6,
+          "time": "初平元年",
+          "event": "十八路诸侯讨董",
+          "chapter": 62,
+          "evidence": "操发檄文去后，各镇诸侯皆起兵相应：第一镇，后将军南阳太守袁术。第二镇，冀州刺史韩馥。第三镇，豫州刺史孔伷。……",
+          "verified": true
+        },
+        {
+          "order": 7,
+          "time": "初平元年",
+          "event": "孙坚于井中得传国玉玺",
+          "chapter": 63,
+          "evidence": "傍有军士指曰：“殿南有五色毫光起于井中。”坚唤军士点起火把，下井打捞，捞起一妇人尸首。……乃一玉玺：方圆四寸，上镌五龙交纽；傍缺一角，以黄金镶之。",
+          "verified": true
+        },
+        {
+          "order": 8,
+          "time": "初平三年（约192年）",
+          "event": "王允施连环计杀董卓",
+          "chapter": 65,
+          "evidence": "司徒王允归到府中，寻思今日席间之事，坐不安席。至夜深月明，策杖步入后园，立于荼蘼架侧，仰天垂泪。忽闻有人在牡丹亭畔，长吁短叹。",
+          "verified": true
+        },
+        {
+          "order": 9,
+          "time": "建安元年",
+          "event": "曹操迎献帝迁都许昌",
+          "chapter": 71,
+          "evidence": "操曰：“东都荒废久矣，不可修葺，更兼转运粮食艰辛。许都地近鲁阳，城郭宫室，钱粮民物，足可备用。臣敢请驾幸许都，惟陛下从之。”",
+          "verified": true
+        },
+        {
+          "order": 10,
+          "time": "建安元年",
+          "event": "吕布夜袭徐州",
+          "chapter": 71,
+          "evidence": "吕布到城下时，恰才四更，月色澄清，城上并不知觉。布到城门边叫曰：“刘使君有机密使人至。”……吕布一声暗号，众军齐入，喊声大举。",
+          "verified": true
+        },
+        {
+          "order": 11,
+          "time": "建安三年",
+          "event": "曹操下邳擒吕布",
+          "chapter": 76,
+          "evidence": "曹操入城，即传令退了所决之水，出榜安民。一面与玄德同坐白门楼上，关、张侍立于侧，提过擒获一干人来。",
+          "verified": true
+        },
+        {
+          "order": 12,
+          "time": "建安五年",
+          "event": "官渡之战",
+          "chapter": 87,
+          "evidence": "却说袁绍兴兵望官渡进发。夏侯惇发书告急，曹操起军七万，前往迎敌，留荀彧守许都。",
+          "verified": true
+        },
+        {
+          "order": 13,
+          "time": "建安十二年",
+          "event": "刘玄德三顾茅庐",
+          "chapter": 94,
+          "evidence": "玄德待其歌罢，上草堂施礼曰：“备久慕先生，无缘拜会。昨因徐元直称荐，敬至仙庄，不遇空回。”……孔明乃起身曰：“何不早报！尚容更衣。”",
+          "verified": true
+        },
+        {
+          "order": 14,
+          "time": "建安十三年冬",
+          "event": "赤壁之战",
+          "chapter": 105,
+          "evidence": "时建安十三年冬十一月十五日，天气晴明，平风静浪。操令：“置酒设乐于大船之上，吾今夕欲会诸将。”",
+          "verified": true
+        },
+        {
+          "order": 15,
+          "time": "建安十四年",
+          "event": "刘备取荆州四郡（零陵、桂阳、武陵、长沙）",
+          "chapter": 109,
+          "evidence": "云遂引三千人马，径往桂阳进发。早有探马报知桂阳太守赵范，范急聚众商议。",
+          "verified": true
+        },
+        {
+          "order": 16,
+          "time": "建安十六年冬",
+          "event": "刘备率兵入蜀",
+          "chapter": 181,
+          "evidence": "是年冬月，引兵望西川进发。行不数程，孟达接着，拜见玄德，说刘益州令某领兵五千远来迎接。",
+          "verified": true
+        },
+        {
+          "order": 17,
+          "time": "建安十九年",
+          "event": "刘璋投降，刘备领益州牧",
+          "chapter": 186,
+          "evidence": "刘璋决计投降，厚待简雍。次日，亲赍印绶文籍，与简雍同车出城投降。玄德出寨迎接，握手流涕曰：“非吾不行仁义，奈势不得已也！”",
+          "verified": true
+        },
+        {
+          "order": 18,
+          "time": "建安二十年",
+          "event": "曹操平定汉中",
+          "chapter": 188,
+          "evidence": "曹操已得东川，主簿司马懿进曰：“刘备以诈力取刘璋，蜀人尚未归心。今主公已得汉中，益州震动。可速进兵攻之，势必瓦解。”",
+          "verified": true
+        },
+        {
+          "order": 19,
+          "time": "建安二十四年八月",
+          "event": "关羽水淹七军，擒于禁斩庞德",
+          "chapter": 195,
+          "evidence": "时值八月秋天，骤雨数日，公令人预备船筏，收拾水具。……关公曰：“于禁七军不屯于广易之地，而聚于罾口川险隘之处。方今秋雨连绵，襄江之水必然泛涨，吾已差人堰住各处水口，待水发时，乘高就船，放水一淹，樊城、罾口川之兵皆为鱼鳖矣。”",
+          "verified": true
+        },
+        {
+          "order": 20,
+          "time": "建安二十四年冬十二月",
+          "event": "关羽败走麦城，被擒遇害",
+          "chapter": 198,
+          "evidence": "时建安二十四年冬十二月也。关公亡年五十八岁。",
+          "verified": true
+        },
+        {
+          "order": 21,
+          "time": "建安二十五年（延康元年）",
+          "event": "曹丕篡汉称帝，建立魏国",
+          "chapter": 201,
+          "evidence": "改延康元年为黄初元年，国号大魏。丕即传旨，大赦天下。",
+          "verified": true
+        },
+        {
+          "order": 22,
+          "time": "章武元年",
+          "event": "刘备在成都即皇帝位",
+          "chapter": 201,
+          "evidence": "改元章武元年。立妃吴氏为皇后，长子刘禅为太子；封诸葛亮为丞相，许靖为司徒。",
+          "verified": true
+        },
+        {
+          "order": 23,
+          "time": "章武二年",
+          "event": "夷陵之战，陆逊火烧连营",
+          "chapter": 206,
+          "evidence": "却说章武二年夏六月，东吴陆逊大破蜀兵于猇亭彝陵之地，先主奔回白帝城，赵云引兵据守。",
+          "verified": true
+        },
+        {
+          "order": 24,
+          "time": "建兴三年",
+          "event": "诸葛亮南征，七擒孟获",
+          "chapter": 208,
+          "evidence": "建兴三年，益州飞报：“蛮王孟获，大起蛮兵十万，犯境侵掠。”",
+          "verified": true
+        },
+        {
+          "order": 25,
+          "time": "建兴五年春三月",
+          "event": "诸葛亮上《出师表》，第一次北伐",
+          "chapter": 212,
+          "evidence": "选定建兴五年春三月丙寅日，出师伐魏。",
+          "verified": true
+        },
+        {
+          "order": 26,
+          "time": "建兴十二年秋八月",
+          "event": "诸葛亮病逝五丈原",
+          "chapter": 225,
+          "evidence": "时建兴十二年秋八月二十三日也，寿五十四岁。",
+          "verified": true
+        },
+        {
+          "order": 27,
+          "time": "嘉平元年",
+          "event": "司马懿诈病赚曹爽，诛曹爽",
+          "chapter": 227,
+          "evidence": "时魏主曹芳，改正始十年为嘉平元年。曹爽一向专权，不知仲达虚实，适魏主除李胜为荆州刺史，即令李胜往辞仲达，就探消息。",
+          "verified": true
+        },
+        {
+          "order": 28,
+          "time": "景元四年秋七月",
+          "event": "钟会邓艾伐蜀，蜀汉灭亡",
+          "chapter": 236,
+          "evidence": "时魏景元四年秋七月初三日，钟会出师，司马昭送之于城外十里方回。",
+          "verified": true
+        },
+        {
+          "order": 29,
+          "time": "咸熙元年（泰始元年）",
+          "event": "司马炎逼魏主禅位，建立晋朝",
+          "chapter": 240,
+          "evidence": "是日，文武百官，再拜于坛上，山呼万岁。炎绍魏统，国号大晋，改元为泰始元年。",
+          "verified": true
+        },
+        {
+          "order": 30,
+          "time": "太康元年",
+          "event": "晋灭东吴，三国归晋",
+          "chapter": 241,
+          "evidence": "自此三国归于晋帝司马炎，为一统之基矣。",
+          "verified": true
+        }
+      ],
+      "scanned": true,
+      "book_session_id": "a33b576dd0ce4afb",
+      "trace": {
+        "input_tokens": 549859,
+        "output_tokens": 5608,
+        "chars": 649896,
+        "duration_ms": 93295
+      }
+    },
+    "POST /api/agent/pacing-curve": {
+      "points": [
+        {
+          "chapter": 1,
+          "tension": 2,
+          "note": "桃园结义、黄巾初起，铺垫背景，冲突未显。"
+        },
+        {
+          "chapter": 2,
+          "tension": 3,
+          "note": "张飞鞭督邮、何进谋诛宦官，矛盾激化。"
+        },
+        {
+          "chapter": 3,
+          "tension": 4,
+          "note": "董卓叱丁原、吕布杀义父，政变激烈。"
+        },
+        {
+          "chapter": 4,
+          "tension": 4,
+          "note": "曹操献刀、陈宫捉放，行刺逃亡紧张。"
+        },
+        {
+          "chapter": 5,
+          "tension": 5,
+          "note": "温酒斩华雄、三英战吕布，高潮迭起。"
+        },
+        {
+          "chapter": 6,
+          "tension": 3,
+          "note": "董卓迁都、孙坚得玺，冲突但弱于前。"
+        },
+        {
+          "chapter": 7,
+          "tension": 4,
+          "note": "磐河之战、孙坚惨死，重要转折。"
+        },
+        {
+          "chapter": 8,
+          "tension": 3,
+          "note": "王允巧使连环计，貂蝉登场，阴谋铺垫。"
+        },
+        {
+          "chapter": 9,
+          "tension": 5,
+          "note": "吕布杀董卓，除暴高潮。"
+        },
+        {
+          "chapter": 10,
+          "tension": 4,
+          "note": "马腾举义、曹操报父仇，战争爆发。"
+        },
+        {
+          "chapter": 11,
+          "tension": 2,
+          "note": "孔融求救、刘备得小沛，节奏缓和。"
+        },
+        {
+          "chapter": 12,
+          "tension": 4,
+          "note": "三让徐州、曹操大战吕布，战斗激烈。"
+        },
+        {
+          "chapter": 13,
+          "tension": 4,
+          "note": "李傕郭汜大交兵，长安混乱。"
+        },
+        {
+          "chapter": 14,
+          "tension": 4,
+          "note": "曹操移驾许都、吕布袭徐州，双线转折。"
+        },
+        {
+          "chapter": 15,
+          "tension": 4,
+          "note": "太史慈酣斗孙策，江东创业精彩。"
+        },
+        {
+          "chapter": 16,
+          "tension": 3,
+          "note": "辕门射戟解斗，紧张度中等。"
+        },
+        {
+          "chapter": 17,
+          "tension": 4,
+          "note": "袁术称帝、曹操会合三将，高潮将至。"
+        },
+        {
+          "chapter": 18,
+          "tension": 4,
+          "note": "贾诩料敌、夏侯惇啖睛，激战。"
+        },
+        {
+          "chapter": 19,
+          "tension": 5,
+          "note": "曹操鏖兵、白门楼吕布殒命，高潮。"
+        },
+        {
+          "chapter": 20,
+          "tension": 3,
+          "note": "许田打围、董承受诏，阴谋酝酿。"
+        },
+        {
+          "chapter": 21,
+          "tension": 3,
+          "note": "煮酒论英雄、关羽斩车胄，暗流涌动。"
+        },
+        {
+          "chapter": 22,
+          "tension": 4,
+          "note": "袁曹起兵、关羽擒将，大战序幕。"
+        },
+        {
+          "chapter": 23,
+          "tension": 3,
+          "note": "祢衡裸衣骂贼、吉平下毒，文斗为主。"
+        },
+        {
+          "chapter": 24,
+          "tension": 4,
+          "note": "董妃被杀、刘备投袁绍，局势紧张。"
+        },
+        {
+          "chapter": 25,
+          "tension": 3,
+          "note": "屯土山约三事，关羽暂降，节奏稍缓。"
+        },
+        {
+          "chapter": 26,
+          "tension": 3,
+          "note": "袁绍败兵、关羽挂印封金，离别情节。"
+        },
+        {
+          "chapter": 27,
+          "tension": 5,
+          "note": "千里走单骑、五关斩六将，英雄壮举。"
+        },
+        {
+          "chapter": 28,
+          "tension": 5,
+          "note": "斩蔡阳、古城会，兄弟重逢高潮。"
+        },
+        {
+          "chapter": 29,
+          "tension": 3,
+          "note": "小霸王斩于吉、孙权继位，权力更替。"
+        },
+        {
+          "chapter": 30,
+          "tension": 5,
+          "note": "官渡之战、乌巢烧粮，决战高潮。"
+        },
+        {
+          "chapter": 31,
+          "tension": 4,
+          "note": "仓亭破袁绍、刘备奔刘表，转换阵地。"
+        },
+        {
+          "chapter": 32,
+          "tension": 4,
+          "note": "夺冀州、袁尚争锋，兄弟内斗。"
+        },
+        {
+          "chapter": 33,
+          "tension": 3,
+          "note": "曹丕纳甄氏、郭嘉遗计，局势渐定。"
+        },
+        {
+          "chapter": 34,
+          "tension": 4,
+          "note": "蔡夫人隔屏、跃马檀溪，危急逃脱。"
+        },
+        {
+          "chapter": 35,
+          "tension": 2,
+          "note": "玄德逢隐沦、单福来投，铺垫寻贤。"
+        },
+        {
+          "chapter": 36,
+          "tension": 3,
+          "note": "元直走马荐诸葛，离别感伤。"
+        },
+        {
+          "chapter": 37,
+          "tension": 2,
+          "note": "三顾草庐，求贤铺垫，节奏平缓。"
+        },
+        {
+          "chapter": 38,
+          "tension": 3,
+          "note": "隆中决策、孙氏报仇，定策与行动。"
+        },
+        {
+          "chapter": 39,
+          "tension": 5,
+          "note": "博望坡初用兵，火攻大胜，高潮。"
+        },
+        {
+          "chapter": 40,
+          "tension": 5,
+          "note": "蔡夫人献荆州、火烧新野，危机高潮。"
+        }
+      ],
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 549844,
+        "output_tokens": 3676,
+        "chars": 649896,
+        "duration_ms": 52051
+      }
+    },
+    "POST /api/agent/consistency-scan": {
+      "contradictions": [],
+      "scanned": true,
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 1099928,
+        "output_tokens": 5766,
+        "chars": 649896,
+        "duration_ms": 91230
+      }
+    },
+    "POST /api/agent/entity-recall": {
+      "entity": "赵云",
+      "appearances": [
+        {
+          "order": 1,
+          "chapter": 64,
+          "what": "初遇公孙瓒，与文丑大战",
+          "snippet": "忽见草坡左侧转出一个少年将军，飞马挺枪，直取文丑。",
+          "verified": true
+        },
+        {
+          "order": 2,
+          "chapter": 64,
+          "what": "一枪刺麹义于马下",
+          "snippet": "战不数合，一枪刺麹义于马下，赵云一骑马飞入绍军，左冲右突，如入无人之境。",
+          "verified": true
+        },
+        {
+          "order": 3,
+          "chapter": 64,
+          "what": "保公孙瓒杀透重围",
+          "snippet": "赵云保公孙瓒杀透重围，回到界桥。",
+          "verified": true
+        },
+        {
+          "order": 4,
+          "chapter": 64,
+          "what": "与刘备分别",
+          "snippet": "玄德与赵云分别，执手垂泪，不忍相离。",
+          "verified": true
+        },
+        {
+          "order": 5,
+          "chapter": 68,
+          "what": "引二千军随刘备往徐州",
+          "snippet": "玄德遂与关、张引本部三千人为前部，子龙引二千人随后，往徐州来。",
+          "verified": true
+        },
+        {
+          "order": 6,
+          "chapter": 68,
+          "what": "领军四千助孔融",
+          "snippet": "玄德令云长、子龙领军四千，在公部下相助。",
+          "verified": true
+        },
+        {
+          "order": 7,
+          "chapter": 68,
+          "what": "辞别刘备",
+          "snippet": "赵云辞去，玄德执手挥泪而别。",
+          "verified": true
+        },
+        {
+          "order": 8,
+          "chapter": 85,
+          "what": "在卧牛山与刘备重逢",
+          "snippet": "原来果然是赵子龙。玄德、关公俱下马相见，问其何由至此。",
+          "verified": true
+        },
+        {
+          "order": 9,
+          "chapter": 85,
+          "what": "烧毁山寨随刘备赴古城",
+          "snippet": "当日就烧毁山寨，率领人众，尽随玄德前赴古城。",
+          "verified": true
+        },
+        {
+          "order": 10,
+          "chapter": 88,
+          "what": "挺枪出马与许褚战三十合",
+          "snippet": "玄德背后赵云挺枪出马。二将相交三十合，不分胜负。",
+          "verified": true
+        },
+        {
+          "order": 11,
+          "chapter": 88,
+          "what": "冲阵枪刺高览",
+          "snippet": "高览后军忽然自乱，一将冲阵而来，枪起处，高览翻身落马。视之，乃赵云也。",
+          "verified": true
+        },
+        {
+          "order": 12,
+          "chapter": 88,
+          "what": "独战张郃三十余合",
+          "snippet": "云纵马挺枪，杀散后队，又来前军独战张郃。郃与云战三十馀合，拨马败走。",
+          "verified": true
+        },
+        {
+          "order": 13,
+          "chapter": 98,
+          "what": "保护老小随刘备撤退",
+          "snippet": "赵云保护老小，张飞断后。",
+          "verified": true
+        },
+        {
+          "order": 14,
+          "chapter": 98,
+          "what": "决意寻找主母与小主人",
+          "snippet": "赵云自思曰：“主人将甘、糜二夫人与小主人阿斗，托付在我身上。今日军中失散，有何面目去见主人？不如去决一死战，好歹要寻主母与小主人下落！”",
+          "verified": true
+        },
+        {
+          "order": 15,
+          "chapter": 98,
+          "what": "路遇简雍并借马",
+          "snippet": "赵云正走之间，见一人卧在草中，视之，乃简雍也。",
+          "verified": true
+        },
+        {
+          "order": 16,
+          "chapter": 98,
+          "what": "刺死淳于导救糜竺与甘夫人",
+          "snippet": "赵云大喝一声，挺枪纵马，直取淳于导。导抵敌不住，被云一枪刺落马下，向前救了糜竺，夺得马二匹。云请甘夫人上马，杀开条大路，直送至长坂坡。",
+          "verified": true
+        },
+        {
+          "order": 17,
+          "chapter": 98,
+          "what": "杀夏侯恩夺青釭剑",
+          "snippet": "赵云更不打话，直取那将。交马只一合，把那将一枪刺倒，从骑皆走。原来那将乃曹操随身背剑之将夏侯恩也。",
+          "verified": true
+        },
+        {
+          "order": 18,
+          "chapter": 98,
+          "what": "在枯井旁寻见糜夫人与阿斗",
+          "snippet": "赵云听了，连忙追寻。只见一个人家，被火烧坏土墙，糜夫人抱着阿斗，坐于墙下枯井之傍啼哭。",
+          "verified": true
+        },
+        {
+          "order": 19,
+          "chapter": 98,
+          "what": "与张郃交战，马陷土坑后跃出",
+          "snippet": "云更不答话，挺枪便战。约十馀合，云不敢恋战，夺路而走。背后张郃赶来，云加鞭而行，不想趷跶一声，连马和人，颠入土坑之内。张郃挺枪来刺，忽然一道红光从土坑中滚起，那匹马平空一跃，跳出坑外。",
+          "verified": true
+        },
+        {
+          "order": 20,
+          "chapter": 98,
+          "what": "力战四将，拔青釭剑乱砍",
+          "snippet": "赵云力战四将，曹军一齐拥至。云乃拔青剑乱砍，手起处，衣甲平过，血如涌泉。杀退众军将，直透重围。",
+          "verified": true
+        },
+        {
+          "order": 21,
+          "chapter": 99,
+          "what": "枪刺钟缙，剑砍钟绅",
+          "snippet": "赵云挺枪便刺，钟缙当先挥大斧来迎。两马相交，战不三合，被云一枪刺落马下。背后钟绅持戟赶来……云急拨转马头……右手拔出青宝剑砍去，带盔连脑，砍去一半，绅落马而死。",
+          "verified": true
+        },
+        {
+          "order": 22,
+          "chapter": 99,
+          "what": "到长坂桥向张飞求救",
+          "snippet": "赵云到得桥边，人困马乏，见张飞挺矛立马于桥上，云大呼曰：“翼德援我！”",
+          "verified": true
+        },
+        {
+          "order": 23,
+          "chapter": 99,
+          "what": "向刘备哭诉并献阿斗",
+          "snippet": "云下马伏地而泣……云喘息而言曰：“赵云之罪，万死犹轻！……怀抱公子，身突重围，赖主公洪福，幸而得脱。”遂解视之，原来阿斗正睡着未醒。云喜曰：“幸得公子无恙！”双手递与玄德。",
+          "verified": true
+        },
+        {
+          "order": 24,
+          "chapter": 109,
+          "what": "自请领军取桂阳",
+          "snippet": "赵云应曰：“某愿往。”",
+          "verified": true
+        },
+        {
+          "order": 25,
+          "chapter": 109,
+          "what": "活捉陈应",
+          "snippet": "云大怒，挺枪骤马，直取陈应，应捻叉来迎。两马相交，战到四五合，陈应料敌不过，拨马便走，赵云追赶。陈应回顾赵云马来相近，用飞叉掷去，被赵云接住，回掷陈应。应急躲过，云马早到，将陈应活捉过马，掷于地下，喝军士绑缚回寨。",
+          "verified": true
+        },
+        {
+          "order": 26,
+          "chapter": 109,
+          "what": "与赵范结拜为兄弟",
+          "snippet": "赵云大喜，各叙年庚。云与范同年，云长范四个月，范遂拜云为兄。",
+          "verified": true
+        },
+        {
+          "order": 27,
+          "chapter": 109,
+          "what": "怒拒赵范以嫂许婚",
+          "snippet": "云闻言大怒而起，厉声曰：“吾既与汝结为兄弟，汝嫂即吾嫂也，岂可作此乱人伦之事乎！”",
+          "verified": true
+        },
+        {
+          "order": 28,
+          "chapter": 109,
+          "what": "识破诈降，反杀陈应、鲍隆",
+          "snippet": "二将到帐下，说：“赵范欲用美人计赚将军……”赵云佯喜，置酒与二人痛饮。二人大醉，云乃缚于帐中，擒其手下人问之，果是诈降。云唤五百军入……将降将陈、鲍二人当时斩了，却教五百军引路，云引一千军在后，连夜到桂阳城下叫门……赵范急忙出城，云喝左右捉下。",
+          "verified": true
+        },
+        {
+          "order": 29,
+          "chapter": 111,
+          "what": "受命保护刘备赴东吴招亲",
+          "snippet": "孔明曰：“吾已定下三条计策，非子龙不可行也。”遂唤赵云近前，附耳言曰：“汝保主公入吴，当领此三个锦囊。囊中有三条妙计，依次而行。”即将三个锦囊，与云贴肉收藏。",
+          "verified": true
+        },
+        {
+          "order": 30,
+          "chapter": 111,
+          "what": "在甘露寺带剑立于刘备之侧",
+          "snippet": "子龙带剑而入，立于玄德之侧。",
+          "verified": true
+        },
+        {
+          "order": 31,
+          "chapter": 111,
+          "what": "告知刘备廊下有刀斧手",
+          "snippet": "赵云谓玄德曰：“却才某于廊下巡视，见房内有刀斧手埋伏，必无好意。可告知国太。”",
+          "verified": true
+        },
+        {
+          "order": 32,
+          "chapter": 112,
+          "what": "拆开第二个锦囊并计激刘备",
+          "snippet": "看看年终，云猛省：“孔明分付三个锦囊与我……此时岁已将终，主公贪恋女色，并不见面，何不拆开第二个锦囊，看计而行？”遂拆开视之，原来如此神策。即日径到府堂，要见玄德。",
+          "verified": true
+        },
+        {
+          "order": 33,
+          "chapter": 112,
+          "what": "佯作失惊谎报荆州危急",
+          "snippet": "云佯作失惊之状曰：“主公深居画堂，不想荆州耶？”",
+          "verified": true
+        },
+        {
+          "order": 34,
+          "chapter": 112,
+          "what": "与孙夫人一同断后",
+          "snippet": "夫人曰：“丈夫先行，我与子龙当后。”",
+          "verified": true
+        },
+        {
+          "order": 35,
+          "chapter": 182,
+          "what": "沿江追赶孙夫人夺回阿斗",
+          "snippet": "原来赵云巡哨方回，听得这个消息，吃了一惊，只带四五骑，旋风般沿江赶来。",
+          "verified": true
+        }
+      ],
+      "scanned": true,
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 549871,
+        "output_tokens": 7997,
+        "chars": 649896,
+        "duration_ms": 87598
+      }
+    },
+    "POST /api/agent/recap": {
+      "up_to_chapter": 30,
+      "points": [
+        {
+          "order": 1,
+          "point": "黄巾起义爆发，百姓从张角者四五十万，官军望风而靡。",
+          "chapter": 1,
+          "snippet": "四方百姓，裹黄巾从张角反者四五十万",
+          "verified": true
+        },
+        {
+          "order": 2,
+          "point": "朝廷主张不纳黄巾降者，认为容其降无以劝善。",
+          "chapter": 1,
+          "snippet": "今海内一统，惟黄巾造反；若容其降，无以劝善",
+          "verified": true
+        },
+        {
+          "order": 3,
+          "point": "董卓在阳城屠杀村民，掠妇女财物，悬头还都。",
+          "chapter": 1,
+          "snippet": "尝引军出城，行到阳城地方，时当二月，村民社赛，男女皆集。卓命军士围住，尽皆杀之，掠妇女财物，装载车上，悬头千馀颗于车下，连轸还都，扬言杀贼大胜而回。",
+          "verified": true
+        },
+        {
+          "order": 4,
+          "point": "董卓声称‘吾为天下计，岂惜小民哉’，驱民迁都，纵军淫掠。",
+          "chapter": 1,
+          "snippet": "吾为天下计，岂惜小民哉！",
+          "verified": true
+        },
+        {
+          "order": 5,
+          "point": "董卓筑郿坞，囤积粮食，选美女八百，金玉彩帛堆积无数。",
+          "chapter": 1,
+          "snippet": "内盖宫室，仓库屯积二十年粮食；选民间少年美女八百人实其中，金玉、彩帛、珍珠堆积不知其数",
+          "verified": true
+        },
+        {
+          "order": 6,
+          "point": "曹操为报父仇攻徐州，军队杀戮人民，发掘坟墓。",
+          "chapter": 1,
+          "snippet": "杀戮人民，发掘坟墓",
+          "verified": true
+        },
+        {
+          "order": 7,
+          "point": "徐州百姓哭拜请刘备领郡，称若不受则不能安生。",
+          "chapter": 1,
+          "snippet": "刘使君若不领此郡，我等皆不能安生矣！",
+          "verified": true
+        },
+        {
+          "order": 8,
+          "point": "战乱中百姓食枣菜，饿莩遍野。",
+          "chapter": 1,
+          "snippet": "百姓皆食枣菜，饿莩遍野",
+          "verified": true
+        },
+        {
+          "order": 9,
+          "point": "刘备兵败，猎户刘安杀妻供食。",
+          "chapter": 1,
+          "snippet": "欲寻野味供食，一时不能得，乃杀其妻以食之",
+          "verified": true
+        },
+        {
+          "order": 10,
+          "point": "百姓焚香遮道请留刘备为牧，曹操以功大待面君封爵为由暂拒。",
+          "chapter": 1,
+          "snippet": "百姓焚香遮道，请留刘使君为牧。操曰：‘刘使君功大，且待面君封爵，回来未迟。’百姓叩谢。",
+          "verified": true
+        },
+        {
+          "order": 11,
+          "point": "董承、王子服、吉平等谋诛曹操，宣称虽灭九族亦无后悔。",
+          "chapter": 1,
+          "snippet": "虽灭九族，亦无后悔",
+          "verified": true
+        }
+      ],
+      "scanned": true,
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 13936,
+        "output_tokens": 3523,
+        "chars": 21308,
+        "duration_ms": 34870
+      }
+    },
+    "POST /api/agent/motif-tracking": {
+      "motif": "忠义",
+      "occurrences": [
+        {
+          "order": 1,
+          "chapter": 58,
+          "manifestation": "刘关张桃园结义，誓言共扶汉室、同生共死，奠定了全书忠义主题的基础。",
+          "snippet": "念刘备、关羽、张飞，虽然异姓，既结为兄弟，则同心协力，救困扶危，上报国家，下安黎庶，不求同年同月同日生，只愿同年同月同日死。皇天后土，实鉴此心。背义忘恩，天人共戮！",
+          "verified": true
+        },
+        {
+          "order": 2,
+          "chapter": 62,
+          "manifestation": "曹操起兵时打出“忠义”旗号，号召诸侯讨伐董卓。",
+          "snippet": "操大喜。于是先发矫诏，驰报各道，然后招集义兵，竖起招兵白旗一面，上书“忠义”二字。",
+          "verified": true
+        },
+        {
+          "order": 3,
+          "chapter": 77,
+          "manifestation": "董承等受汉献帝衣带密诏，共立义状，誓诛曹操以扶汉室，体现了对汉室的忠诚。",
+          "snippet": "承大喜，取白绢一幅，先书名画字。子服亦即书名画字。书毕，子服曰：“将军吴子兰，与吾至厚，可与同谋。”……众皆书名画字。",
+          "verified": true
+        },
+        {
+          "order": 4,
+          "chapter": 82,
+          "manifestation": "关羽在土山约三事，暂降曹操但坚持降汉不降曹，并承诺一旦得知刘备下落便去，体现其忠义之心。",
+          "snippet": "一者，吾与皇叔设誓，共扶汉室，吾今只降汉帝，不降曹操；二者，二嫂处请给皇叔俸禄养赡，一应上下人等，皆不许到门；三者，但知刘皇叔去向，不管千里万里，便当辞去。",
+          "verified": true
+        },
+        {
+          "order": 5,
+          "chapter": 83,
+          "manifestation": "关羽得知刘备在袁绍处，毅然挂印封金，辞别曹操去寻兄，重义轻利。",
+          "snippet": "吾今探知故主现在袁绍军中，回思昔日之盟，岂容违背？新恩虽厚，旧义难忘。兹特奉书告辞，伏惟照察。其有馀恩未报，愿以俟之异日。",
+          "verified": true
+        },
+        {
+          "order": 6,
+          "chapter": 84,
+          "manifestation": "关羽千里走单骑，过五关斩六将，不为曹操所阻，一心寻兄，义薄云天。",
+          "snippet": "云长于马上自叹曰：“吾非欲沿途杀人，奈事不得已也。曹公知之，必以我为负恩之人矣。”",
+          "verified": true
+        },
+        {
+          "order": 7,
+          "chapter": 107,
+          "manifestation": "华容道关羽念及曹操旧恩，义释曹操，体现了重义轻功的性格。",
+          "snippet": "云长是个义重如山之人，想起当日曹操许多恩义，与后来五关斩将之事，如何不动心？又见曹军惶惶，皆欲垂泪，一发心中不忍。于是把马头勒回，谓众军曰：“四散摆开。”",
+          "verified": true
+        },
+        {
+          "order": 8,
+          "chapter": 184,
+          "manifestation": "张飞义释严颜，感其忠勇，以义气使严颜归降，体现了以义服人的精神。",
+          "snippet": "张飞见严颜声音雄壮，面不改色，乃回嗔作喜，下阶喝退左右，亲解其缚，取衣衣之，扶在正中高坐，低头便拜曰：“适来言语冒渎，幸勿见责。吾素知老将军乃豪杰之士也。”",
+          "verified": true
+        },
+        {
+          "order": 9,
+          "chapter": 197,
+          "manifestation": "关羽单刀赴会，拒绝鲁肃索要荆州，以忠义自守荆州，并誓言宁死不屈。",
+          "snippet": "关公正色而言曰：“吾乃解良一武夫，蒙吾主以手足相待，安肯背义投敌国乎？城若破，有死而已。玉可碎而不可改其白，竹可焚而不可毁其节：身虽殒，名可垂于竹帛也。”",
+          "verified": true
+        },
+        {
+          "order": 10,
+          "chapter": 206,
+          "manifestation": "刘备临终托孤于诸葛亮，嘱其可自取成都，诸葛亮泣血誓效忠，体现君臣忠义。",
+          "snippet": "先主泣曰：“君才十倍曹丕，必能安邦定国，终定大事。若嗣子可辅则辅之，如其不才，君可自为成都之主。”孔明听毕，汗流遍体，手足失措，泣拜于地曰：“臣安敢不竭股肱之力，效忠贞之节，继之以死乎！”",
+          "verified": true
+        },
+        {
+          "order": 11,
+          "chapter": 218,
+          "manifestation": "诸葛亮在《出师表》中表明自己鞠躬尽瘁、死而后已的忠诚，决心北伐中原报答先帝。",
+          "snippet": "臣鞠躬尽瘁，死而后已，至于成败利钝，非臣之明所能逆睹也。",
+          "verified": true
+        },
+        {
+          "order": 12,
+          "chapter": 238,
+          "manifestation": "诸葛瞻、诸葛尚父子在绵竹战死，以死报国，体现了世代忠义。",
+          "snippet": "瞻中箭落马，乃大呼曰：“吾力竭矣，当以一死报国！”遂拔剑自刎而死。其子诸葛尚在城上……遂策马杀出，死于阵中。",
+          "verified": true
+        },
+        {
+          "order": 13,
+          "chapter": 239,
+          "manifestation": "北地王刘谌不愿屈膝投降，杀妻儿后哭祭祖庙，自刎而死，以死明志，保全忠义。",
+          "snippet": "谌乃自杀其三子，并割妻头，提至昭烈庙中，伏地哭曰：“臣羞见基业弃于他人，故先杀妻子，以绝挂念，后将一命报祖！祖如有灵，知孙之心！”大哭一场，眼中流血，自刎而死。",
+          "verified": true
+        },
+        {
+          "order": 14,
+          "chapter": 240,
+          "manifestation": "姜维假投降钟会，密谋复国，事败被杀，至死不忘汉室，忠义可鉴。",
+          "snippet": "维拔剑上殿，往来冲突，不幸心疼转加。维仰天大叫曰：“吾计不成，乃天命也！”遂自刎而死。",
+          "verified": true
+        }
+      ],
+      "scanned": true,
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 549848,
+        "output_tokens": 2819,
+        "chars": 649896,
+        "duration_ms": 51166
+      }
+    },
+    "POST /api/agent/argument-structure": {
+      "claims": [
+        {
+          "order": 1,
+          "claim": "本书取材于三国历史，描写了从黄巾起义到吴亡的世纪历程。",
+          "chapter": 1,
+          "evidence": "《三国演义》取材于东汉末年和魏、蜀、吴三国的历史，从东汉灵帝中平元年（公元184年）黄巾起义开始，一直叙写到晋武帝太康元年（公元280年）吴亡为止，差不多整整一个世纪。",
+          "verified": true
+        },
+        {
+          "order": 2,
+          "claim": "作者推崇“忠”“义”，主张用“王道”“仁政”治理天下。",
+          "chapter": 1,
+          "evidence": "从罗贯中所写几种小说的思想倾向看，他推崇“忠”“义”，主张用“王道”“仁政”治理天下。",
+          "verified": true
+        },
+        {
+          "order": 3,
+          "claim": "作者从根本上否定农民起义的历史作用。",
+          "chapter": 1,
+          "evidence": "他从根本上否定农民起义的历史作用。",
+          "verified": true
+        },
+        {
+          "order": 4,
+          "claim": "本书反映了封建统治阶级内部的争权夺利斗争。",
+          "chapter": 1,
+          "evidence": "《三国演义》反映了公元三世纪前后黄巾起义与被镇压的过程，广泛而具体地描写了魏、蜀、吴等封建统治集团内部斗争，反映了当时某些历史情况。",
+          "verified": true
+        },
+        {
+          "order": 5,
+          "claim": "作品描写了政治骗局和勾心斗角。",
+          "chapter": 1,
+          "evidence": "《三国演义》在反映这些政治军事集团争权夺利的尖锐斗争时，还描写了一个个政治骗局，一幅幅勾心斗角、尔虞我诈的场景。",
+          "verified": true
+        },
+        {
+          "order": 6,
+          "claim": "作品暴露了战争带给人民的灾难。",
+          "chapter": 1,
+          "evidence": "这些大小豪强、军阀，两手都沾满被压迫人民的鲜血，一次次争权夺利的混战，带给人民的是无穷无尽的灾难。",
+          "verified": true
+        },
+        {
+          "order": 7,
+          "claim": "作者通过刘备美化“王道”“仁政”，把刘备作为“王道”的化身。",
+          "chapter": 1,
+          "evidence": "《三国演义》把刘备美化成一个“仁慈”的、备受人民“爱戴”的统治者，也正是把他作为“王道”的化身来进行歌颂的。",
+          "verified": true
+        },
+        {
+          "order": 8,
+          "claim": "作者把刘备写成封建王朝的“正统”代表。",
+          "chapter": 1,
+          "evidence": "特别值得注意的是，《三国演义》通过刘备鼓吹“王道”的同时，还把他写成封建王朝的“正统”代表。",
+          "verified": true
+        },
+        {
+          "order": 9,
+          "claim": "作者批判董卓、曹操等为破坏“正统”的“乱臣贼子”。",
+          "chapter": 1,
+          "evidence": "而对于董卓、曹操之流，作品则一再斥责他们为违反“纲纪”、破坏“正统”的“乱臣贼子”。",
+          "verified": true
+        },
+        {
+          "order": 10,
+          "claim": "作者对农民革命直接进行诬蔑。",
+          "chapter": 1,
+          "evidence": "《三国演义》对农民革命直接进行了诬蔑。",
+          "verified": true
+        },
+        {
+          "order": 11,
+          "claim": "作品宣扬“英雄”史观，认为历史是少数英雄创造的。",
+          "chapter": 1,
+          "evidence": "然而，无论是赞扬还是鞭笞，无论是正面人物还是反面人物，作者都宣扬了“英雄”史观。",
+          "verified": true
+        },
+        {
+          "order": 12,
+          "claim": "作者通过刘备和曹操都宣扬英雄史观。",
+          "chapter": 1,
+          "evidence": "作品所着重塑造的两个艺术形象——刘备和曹操，是统治阶级内部两个对立的人物……然而，无论是赞扬还是鞭笞，无论是正面人物还是反面人物，作者都宣扬了“英雄”史观。",
+          "verified": true
+        },
+        {
+          "order": 13,
+          "claim": "作品大肆吹嘘封建统治者的天赋才能。",
+          "chapter": 1,
+          "evidence": "与此同时，《三国演义》还大肆吹嘘这些封建统治者的天赋才能。",
+          "verified": true
+        },
+        {
+          "order": 14,
+          "claim": "作品借助“天命”来颂扬作者理想的“英雄”。",
+          "chapter": 1,
+          "evidence": "《三国演义》还借助“天命”来颂扬作者理想的“英雄”。",
+          "verified": true
+        },
+        {
+          "order": 15,
+          "claim": "作者把诸葛亮写成“先知先觉”的人物，宣传了唯心主义的先验论。",
+          "chapter": 1,
+          "evidence": "然而，在更多的章节里，作者却把诸葛亮写成了“先知先觉”的人物，宣传了唯心主义的先验论。",
+          "verified": true
+        },
+        {
+          "order": 16,
+          "claim": "关羽形象被用来提倡封建的“忠”“义”思想。",
+          "chapter": 1,
+          "evidence": "《三国演义》如此美化关羽，完全是为提倡封建的“忠”“义”思想。",
+          "verified": true
+        },
+        {
+          "order": 17,
+          "claim": "作品塑造了一系列“忠臣”形象，宣扬封建道德。",
+          "chapter": 1,
+          "evidence": "由此可见，《三国演义》所塑造的人物形象，是贯穿了作者的社会、政治观点的。通过这些形象，作者宣扬了封建的“仁政”、“英雄”史观、唯心的先验论和封建道德等。",
+          "verified": true
+        },
+        {
+          "order": 18,
+          "claim": "《三国演义》善于描写战争，提供封建社会战争的某些有价值的研究材料。",
+          "chapter": 1,
+          "evidence": "善于描写战争，提供封建社会战争的某些有价值的研究材料，是《三国演义》具有积极意义的又一个重要方面。",
+          "verified": true
+        },
+        {
+          "order": 19,
+          "claim": "战争描写中表现出“将帅决定一切”的英雄史观。",
+          "chapter": 1,
+          "evidence": "《三国演义》在描写战争方面是有成就的，但是应该看到作者的鲜明倾向是：“将帅”决定战争的一切，“兵士”几乎是虚设的，人民更是毫无地位。",
+          "verified": true
+        },
+        {
+          "order": 20,
+          "claim": "取材于历史，又不为历史事实所限制，是《三国演义》创作方法的一个特点。",
+          "chapter": 1,
+          "evidence": "取材于历史，又不为历史事实所限制，是《三国演义》创作方法的一个特点。",
+          "verified": true
+        }
+      ],
+      "scanned": true,
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 549833,
+        "output_tokens": 5183,
+        "chars": 649896,
+        "duration_ms": 69208
+      }
+    },
+    "POST /api/agent/concept-evolution": {
+      "concept": "天下大势",
+      "stages": [
+        {
+          "order": 1,
+          "chapter": 58,
+          "development": "开篇提出“天下大势”的概念，并阐述其“分久必合，合久必分”的规律，为全书的历史循环叙事定调。",
+          "snippet": "话说天下大势，分久必合，合久必分",
+          "verified": true
+        },
+        {
+          "order": 2,
+          "chapter": 241,
+          "development": "全书结尾呼应开篇，以“天下大势，合久必分，分久必合”总结三国归晋的历史结局，完成对分合规律的闭环印证。",
+          "snippet": "此所谓“天下大势，合久必分，分久必合”者也",
+          "verified": true
+        }
+      ],
+      "scanned": true,
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 549839,
+        "output_tokens": 942,
+        "chars": 649896,
+        "duration_ms": 21683
+      }
+    },
+    "POST /api/agent/writing-technique": {
+      "techniques": [
+        {
+          "order": 1,
+          "technique": "对比手法",
+          "how": "通过将曹操与刘备的治国策略进行对比，突出人物性格差异",
+          "chapter": 1,
+          "snippet": "操以急，吾以宽；操以暴，吾以仁；操以谲，吾以忠：每与操相反。",
+          "verified": true
+        },
+        {
+          "order": 2,
+          "technique": "侧面烘托",
+          "how": "通过描写关羽斩华雄后酒尚温来表现其神勇",
+          "chapter": 62,
+          "snippet": "鸾铃响处，马到中军，云长提华雄之头，掷于地上，其酒尚温。",
+          "verified": true
+        },
+        {
+          "order": 3,
+          "technique": "心理描写",
+          "how": "通过刘备在曹操面前掩饰惊慌的心理活动，表现其机敏",
+          "chapter": 78,
+          "snippet": "玄德闻言，吃了一惊，手中所执匙箸，不觉落于地下。时正值大雨将至，雷声大作，玄德乃从容俯首拾箸曰：“一震之威，乃至于此。”",
+          "verified": true
+        },
+        {
+          "order": 4,
+          "technique": "语言描写",
+          "how": "通过曹操的经典语句表现其奸雄性格",
+          "chapter": 61,
+          "snippet": "宁教我负天下人，休教天下人负我。",
+          "verified": true
+        },
+        {
+          "order": 5,
+          "technique": "环境渲染",
+          "how": "通过描写卧龙冈的清幽景色来烘托诸葛亮的高雅",
+          "chapter": 94,
+          "snippet": "山不高而秀雅，水不深而澄清，地不广而平坦，林不大而茂盛，猿鹤相亲，松篁交翠。",
+          "verified": true
+        },
+        {
+          "order": 6,
+          "technique": "结构布局",
+          "how": "开篇以‘分合’理论概括全书历史规律",
+          "chapter": 58,
+          "snippet": "话说天下大势，分久必合，合久必分。",
+          "verified": true
+        }
+      ],
+      "scanned": true,
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 549847,
+        "output_tokens": 1652,
+        "chars": 649896,
+        "duration_ms": 26782
+      }
+    },
+    "POST /api/agent/study-cards": {
+      "cards": [
+        {
+          "order": 1,
+          "concept": "桃园结义",
+          "point": "刘备、关羽、张飞在桃园中结拜为异姓兄弟，立誓同心协力，上报国家，下安黎庶，同生共死。",
+          "question": "刘备、关羽、张飞为何要结为异姓兄弟？这种结义方式对他们的合作产生了怎样的影响？",
+          "chapter": 58,
+          "snippet": "次日，于桃园中，备下乌牛白马祭礼等项，三人焚香再拜而说誓曰：'念刘备、关羽、张飞，虽然异姓，既结为兄弟，则同心协力，救困扶危，上报国家，下安黎庶，不求同年同月同日生，只愿同年同月同日死。'",
+          "verified": true
+        },
+        {
+          "order": 2,
+          "concept": "三顾茅庐",
+          "point": "刘备三次亲自前往隆中拜访诸葛亮，最终感动诸葛亮出山辅佐，成为蜀汉的军师。",
+          "question": "刘备为什么要三次亲自拜访诸葛亮？这体现了刘备怎样的品质？",
+          "chapter": 94,
+          "snippet": "玄德曰：'备久慕先生，无缘拜会。昨因徐元直称荐，敬至仙庄，不遇空回。今特冒风雪而来，得瞻道貌，实为万幸！'",
+          "verified": true
+        },
+        {
+          "order": 3,
+          "concept": "草船借箭",
+          "point": "诸葛亮利用大雾天气，以草船从曹操水寨借得十万支箭，解决了军需之急。",
+          "question": "诸葛亮为什么敢立下三天造十万支箭的军令状？他利用了哪些自然条件和对手的心理？",
+          "chapter": 103,
+          "snippet": "孔明曰：'只消三日，便可拜纳十万枝箭。'",
+          "verified": true
+        },
+        {
+          "order": 4,
+          "concept": "赤壁火攻",
+          "point": "周瑜和诸葛亮不约而同想到用火攻对付曹操，最终借助东风大败曹军。",
+          "question": "周瑜和诸葛亮为什么都想到用火攻？火攻成功的关键因素是什么？",
+          "chapter": 103,
+          "snippet": "原来周瑜掌中字乃一'火'字，孔明掌中亦一'火'字。",
+          "verified": true
+        },
+        {
+          "order": 5,
+          "concept": "空城计",
+          "point": "诸葛亮在街亭失守后，于西城大开城门，焚香弹琴，使司马懿退兵。",
+          "question": "诸葛亮在空城计中为什么敢大开城门？司马懿为什么怀疑有伏兵而退走？",
+          "chapter": 216,
+          "snippet": "孔明乃披鹤氅，戴纶巾，引二小童携琴一张，于城上敌楼前，凭栏而坐，焚香操琴。",
+          "verified": true
+        },
+        {
+          "order": 6,
+          "concept": "七擒孟获",
+          "point": "诸葛亮对南蛮首领孟获七次擒获七次释放，最终使孟获心服口服，南方平定。",
+          "question": "诸葛亮为什么要七擒七纵孟获？这种策略对于平定南方有什么长远意义？",
+          "chapter": 211,
+          "snippet": "孔明曰：'公今服乎？'获泣谢曰：'某子子孙孙皆感覆载生成之恩，安得不服！'",
+          "verified": true
+        }
+      ],
+      "scanned": true,
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 549859,
+        "output_tokens": 2748,
+        "chars": 649896,
+        "duration_ms": 35909
+      }
+    },
+    "POST /api/agent/style-issues": {
+      "issues": [],
+      "scanned": true,
+      "book_session_id": "cb20abc218fd49fe",
+      "trace": {
+        "input_tokens": 549872,
+        "output_tokens": 507,
+        "chars": 649896,
+        "duration_ms": 26643
+      }
+    },
+    "POST /api/agent/check-citations": {
+      "citations": [
+        {
+          "chapter": 95,
+          "snippet": "玄德曰：‘备虽名微德薄，愿先生不弃鄙贱，出山相助。备当拱听明诲。’",
+          "verified": true,
+          "chunk_id": "r0-chunk-152",
+          "match_score": 0.87,
+          "match_type": "paraphrase",
+          "claim_support": "weak"
+        },
+        {
+          "chapter": 95,
+          "snippet": "孔明曰：‘将军既不相弃，愿效犬马之劳。’",
+          "verified": true,
+          "chunk_id": "r0-chunk-152",
+          "match_score": 0.78,
+          "match_type": "paraphrase",
+          "claim_support": "weak"
+        },
+        {
+          "chapter": 95,
+          "snippet": "玄德拜请孔明曰：‘备虽名微德薄，愿先生不弃鄙贱，出山相助。备当拱听明诲。’孔明曰：‘亮久乐耕锄，懒于应世，不能奉命。’玄德泣曰：‘先生不出，如苍生何！’言毕，泪沾袍袖，衣襟尽湿。孔明见其意甚诚，乃曰：‘将军既不相弃，愿效犬马之劳。’",
+          "verified": true,
+          "chunk_id": "r0-chunk-152",
+          "match_score": 0.82,
+          "match_type": "paraphrase",
+          "claim_support": "weak"
+        },
+        {
+          "chapter": 96,
+          "snippet": "玄德曰：‘智赖孔明，勇须二弟，何可推调？’关、张出，玄德请孔明商议。孔明曰：‘但恐关、张二人不肯听吾号令。主公若欲亮行兵，乞假剑印。’玄德便以剑印付孔明。",
+          "verified": true,
+          "chunk_id": "r0-chunk-156",
+          "match_score": 0.84,
+          "match_type": "paraphrase",
+          "claim_support": "supported"
+        },
+        {
+          "chapter": 206,
+          "snippet": "先主泣曰：‘君才十倍曹丕，必能安邦定国，终定大事。若嗣子可辅则辅之，如其不才，君可自为成都之主。’孔明听毕，汗流遍体，手足失措，泣拜于地曰：‘臣安敢不竭股肱之力，效忠贞之节，继之以死乎！’",
+          "verified": true,
+          "chunk_id": "r0-chunk-322",
+          "match_score": 0.9,
+          "match_type": "paraphrase",
+          "claim_support": "supported"
+        }
+      ]
+    }
+  },
+  "sse": {
+    "POST /api/agent/ask/stream": "event: iteration_start\ndata: {\"iteration\": 1, \"elapsed_ms\": 0, \"type\": \"iteration_start\"}\n\nevent: final_answer\ndata: {\"answer\": \"刘备与诸葛亮的关系经历了从‘求贤若渴’到‘君臣相知’再到‘托孤寄命’的逐步深化过程。起初，刘备经徐庶推荐，得知诸葛亮之才，遂‘三顾草庐’以诚相邀；孔明感其诚意，提出‘隆中对策’，奠定战略框架。此后，刘备对孔明言听计从，如博望坡初用兵时‘以剑印付孔明’，赤壁之战中全权倚重；而孔明亦竭智尽忠，助刘备夺取荆、益，建立蜀汉。刘备临终前白帝城托孤，明确表示‘若嗣子可辅则辅之，如其不才，君可自为成都之主’，孔明则‘泣拜于地’誓死效忠。这一过程由礼遇、信任发展为生死相托，体现了君臣之间深厚的‘知遇之恩’与‘托孤之重’。\", \"citations\": [{\"chapter\": 95, \"snippet\": \"玄德曰：‘备虽名微德薄，愿先生不弃鄙贱，出山相助。备当拱听明诲。’\", \"verified\": true, \"chunk_id\": \"r0-chunk-152\", \"match_score\": 0.87, \"match_type\": \"paraphrase\"}, {\"chapter\": 95, \"snippet\": \"孔明曰：‘将军既不相弃，愿效犬马之劳。’\", \"verified\": true, \"chunk_id\": \"r0-chunk-152\", \"match_score\": 0.78, \"match_type\": \"paraphrase\"}, {\"chapter\": 95, \"snippet\": \"玄德拜请孔明曰：‘备虽名微德薄，愿先生不弃鄙贱，出山相助。备当拱听明诲。’孔明曰：‘亮久乐耕锄，懒于应世，不能奉命。’玄德泣曰：‘先生不出，如苍生何！’言毕，泪沾袍袖，衣襟尽湿。孔明见其意甚诚，乃曰：‘将军既不相弃，愿效犬马之劳。’\", \"verified\": true, \"chunk_id\": \"r0-chunk-152\", \"match_score\": 0.82, \"match_type\": \"paraphrase\"}, {\"chapter\": 96, \"snippet\": \"玄德曰：‘智赖孔明，勇须二弟，何可推调？’关、张出，玄德请孔明商议。孔明曰：‘但恐关、张二人不肯听吾号令。主公若欲亮行兵，乞假剑印。’玄德便以剑印付孔明。\", \"verified\": true, \"chunk_id\": \"r0-chunk-156\", \"match_score\": 0.84, \"match_type\": \"paraphrase\"}, {\"chapter\": 206, \"snippet\": \"先主泣曰：‘君才十倍曹丕，必能安邦定国，终定大事。若嗣子可辅则辅之，如其不才，君可自为成都之主。’孔明听毕，汗流遍体，手足失措，泣拜于地曰：‘臣安敢不竭股肱之力，效忠贞之节，继之以死乎！’\", \"verified\": true, \"chunk_id\": \"r0-chunk-322\", \"match_score\": 0.9, \"match_type\": \"paraphrase\"}], \"iterations\": 1, \"duration_ms\": 586, \"type\": \"final_answer\"}\n\n"
+  },
+  "meta": {
+    "book": "三国演义",
+    "chapters_used": "未知",
+    "model": "deepseek-v4-flash",
+    "provider": "deepseek",
+    "cost_est": "",
+    "skipped": [],
+    "failures": {},
+    "notes": "",
+    "captured_at": "2026-06-17 16:25:04",
+    "session_id": "cb20abc218fd49fe"
+  }
+}

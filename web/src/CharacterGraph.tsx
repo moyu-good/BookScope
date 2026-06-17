@@ -145,13 +145,15 @@ export function CharacterGraph({
   function startSim() {
     stopSim();
     coolRef.current = 0;
+    let ticks = 0; // 硬上限兜底：力学万一不收敛也强制停，绝不无限空转烧 CPU
     const tick = () => {
       const maxv = step();
       setFrame((f) => f + 1);
+      ticks += 1;
       if (dragRef.current == null && maxv < 0.4) coolRef.current += 1;
       else coolRef.current = 0;
-      if (coolRef.current > 40) {
-        rafRef.current = null; // 冷却：停 rAF 省 CPU
+      if (coolRef.current > 40 || ticks > 600) {
+        rafRef.current = null; // 冷却（静止）或到硬上限 ~600 帧：停 rAF 省 CPU
         return;
       }
       rafRef.current = requestAnimationFrame(tick);

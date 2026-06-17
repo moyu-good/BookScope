@@ -69,3 +69,6 @@ test*.epub
 test*.txt
 test-arxiv-*.pdf
 
+# demo 用的样书（公版三国，本地生成样本数据用，不入库）
+_demo_book/
+

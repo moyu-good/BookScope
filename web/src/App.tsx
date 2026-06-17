@@ -33,6 +33,10 @@ import type {
 } from "./RouteDecisionBanner";
 import { useUploadProgress } from "./uploadProgress";
 
+// 演示模式（VITE_DEMO_MODE=1，发布到 GitHub Pages 的静态 demo）：
+// 用打包好的真实样本、不连后端、不要 key，访客点开即看。
+const DEMO = import.meta.env.VITE_DEMO_MODE === "1";
+
 // ---------------------------------------------------------------------------
 // 类型：与 bookscope.api.schemas 对齐
 // ---------------------------------------------------------------------------
@@ -639,7 +643,14 @@ export function App() {
     // "国内 LLM 首选 DeepSeek" 对齐；已存配置的老用户不受影响
     persisted?.provider ?? "deepseek",
   );
-  const [apiKey, setApiKey] = useState(persisted?.apiKey ?? "");
+  // 演示模式：强制给个占位 key（不看 persisted——本地存过空串也得放行），让所有
+  // 「没填 key 不能用」的守卫通过、隐藏填 key 横幅。真实请求会带上它，但 demo
+  // 拦截器只返打包样本、根本不看 key 值。
+  const [apiKey, setApiKey] = useState(
+    import.meta.env.VITE_DEMO_MODE === "1"
+      ? "demo"
+      : (persisted?.apiKey ?? ""),
+  );
   const [model, setModel] = useState(persisted?.model ?? "");
   const [baseUrl, setBaseUrl] = useState(persisted?.baseUrl ?? "");
   // LLM 配置降级——收进设置抽屉，不占头版
@@ -1134,24 +1145,42 @@ export function App() {
                 triggered={hasSwitched}
                 bookTitle={currentSession?.book_title ?? ""}
               />
-              <div className="mt-6 pt-5 border-t border-[var(--color-rule)]">
-                <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-                  书架里没有？上传一本新的（epub / txt / pdf）：
-                </p>
-                <UploadForm
-                  file={file}
-                  setFile={setFile}
-                  bookTitle={bookTitle}
-                  setBookTitle={setBookTitle}
-                  language={language}
-                  setLanguage={setLanguage}
-                  uploading={uploading}
-                  session={lastUpload}
-                  onSubmit={handleUpload}
-                  canSubmit={!!file && !!bookTitle && !!apiKey}
-                  ingestProgress={ingestProgress}
-                />
-              </div>
+              {DEMO ? (
+                <div className="mt-6 pt-5 border-t border-[var(--color-rule)]">
+                  <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
+                    这是只读演示，预置了一本《三国演义》的真实分析结果。想分析
+                    <strong>你自己的书</strong>（epub / txt / pdf）？{" "}
+                    <a
+                      href="https://github.com/moyu-good/BookScope"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[var(--color-seal)] underline"
+                    >
+                      克隆仓库本地运行
+                    </a>
+                    ，填上你自己的 LLM key 即可。
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 pt-5 border-t border-[var(--color-rule)]">
+                  <p className="text-sm text-[var(--color-ink-muted)] mb-3">
+                    书架里没有？上传一本新的（epub / txt / pdf）：
+                  </p>
+                  <UploadForm
+                    file={file}
+                    setFile={setFile}
+                    bookTitle={bookTitle}
+                    setBookTitle={setBookTitle}
+                    language={language}
+                    setLanguage={setLanguage}
+                    uploading={uploading}
+                    session={lastUpload}
+                    onSubmit={handleUpload}
+                    canSubmit={!!file && !!bookTitle && !!apiKey}
+                    ingestProgress={ingestProgress}
+                  />
+                </div>
+              )}
             </section>
           )}
 
@@ -1584,6 +1613,17 @@ function Sidebar(props: {
         >
           书鉴
         </span>
+        {DEMO && (
+          <span
+            className="mt-1 rounded-full px-2 py-0.5 text-[10px] tracking-wide"
+            style={{
+              background: "color-mix(in oklch, var(--color-seal) 13%, transparent)",
+              color: "var(--color-seal)",
+            }}
+          >
+            演示 · 样本《三国演义》
+          </span>
+        )}
       </div>
 
       {/* 案上当前书 */}

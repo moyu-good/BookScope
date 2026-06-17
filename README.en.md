@@ -8,6 +8,8 @@
 
 > Drop a long book into your browser and ask it anything. Every quote is checked character-by-character against the source text, and only verified quotes are shown.
 
+🔗 **Live demo**: [moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/) — click and play, preloaded with a real analysis of *Romance of the Three Kingdoms* (no install, no key). To analyze your own book, clone and run locally.
+
 ![BookScope overview](docs/images/overview.png)
 
 BookScope is a local tool for deep-reading long texts. Upload an epub / txt / pdf, ask open questions, or use 13 built-in lenses — character graphs, timelines, pacing curves, consistency scans, foreshadow tracking, argument structure, and more.

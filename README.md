@@ -8,6 +8,8 @@
 
 > 上传一本大部头,随便问它。凡是它说“书里写了……”,都回原文一个字一个字对过,对得上才显示给你。
 
+🔗 **在线 Demo**:[moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/) —— 点开就能玩,预置了一本《三国演义》的真实分析(不用装、不用 key)。想分析自己的书,克隆下来本地跑。
+
 ![书鉴 · BookScope 概览](docs/images/overview.png)
 
 书鉴帮你读厚书。把书(epub / txt / pdf)拖进去,你可以像聊天一样问它,也能一键画人物关系图、理时间线、找伏笔、扫一遍全书前后有没有写矛盾。
