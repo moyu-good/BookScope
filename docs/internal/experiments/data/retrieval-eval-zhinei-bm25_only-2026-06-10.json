@@ -1,0 +1,474 @@
+{
+  "book": "zhinei",
+  "retrieval_mode": "bm25_only",
+  "top_k": 10,
+  "date": "2026-06-10",
+  "golden_set": "golden-retrieval-zhinei.json",
+  "golden_annotated_at_commit": "9a9778d",
+  "n_chunks": 319,
+  "summary": {
+    "n_queries": 17,
+    "recall_at_5": 0.6373,
+    "recall_at_10": 0.7451,
+    "mrr": 0.5413,
+    "by_type": {
+      "semantic": {
+        "n": 11,
+        "recall_at_5": 0.6212,
+        "recall_at_10": 0.697,
+        "mrr": 0.46
+      },
+      "positional": {
+        "n": 3,
+        "recall_at_5": 0.3333,
+        "recall_at_10": 0.6667,
+        "mrr": 0.381
+      },
+      "character": {
+        "n": 3,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr": 1.0
+      }
+    }
+  },
+  "per_query": [
+    {
+      "query": "什么是'制内市场'？和西方的'场内国家'有什么区别？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        20,
+        65,
+        90
+      ],
+      "retrieved_indices": [
+        44,
+        315,
+        10,
+        65,
+        20,
+        23,
+        13,
+        192,
+        314,
+        46
+      ],
+      "recall_at_5": 0.6666666666666666,
+      "recall_at_10": 0.6666666666666666,
+      "reciprocal_rank": 0.25,
+      "hit_indices": [
+        20,
+        65
+      ]
+    },
+    {
+      "query": "三层市场结构指的是哪三层？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        313,
+        194
+      ],
+      "retrieved_indices": [
+        315,
+        312,
+        313,
+        194,
+        214,
+        115,
+        151,
+        65,
+        215,
+        18
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.3333333333333333,
+      "hit_indices": [
+        194,
+        313
+      ]
+    },
+    {
+      "query": "《盐铁论》辩论里法家为什么主张国家垄断盐铁？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        50,
+        52,
+        55
+      ],
+      "retrieved_indices": [
+        49,
+        52,
+        50,
+        53,
+        56,
+        51,
+        213,
+        210,
+        58,
+        55
+      ],
+      "recall_at_5": 0.6666666666666666,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.5,
+      "hit_indices": [
+        50,
+        52,
+        55
+      ]
+    },
+    {
+      "query": "儒家在盐铁会议上反对什么？理由是什么？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        53
+      ],
+      "retrieved_indices": [
+        52,
+        44,
+        10,
+        192,
+        210,
+        50,
+        120,
+        26,
+        13,
+        315
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "'抓大放小'改革是什么？对国企格局有什么影响？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        139,
+        175
+      ],
+      "retrieved_indices": [
+        315,
+        10,
+        44,
+        13,
+        65,
+        192,
+        139,
+        26,
+        132,
+        120
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.5,
+      "reciprocal_rank": 0.14285714285714285,
+      "hit_indices": [
+        139
+      ]
+    },
+    {
+      "query": "乡镇企业为什么在 90 年代由盛转衰？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        138,
+        140
+      ],
+      "retrieved_indices": [
+        123,
+        193,
+        140,
+        170,
+        13,
+        139,
+        44,
+        14,
+        212,
+        192
+      ],
+      "recall_at_5": 0.5,
+      "recall_at_10": 0.5,
+      "reciprocal_rank": 0.3333333333333333,
+      "hit_indices": [
+        140
+      ]
+    },
+    {
+      "query": "4 万亿刺激计划带来了什么后果？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        169,
+        196
+      ],
+      "retrieved_indices": [
+        131,
+        132,
+        252,
+        193,
+        10,
+        1,
+        65,
+        26,
+        314,
+        13
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "为什么把中国的国有部门比作放大版的家庭自留地？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        173,
+        174
+      ],
+      "retrieved_indices": [
+        173,
+        174,
+        172,
+        171,
+        10,
+        61,
+        170,
+        192,
+        13,
+        138
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        173,
+        174
+      ]
+    },
+    {
+      "query": "中国加入 WTO 时的'非市场经济体'地位是怎么回事？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        11
+      ],
+      "retrieved_indices": [
+        12,
+        11,
+        13,
+        10,
+        198,
+        65,
+        27,
+        44,
+        311,
+        134
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.5,
+      "hit_indices": [
+        11
+      ]
+    },
+    {
+      "query": "淘宝和国家工商总局的拉锯战说明了什么？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        152
+      ],
+      "retrieved_indices": [
+        152,
+        120,
+        47,
+        44,
+        10,
+        45,
+        65,
+        318,
+        26,
+        13
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        152
+      ]
+    },
+    {
+      "query": "明代的朝贡体系和海洋贸易管制是什么关系？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        83
+      ],
+      "retrieved_indices": [
+        83,
+        10,
+        52,
+        44,
+        27,
+        13,
+        26,
+        315,
+        24,
+        65
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        83
+      ]
+    },
+    {
+      "query": "这本书的导论说要重新思考什么问题？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        10
+      ],
+      "retrieved_indices": [
+        10,
+        312,
+        315,
+        20,
+        314,
+        45,
+        65,
+        47,
+        44,
+        316
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        10
+      ]
+    },
+    {
+      "query": "译后记里怎么概括全书的三大部分结构？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        313
+      ],
+      "retrieved_indices": [
+        10,
+        312,
+        311,
+        211,
+        316,
+        315,
+        313,
+        0,
+        214,
+        317
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.14285714285714285,
+      "hit_indices": [
+        313
+      ]
+    },
+    {
+      "query": "第五章开头是怎么承接前面历史章节、转入当代市场改革的？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        115
+      ],
+      "retrieved_indices": [
+        118,
+        1,
+        170,
+        136,
+        21,
+        313,
+        315,
+        130,
+        211,
+        155
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "年广久和'傻子瓜子'的案例说明了什么政治逻辑？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        120,
+        121
+      ],
+      "retrieved_indices": [
+        120,
+        119,
+        121,
+        238,
+        122,
+        116,
+        302,
+        163,
+        45,
+        315
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        120,
+        121
+      ]
+    },
+    {
+      "query": "禹作敏和大邱庄为什么倒台？他和年广久的区别在哪？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        122,
+        123
+      ],
+      "retrieved_indices": [
+        123,
+        122,
+        121,
+        120,
+        119,
+        13,
+        170,
+        192,
+        238,
+        14
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        122,
+        123
+      ]
+    },
+    {
+      "query": "汉武帝当年为什么要搞盐铁专营？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        50
+      ],
+      "retrieved_indices": [
+        50,
+        213,
+        44,
+        192,
+        83,
+        52,
+        139,
+        210,
+        193,
+        13
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        50
+      ]
+    }
+  ]
+}

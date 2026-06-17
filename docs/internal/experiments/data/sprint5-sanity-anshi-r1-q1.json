@@ -1,0 +1,148 @@
+{
+  "batch_id": "sprint5-sanity-anshi-r1-q1",
+  "created_at": "2026-05-13",
+  "book": {
+    "title": "安史之乱 : 历史、宣传与神话",
+    "path": "test明朝那些事儿.epub",
+    "word_count": 3134,
+    "chunk_count": 267,
+    "book_scope": "full"
+  },
+  "config": {
+    "generator_provider": "minimax",
+    "generator_model": "MiniMax-M2.7",
+    "generator_prompt": "loop_system_prompt_v3.4",
+    "citation_format": "citation_format_v1",
+    "kg_source": "manual_4_characters_朱元璋_李善长_徐达_常遇春",
+    "vector_mode": "bm25_only",
+    "reviewer_provider": "minimax",
+    "reviewer_model": "MiniMax-M2.7",
+    "reviewer_rubric": "reviewer_rubric_v1",
+    "limitation": "reviewer 与生成方同 provider/model；存在自我偏袒风险"
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "type": "节奏评估",
+      "type_description": "清洗开国功臣弧线的叙事节奏是否匀速",
+      "smoke": {
+        "question": "从第14章审问张士诚，到第20章李善长之死，朱元璋清洗开国功臣的整条弧线在叙事节奏上是否匀速？哪一段最密、哪一段最稀？密与稀的差异是作者有意控制还是结构性失衡？",
+        "duration_s": 93.4,
+        "answer": "根据对第14至20章全文的调取，当前 BookScope 会话加载的书是《安史之乱：历史、宣传与神话》，主题为唐朝安禄山叛乱。书中第14章至第20章的内容依次为：李泌的战略博弈与朔方军矛盾（第十四章）、永王东巡与李白涉入（第十五章）、唐军反攻与武功/永丰仓/三原诸战（第十五至十六章）、清渠之战唐军大败与政治号召力分析（第十六章）、香积寺决战收复长安（第十七章）、睢阳保卫战与张巡事迹考辨（第十八章）、唐廷财政危机与第五琦盐铁改革（第十九章）。全书中没有出现张士诚、李善长、朱元璋、胡惟庸、蓝玉等任何明朝人物，也没有「清洗开国功臣」这一叙事线。用户所询问的问题与当前 session 加载的书籍内容完全不匹配，无法作答。",
+        "citations": [
+          {
+            "chapter": 14,
+            "snippet": "本章主题为「仙人」李泌神话背后：唐廷与朔方军的博弈，涉及李泌战略、李亨与郭子仪矛盾，无任何明朝相关人物。"
+          },
+          {
+            "chapter": 15,
+            "snippet": "本章主题为兄弟阋于墙：诗人李白深度涉入的永王事件始末，涉及李白、永王李璘、高适，无任何明朝相关人物。"
+          },
+          {
+            "chapter": 16,
+            "snippet": "本章主题为唐军反攻初期的激烈对决，涉及郭子仪、仆固怀恩、安守忠等唐燕两军将领，无任何明朝相关人物。"
+          },
+          {
+            "chapter": 17,
+            "snippet": "本章主题为香积寺和新店的辉煌胜利，涉及郭子仪、回纥叶护太子、李嗣业等，无任何明朝相关人物。"
+          },
+          {
+            "chapter": 18,
+            "snippet": "本章主题为睢阳保卫战，涉及张巡、南霁云、尹子奇等，无任何明朝相关人物。"
+          },
+          {
+            "chapter": 19,
+            "snippet": "本章主题为唐廷财政危机与食盐专卖改革，涉及第五琦、郑叔清、盐铁专卖制度，无任何明朝相关人物。"
+          },
+          {
+            "chapter": 20,
+            "snippet": "本章标题为没有乘胜追击的唐军：比平叛更重要的是什么？涉及肃宗财政政策、敛财手段，无任何明朝相关人物。"
+          }
+        ],
+        "citation_count": 7,
+        "trace_summary": {
+          "iterations": 7,
+          "duration_ms": 93437,
+          "total_input_tokens": 304232,
+          "total_output_tokens": 2623,
+          "content_filter_retries": 0,
+          "outcome": "success",
+          "tool_call_names": [
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "get_chapter_range"
+          ],
+          "tool_call_count_total": 6
+        },
+        "citation_coverage": {
+          "chapters_referenced_in_answer": [
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "chapters_with_citation": [
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "citation_coverage_ratio": 1.0
+        }
+      },
+      "review": {
+        "scores": {
+          "structural_judgment": 1,
+          "evidence_density": 1,
+          "honesty": 4,
+          "actionability": 1,
+          "cross_chapter_coherence": 1
+        },
+        "per_dimension_comment": {
+          "structural_judgment": "答非所问：问的是叙事节奏和密度，回答的是书里没这段内容。结构判断在这里根本无从谈起。",
+          "evidence_density": "7条citation全是\"无任何明朝相关人物\"的目录式摘要，没有一条能支撑任何关于节奏/密度的论点。",
+          "honesty": "不回避问题、没瞎编内容，这点是加分项——但诚实只限于说\"答不了\"，没有进一步帮用户找到方向。",
+          "actionability": "用户拿到的是一句\"无法作答\"，下一步没有任何指引：不知道是书选错了、章节错了、还是书压根没这内容。",
+          "cross_chapter_coherence": "7章被逐一摘要了一遍，但这些摘要是机械罗列，不是分析——没有把章节串成结构理解，更没有拿这个去对比用户的问题。"
+        },
+        "overall": "BookScope 做了一件正确的事：没瞎编。这在诚实维度上值得肯定。但它的正确止步于此。用户问的是一个具体叙事弧线的节奏问题，BookScope 给的答复等于什么都没说——只是声明\"这个问题不归我管\"。一个真正有用的第一读者，在此情境下至少应该告诉用户：你到底需要什么书、或者你能从这七章里析出什么结构性观察，而不是一句\"无法作答\"就把门关死。",
+        "top_issues": [
+          "BookScope 把一个可转译的问题当成了不可回答的问题。用户问的是叙事节奏，你虽然手里没有明朝历史书，但可以指出第14-20章这七章里最密的段落是哪几章、最稀的段落是哪几章，给出基于现有内容的分析——而不是直接放弃。",
+          "7条citation全是\"No Ming figures\"的重复断言，没有任何一条是真正的原文证据，全部是元信息而非内容信息。"
+        ],
+        "single_most_valuable_improvement": "把\"无法回答\"改为\"能回答什么\"：即使用户选错了书，BookScope 也应该能从第14-20章析出这七章的节奏结构——比如哪章叙事密度最高、哪章最稀——然后告诉用户\"你想问的明朝线不在本书，但本书第14-20章的节奏分布如下\"，把拒绝变成服务。",
+        "total": 8
+      },
+      "error": null
+    }
+  ],
+  "summary": {
+    "average_scores": {
+      "structural_judgment": 1.0,
+      "evidence_density": 1.0,
+      "honesty": 4.0,
+      "actionability": 1.0,
+      "cross_chapter_coherence": 1.0
+    },
+    "average_total": 8.0,
+    "min_total": 8.0,
+    "max_total": 8.0,
+    "average_citation_coverage_ratio": 1.0,
+    "citation_coverage_sample_size": 1,
+    "all_outcomes_success": true,
+    "success_count": 1,
+    "total_questions": 1,
+    "total_duration_s": 206.4,
+    "total_input_tokens": 304232,
+    "total_output_tokens": 2623
+  }
+}

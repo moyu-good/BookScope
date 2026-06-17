@@ -1,0 +1,345 @@
+"""人物关系图抽取：整本进 context、单次 LLM 吐结构化关系图 JSON（WP-character-graph）。
+
+exp-013 验证 GO：agent 能从整本书抽出全面、每条边带原文证据的人物关系网，且不编
+书里不存在的关系。本模块是它的生产实现。
+
+结构同 :func:`bookscope.agent.long_context.run_long_context`（整本进 system 固定段、
+缓存友好），差别两处：
+
+1. **要结构化 JSON 图**——``{"nodes": [...], "edges": [{source, target, relation,
+   evidence}]}``，省下游 parse 散文。
+2. **max_tokens 默认 8000**——exp-013 实测图输出 ~5000-6000 token，4000 会截断/空。
+3. **边粒度证据校验**——每条 edge 的 ``evidence`` 当一条 citation 过
+   :func:`verify_citations`：命中某 chunk → ``verified=True`` + 用命中 chunk 的真
+   章号填 ``chapter``（同 long_context 的章号纠偏思路，提到边粒度）。
+
+契约同 ``run_long_context``：成功返 :class:`CharacterGraphResult`，**任意环节失败返
+None**——调用方据此报错 / 回退。
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.utils.json_parsing import (
+    extract_first_json_object as _extract_first_json_object,
+)
+from bookscope.agent.utils.json_parsing import (
+    strip_code_fence as _strip_code_fence,
+)
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_GRAPH_MAX_TOKENS = 8000
+"""图输出比单点判断长得多——exp-013 实测 ~5000-6000 token，4000 截断/空。"""
+
+_PERSON_SYSTEM_INSTRUCTION = (
+    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
+    "请梳理书中主要人物之间的关系网，只依据原文，不臆测、不编造书里不存在的关系。\n"
+    "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
+    '{"nodes": [{"name": "人物名"}], '
+    '"edges": [{"source": "人物A", "target": "人物B", '
+    '"relation": "关系类型（君臣/政敌/父子/同盟/同僚/亲族/师徒等）", '
+    '"strength": 关系亲疏强度1到5的整数, '
+    '"evidence": "证明这条关系的原文逐字片段，原样摘录不改写"}]}\n'
+    "strength 按原文体现的亲疏判：5=最紧密（父子/生死同盟/夫妻），3=一般（同僚/君臣），"
+    "1=最疏远（点头之交/远亲/敌对但少交集）。只据原文判，拿不准给 3。\n"
+    "每条 edge 必须带 evidence，且 evidence 是原文里逐字出现的句子。"
+    "source 和 target 必须是 nodes 里出现过的人物名。"
+    "书里没有直接关系的人物之间不要硬连。"
+    "只列最重要的核心人物与关系（最多约 30 条边），宁可少而准，不必穷尽次要人物——"
+    "图太大既看不清也容易超出输出长度。"
+)
+
+# 概念图：人物图的跨题材投影（exp-014 GO）。分析单位从人物换成概念，
+# 关系类型换成概念逻辑关系，其余机制（JSON 形态 + 边粒度证据）完全一致。
+_CONCEPT_SYSTEM_INSTRUCTION = (
+    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
+    "请梳理书中核心概念之间的关系网，只依据原文，不臆测、不编造书里不存在的关系。\n"
+    "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
+    '{"nodes": [{"name": "概念名"}], '
+    '"edges": [{"source": "概念A", "target": "概念B", '
+    '"relation": "关系类型（定义/包含/对立/因果/递进/支撑等）", '
+    '"strength": 关联紧密度1到5的整数, '
+    '"evidence": "证明这条关系的原文逐字片段，原样摘录不改写"}]}\n'
+    "strength 按原文里两概念的关联紧密度判：5=最紧密（定义/包含/强因果），3=一般"
+    "（支撑/递进），1=最弱（偶尔并提/弱关联）。只据原文判，拿不准给 3。\n"
+    "每条 edge 必须带 evidence，且 evidence 是原文里逐字出现的句子。"
+    "source 和 target 必须是 nodes 里出现过的概念名。"
+    "书里没有直接论证关系的概念之间不要硬连。"
+    "只列最重要的核心概念与关系（最多约 30 条边），宁可少而准，不必穷尽次要概念——"
+    "图太大既看不清也容易超出输出长度。"
+)
+
+_INSTRUCTION_BY_UNIT: dict[str, str] = {
+    "person": _PERSON_SYSTEM_INSTRUCTION,
+    "concept": _CONCEPT_SYSTEM_INSTRUCTION,
+}
+
+_USER_MSG_BY_UNIT: dict[str, str] = {
+    "person": "请抽取这本书的人物关系图。",
+    "concept": "请抽取这本书的概念关系图。",
+}
+
+_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
+
+
+@dataclass(frozen=True)
+class CharacterGraphResult:
+    """抽取结果。``edges`` 每条含 source/target/relation/evidence + 校验后的
+    verified/chapter/match_score。"""
+
+    nodes: list[str]
+    edges: list[dict[str, Any]]
+    duration_ms: int
+    input_tokens: int
+    output_tokens: int
+
+
+def _resp_field(resp: Any, field: str) -> Any:
+    if resp is None:
+        return None
+    if isinstance(resp, dict):
+        return resp.get(field)
+    return getattr(resp, field, None)
+
+
+def _coerce_nodes(raw_nodes: Any) -> list[str]:
+    """nodes 可能是 [{"name": "X"}] 或 ["X"]——都归一成去重的 list[str]。"""
+    names: list[str] = []
+    seen: set[str] = set()
+    if not isinstance(raw_nodes, list):
+        return names
+    for item in raw_nodes:
+        name = ""
+        if isinstance(item, dict):
+            name = str(item.get("name", "")).strip()
+        elif isinstance(item, str):
+            name = item.strip()
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    return names
+
+
+def _coerce_edges(raw_edges: Any) -> list[dict[str, Any]]:
+    """保留 source/target/relation 齐全的边；evidence 可缺（缺则 verified 自然 False）。"""
+    edges: list[dict[str, Any]] = []
+    if not isinstance(raw_edges, list):
+        return edges
+    for item in raw_edges:
+        if not isinstance(item, dict):
+            continue
+        source = str(item.get("source", "")).strip()
+        target = str(item.get("target", "")).strip()
+        relation = str(item.get("relation", "")).strip()
+        if not source or not target or not relation:
+            continue
+        raw_strength = item.get("strength")
+        strength = raw_strength if isinstance(raw_strength, int) else 3
+        strength = max(1, min(5, strength))  # 夹到 1-5，缺失/越界落 3 档
+        edges.append({
+            "source": source,
+            "target": target,
+            "relation": relation,
+            "strength": strength,
+            "evidence": str(item.get("evidence", "")).strip(),
+        })
+    return edges
+
+
+def _finalize_nodes(nodes: list[str], edges: list[dict[str, Any]]) -> list[str]:
+    """把边端点里没在 nodes 出现的人物/概念补进 nodes（模型偶尔漏列）。"""
+    known = set(nodes)
+    for e in edges:
+        for endpoint in (e["source"], e["target"]):
+            if endpoint not in known:
+                known.add(endpoint)
+                nodes.append(endpoint)
+    return nodes
+
+
+def _salvage_truncated_graph(
+    text: str,
+) -> tuple[list[str], list[dict[str, Any]]] | None:
+    """从截断的 JSON 里抢救已吐完的完整边对象。
+
+    flash 把 reasoning_content 算进 max_tokens，图一大内容就可能被截断成半截 JSON，
+    整段 ``json.loads`` 必败。与其整张图丢掉返 502，不如把 ``"edges"`` 数组里已经
+    闭合的 ``{...}`` 逐个抠出来拼个部分图——用户至少看到大部分关系。
+    """
+    idx = text.find('"edges"')
+    if idx == -1:
+        return None
+    start = text.find("[", idx)
+    if start == -1:
+        return None
+    raw_edges: list[Any] = []
+    i = start + 1
+    n = len(text)
+    while i < n:
+        while i < n and text[i] not in "{]":  # 跳到下一个对象起点；遇 ] 收工
+            i += 1
+        if i >= n or text[i] == "]":
+            break
+        depth = 0
+        in_str = False
+        esc = False
+        closed = False
+        j = i
+        while j < n:  # 括号匹配抠一个完整 {...}，跳过字符串内的括号
+            ch = text[j]
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = not in_str
+            elif not in_str:
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        j += 1
+                        closed = True
+                        break
+            j += 1
+        if not closed:
+            break  # 最后一个对象被截断 → 停
+        try:
+            raw_edges.append(json.loads(text[i:j]))
+        except json.JSONDecodeError:
+            pass
+        i = j
+    edges = _coerce_edges(raw_edges)
+    if not edges:
+        return None
+    return _finalize_nodes([], edges), edges
+
+
+def _parse_graph(text: str) -> tuple[list[str], list[dict[str, Any]]] | None:
+    """解析模型输出的图 JSON。正常失败 → 抢救截断的边 → 仍不行返 None。"""
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    candidate = _strip_code_fence(raw)
+    obj: Any = None
+    try:
+        obj = json.loads(candidate)
+    except json.JSONDecodeError:
+        sliced = _extract_first_json_object(candidate)
+        if sliced is not None:
+            try:
+                obj = json.loads(sliced)
+            except json.JSONDecodeError:
+                obj = None
+    if isinstance(obj, dict):
+        edges = _coerce_edges(obj.get("edges"))
+        if edges:
+            return _finalize_nodes(_coerce_nodes(obj.get("nodes")), edges), edges
+    # 兜底：截断输出抢救完整的边（reasoning 吃 token 致内容截断时不全军覆没）
+    salvaged = _salvage_truncated_graph(candidate)
+    if salvaged is not None:
+        logger.warning(
+            "character_graph: 主解析失败，从截断输出抢救到 %d 条边", len(salvaged[1])
+        )
+        return salvaged
+    logger.warning("character_graph parse failed; raw head=%r", candidate[:200])
+    return None
+
+
+def extract_character_graph(
+    *,
+    full_text: str,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    unit: str = "person",
+    max_tokens: int = DEFAULT_GRAPH_MAX_TOKENS,
+    session_id: str | None = None,
+) -> CharacterGraphResult | None:
+    """整本进 context 抽一次关系图；失败返 ``None``。
+
+    ``unit`` 选分析单位：``"person"`` 抽人物关系图（默认），``"concept"`` 抽概念
+    关系图（exp-014 GO 的跨题材投影）。两者共用同一抽取/解析/边校验机制，只换
+    system 指令里的"节点是什么 + 关系类型"。未知 unit 回退 person。
+
+    Args:
+        full_text: 整本书 cleaned 原文。
+        chunks: 全书 chunk dict（含 ``chunk_id`` / ``chapter`` / ``text``），给边
+            evidence 做证据登记表 + 提供章号 ground truth。
+        llm_client: duck-typed LLM client（同 AgentLoop / long_context）。
+        model: 模型名。
+        unit: ``"person"`` | ``"concept"``。决定抽人物图还是概念图。
+        max_tokens: 单次 LLM 调用 max_tokens（默认 8000，图输出长）。
+        session_id: 给 L2 缓存用；None 时降级直调。
+
+    Returns:
+        成功 :class:`CharacterGraphResult`；任意失败 ``None``。
+    """
+    start = time.monotonic()
+    instruction = _INSTRUCTION_BY_UNIT.get(unit, _PERSON_SYSTEM_INSTRUCTION)
+    user_msg = _USER_MSG_BY_UNIT.get(unit, _USER_MSG_BY_UNIT["person"])
+    system = instruction + _BOOK_DELIMITER + full_text
+    messages = [{"role": "user", "content": user_msg}]
+
+    try:
+        response = _invoke_client(
+            llm_client,
+            model=model,
+            system=system,
+            tools=[],
+            messages=messages,
+            max_tokens=max_tokens,
+            cache_enabled=session_id is not None,
+        )
+    except Exception as exc:  # noqa: BLE001 — 包死返 None
+        logger.warning(
+            "character_graph LLM call raised %s: %s; returning None",
+            type(exc).__name__, exc,
+        )
+        return None
+
+    input_tokens, output_tokens = llm_client.extract_usage_tokens(response)
+    final_text = llm_client.extract_final_text(response)
+
+    parsed = _parse_graph(final_text)
+    if parsed is None:
+        logger.warning("character_graph parse failed; returning None")
+        return None
+    nodes, edges = parsed
+
+    # 边粒度证据校验：每条 edge 的 evidence 当一条 citation 过 verify_citations。
+    evidence = {
+        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
+        for c in chunks
+        if c.get("chunk_id")
+    }
+    edge_citations = [{"snippet": e["evidence"]} for e in edges]
+    verify_citations(edge_citations, evidence)
+    for edge, vc in zip(edges, edge_citations, strict=True):
+        edge["verified"] = bool(vc.get("verified", False))
+        edge["match_score"] = vc.get("match_score", 0.0)
+        # 章号纠偏：命中 chunk 的真章号才是 ground truth（同 long_context）。
+        cid = vc.get("chunk_id")
+        true_chapter = evidence.get(cid, {}).get("chapter") if cid else None
+        edge["chapter"] = true_chapter if isinstance(true_chapter, int) and true_chapter > 0 else 0
+
+    duration_ms = int((time.monotonic() - start) * 1000)
+    return CharacterGraphResult(
+        nodes=nodes,
+        edges=edges,
+        duration_ms=duration_ms,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+
+
+__all__ = ["CharacterGraphResult", "DEFAULT_GRAPH_MAX_TOKENS", "extract_character_graph"]

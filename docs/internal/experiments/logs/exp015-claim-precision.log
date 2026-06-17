@@ -1,0 +1,60 @@
+[probe] 10 对 × 3 次；模型 deepseek-v4-flash
+
+[P1  genuine]  9.5s → supported    原文直接陈述安禄山是范阳、平卢、河东三镇节度使，与论断完全一致。
+[P1  genuine]  1.7s → supported    原文明确说安禄山是范阳、平卢、河东三镇节度使，与论断表述一致。
+[P1  genuine]  2.1s → supported    原文明确说明安禄山是范阳、平卢、河东三镇节度使，与论断完全一致。
+     众数=supported 期望=supported ✓
+
+[P2  genuine]  1.8s → supported    原文明确指出安禄山被亲生儿子安庆绪联合亲信暗杀，与论断核心主张一致。
+[P2  genuine]  1.9s → supported    原文明确说安禄山是被亲生儿子安庆绪联合严庄暗杀的，与论断一致。
+[P2  genuine]  2.4s → supported    原文明确指出安禄山是被亲生儿子安庆绪联合亲信严庄一起暗杀的，与论断核心主张一致。
+     众数=supported 期望=supported ✓
+
+[P3  genuine]  2.3s → supported    原文直接指出杨贵妃很少获得实质性政治权力，与论断一致。
+[P3  genuine]  1.8s → supported    原文直接指出杨贵妃及其姐姐们很少获得实质性的政治权力，与论断主张一致。
+[P3  genuine]  2.7s → supported    原文明确表示杨贵妃很少获得实质性的政治权力，与论断的核心主张一致。
+     众数=supported 期望=supported ✓
+
+[P4  genuine]  1.4s → supported    原文明确提到唐玄宗派使节催促哥舒翰出潼关东进决战，与论断一致。
+[P4  genuine]  1.8s → supported    原文明确提到唐玄宗派使节催促哥舒翰出潼关东进决战，与论断一致。
+[P4  genuine]  1.5s → supported    原文明确记载唐玄宗派使节催促哥舒翰出潼关东进决战，与论断完全一致。
+     众数=supported 期望=supported ✓
+
+[N1  无关    ]  1.7s → unsupported  原文讨论的是杨贵妃的政治权力，完全没有提到安禄山的官职，无法支撑论断的核心主张。
+[N1  无关    ]  1.5s → unsupported  原文讨论的是杨贵妃的政治权力，并未提及安禄山的官职情况。
+[N1  无关    ]  1.6s → unsupported  原文完全未提及安禄山或三镇节度使的信息，无法支撑论断。
+     众数=unsupported 期望=unsupported ✓
+
+[N2  无关    ]  1.8s → unsupported  原文内容是关于府兵制的起源和性质，完全没有提及马嵬驿之变或杨贵妃，无法支撑论断。
+[N2  无关    ]  1.7s → unsupported  原文讨论的是府兵制起源，完全没有提及马嵬驿之变或杨贵妃，因此无法支撑论断。
+[N2  无关    ]  1.6s → unsupported  原文讨论的是府兵制的起源，完全没有提及马嵬驿之变或杨贵妃，无法支撑论断。
+     众数=unsupported 期望=unsupported ✓
+
+[N3  提到不撑  ]  1.9s → unsupported  原文只提到唐玄宗宠爱杨贵妃，但并未提及‘怠政’或说明这是直接原因，论断将宠爱夸大为直接导致怠政的因果关系。
+[N3  提到不撑  ]  2.0s → unsupported  原文只提到唐玄宗宠爱杨贵妃，并未提及怠政或因果关系，无法支撑‘直接导致’的主张。
+[N3  提到不撑  ]  1.8s → unsupported  原文仅描述唐玄宗宠爱杨贵妃，未提及因她导致怠政，缺乏因果关系的支持。
+     众数=unsupported 期望=unsupported ✓
+
+[N4  提到不撑  ]  1.8s → unsupported  原文只提到府兵制崩溃，并未建立其与安禄山起兵之间的直接因果关系。
+[N4  提到不撑  ]  2.4s → unsupported  原文仅提及府兵制走向崩溃，未涉及安禄山起兵，更没有说明两者存在直接因果关系。
+[N4  提到不撑  ]  1.8s → unsupported  原文仅陈述府兵制崩溃这一事实，未提及与安禄山叛乱之间的直接因果关系。
+     众数=unsupported 期望=unsupported ✓
+
+[N5  过度声称  ]  1.6s → unsupported  原文明确指出安禄山实际兵力约十五万，二十万只是对外号称，并非确切数字。
+[N5  过度声称  ]  2.0s → unsupported  原文指出实际兵力约十五万，而非二十万，论断将号称数量当作实际数量，与原文不符。
+[N5  过度声称  ]  2.0s → unsupported  原文指出安禄山实际兵力约十五万，对外号称二十万，论断将虚称当作事实，与原文不符。
+     众数=unsupported 期望=unsupported ✓
+
+[N6  过度声称  ]  1.8s → unsupported  原文明确表示二人互不服气、无法统率对方，与“关系亲密、配合无间”相矛盾。
+[N6  过度声称  ]  1.6s → unsupported  原文明确表示两人互不服气、互相统率不动，与‘关系亲密、配合无间’完全矛盾。
+[N6  过度声称  ]  2.0s → unsupported  原文指出两人互不服气、谁也无法统率对方，与论断中的“关系亲密、配合无间”直接矛盾。
+     众数=unsupported 期望=unsupported ✓
+
+============================================================
+假阳性（正例被判 unsupported）= 0/4
+召回（负例揪出 unsupported）   = 6/6
+  - 无关: 2/2
+  - 提到不撑: 2/2
+  - 过度声称: 2/2
+============================================================
+[probe] 写入 C:\project file\BookScope\docs\experiments\data\exp015-claim-precision.json

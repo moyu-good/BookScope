@@ -1,0 +1,58 @@
+"""GET /api/health 的端到端测试。
+
+用 FastAPI TestClient 走完整的 ASGI 栈，验证：
+
+  - 状态码 200
+  - 响应字段齐全（status / version / generation）
+  - generation 恒为 r1-agent-loop（代际不变量）
+"""
+
+from __future__ import annotations
+
+import pytest
+from fastapi.testclient import TestClient
+
+from bookscope.api import create_app
+from bookscope.api.book_sessions import get_book_session_store
+
+
+@pytest.fixture()
+def client() -> TestClient:
+    """为每条测试构造隔离的 TestClient；退出时清空 session 存储。"""
+    app = create_app()
+    with TestClient(app) as c:
+        yield c
+    get_book_session_store().clear()
+
+
+def test_health_returns_200(client: TestClient) -> None:
+    """健康检查必须返回 200。"""
+    resp = client.get("/api/health")
+    assert resp.status_code == 200
+
+
+def test_health_response_has_expected_fields(client: TestClient) -> None:
+    """响应必须含 status / version / generation 三个字段。"""
+    body = client.get("/api/health").json()
+    assert "status" in body
+    assert "version" in body
+    assert "generation" in body
+
+
+def test_health_status_ok(client: TestClient) -> None:
+    """status 字段当前固定为 'ok'。"""
+    body = client.get("/api/health").json()
+    assert body["status"] == "ok"
+
+
+def test_health_generation_is_r1_agent_loop(client: TestClient) -> None:
+    """generation 恒为 r1-agent-loop；代际标识是永久合约。"""
+    body = client.get("/api/health").json()
+    assert body["generation"] == "r1-agent-loop"
+
+
+def test_health_version_is_nonempty_string(client: TestClient) -> None:
+    """version 字段必须是非空字符串（缺 VERSION 时会是 'unknown'）。"""
+    body = client.get("/api/health").json()
+    assert isinstance(body["version"], str)
+    assert body["version"]

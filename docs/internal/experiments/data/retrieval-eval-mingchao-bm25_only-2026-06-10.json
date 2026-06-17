@@ -1,0 +1,563 @@
+{
+  "book": "mingchao",
+  "retrieval_mode": "bm25_only",
+  "top_k": 10,
+  "date": "2026-06-10",
+  "golden_set": "golden-retrieval-mingchao.json",
+  "golden_annotated_at_commit": "9a9778d",
+  "n_chunks": 1069,
+  "summary": {
+    "n_queries": 20,
+    "recall_at_5": 0.6667,
+    "recall_at_10": 0.8083,
+    "mrr": 0.5637,
+    "by_type": {
+      "semantic": {
+        "n": 12,
+        "recall_at_5": 0.6111,
+        "recall_at_10": 0.8472,
+        "mrr": 0.6201
+      },
+      "positional": {
+        "n": 4,
+        "recall_at_5": 0.75,
+        "recall_at_10": 0.75,
+        "mrr": 0.5
+      },
+      "character": {
+        "n": 4,
+        "recall_at_5": 0.75,
+        "recall_at_10": 0.75,
+        "mrr": 0.4583
+      }
+    }
+  },
+  "per_query": [
+    {
+      "query": "鄱阳湖之战朱元璋的小船是怎么打败陈友谅巨舰的？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        32,
+        35,
+        36
+      ],
+      "retrieved_indices": [
+        32,
+        35,
+        36,
+        30,
+        20,
+        33,
+        34,
+        16,
+        38,
+        18
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        32,
+        35,
+        36
+      ]
+    },
+    {
+      "query": "胡惟庸是怎么当上丞相的？朱元璋为什么选他？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        66,
+        67
+      ],
+      "retrieved_indices": [
+        68,
+        71,
+        72,
+        66,
+        88,
+        67,
+        86,
+        73,
+        74,
+        70
+      ],
+      "recall_at_5": 0.5,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.25,
+      "hit_indices": [
+        66,
+        67
+      ]
+    },
+    {
+      "query": "土木堡之战明军二十万人是怎么覆灭的？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        268,
+        269
+      ],
+      "retrieved_indices": [
+        268,
+        288,
+        262,
+        292,
+        269,
+        267,
+        294,
+        266,
+        264,
+        279
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        268,
+        269
+      ]
+    },
+    {
+      "query": "北京保卫战于谦和石亨怎么部署德胜门、安定门的防守？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        291,
+        296
+      ],
+      "retrieved_indices": [
+        295,
+        296,
+        297,
+        289,
+        293,
+        322,
+        290,
+        338,
+        334,
+        308
+      ],
+      "recall_at_5": 0.5,
+      "recall_at_10": 0.5,
+      "reciprocal_rank": 0.5,
+      "hit_indices": [
+        296
+      ]
+    },
+    {
+      "query": "王守仁龙场悟道悟出了什么？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        390,
+        391
+      ],
+      "retrieved_indices": [
+        389,
+        387,
+        388,
+        453,
+        383,
+        390,
+        385,
+        416,
+        391,
+        392
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.16666666666666666,
+      "hit_indices": [
+        390,
+        391
+      ]
+    },
+    {
+      "query": "张居正的一条鞭法到底改了什么？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        677,
+        678
+      ],
+      "retrieved_indices": [
+        678,
+        677,
+        694,
+        693,
+        700,
+        953,
+        699,
+        703,
+        684,
+        669
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        677,
+        678
+      ]
+    },
+    {
+      "query": "张居正改革为什么得罪了几乎所有官员？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        690,
+        693
+      ],
+      "retrieved_indices": [
+        693,
+        676,
+        675,
+        694,
+        678,
+        677,
+        690,
+        696,
+        979,
+        657
+      ],
+      "recall_at_5": 0.5,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        690,
+        693
+      ]
+    },
+    {
+      "query": "海瑞上《治安疏》骂嘉靖之前做了什么准备？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        624,
+        625
+      ],
+      "retrieved_indices": [
+        624,
+        659,
+        645,
+        633,
+        790,
+        632,
+        646,
+        707,
+        627,
+        628
+      ],
+      "recall_at_5": 0.5,
+      "recall_at_10": 0.5,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        624
+      ]
+    },
+    {
+      "query": "皇太极绕过关宁防线打到北京城下，袁崇焕是怎么应对的？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        965,
+        966,
+        967
+      ],
+      "retrieved_indices": [
+        966,
+        973,
+        965,
+        967,
+        932,
+        930,
+        969,
+        1031,
+        927,
+        1050
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        965,
+        966,
+        967
+      ]
+    },
+    {
+      "query": "袁崇焕为什么杀毛文龙？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        959
+      ],
+      "retrieved_indices": [
+        962,
+        960,
+        961,
+        976,
+        959,
+        971,
+        965,
+        977,
+        963,
+        968
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.2,
+      "hit_indices": [
+        959
+      ]
+    },
+    {
+      "query": "朱棣起兵为什么打着'靖难'的旗号？理论依据是什么？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        133,
+        134
+      ],
+      "retrieved_indices": [
+        242,
+        423,
+        340,
+        173,
+        150,
+        160,
+        238,
+        134,
+        177,
+        170
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.5,
+      "reciprocal_rank": 0.125,
+      "hit_indices": [
+        134
+      ]
+    },
+    {
+      "query": "夺门之变是怎么策划出来的？参与者都有谁？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        323,
+        324,
+        325
+      ],
+      "retrieved_indices": [
+        338,
+        339,
+        331,
+        328,
+        325,
+        825,
+        324,
+        803,
+        1016,
+        355
+      ],
+      "recall_at_5": 0.3333333333333333,
+      "recall_at_10": 0.6666666666666666,
+      "reciprocal_rank": 0.2,
+      "hit_indices": [
+        324,
+        325
+      ]
+    },
+    {
+      "query": "全书第一章开头给朱元璋列的那份档案写了什么？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        1
+      ],
+      "retrieved_indices": [
+        1,
+        85,
+        647,
+        461,
+        462,
+        216,
+        936,
+        180,
+        618,
+        392
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        1
+      ]
+    },
+    {
+      "query": "朱祁镇篇'土木堡'那一章是从什么讲起的？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        262
+      ],
+      "retrieved_indices": [
+        292,
+        254,
+        0,
+        307,
+        311,
+        408,
+        284,
+        286,
+        316,
+        266
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "'郑和之后，再无郑和'这一章讲了什么？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        190,
+        192
+      ],
+      "retrieved_indices": [
+        198,
+        190,
+        192,
+        194,
+        191,
+        193,
+        195,
+        196,
+        197,
+        173
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.5,
+      "hit_indices": [
+        190,
+        192
+      ]
+    },
+    {
+      "query": "'第十六章 孙传庭'这一章怎么介绍孙传庭的出身？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        1033
+      ],
+      "retrieved_indices": [
+        940,
+        1033,
+        1035,
+        1032,
+        1045,
+        1028,
+        1034,
+        1049,
+        1044,
+        1029
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.5,
+      "hit_indices": [
+        1033
+      ]
+    },
+    {
+      "query": "明光宗死后，杨涟他们是怎么把朱由校从李选侍手里弄出乾清宫的？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        858,
+        860
+      ],
+      "retrieved_indices": [
+        857,
+        859,
+        858,
+        860,
+        855,
+        852,
+        889,
+        851,
+        856,
+        861
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.3333333333333333,
+      "hit_indices": [
+        858,
+        860
+      ]
+    },
+    {
+      "query": "为什么说戚家军其实是戚继光的私人武装？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        724,
+        725
+      ],
+      "retrieved_indices": [
+        725,
+        724,
+        580,
+        732,
+        553,
+        589,
+        588,
+        579,
+        593,
+        877
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        724,
+        725
+      ]
+    },
+    {
+      "query": "徐阶是怎么救下海瑞一命的？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        633
+      ],
+      "retrieved_indices": [
+        660,
+        659,
+        627,
+        65,
+        630,
+        631,
+        705,
+        628,
+        645,
+        622
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "孙传庭是怎么挡住并击败高迎祥的？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        1034
+      ],
+      "retrieved_indices": [
+        1029,
+        1034,
+        1035,
+        1028,
+        1032,
+        1030,
+        1033,
+        1027,
+        1025,
+        1042
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.5,
+      "hit_indices": [
+        1034
+      ]
+    }
+  ]
+}

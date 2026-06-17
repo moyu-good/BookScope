@@ -1,0 +1,69 @@
+[exp007] book=kuicheng top_k=10
+[exp007] ingest+chunk 15.5s · 4315 chunks
+[exp007] 生成 header：4315/4315 chunks · deepseek-chat · 并发 10
+[exp007] header 100/4315 (16s, 失败 0)
+[exp007] header 200/4315 (27s, 失败 0)
+[exp007] header 300/4315 (39s, 失败 0)
+[exp007] header 400/4315 (50s, 失败 0)
+[exp007] header 500/4315 (61s, 失败 0)
+[exp007] header 600/4315 (73s, 失败 0)
+[exp007] header 700/4315 (85s, 失败 0)
+[exp007] header 800/4315 (96s, 失败 0)
+[exp007] header 900/4315 (108s, 失败 0)
+[exp007] header 1000/4315 (119s, 失败 0)
+[exp007] header 1100/4315 (131s, 失败 0)
+[exp007] header 1200/4315 (142s, 失败 0)
+[exp007] header 1300/4315 (154s, 失败 0)
+[exp007] header 1400/4315 (166s, 失败 0)
+[exp007] header 1500/4315 (178s, 失败 0)
+[exp007] header 1600/4315 (189s, 失败 0)
+[exp007] header 1700/4315 (200s, 失败 0)
+[exp007] header 1800/4315 (211s, 失败 0)
+[exp007] header 1900/4315 (223s, 失败 0)
+[exp007] header 2000/4315 (235s, 失败 0)
+[exp007] header 2100/4315 (246s, 失败 0)
+[exp007] header 2200/4315 (257s, 失败 0)
+[exp007] header 2300/4315 (269s, 失败 0)
+[exp007] header 2400/4315 (280s, 失败 0)
+[exp007] header 2500/4315 (292s, 失败 0)
+[exp007] header 2600/4315 (304s, 失败 0)
+[exp007] header 2700/4315 (316s, 失败 0)
+[exp007] header 2800/4315 (328s, 失败 0)
+[exp007] header 2900/4315 (340s, 失败 0)
+[exp007] header 3000/4315 (351s, 失败 0)
+[exp007] header 3100/4315 (363s, 失败 0)
+[exp007] header 3200/4315 (375s, 失败 0)
+[exp007] header 3300/4315 (387s, 失败 0)
+[exp007] header 3400/4315 (398s, 失败 0)
+[exp007] header 3500/4315 (410s, 失败 0)
+[exp007] header 3600/4315 (422s, 失败 0)
+[exp007] header 3700/4315 (433s, 失败 0)
+[exp007] header 3800/4315 (444s, 失败 0)
+[exp007] header 3900/4315 (456s, 失败 0)
+[exp007] header 4000/4315 (467s, 失败 0)
+[exp007] header 4100/4315 (479s, 失败 0)
+[exp007] header 4200/4315 (490s, 失败 0)
+[exp007] header 4300/4315 (502s, 失败 0)
+[exp007] header 4315/4315 (503s, 失败 0)
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 1.018 seconds.
+Prefix dict has been built successfully.
+[exp007] headers 已写入 C:\project file\BookScope\docs\experiments\data\exp007-headers-kuicheng.json（失败 0）
+========================================================================
+[exp007] 两组 BM25 索引建完 44.3s
+[exp007] 对照组(原文): recall@5=0.380 recall@10=0.426 MRR=0.397
+    semantic   n=10 recall@5=0.567 recall@10=0.567 MRR=0.453
+    positional n= 4 recall@5=0.000 recall@10=0.125 MRR=0.028
+    character  n= 4 recall@5=0.292 recall@10=0.375 MRR=0.625
+------------------------------------------------------------------------
+[exp007] 实验组(header+原文): recall@5=0.407 recall@10=0.500 MRR=0.461
+    semantic   n=10 recall@5=0.567 recall@10=0.567 MRR=0.470
+    positional n= 4 recall@5=0.125 recall@10=0.375 MRR=0.150
+    character  n= 4 recall@5=0.292 recall@10=0.458 MRR=0.750
+========================================================================
+[exp007] Δ(实验组-对照组): recall@5=+0.028 recall@10=+0.074 MRR=+0.064
+[exp007] 结果已写入 C:\project file\BookScope\docs\experiments\data\exp007-eval-kuicheng.json
+exp007 kuicheng exit=0

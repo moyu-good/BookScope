@@ -1,0 +1,33 @@
+from bookscope.models.schemas import (
+    BookClubPack,
+    BookKnowledgeGraph,
+    BookText,
+    ChapterAnalysis,
+    ChapterSummary,
+    CharacterProfile,
+    ChunkResult,
+    ChunkScanResult,
+    EmotionalStage,
+    EmotionScore,
+    NarrativePoint,
+    ReaderVerdict,
+    StyleScore,
+    ThemeDescription,
+)
+
+__all__ = [
+    "BookClubPack",
+    "BookKnowledgeGraph",
+    "BookText",
+    "ChapterAnalysis",
+    "ChapterSummary",
+    "CharacterProfile",
+    "ChunkResult",
+    "ChunkScanResult",
+    "EmotionScore",
+    "EmotionalStage",
+    "NarrativePoint",
+    "ReaderVerdict",
+    "StyleScore",
+    "ThemeDescription",
+]

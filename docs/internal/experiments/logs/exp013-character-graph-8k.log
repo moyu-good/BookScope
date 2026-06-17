@@ -1,0 +1,17 @@
+[probe] anshi 全文 394761 字符；3 case × 3 次；模型 deepseek-v4-flash
+
+[Q1#1]  66.9s out=4995 finish=stop len=5606
+[Q1#2]  45.8s out=3616 finish=stop len=3912
+[Q1#3]  49.6s out=4641 finish=stop len=5982
+[N1#1]   2.8s out=63 finish=stop len=3
+[N1#2]   5.8s out=199 finish=stop len=100
+[N1#3]   6.7s out=162 finish=stop len=23
+[N2#1]   4.4s out=174 finish=stop len=57
+[N2#2]   4.5s out=204 finish=stop len=107
+[N2#3]   4.5s out=153 finish=stop len=66
+
+============================================================
+9/9 成功
+判分人工：Q1 看收敛(核心关系全不全)+每边证据率+复现；N1/N2 看编没编不存在的关系
+============================================================
+[probe] 写入 C:\project file\BookScope\docs\experiments\data\exp013-character-graph-anshi.json

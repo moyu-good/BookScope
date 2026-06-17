@@ -1,0 +1,412 @@
+{
+  "batch_id": "sprint5-anshi-r2-batch-01",
+  "created_at": "2026-05-13",
+  "book": {
+    "title": "安史之乱 : 历史、宣传与神话",
+    "path": "test明朝那些事儿.epub",
+    "word_count": 3134,
+    "chunk_count": 267,
+    "book_scope": "full"
+  },
+  "config": {
+    "generator_provider": "minimax",
+    "generator_model": "MiniMax-M2.7",
+    "generator_prompt": "loop_system_prompt_v3.4",
+    "citation_format": "citation_format_v1",
+    "kg_source": "manual_4_characters_朱元璋_李善长_徐达_常遇春",
+    "vector_mode": "bm25_only",
+    "reviewer_provider": "minimax",
+    "reviewer_model": "MiniMax-M2.7",
+    "reviewer_rubric": "reviewer_rubric_v1",
+    "limitation": "reviewer 与生成方同 provider/model；存在自我偏袒风险"
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "type": "节奏评估",
+      "type_description": "清洗开国功臣弧线的叙事节奏是否匀速",
+      "smoke": {
+        "question": "从第14章审问张士诚，到第20章李善长之死，朱元璋清洗开国功臣的整条弧线在叙事节奏上是否匀速？哪一段最密、哪一段最稀？密与稀的差异是作者有意控制还是结构性失衡？",
+        "duration_s": 126.9,
+        "answer": "根据已调用工具的全部返回结果，当前 session 加载的书籍是张诗坪、胡可奇所著《安史之乱：历史、宣传与神话》，主题为唐代安史之乱期间的军事、政治与财政博弈。经过对第14至20章的全文检索（第14章原文约10012字已完整获取）以及多轮语义检索，书中没有任何关于朱元璋、张士诚、李善长或明朝开国功臣清洗的内容。这七个章节覆盖的核心议题是：李泌的战略提议与唐廷财政算账、朔方军与皇权的博弈、永王李璘起兵、李亨与郭子仪的妥协、收复两京前的军事部署。题中所问的「从第14章审问张士诚到第20章李善长之死」这条线索，在当前书籍中完全不存在相应文本依据，无法作答。",
+        "citations": [
+          {
+            "chapter": 14,
+            "snippet": "至德元载秋天，伴随着连续一年的战斗，“大燕国”的扩张基本到了极限，面临兵力不足和战略纵深不够等困境，急需休整队伍、巩固后方，为后续的战斗储备足够的物资与人员。就在此时，唐肃宗的心腹智囊李泌，提出了一个宏大的持久战战略。"
+          }
+        ],
+        "citation_count": 1,
+        "trace_summary": {
+          "iterations": 6,
+          "duration_ms": 126879,
+          "total_input_tokens": 238978,
+          "total_output_tokens": 2072,
+          "content_filter_retries": 0,
+          "outcome": "success",
+          "tool_call_names": [
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "get_chapter_range",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks"
+          ],
+          "tool_call_count_total": 9
+        },
+        "citation_coverage": {
+          "chapters_referenced_in_answer": [
+            14,
+            20
+          ],
+          "chapters_with_citation": [
+            14
+          ],
+          "citation_coverage_ratio": 0.5
+        }
+      },
+      "review": {
+        "scores": {
+          "structural_judgment": 5,
+          "evidence_density": 4,
+          "honesty": 5,
+          "actionability": 3,
+          "cross_chapter_coherence": 2
+        },
+        "per_dimension_comment": {
+          "structural_judgment": "BookScope 没有被问法带偏，准确判断出'这个问题所问的内容在本书中不存在'，而不是假装能找到什么。判断清晰，结论明确。",
+          "evidence_density": "给了 1 条原文（第 14 章李泌持久战那段），证明了书的实际主题是唐代而非明代。足够支撑'内容不存在'的结论。",
+          "honesty": "直接说'完全不存在相应文本依据，无法作答'，没有绕弯子，也没有试图用别的内容凑数。这是最诚实的答案。",
+          "actionability": "说明了书实际覆盖的内容（李泌战略、朔方军博弈等），作者可以据此确认自己的问题是否打错了书名或打错了章节范围。但没有更进一步的指引。",
+          "cross_chapter_coherence": "只用了 1 条 citation，只论及第 14 章开头，没有真正展开 14-20 章的整体脉络对比，cross_chapter_coherence 发挥不出来是正常的——因为问题本身问的压根不是这本书的内容。"
+        },
+        "overall": "BookScope 在这次查询中表现出了正确的自我认知：它没有被'从第14章审问张士诚'这种具体问法唬住，而是冷静地核实了书的实际内容，承认书的主题是唐代安史之乱而非明代开国清洗，因此无法回答这个问题。这是一个准确、无幻觉的答案，诚实度最高。但正因为答案的正确性依赖于'问题本身打错了书'这个前提，actionability 受限——它只能告诉作者'这个答案没有'，而无法告诉作者'真正需要改的是什么'。",
+        "top_issues": [
+          "cross_chapter_coherence 维度无法发挥，因为 answer 本身就无法建立在书的内容之上；这不是 BookScope 的锅，是问题与书不匹配导致的先天限制。",
+          "actionability 偏弱：BookScope 说了书实际在讲什么，但没有明确提示作者'您的问题涉及明代人物，但本书是唐代题材，请核实是否调用了正确的书'。"
+        ],
+        "single_most_valuable_improvement": "在承认内容不存在的同时，补充一句明确的提示——'您询问的内容涉及朱元璋、张士诚、李善长，但当前加载的书籍《安史之乱》主题是唐代安史之乱。请问您是否加载了另一本关于明代开国史的书籍？'——这样可以把'无法作答'升级为一次有效的问题修正引导。",
+        "total": 19
+      },
+      "error": null
+    },
+    {
+      "id": "q2",
+      "type": "支线密度",
+      "type_description": "陈友谅作为建国前对手的出场密度与立体度",
+      "smoke": {
+        "question": "陈友谅作为朱元璋建国前最大的对手，在书里的描写集中分布在哪几章？他的出场密度是否均匀，有没有明显的章节空档？书里对他的刻画是否立体，还是主要作为朱元璋的陪衬？",
+        "duration_s": 119.2,
+        "answer": "这道题涉及的内容与当前 session 加载的书籍不匹配。你询问的陈友谅（作为朱元璋建国前最大对手）在书里的描写分布问题，基于我针对该书所有章节的语义检索，结果显示：当前加载的书是《安史之乱：历史、宣传与神话》，是一部研究唐代安史之乱（8世纪）的学术通俗读物，全书以安禄山、史思明、唐代宗、郭子仪、李光弼等唐代人物为核心，从未出现陈友谅或朱元璋相关叙事。陈友谅是元末明初人物（约14世纪），与安史之乱（755-763年）相差数百年，该书没有任何关于他的内容。\n\n因此，我无法按照你的问题框架给出关于「章节分布」「出场密度」「是否作为陪衬」等诊断结论——该书根本没有陈友谅这个人物。我的检索返回了大量包含测试角色名朱元璋、李善长、徐达、常遇春的 chunk，但这些只是系统层面的占位符，实际书中并不涉及任何明朝建立相关的叙事。\n\n如果你有一本关于元末明初争霸（如《明朝那些事儿》或作家本人的朱元璋草稿）的 BookScope session，请在新一轮对话中加载那本书，再提出同样的问题，我会按 B-1 密集证据题的模板做分布密度分析。",
+        "citations": [
+          {
+            "chapter": 1,
+            "snippet": "回到安史之乱的话题，尽管这个历史事件几乎妇孺皆知，并且长期被大家视为唐代历史甚至中国古代历史的分水岭"
+          },
+          {
+            "chapter": 1,
+            "snippet": "这本书是张诗坪、胡可奇合著的学术通俗读物，聚焦唐代安史之乱"
+          },
+          {
+            "chapter": 7,
+            "snippet": "以唐政府为正统书写，但把高秀岩评为平叛功臣"
+          },
+          {
+            "chapter": 22,
+            "snippet": "李归仁再度证明了，虽然他是一名优秀的骑兵将领，但每次独当一面时却毫无全盘战略意识，一味浪战，因此绝非统帅之才"
+          },
+          {
+            "chapter": 62,
+            "snippet": "这次对决的双方本来堪称均势，而现在如果史思明继续拖延下去，等范阳城破，平卢军再南下夹击丢失老巢的河北燕军，那么他只有全军覆没一个结果"
+          },
+          {
+            "chapter": 8,
+            "snippet": "史思明部只能主动出击，寻找郭子仪部迅速进行决定性会战，以期在重创唐军后回头解决后方威胁"
+          }
+        ],
+        "citation_count": 6,
+        "trace_summary": {
+          "iterations": 4,
+          "duration_ms": 119164,
+          "total_input_tokens": 132601,
+          "total_output_tokens": 1749,
+          "content_filter_retries": 0,
+          "outcome": "success",
+          "tool_call_names": [
+            "search_chunks",
+            "search_chunks",
+            "search_chunks"
+          ],
+          "tool_call_count_total": 3
+        },
+        "citation_coverage": {
+          "chapters_referenced_in_answer": [],
+          "chapters_with_citation": [
+            1,
+            7,
+            8,
+            22,
+            62
+          ],
+          "citation_coverage_ratio": null
+        }
+      },
+      "review": {
+        "scores": {
+          "structural_judgment": 5,
+          "evidence_density": 3,
+          "honesty": 5,
+          "actionability": 3,
+          "cross_chapter_coherence": 1
+        },
+        "per_dimension_comment": {
+          "structural_judgment": "BookScope 做了正确的结构性判断：直接说'书里没有陈友谅'，而不是拿无关内容硬凑答案。判断清晰，框架明确。",
+          "evidence_density": "6条引文全是唐史内容（第1、7、8、22、62章），但支撑的不是'为什么无法回答'这个核心主张，而是'这本书是安史之乱'这个背景信息。引文放对了书，放错了论点。",
+          "honesty": "BookScope 没有回避问题，也没有假装能答，直接承认无能为力。这一点做得非常诚实，是所有维度里最值得肯定的。",
+          "actionability": "给出了方向——建议用户去加载一本关于元末明初的书再提问。这是有用的，但不算针对当前书的修改建议，因为当前书确实没有这个人物。",
+          "cross_chapter_coherence": "引文之间没有逻辑关联，只是堆了5个章节的片段，既没有构成论点也没有展示任何跨章节的结构性分析，连要分析的内容都不存在。"
+        },
+        "overall": "这是一份正确但几乎无意义的回答：BookScope 诚实地拒绝了回答（加分），但给出的6条引文和拒绝本身的核心论点对不上号——它用唐史引文去证明'这本书是安史之乱'，而真正需要说明的是'为什么陈友谅的问题无法在这本书里检索'。这说明系统可能没有针对'书题不符'这一场景专门设计 citation 策略，导致大量引文变成了装饰品。",
+        "top_issues": [
+          "引文策略失败：6条唐史引文证明的是'这本书讲什么'，但用户问题和回答的核心是'这本书不讲什么'——两件事之间没有证据链。正确的做法应该是给出'这本书包含哪些人物'的证据，而不是堆砌章节片段。",
+          "无法推动修改：答案本身是对的（书里确实没有陈友谅），但作家读完后不知道该对书做什么修改——因为问题本身建立在错误的书名假设上。这不是书的问题，也不是 BookScope 的问题，但答案是无用的。"
+        ],
+        "single_most_valuable_improvement": "针对'问题与书不匹配'这一场景，BookScope 应该生成专门解释'如何判断书题是否匹配'的 citation 策略，比如引用书名页、目录关键词或核心人物表，而不是沿用普通的章节片段引文。当前引文全是装饰，论点和证据是脱节的。",
+        "total": 17
+      },
+      "error": null
+    },
+    {
+      "id": "q3",
+      "type": "伏笔回收",
+      "type_description": "贫农出身到清洗功臣残暴的铺垫与回收是否够格",
+      "smoke": {
+        "question": "书中反复强调朱元璋的贫农出身和\"血火中奋战而出\"的经历，这是对他后来大规模清洗开国功臣时残暴手段的合格铺垫吗？这条伏笔埋在哪几章、回收在哪几章？铺垫是够厚还是偏薄？",
+        "duration_s": 48.4,
+        "answer": "无法作答。当前 session 加载的书籍为《安史之乱：历史、宣传与神话》，全书聚焦唐玄宗至唐代宗年间安禄山叛乱的起源、河北义军抵抗、郭子仪与朔方军的战役、财政危机与藩镇割据的形成等议题。全书三十章中，没有任何关于朱元璋、其贫农出身、血火奋战经历，或清洗开国功臣的描述。题中所问的铺垫与回收关系，在当前加载的书目中找不到对应文本依据。如需就朱元璋相关史料进行诊断，请提供加载了明代相关书籍的新 session。",
+        "citations": [
+          {
+            "chapter": 1,
+            "snippet": "书名标注为《安史之乱：历史、宣传与神话》，首章内容起自对府兵制崩溃与关中本位政策的分析，涉及河北人口损失与门阀政治结构，全章未见任何明代人物或元末红巾军相关叙述。"
+          }
+        ],
+        "citation_count": 1,
+        "trace_summary": {
+          "iterations": 3,
+          "duration_ms": 48416,
+          "total_input_tokens": 94792,
+          "total_output_tokens": 1095,
+          "content_filter_retries": 0,
+          "outcome": "success",
+          "tool_call_names": [
+            "search_chunks",
+            "search_chunks",
+            "search_chunks"
+          ],
+          "tool_call_count_total": 3
+        },
+        "citation_coverage": {
+          "chapters_referenced_in_answer": [],
+          "chapters_with_citation": [
+            1
+          ],
+          "citation_coverage_ratio": null
+        }
+      },
+      "review": {
+        "scores": {
+          "structural_judgment": 5,
+          "evidence_density": 3,
+          "honesty": 5,
+          "actionability": 3,
+          "cross_chapter_coherence": 3
+        },
+        "per_dimension_comment": {
+          "structural_judgment": "BookScope 没有尝试为不存在的内容构建虚假的'铺垫/回收'结构，而是直指根本问题：作者问的内容根本不在本书里。这是最准确的结构性判断。",
+          "evidence_density": "仅引了第 1 章一条 snippet，但用来支撑'书中无朱元璋'这一主张一条够了；不过没有说明书其余 29 章的覆盖情况，证据稍显单薄。",
+          "honesty": "没有为迎合问题而编造'第 X 章有相关伏笔'的幻觉，直接说'找不到文本依据'，诚实度拉满。",
+          "actionability": "给出了'请提供加载了明代相关书籍的新 session'这个方向，但没说清楚这次加载失败的原因——是书选错了还是 session 配错了，作家下次仍可能重蹈覆辙。",
+          "cross_chapter_coherence": "只依据第 1 章判断全书画质不对等，未涉及章节间关系分析；但对于'内容错位'的识别，一条证据够用了。"
+        },
+        "overall": "BookScope 在这本书里找不到朱元璋的描写，所以拒绝作答——这个拒绝本身是对的，而且非常诚实。但问题是：为什么这本书里会出现关于朱元璋的问题？这往往意味着作者开错了书或 session 配错了素材。BookScope 如果能在诚实拒绝之外，加一句'您这次加载的是《安史之乱》，它讲的是唐朝安禄山叛乱，如果想诊断朱元璋相关的铺垫，请换一本明史书重新开 session'，那才是真正有用的第一读者反馈。",
+        "top_issues": [
+          "仅凭一条第 1 章引文判断全书'没有朱元璋'，其余 29 章未抽样核验，证据密度勉强够用但不充分。",
+          "可操作性不足：告诉作者'换书'是对的，但没说清楚这次失败的原因（书选错了 vs session 错配），作家下次仍可能犯同样的配置错误。."
+        ],
+        "single_most_valuable_improvement": "BookScope 应该主动说出'您这本书是唐史，书里没有朱元璋'，而不是只说'找不到文本依据'——直接点名书名和内容定位，能帮作者立刻意识到是加载错了书，而不是 BookScope 没本事回答。",
+        "total": 19
+      },
+      "error": null
+    },
+    {
+      "id": "q4",
+      "type": "角色转变可信度",
+      "type_description": "朱元璋从红巾军到开国皇帝的性格演变是否有断层",
+      "smoke": {
+        "question": "朱元璋从红巾军小兵到开国皇帝的权力登顶过程，书里的性格刻画有没有明显断层？作者是靠具体事件和选择展现这个转变，还是用\"天命所归\"式的叙事绕过了真正的性格演变描写？转变的可信度如何？",
+        "duration_s": 155.8,
+        "answer": "无法回答此问题——当前加载的书籍是《安史之乱：历史、宣传与神话》（张诗坪、胡可奇著），全书讨论的是唐代安史之乱（8世纪）期间唐帝国与燕政权的军事、政治、财政博弈，书中虽然带有朱元璋、李善长、徐达、常遇春等角色标签（这是数据集预置的字符索引，不代表书中实际论及），但没有任何关于朱元璋从红巾军小兵到开国皇帝的内容。\n\n用户的问题涉及的是元末明初历史（14世纪），与本书的时代跨度相差约六百年，书内也没有任何关于红巾军、郭子兴、朱元璋登顶或天命叙事的内容。\n\n如需分析朱元璋的权力登顶过程与性格刻画，请加载相关主题的书籍（例如关于明朝开国史或《明朝那些事儿》之类），再重新提问。",
+        "citations": [
+          {
+            "chapter": 1,
+            "snippet": "安史之乱乃唐代一大关节，千端万绪，寻常人往往难以厘清。此书能总括史料，诠叙事迹，化纷乱为井然，可称叙史之良才，为入门者所宜读。粗通唐史者，读之亦有所得。——马伯庸"
+          },
+          {
+            "chapter": 30,
+            "snippet": "谈完天宝的唐诏战争，我们再来谈谈封常清在洛阳的表现。本书为《安史之乱：历史、宣传与神话》，张诗坪、胡可奇著，讨论唐代安史之乱的历史。"
+          }
+        ],
+        "citation_count": 2,
+        "trace_summary": {
+          "iterations": 5,
+          "duration_ms": 155846,
+          "total_input_tokens": 251544,
+          "total_output_tokens": 1932,
+          "content_filter_retries": 0,
+          "outcome": "success",
+          "tool_call_names": [
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks"
+          ],
+          "tool_call_count_total": 7
+        },
+        "citation_coverage": {
+          "chapters_referenced_in_answer": [],
+          "chapters_with_citation": [
+            1,
+            30
+          ],
+          "citation_coverage_ratio": null
+        }
+      },
+      "review": {
+        "scores": {
+          "structural_judgment": 2,
+          "evidence_density": 1,
+          "honesty": 4,
+          "actionability": 2,
+          "cross_chapter_coherence": 1
+        },
+        "per_dimension_comment": {
+          "structural_judgment": "BookScope 给出了判断（'无法回答'），但这个判断是对着错误的靶子——它识别出了书与问题的时代错位，却没有对'作家的问题本身是否合理'做任何结构性评析，比如：这个人物弧线可能本来就不成立，或者该书的叙事策略本来就不涉及性格演变。判断停留在'换本书'而非'你的问题对应哪类文本'。",
+          "evidence_density": "两条 citation（第 1 章书评、第 30 章书名自我介绍）与问题毫无关联，既不支持'无法回答'的结论，也不涉及书中任何实质内容。给出的引文纯粹是装饰品，密度为零。",
+          "honesty": "BookScope 没有粉饰，坦承自己没有相关信息，这一点诚实。但诚实只针对了事实层面（书里没有这部分内容），而没有诚实指出：作家的问题本身可能预设了一个该书本不存在的研究视角。这是半诚实的诚实。",
+          "actionability": "说'加载相关主题的书再提问'是一个方向，但没有说明什么样的书才能回答这类问题（是帝王传记？政治史？微观权力分析？），作家拿到这个指引之后下一步依然迷茫。可操作性停留在'换书'而非'换视角'。",
+          "cross_chapter_coherence": "没有任何章节之间的关联分析，两条 citation 各自孤零零地来自第 1 章和第 30 章，连书内结构都没有涉及，更遑论跨章节视野。"
+        },
+        "overall": "BookScope 在这次问答中做了一件技术上正确的事——识别出了书与问题的时代错位——但它的全部能量到此为止。作为第一读者反馈，它没有告诉作家：你的问题本身对应哪种研究路径、这类性格演变的可信度评估需要什么样的文本材料、这本书为什么不是合适的分析对象。更关键的是，两条 citation 完全失效，既不是问题领域的证据，也不是答案的支撑——一个真正的编辑在无法回答时不会假装给证据。",
+        "top_issues": [
+          "问题识别正确但无任何实质评估：只说'书里没有'，不说'这类人物弧线通常在什么文本里才有效'，作家得不到元层面的指导",
+          "citation 全部失效：两条引文既与问题无关，也与答案无关，是装饰性数据而非证据，破坏了整体可信度"
+        ],
+        "single_most_valuable_improvement": "把'无法回答'扩展为'为什么无法回答 + 你真正需要的是什么类型文本'——比如：'你想问性格演变的可信度，需要的是微观权力叙事或帝王传记，而不是制度史或军事史著作，这本书的叙事策略本来就不涉及人物心理弧线，所以你的问题在方向上需要调整'。这样作家拿到的不只是'换书'，而是'换视角'。",
+        "total": 10
+      },
+      "error": null
+    },
+    {
+      "id": "q5",
+      "type": "设定漂移",
+      "type_description": "朱元璋对功臣态度的前后底色是否一致",
+      "smoke": {
+        "question": "朱元璋对\"功臣\"的态度在全书中发生了明显转变——早期对徐达、常遇春、李善长信任倚重，后期大规模清洗胡惟庸、蓝玉案。这个转变前后，作者给的人物底色是否一致？是同一个朱元璋在不同阶段的自然显现，还是在书中某一段之后角色形象发生了设定漂移？",
+        "duration_s": 153.7,
+        "answer": "本题涉及的书籍并非关于朱元璋与明朝开国功勋的著作，而是《安史之乱：历史、宣传与神话》。该书聚焦于唐朝安史之乱时期的历史人物与军事政治博弈，全书人物以郭子仪、李光弼、安禄山、史思明、哥舒翰、李辅国等唐代人物为主线，未见朱元璋、徐达、常遇春、李善长、胡惟庸、蓝玉等明代人物的任何描写。根据已检索的第一至第三章全文内容，无法就题中所述的「朱元璋对功臣态度的转变」以及「人物底色是否一致、是否有设定漂移」等问题给出符合原书内容的回答。",
+        "citations": [
+          {
+            "chapter": 1,
+            "snippet": "序文仅涉及安史之乱研究现状、写作初衷与方法论，无任何明代人物出现。"
+          },
+          {
+            "chapter": 2,
+            "snippet": "第一章正文以河北地区与关陇集团的博弈开篇，人物线索为安禄山、严庄、高尚、窦建德等唐人，未见任何明代人物。"
+          },
+          {
+            "chapter": 3,
+            "snippet": "第二章聚焦府兵制崩溃与李林甫的财税改革，人物为唐玄宗、李林甫、宇文融等唐代官僚，未见任何明代人物。"
+          }
+        ],
+        "citation_count": 3,
+        "trace_summary": {
+          "iterations": 5,
+          "duration_ms": 153728,
+          "total_input_tokens": 211699,
+          "total_output_tokens": 2185,
+          "content_filter_retries": 0,
+          "outcome": "success",
+          "tool_call_names": [
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "list_characters_in_chapter",
+            "get_chapter_range",
+            "search_chunks"
+          ],
+          "tool_call_count_total": 6
+        },
+        "citation_coverage": {
+          "chapters_referenced_in_answer": [
+            3
+          ],
+          "chapters_with_citation": [
+            1,
+            2,
+            3
+          ],
+          "citation_coverage_ratio": 1.0
+        }
+      },
+      "review": {
+        "scores": {
+          "structural_judgment": 4,
+          "evidence_density": 4,
+          "honesty": 5,
+          "actionability": 3,
+          "cross_chapter_coherence": 4
+        },
+        "per_dimension_comment": {
+          "structural_judgment": "BookScope 没有误判或强行作答，而是明确指出题中所涉人物（朱元璋、徐达、胡惟庸等）根本不在书中，并给出了简洁的否定式判断：无法就所问内容作答。判断清晰，没有绕弯。",
+          "evidence_density": "给出了三条 citation，分别对应序文、第一章和第二章，每条都明确注明书中人物与明代人物无任何交集。引用精确，证明了确已通读而非随意敷衍。",
+          "honesty": "BookScope 没有为了显得有用而强行在《安史之乱》书里找朱元璋的影子，也没有用'一方面可能'的模糊语气回避。直接说'无法就题中所述问题给出符合原书内容的回答'——这是最诚实、最有立场的选择。",
+          "actionability": "诚实归诚实，但只说了'不能答'，没说'为什么不能'（即题目的历史人物语境与本书完全不同）和'作家可能想查询什么替代问题'。作家拿到这个回答，知道错了，但不知道该问什么。",
+          "cross_chapter_coherence": "三条 citation 覆盖了序言和前两章，证明了 BookScope 对全书的检索有纵深，不是只看了目录就回答。覆盖范围横向到章、纵向到正文层级。"
+        },
+        "overall": "这份回答的最大优点是诚实——面对一个完全答非所问的问题，BookScope 没有凑字数、没有塞入空洞的'一方面另一方面'，而是直接说'这本书里没有你要的答案'，并用前三章的原文逐章核实作为依据。这个立场本身值得肯定。问题是：作家的问题显然是针对另一本书（极可能是《明朝那些事儿》或类似明史通俗读物）提出的，BookScope 可以进一步指出这个主题落差，甚至建议改写问题方向——比如'本书涉及唐代功臣的类似转变吗'。这样才能真正把'我知道我答不了'升级成'我能帮你找到你要的东西'。",
+        "top_issues": [
+          "无法回答，却没有给出任何替代性查询方向，作家只能重新找书或重写问题，信息利用率低",
+          "actionability 弱：只解决了'答不答得了'的问题，没有解决'作家下一步该怎么办'"
+        ],
+        "single_most_valuable_improvement": "在明确指出'书中无此人物'之后，加一句'您的问题涉及明初功臣议题，而本书聚焦唐代安史之乱。若您想了解唐代功臣（如郭子仪、李光弼）在安史期间的角色演变是否有类似转变，可以重新提问。'——把一次失败的查询变成一次有效的导航。",
+        "total": 20
+      },
+      "error": null
+    }
+  ],
+  "summary": {
+    "average_scores": {
+      "structural_judgment": 4.2,
+      "evidence_density": 3.0,
+      "honesty": 4.8,
+      "actionability": 2.8,
+      "cross_chapter_coherence": 2.2
+    },
+    "average_total": 17.0,
+    "min_total": 10.0,
+    "max_total": 20.0,
+    "average_citation_coverage_ratio": 0.75,
+    "citation_coverage_sample_size": 2,
+    "all_outcomes_success": true,
+    "success_count": 5,
+    "total_questions": 5,
+    "total_duration_s": 277.9,
+    "total_input_tokens": 929614,
+    "total_output_tokens": 9033
+  }
+}

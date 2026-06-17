@@ -1,0 +1,88 @@
+name: Benchmark
+
+# 性能 benchmark workflow —— Sprint 5 OPS deliverable
+# 触发：手动（workflow_dispatch）+ 每周一 02:00 UTC 定时
+# 模式：dry-run 默认（CI 没 LLM key），真模式需要在 secrets 配 MINIMAX_API_KEY
+# 失败：benchmark_compare.py 检测 REGRESSION > 20% 时 exit 1 让 workflow 红
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run only (no real LLM calls)"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+  schedule:
+    # 每周一 02:00 UTC（北京时间 10:00）
+    - cron: "0 2 * * 1"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Download NLTK / TextBlob corpora
+        run: python -m textblob.download_corpora
+
+      # 拉上次 benchmark artifact 用于对比；首次跑或没数据时 continue-on-error
+      - name: Download previous benchmark artifact
+        id: download-prev
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: benchmark-data
+          path: benchmark-prev/
+
+      - name: Run benchmark
+        id: run-bench
+        env:
+          # schedule 触发默认走 dry-run；workflow_dispatch 看用户输入
+          BOOKSCOPE_BENCHMARK_DRY_RUN: ${{ github.event.inputs.dry_run != 'false' && '1' || '' }}
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          BOOKSCOPE_SMOKE_PROVIDER: minimax
+          BOOKSCOPE_REVIEW_PROVIDER: minimax
+        run: |
+          mkdir -p benchmark-data
+          python scripts/benchmark_run_and_report.py \
+            --output-dir benchmark-data/ \
+            --label "scheduled-${{ github.run_id }}"
+          ls -la benchmark-data/
+
+      # 与上一次 benchmark 对比，REGRESSION > 20% 时 exit 1 挂 workflow
+      - name: Compare with previous baseline
+        if: steps.download-prev.outcome == 'success'
+        run: |
+          PREV_JSON=$(ls benchmark-prev/*.json 2>/dev/null | head -n 1)
+          NEW_JSON=$(ls benchmark-data/*.json 2>/dev/null | head -n 1)
+          if [ -z "$PREV_JSON" ] || [ -z "$NEW_JSON" ]; then
+            echo "Missing JSON file for comparison; skipping"
+            exit 0
+          fi
+          echo "Comparing $PREV_JSON vs $NEW_JSON"
+          python scripts/benchmark_compare.py "$PREV_JSON" "$NEW_JSON"
+
+      - name: Upload benchmark artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-data
+          path: benchmark-data/
+          retention-days: 30

@@ -1,0 +1,110 @@
+{
+  "batch_id": "sprint5-sanity2-q1",
+  "created_at": "2026-05-13",
+  "book": {
+    "title": "安史之乱 : 历史、宣传与神话",
+    "path": "test明朝那些事儿.epub",
+    "word_count": 3134,
+    "chunk_count": 267,
+    "book_scope": "full"
+  },
+  "config": {
+    "generator_provider": "minimax",
+    "generator_model": "MiniMax-M2.7",
+    "generator_prompt": "loop_system_prompt_v3.4",
+    "citation_format": "citation_format_v1",
+    "kg_source": "manual_4_characters_朱元璋_李善长_徐达_常遇春",
+    "vector_mode": "bm25_only",
+    "reviewer_provider": "minimax",
+    "reviewer_model": "MiniMax-M2.7",
+    "reviewer_rubric": "reviewer_rubric_v1",
+    "limitation": "reviewer 与生成方同 provider/model；存在自我偏袒风险"
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "type": "节奏评估",
+      "type_description": "清洗开国功臣弧线的叙事节奏是否匀速",
+      "smoke": {
+        "question": "从第14章审问张士诚，到第20章李善长之死，朱元璋清洗开国功臣的整条弧线在叙事节奏上是否匀速？哪一段最密、哪一段最稀？密与稀的差异是作者有意控制还是结构性失衡？",
+        "duration_s": 289.8,
+        "answer": "无法回答：当前 session 加载的书是《安史之乱：历史、宣传与神话》，内容全部围绕唐代安史之乱（安禄山、史思明、郭子仪、李光弼等人物与战役），与用户提问所指的朱元璋清洗功臣主题（第14章张士诚审问、第20章李善长之死）毫无关联。书中的\"朱元璋\"\"李善长\"\"徐达\"\"常遇春\"等人物名只是在字符特征检索时出现在 metadata 字段里，并不代表正文含有相关内容。需重新加载正确的书籍后才能回答此问题。",
+        "citations": [
+          {
+            "chapter": 14,
+            "snippet": "我们取《通典》《旧唐书》的相近口径，也就是310万左右进行计算。假设建中元年的户数统计中，江东八道占比和乾元三年差别不大，大约为46%，则乾元三年江东的课口大约110万，换算成在籍户数约90万。"
+          }
+        ],
+        "citation_count": 1,
+        "trace_summary": {
+          "iterations": 5,
+          "duration_ms": 289772,
+          "total_input_tokens": 264334,
+          "total_output_tokens": 2237,
+          "content_filter_retries": 0,
+          "outcome": "success",
+          "tool_call_names": [
+            "search_chunks",
+            "search_chunks",
+            "get_chapter_range"
+          ],
+          "tool_call_count_total": 3
+        },
+        "citation_coverage": {
+          "chapters_referenced_in_answer": [
+            14,
+            20
+          ],
+          "chapters_with_citation": [
+            14
+          ],
+          "citation_coverage_ratio": 0.5
+        }
+      },
+      "review": {
+        "scores": {
+          "structural_judgment": 2,
+          "evidence_density": 1,
+          "honesty": 4,
+          "actionability": 2,
+          "cross_chapter_coherence": 1
+        },
+        "per_dimension_comment": {
+          "structural_judgment": "给出了明确判断——「无法回答」——但这个判断是关于工具配置层面的，不是作家所问的叙事节奏层面，等于回避了问题本身。",
+          "evidence_density": "引用了一条原文（第14章），但内容是唐代江东课口计算，和朱元璋清洗功臣毫无关联；整条 citation 是装饰品，不支撑任何主张。",
+          "honesty": "诚实度在这里是正面的：BookScope 如实承认书的内容与问题不匹配，没有瞎编一个关于叙事节奏的答案。",
+          "actionability": "给了「重新加载正确书籍」的建议，但作家拿到的反馈是零——既没有节奏分析也没有修改方向。",
+          "cross_chapter_coherence": "无跨章节分析可言；整篇答复只说「内容不匹配」，citation 也是单点碎片，和作家问的「第14章到第20章的弧线」完全不搭。"
+        },
+        "overall": "这份答复的本质是「报错」而非「审稿」。诚实地说出书和提问不匹配是对的，但 BookScope 给出的第14章 citation 是一条唐代人口数据，和作家问的朱元璋清洗功臣毫无关系——这产生了最坏的效果：看上去有引文支撑，实际上是误导性装饰，让作家误以为系统做过文本检索。对作家来说，这比直接说「我无法访问该书正文」更糟糕，因为他不知道系统到底有没有看他的稿子。",
+        "top_issues": [
+          "Citation 与 answer 完全脱节：第14章引文是唐代人口数据，不支撑任何「无法回答」的理由，要么换一条真正相关的引文（比如元末史料片段），要么干脆不挂 citation",
+          "BookScope 没有尝试从现有文本出发——书里虽然写的是安史之乱，但作家的问题是叙事节奏，BookScope 可以问「您是指书中的哪个具体情节段落」而不是直接说无法回答"
+        ],
+        "single_most_valuable_improvement": "在报错之前先确认：作家是否加载了错误的书？如果是，引导重新加载；如果书是对的但问题超出范围，则明确说「我在这本书里没有找到第14-20章涉及朱元璋清洗功臣的内容，您能确认具体指的是哪段文字吗」——这样至少给作家一个具体下一步，而不是一张空头支票。",
+        "total": 10
+      },
+      "error": null
+    }
+  ],
+  "summary": {
+    "average_scores": {
+      "structural_judgment": 2.0,
+      "evidence_density": 1.0,
+      "honesty": 4.0,
+      "actionability": 2.0,
+      "cross_chapter_coherence": 1.0
+    },
+    "average_total": 10.0,
+    "min_total": 10.0,
+    "max_total": 10.0,
+    "average_citation_coverage_ratio": 0.5,
+    "citation_coverage_sample_size": 1,
+    "all_outcomes_success": true,
+    "success_count": 1,
+    "total_questions": 1,
+    "total_duration_s": 336.0,
+    "total_input_tokens": 264334,
+    "total_output_tokens": 2237
+  }
+}

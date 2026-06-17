@@ -1,0 +1,17 @@
+[probe] anshi 全文 394761 字符；3 case × 3 次；模型 deepseek-v4-flash
+
+[Q1#1]  50.8s out=3480 finish=stop len=2188
+[Q1#2]  26.4s out=2072 finish=stop len=1921
+[Q1#3]  40.3s out=3165 finish=stop len=2072
+[N1#1]   6.9s out=268 finish=stop len=57
+[N1#2]   5.0s out=159 finish=stop len=65
+[N1#3]   7.5s out=331 finish=stop len=57
+[N2#1]   5.6s out=306 finish=stop len=139
+[N2#2]   5.4s out=225 finish=stop len=114
+[N2#3]   8.2s out=538 finish=stop len=206
+
+============================================================
+9/9 成功
+判分人工：Q1 看收敛(高潮高/铺垫低)+复现(3次最松章重合)+证据；N1/N2 看附没附和
+============================================================
+[probe] 写入 C:\project file\BookScope\docs\experiments\data\exp012-pacing-anshi.json

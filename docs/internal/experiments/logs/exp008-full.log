@@ -1,0 +1,112 @@
+[probe] BookScope L2 整答案缓存 disabled = True（约束 3）
+[probe] 选中 13 条 pair × 3 次 = 39 次端到端跑
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 3.000 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: OpenAI choices 在但 message.content 为空——多半是 reasoning model 推理吃光 max_tokens 被截断（finish_reason=length）
+[probe] ingest 中（load epub + chunk + BM25 索引；跳过 KG 抽取）...
+[smoke] 加载 epub: C:\project file\BookScope\test亏成首富从游戏开始 (青衫取醉) (z-library.sk, 1lib.sk, z-lib.sk).epub
+[smoke] 书名: 亏成首富从游戏开始，字数: 5381554
+[smoke] 切分 chunk 数: 4315
+[probe] ingest 完成 81.1s：5381554 字 / 4315 chunk / KG 4 角色（手工壳，未发 LLM 抽取）
+[probe] generator model = deepseek-v4-flash（约束 1：只用 flash）
+[probe] 并发 5 跑 39 次
+================================================================
+[probe] P1 任务A run3 完成 42.4s | iter=3 tools=2 cite=2(verified=2) | in=75861 cache_hit=19200 cache_miss=56661
+[probe] P1 任务A run1 完成 49.8s | iter=4 tools=7 cite=4(verified=4) | in=165682 cache_hit=71808 cache_miss=93874
+[probe] P1 任务A run2 完成 54.0s | iter=3 tools=3 cite=3(verified=3) | in=64180 cache_hit=19200 cache_miss=44980
+[probe] P2 任务A run2 完成 54.9s | iter=4 tools=5 cite=4(verified=4) | in=106922 cache_hit=72576 cache_miss=34346
+[probe] P2 任务A run1 完成 56.3s | iter=4 tools=5 cite=5(verified=5) | in=81269 cache_hit=59136 cache_miss=22133
+[probe] P3b 任务A run1 完成 41.2s | iter=4 tools=4 cite=4(verified=4) | in=95243 cache_hit=47616 cache_miss=47627
+[probe] P2 任务A run3 完成 59.3s | iter=5 tools=5 cite=3(verified=3) | in=192421 cache_hit=30720 cache_miss=161701
+[probe] P3 任务A run2 完成 57.6s | iter=4 tools=3 cite=1(verified=1) | in=58271 cache_hit=26112 cache_miss=32159
+[probe] P3 任务A run3 完成 57.6s | iter=6 tools=9 cite=6(verified=6) | in=95603 cache_hit=73728 cache_miss=21875
+[probe] P3 任务A run1 完成 74.6s | iter=5 tools=6 cite=4(verified=4) | in=190275 cache_hit=91136 cache_miss=99139
+[probe] P3b 任务A run2 完成 47.1s | iter=5 tools=8 cite=5(verified=5) | in=76252 cache_hit=30720 cache_miss=45532
+[probe] P4 任务A run3 完成 34.8s | iter=2 tools=3 cite=2(verified=2) | in=57739 cache_hit=12800 cache_miss=44939
+[probe] P3b 任务A run3 完成 62.8s | iter=6 tools=5 cite=4(verified=4) | in=191032 cache_hit=106240 cache_miss=84792
+[probe] P4 任务A run2 完成 53.4s | iter=5 tools=5 cite=2(verified=2) | in=117058 cache_hit=75648 cache_miss=41410
+[probe] P4 任务A run1 完成 56.0s | iter=3 tools=3 cite=5(verified=5) | in=64517 cache_hit=19200 cache_miss=45317
+[probe] P6 任务A run1 完成 32.5s | iter=4 tools=3 cite=4(verified=4) | in=110138 cache_hit=56192 cache_miss=53946
+[probe] P5 任务A run2 完成 43.5s | iter=3 tools=3 cite=6(verified=6) | in=106864 cache_hit=18176 cache_miss=88688
+[probe] P6 任务A run2 完成 42.0s | iter=3 tools=5 cite=3(verified=3) | in=108296 cache_hit=60544 cache_miss=47752
+[probe] P5 任务A run1 完成 69.6s | iter=3 tools=3 cite=4(verified=4) | in=92718 cache_hit=19328 cache_miss=73390
+[probe] P5 任务A run3 完成 56.5s | iter=5 tools=7 cite=2(verified=2) | in=166998 cache_hit=102528 cache_miss=64470
+[probe] P7 任务A run1 完成 36.7s | iter=3 tools=4 cite=4(verified=4) | in=76745 cache_hit=19328 cache_miss=57417
+[probe] P6 任务A run3 完成 52.6s | iter=4 tools=4 cite=2(verified=2) | in=142870 cache_hit=64256 cache_miss=78614
+[probe] N1 任务B run1 完成 42.3s | iter=4 tools=4 cite=6(verified=6) | in=130697 cache_hit=55680 cache_miss=75017
+[probe] P7 任务A run3 完成 54.0s | iter=4 tools=4 cite=3(verified=3) | in=139413 cache_hit=25856 cache_miss=113557
+[probe] P7 任务A run2 完成 59.1s | iter=6 tools=5 cite=3(verified=3) | in=248577 cache_hit=39424 cache_miss=209153
+[probe] N1 任务B run2 完成 31.4s | iter=2 tools=2 cite=6(verified=2) | in=37557 cache_hit=12672 cache_miss=24885
+[probe] N1 任务B run3 完成 32.6s | iter=3 tools=3 cite=5(verified=4) | in=96169 cache_hit=49280 cache_miss=46889
+[probe] N2 任务B run3 完成 28.2s | iter=3 tools=4 cite=3(verified=3) | in=108603 cache_hit=19328 cache_miss=89275
+[probe] N2 任务B run2 完成 31.2s | iter=3 tools=4 cite=3(verified=3) | in=117990 cache_hit=19072 cache_miss=98918
+[probe] N2 任务B run1 完成 36.2s | iter=3 tools=4 cite=3(verified=3) | in=109373 cache_hit=18176 cache_miss=91197
+[probe] N3 任务B run1 完成 42.8s | iter=3 tools=6 cite=3(verified=3) | in=163025 cache_hit=49152 cache_miss=113873
+[probe] N3 任务B run2 完成 37.7s | iter=4 tools=7 cite=3(verified=3) | in=197164 cache_hit=46720 cache_miss=150444
+[probe] N3 任务B run3 完成 37.6s | iter=3 tools=6 cite=4(verified=4) | in=90693 cache_hit=19072 cache_miss=71621
+[probe] N4 任务B run1 完成 41.5s | iter=3 tools=4 cite=5(verified=5) | in=80338 cache_hit=39680 cache_miss=40658
+[probe] N4 任务B run2 完成 46.5s | iter=3 tools=6 cite=8(verified=8) | in=116173 cache_hit=19072 cache_miss=97101
+[probe] N4 任务B run3 完成 44.5s | iter=3 tools=4 cite=4(verified=4) | in=84357 cache_hit=19328 cache_miss=65029
+[probe] N5 任务B run2 完成 27.3s | iter=3 tools=4 cite=6(verified=6) | in=81979 cache_hit=19200 cache_miss=62779
+[probe] N5 任务B run1 完成 42.7s | iter=4 tools=6 cite=4(verified=3) | in=151312 cache_hit=25856 cache_miss=125456
+[probe] N5 任务B run3 完成 28.2s | iter=3 tools=5 cite=6(verified=6) | in=150522 cache_hit=64640 cache_miss=85882
+================================================================
+[probe] 写出 C:\project file\BookScope\docs\experiments\data\exp008-probe-runs-kuicheng.json
+[probe] 批耗时 369.2s
+----------------------------------------------------------------
+[probe] 跨 run 答案差异（验 L2 真关：unique>1 = 每次真重算）：
+  N1: 3 次 / 3 个不同答案 → OK(有差异)
+  N2: 3 次 / 3 个不同答案 → OK(有差异)
+  N3: 3 次 / 3 个不同答案 → OK(有差异)
+  N4: 3 次 / 3 个不同答案 → OK(有差异)
+  N5: 3 次 / 3 个不同答案 → OK(有差异)
+  P1: 3 次 / 3 个不同答案 → OK(有差异)
+  P2: 3 次 / 3 个不同答案 → OK(有差异)
+  P3: 3 次 / 3 个不同答案 → OK(有差异)
+  P3b: 3 次 / 3 个不同答案 → OK(有差异)
+  P4: 3 次 / 3 个不同答案 → OK(有差异)
+  P5: 3 次 / 3 个不同答案 → OK(有差异)
+  P6: 3 次 / 3 个不同答案 → OK(有差异)
+  P7: 3 次 / 3 个不同答案 → OK(有差异)
+[probe] 缓存命中（验 DeepSeek 服务端前缀缓存）：
+  N1 run1: hit=55680 miss=75017 命中率=42.6%
+  N1 run2: hit=12672 miss=24885 命中率=33.7%
+  N1 run3: hit=49280 miss=46889 命中率=51.2%
+  N2 run1: hit=18176 miss=91197 命中率=16.6%
+  N2 run2: hit=19072 miss=98918 命中率=16.2%
+  N2 run3: hit=19328 miss=89275 命中率=17.8%
+  N3 run1: hit=49152 miss=113873 命中率=30.1%
+  N3 run2: hit=46720 miss=150444 命中率=23.7%
+  N3 run3: hit=19072 miss=71621 命中率=21.0%
+  N4 run1: hit=39680 miss=40658 命中率=49.4%
+  N4 run2: hit=19072 miss=97101 命中率=16.4%
+  N4 run3: hit=19328 miss=65029 命中率=22.9%
+  N5 run1: hit=25856 miss=125456 命中率=17.1%
+  N5 run2: hit=19200 miss=62779 命中率=23.4%
+  N5 run3: hit=64640 miss=85882 命中率=42.9%
+  P1 run1: hit=71808 miss=93874 命中率=43.3%
+  P1 run2: hit=19200 miss=44980 命中率=29.9%
+  P1 run3: hit=19200 miss=56661 命中率=25.3%
+  P2 run1: hit=59136 miss=22133 命中率=72.8%
+  P2 run2: hit=72576 miss=34346 命中率=67.9%
+  P2 run3: hit=30720 miss=161701 命中率=16.0%
+  P3 run1: hit=91136 miss=99139 命中率=47.9%
+  P3 run2: hit=26112 miss=32159 命中率=44.8%
+  P3 run3: hit=73728 miss=21875 命中率=77.1%
+  P3b run1: hit=47616 miss=47627 命中率=50.0%
+  P3b run2: hit=30720 miss=45532 命中率=40.3%
+  P3b run3: hit=106240 miss=84792 命中率=55.6%
+  P4 run1: hit=19200 miss=45317 命中率=29.8%
+  P4 run2: hit=75648 miss=41410 命中率=64.6%
+  P4 run3: hit=12800 miss=44939 命中率=22.2%
+  P5 run1: hit=19328 miss=73390 命中率=20.8%
+  P5 run2: hit=18176 miss=88688 命中率=17.0%
+  P5 run3: hit=102528 miss=64470 命中率=61.4%
+  P6 run1: hit=56192 miss=53946 命中率=51.0%
+  P6 run2: hit=60544 miss=47752 命中率=55.9%
+  P6 run3: hit=64256 miss=78614 命中率=45.0%
+  P7 run1: hit=19328 miss=57417 命中率=25.2%
+  P7 run2: hit=39424 miss=209153 命中率=15.9%
+  P7 run3: hit=25856 miss=113557 命中率=18.5%

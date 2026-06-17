@@ -1,0 +1,153 @@
+{
+  "book": "mingchao",
+  "title": "明朝那些事儿",
+  "epub_filename": "test明朝那些事儿.epub",
+  "annotation_date": "2026-06-10",
+  "annotated_at_commit": "9a9778d",
+  "chunker_version_note": "bookscope.ingest.book_chunker.chunk_book 默认参数（target=1500/min=300/max=3000/overlap=150），load_text 后手动设 language='zh'。本书是七卷合订本：原文章号每卷从'第一章'重置，chunker 把全书顺序重编为 chapter 1~158（外加 chapter 0 序章=目录页），所以 chunk header 里的'第十六章 孙传庭'（第七卷）对应 chunker chapter=153。expected_chapters 记的是 chunker 顺序章号。另有多个目录 chunk（如 0、254、283）只含各卷章节标题列表，会被任何含章名关键词的 BM25 query 命中。共 1069 chunks。重标前先核对 n_chunks=1069。本书切块结果已在 2 次独立进程验证一致（zhinei/kuicheng 出现过首跑不可复现事故，本书未受影响）。",
+  "n_chunks": 1069,
+  "n_chapters": 159,
+  "format_note": "扩展 WP2a 设计稿第 4 条格式：expected_chunk_ids 落地为 expected_chunk_indices（对应 ChunkResult.index），加 query_type 与 note。",
+  "queries": [
+    {
+      "query": "鄱阳湖之战朱元璋的小船是怎么打败陈友谅巨舰的？",
+      "expected_chunk_indices": [32, 35, 36],
+      "expected_chapters": [12],
+      "query_type": "semantic",
+      "note": "32 写开战时朱军发现战船太小'在陈友谅的巨舰前就像玩具'；35 写火攻总攻后'数十条战船全部被焚毁'、鄱阳湖变血湖；36 写两道命令断送陈友谅军心、士兵纷纷逃亡。"
+    },
+    {
+      "query": "胡惟庸是怎么当上丞相的？朱元璋为什么选他？",
+      "expected_chunk_indices": [66, 67],
+      "expected_chapters": [16],
+      "query_type": "semantic",
+      "note": "66 写李善长要找一个有能力又容易控制的代言人、看中了胡惟庸（'这个选择最终让他踏上了不归之路'）；67 写胡惟庸成为丞相后指使手下告刘基'占据王气之地'。"
+    },
+    {
+      "query": "土木堡之战明军二十万人是怎么覆灭的？",
+      "expected_chunk_indices": [268, 269],
+      "expected_chapters": [45, 46],
+      "query_type": "semantic",
+      "note": "268 写朱勇部鹞儿岭覆灭换来三天时间、王振为等一千多辆车不肯进怀来城；269 写土木堡变成人间地狱、朱祁镇失去二十万大军只剩'大明皇帝的尊严'。"
+    },
+    {
+      "query": "北京保卫战于谦和石亨怎么部署德胜门、安定门的防守？",
+      "expected_chunk_indices": [291, 296],
+      "expected_chapters": [48, 49],
+      "query_type": "semantic",
+      "note": "291 写于谦披甲走向德胜门、十月十一日前锋战开始；296 写战前部署：判定也先主攻德胜门和安定门，于谦守德胜门设神机营伏兵、石亨率骑兵在安定门外迎敌（含石彪抢先冲锋）。"
+    },
+    {
+      "query": "王守仁龙场悟道悟出了什么？",
+      "expected_chunk_indices": [390, 391],
+      "expected_chapters": [62],
+      "query_type": "semantic",
+      "note": "390 写龙场绝境中修房、教苗人读书、只剩'理'这个问题没有答案；391 是顿悟本体：'理'在心中、天人本是一体、'心学'就此诞生、与孔孟朱并列。"
+    },
+    {
+      "query": "张居正的一条鞭法到底改了什么？",
+      "expected_chunk_indices": [677, 678],
+      "expected_chapters": [105],
+      "query_type": "semantic",
+      "note": "677 写一条鞭法'改变了自唐朝以来延续八百余年的税制'；678 写核心内容：全国税收由实物税改货币税、统一收钱，并解释这砍掉了中间盘剥。"
+    },
+    {
+      "query": "张居正改革为什么得罪了几乎所有官员？",
+      "expected_chunk_indices": [690, 693],
+      "expected_chapters": [107],
+      "query_type": "semantic",
+      "note": "690 写考成法奏疏里附带的'阴谋'——六科考核六部、内阁控制六科，得罪整个文官系统；693 列举一条鞭法断了鱼肉百姓的路、丈量土地断了逃税的路、考成法断了偷懒的路。"
+    },
+    {
+      "query": "海瑞上《治安疏》骂嘉靖之前做了什么准备？",
+      "expected_chunk_indices": [624, 625],
+      "expected_chapters": [99],
+      "query_type": "semantic",
+      "note": "624 介绍《治安疏》'直言天下第一事疏'、面面俱骂；625 写海瑞早就买好棺材、洗好澡换好衣服坐在棺材旁边等那一刀。"
+    },
+    {
+      "query": "皇太极绕过关宁防线打到北京城下，袁崇焕是怎么应对的？",
+      "expected_chunk_indices": [965, 966, 967],
+      "expected_chapters": [144],
+      "query_type": "semantic",
+      "note": "965 写皇太极避开山海关另寻路线入关、袁崇焕听到风声不慌；966 写袁崇焕'只追不击'跟着皇太极在北京近郊转悠五天；967 写袁崇焕赌到达京城之日即胜利之日、但'命令下发的那天他的死期已然注定'。"
+    },
+    {
+      "query": "袁崇焕为什么杀毛文龙？",
+      "expected_chunk_indices": [959],
+      "expected_chapters": [143],
+      "query_type": "semantic",
+      "note": "959 直接给判断：通敌说出自《满文老档》真实性存疑，'袁崇焕之所以决定干掉毛文龙，只是因为毛文龙不太听话'。"
+    },
+    {
+      "query": "朱棣起兵为什么打着'靖难'的旗号？理论依据是什么？",
+      "expected_chunk_indices": [133, 134],
+      "expected_chapters": [27],
+      "query_type": "semantic",
+      "note": "133 写朱棣集团宣称朝中有奸臣、出兵'靖难'清君侧，还写成奏折公然上奏；134 用'地痞打人后要为对方主持公道'的比喻 + 腓特烈二世'辩护律师总是找得到的'点破权谋本质。"
+    },
+    {
+      "query": "夺门之变是怎么策划出来的？参与者都有谁？",
+      "expected_chunk_indices": [323, 324, 325],
+      "expected_chapters": [53],
+      "query_type": "semantic",
+      "note": "323 写石亨找到曹吉祥（宦官、王振旧党）和张軏两个同谋；324 写计划的致命漏洞——没有南宫和大内宫门的控制权、徐有贞的判断；325 写徐有贞'若回来就做人，不能回来便是鬼'后阴谋集团行动。"
+    },
+    {
+      "query": "全书第一章开头给朱元璋列的那份档案写了什么？",
+      "expected_chunk_indices": [1],
+      "expected_chapters": [1],
+      "query_type": "positional",
+      "note": "1 是第一卷第一章正文第一个 chunk：著名的朱元璋档案（别名朱重八、家庭出身三代贫农、座右铭'你的就是我的我还是我的'、1328-1344 放牛……）。"
+    },
+    {
+      "query": "朱祁镇篇'土木堡'那一章是从什么讲起的？",
+      "expected_chunk_indices": [262],
+      "expected_chapters": [45],
+      "query_type": "positional",
+      "note": "262 是该章（chunker chapter 45，原文'第十四章 土木堡'）正文开头：正统十四年七月也先挥刀出鞘、蒙古骑兵四路进攻。"
+    },
+    {
+      "query": "'郑和之后，再无郑和'这一章讲了什么？",
+      "expected_chunk_indices": [190, 192],
+      "expected_chapters": [35],
+      "query_type": "positional",
+      "note": "190 是该章（chunker chapter 35，朱棣篇第四章）开头，从朱棣派胡濙、郑和两路找建文帝讲起；192 写下西洋的动机——强盛王朝对四周世界的探索。章名本身是书中名句。"
+    },
+    {
+      "query": "'第十六章 孙传庭'这一章怎么介绍孙传庭的出身？",
+      "expected_chunk_indices": [1033],
+      "expected_chapters": [153],
+      "query_type": "positional",
+      "note": "1033 写孙传庭'相当奇怪'：杀高迎祥之前从未带过兵打过仗，过去三十多年从事的主要工作是人事干部；山西代县人、万历四十七年进士。注意这是第七卷的'第十六章'，chunker 顺序章号 153。"
+    },
+    {
+      "query": "明光宗死后，杨涟他们是怎么把朱由校从李选侍手里弄出乾清宫的？",
+      "expected_chunk_indices": [858, 860],
+      "expected_chapters": [127],
+      "query_type": "character",
+      "note": "858 写王安用'安排丧事、事完人就回来'的谎话把朱由校从李选侍手里骗出来、众大臣'活像绑匪'地把人带走；860 写李选侍派李进忠（未来的魏忠贤）找杨涟谈判、被杨涟顶回去限期移宫。"
+    },
+    {
+      "query": "为什么说戚家军其实是戚继光的私人武装？",
+      "expected_chunk_indices": [724, 725],
+      "expected_chapters": [111],
+      "query_type": "character",
+      "note": "724/725（重叠段）写戚家军从征集到训练都由戚继光本人负责、从军官到士兵都是他的铁杆、除他之外谁也指挥不动，维系方式是'跟着我，有肉吃'。"
+    },
+    {
+      "query": "徐阶是怎么救下海瑞一命的？",
+      "expected_chunk_indices": [633],
+      "expected_chapters": [100],
+      "query_type": "character",
+      "note": "633 写徐阶对嘉靖说'皇上你上了海瑞的当了'——海瑞买好棺材就是要激怒皇帝以死求名，杀他反而成全他，用这套说辞让嘉靖不杀海瑞。"
+    },
+    {
+      "query": "孙传庭是怎么挡住并击败高迎祥的？",
+      "expected_chunk_indices": [1034],
+      "expected_chapters": [154],
+      "query_type": "character",
+      "note": "1034 写高迎祥进军汉中路上被孙传庭的万把人挡住，打了几次损失上千人没打动；高迎祥不熟悉也不在乎这个对手，结果栽在他手里。"
+    }
+  ]
+}

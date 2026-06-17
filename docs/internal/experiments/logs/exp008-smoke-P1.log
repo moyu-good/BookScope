@@ -1,0 +1,29 @@
+[probe] BookScope L2 整答案缓存 disabled = True（约束 3）
+[probe] 选中 1 条 pair × 3 次 = 3 次端到端跑
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 1.689 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing both 'choices' and 'content' fields
+question_processor fallback: ValueError: response missing both 'choices' and 'content' fields
+[probe] ingest 中（load epub + chunk + BM25 索引；跳过 KG 抽取）...
+[smoke] 加载 epub: C:\project file\BookScope\test亏成首富从游戏开始 (青衫取醉) (z-library.sk, 1lib.sk, z-lib.sk).epub
+[smoke] 书名: 亏成首富从游戏开始，字数: 5381554
+[smoke] 切分 chunk 数: 4315
+[probe] ingest 完成 89.6s：5381554 字 / 4315 chunk / KG 4 角色（手工壳，未发 LLM 抽取）
+[probe] generator model = deepseek-v4-flash（约束 1：只用 flash）
+[probe] 串行 跑 3 次
+================================================================
+[probe] P1 任务A run1 完成 51.5s | iter=3 tools=4 cite=2(verified=2) | in=105048 cache_hit=59264 cache_miss=45784
+[probe] P1 任务A run2 完成 28.4s | iter=3 tools=2 cite=2(verified=2) | in=64627 cache_hit=39424 cache_miss=25203
+[probe] P1 任务A run3 完成 39.4s | iter=2 tools=2 cite=2(verified=2) | in=54054 cache_hit=13824 cache_miss=40230
+================================================================
+[probe] 写出 C:\project file\BookScope\docs\experiments\data\exp008-probe-runs-kuicheng.json
+[probe] 批耗时 119.3s
+----------------------------------------------------------------
+[probe] 跨 run 答案差异（验 L2 真关：unique>1 = 每次真重算）：
+  P1: 3 次 / 3 个不同答案 → OK(有差异)
+[probe] 缓存命中（验 DeepSeek 服务端前缀缓存）：
+  P1 run1: hit=59264 miss=45784 命中率=56.4%
+  P1 run2: hit=39424 miss=25203 命中率=61.0%
+  P1 run3: hit=13824 miss=40230 命中率=25.6%

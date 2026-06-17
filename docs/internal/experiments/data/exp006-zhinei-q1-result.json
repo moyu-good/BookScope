@@ -1,0 +1,134 @@
+{
+  "batch_id": "exp006-zhinei-q1",
+  "created_at": "2026-05-18",
+  "book": {
+    "title": "制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关）",
+    "path": "test明朝那些事儿.epub",
+    "word_count": 15441,
+    "chunk_count": 398,
+    "book_scope": "full"
+  },
+  "config": {
+    "generator_provider": "minimax",
+    "generator_model": "MiniMax-M2.7",
+    "generator_prompt": "loop_system_prompt_v3",
+    "citation_format": "citation_format_v1",
+    "kg_source": "manual_4_characters_朱元璋_李善长_徐达_常遇春",
+    "vector_mode": "bm25_only",
+    "reviewer_provider": "minimax",
+    "reviewer_model": "MiniMax-M2.7",
+    "reviewer_rubric": "reviewer_rubric_v1",
+    "limitation": "reviewer 与生成方同 provider/model；存在自我偏袒风险"
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "type": "",
+      "type_description": "",
+      "smoke": {
+        "question": "郑永年在本书中的核心论点是什么？他用了哪些历史或当代案例来支撑这个论点？请基于具体章节内容引用支撑判断。",
+        "duration_s": 107.1,
+        "answer": "郑永年在《制内市场》中的核心论点是：中国的政治经济体制既非西方式的「场内国家」（state in market，市场原则主导政治原则），也非简单的「国家资本主义」，而是「制内市场」（market in state，MIS）——一种国家（政治）原则主导市场（经济）原则的独特体制，其常态是「不对称均衡」，即国家主导市场但市场并非无力，而是能够反向影响国家，两者相互赋权。这一概念旨在回应西方对中国「国家资本主义」的不准确标签，同时反驳将中国问题归咎于「市场力量」或「腐败政府」的简单化诊断。\n\n郑永年构建了「三层市场结构」理论来解释这一体制：集市繁荣的社会基层市场（草根层）、政府机构与私营企业相互作用的中间市场（中间层），以及国家垄断和战略关切主导的国家市场（国家层）。他强调整体逻辑的内在一致性——市场规模扩大必然吸引国家吸纳，市场行为者从小规模的完全市场参与者演变为受制于政治力量的对象，「红线」是动态的、政治化的而非法律严格界定的。\n\n历史案例方面，郑永年援引《盐铁论》（记载西汉关于国家控制工商业的大辩论）来追溯「两个市场」概念的思想源头：法家主张国家主导的生产优先（富国强兵），儒家强调市场导向的分配和谐（「不患寡而患不均」），两者在中国皇权制度形成初期便已代表两种理想类型。帝制中国的财政体制遵循「常态—国家主义—混乱—崩塌」的朝代周期，政治经济在自由放任与国家主义之间循环。重要的是，帝制国家既高于市场机制又包含市场机制，市场在概念上嵌入国家内部而非平行或高于国家——这是留给当代中国最重要的制度遗产。\n\n当代案例方面，郑永年以年广久的「傻子瓜子」为例：这位安徽芜湖的草根企业家在20世纪80年代初从旧体制边缘崛起，1982年春节期间瓜子销量达数百吨，但因「非法」雇工和虚假标签遭调查，最终邓小平在1984年和1992年两次点名保护，将其作为市场化政策稳定的象征——显示国家如何在改革关键时刻保护基层市场行为者但又保持主导。大邱庄与禹作敏的案例则展示了另一面：这位天津郊区的农村领导人带领村庄从赤贫走向富裕，但其政治野心越界（涉嫌参与命案、武装对抗警方逮捕），最终被判20年监禁，表明当市场行为者的政治势力大到国家无法容忍时，国家会坚决介入。\n\n郑永年还分析了1994年分税制改革如何通过重新划分中央与地方税基（增值税中央占75％），扭转了80年代地方作为唯一剩余索取者的财政结构，使中央政府在经济增长中获取最稳定份额，进一步强化了国家对市场的支配。此外，温州模式、苏南模式、互联网企业（阿里巴巴、百度）等不同层级的市场主体，在「制内市场」框架下各有其与国家的互动逻辑——互联网公司虽无央企式的基础设施控制，却因国家对安全内容的管控而必须在自我审查与市场扩张间取得平衡。",
+        "citations": [
+          {
+            "chapter": 12,
+            "snippet": "我们可以将西方各种形式的资本主义概念化为「场内国家」（state in market）。在这一体制内，市场（经济）原则主导国家（政治）原则。与此相反，我们可以将中国的政治经济体制归纳为「制内市场」。通过这一概念，我们认为，尽管存在不同形式的资本和市场规则的运作，但是在中国的政治经济体制中，国家（政治）原则主导市场（经济）原则。"
+          },
+          {
+            "chapter": 12,
+            "snippet": "两者间的关系是不对称的，国家对于市场的主导才是常态规则。从这个意义上说，我们将中国政治经济体制的核心理念和实践，概念化为「经济国家主义」。……我们称之为「不对称均衡」。"
+          },
+          {
+            "chapter": 20,
+            "snippet": "我们明确了中国市场的三个层次：草根层、中间层和国家层，并且讨论了国家如何与不同层次的市场主体发生关系，以及这些关系背后的基本原理。"
+          },
+          {
+            "chapter": 24,
+            "snippet": "本章讨论的主要文献是《盐铁论》，它记录了汉代一场关于国家控制工商业的大规模辩论。……它反映了那一代主要政府官员和学者的观点，以及他们对秦朝和汉初（前221—前87年）经济和政策实践的观点。"
+          },
+          {
+            "chapter": 51,
+            "snippet": "法家学派强调生产问题和国家在生产中的作用，而儒家学派则强调分配问题和市场在分配中的作用。……法家学派关注的是国家主导的政治经济，而儒家关注的是自然市场主导的政治经济。"
+          },
+          {
+            "chapter": 53,
+            "snippet": "安徽芜湖市的年广久被称为中国最具启发性的草根企业家，他是一个从旧秩序的边缘地带自下而上出现的企业家精神的典型案例。……1982年春节期间，年广久的瓜子仅在上海市场就卖出了数百吨。"
+          },
+          {
+            "chapter": 53,
+            "snippet": "邓小平「放两年再看」的及时建议，立刻为年广久提供了一个破例，让其得以继续他的瓜子生意。……1992年1月，在邓小平具有里程碑意义的视察南方期间，这位事实上的最高领导人在他著名的南方讲话中提到了年广久的名字。"
+          },
+          {
+            "chapter": 124,
+            "snippet": "随着禹作敏越界行为的增多，问题最终出现了。……1993年初，天津市政府逮捕了他。禹作敏号召村民武装保卫他不受警察的逮捕，最终被判处20年有期徒刑。"
+          },
+          {
+            "chapter": 128,
+            "snippet": "1994年的分税制改革……最关键的是，它让中央政府在新的主要税基——增值税中，获得了75%的多数份额，从而扭转了20世纪80年代地方政府是地方经济增长唯一剩余索取者（residual claimant）的财政结构。"
+          },
+          {
+            "chapter": 390,
+            "snippet": "中国早期关于国家和经济之间关系的思想自形成以后，持续影响着经济思想家和政策制定者的思想，且这一经济哲学的核心始终没有改变。……一个允许在不同经济领域发挥作用的「三层市场」结构就成为必然，即集市繁荣的社会基层市场、国家垄断和战略关切占主导地位的国家市场，以及介于两者之间的政府机构和私营企业相互作用的中间市场。"
+          }
+        ],
+        "citation_count": 10,
+        "trace_summary": {
+          "iterations": 7,
+          "duration_ms": 107104,
+          "total_input_tokens": 196288,
+          "total_output_tokens": 3394,
+          "content_filter_retries": 1,
+          "outcome": "success",
+          "tool_call_names": [
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks",
+            "search_chunks"
+          ],
+          "tool_call_count_total": 6
+        },
+        "citation_coverage": {
+          "chapters_referenced_in_answer": [],
+          "chapters_with_citation": [
+            12,
+            20,
+            24,
+            51,
+            53,
+            124,
+            128,
+            390
+          ],
+          "citation_coverage_ratio": null
+        }
+      },
+      "review": {
+        "_error": "reviewer_format_error: reviewer returned empty text",
+        "_raw_text": null
+      },
+      "error": "reviewer_format_error: reviewer returned empty text"
+    }
+  ],
+  "summary": {
+    "average_scores": {
+      "structural_judgment": null,
+      "evidence_density": null,
+      "honesty": null,
+      "actionability": null,
+      "cross_chapter_coherence": null
+    },
+    "average_total": null,
+    "min_total": null,
+    "max_total": null,
+    "average_citation_coverage_ratio": null,
+    "citation_coverage_sample_size": 0,
+    "all_outcomes_success": false,
+    "success_count": 0,
+    "total_questions": 1,
+    "total_duration_s": 161.0,
+    "total_input_tokens": 196288,
+    "total_output_tokens": 3394
+  }
+}

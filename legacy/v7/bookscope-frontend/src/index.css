@@ -1,0 +1,289 @@
+@import "tailwindcss";
+
+/* ================================================================
+   BookScope · 「宋版刻本」Song Edition Theme (v2)
+   ────────────────────────────────────────────────
+   Parchment ivory ground. Ink text. Vermilion seals only.
+   Cormorant Garamond headings · Libre Baskerville body ·
+   Noto Serif SC for Chinese. No brush script, no rotation,
+   no machine-stripe textures, minimal motion.
+================================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Noto+Serif+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  /* ── Surfaces (parchment ground) ────────────────────── */
+  --bg: #f5ede0;                /* 宣纸米白 */
+  --surface: #fbf5ea;           /* 略亮宣纸 */
+  --surface-hover: #ede3cf;     /* 悬停暖米 */
+  --border: #d4c9b5;            /* 浅墨分隔 */
+
+  /* ── Text (墨色) ───────────────────────────────────── */
+  --text: #1a1714;              /* 浓墨正文 */
+  --text-secondary: #6b5f50;    /* 淡墨次要 */
+
+  /* ── Accent (青铜墨金) ─────────────────────────────── */
+  --accent: #7c5f35;            /* 青铜墨金 — 用于编号/元数据 */
+  --accent-hover: #8f6f3f;
+  --accent-subtle: rgba(124, 95, 53, 0.12);
+
+  /* ── Typography ──────────────────────────────────── */
+  --font-display: "Cormorant Garamond", "Noto Serif SC", "Songti SC", serif;
+  --font-body: "Libre Baskerville", "Noto Serif SC", "Songti SC", serif;
+  --font-mono: "JetBrains Mono", "Courier New", monospace;
+
+  /* ── Imperial Review tokens ─────────────────────────── */
+  --parchment: #f5ede0;
+  --parchment-dark: #ede3cf;
+  --parchment-text: #1a1714;
+  --parchment-text-secondary: #6b5f50;
+
+  /* Vermilion — 宫墙红（暗沉珍贵）·仅用于印章 + 档案序号 */
+  --vermillion: #8b2332;
+  --vermillion-light: rgba(139, 35, 50, 0.06);
+  --vermillion-border: rgba(139, 35, 50, 0.3);
+  --fold-line: rgba(124, 95, 53, 0.18);
+  --seal-shadow: rgba(139, 35, 50, 0.15);
+
+  /* Semantic (preserved) */
+  --trust: #4a6b3a;   /* 青竹 — 适合你 */
+  --anger: #8b2332;   /* 宫墙红 — 不适合 */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.75;
+  font-size: 15px;
+}
+
+#root { min-height: 100svh; }
+
+/* ── Headings ─────────────────────────────────────── */
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+/* ── Scrollbar ────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Editorial divider ────────────────────────────── */
+
+.ink-heading {
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.ink-divider {
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Card (subtle edge, no top gradient stripe) ──── */
+
+.ink-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;  /* sharp-ish, book-like */
+}
+
+/* ── Drop Cap — 首字放大 ─────────────────────────── */
+
+.drop-cap::first-letter {
+  font-family: var(--font-display);
+  font-size: 5em;
+  font-weight: 600;
+  float: left;
+  line-height: 0.9;
+  margin: 0.05em 0.12em 0 0;
+  color: var(--vermillion);
+}
+
+/* ── Archival metadata label ─────────────────────── */
+
+.archive-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.archive-number {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--vermillion);
+}
+
+/* ── Animations (minimal — editorial reject) ──── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes memorialUnfold {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes stampPress {
+  from { opacity: 0; transform: scale(1.15); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes annotationSlide {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Memorial Section (flat, book-page feel) ─── */
+
+.memorial-section {
+  background: var(--parchment);
+  color: var(--parchment-text);
+  position: relative;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid var(--border);
+
+  --surface: var(--parchment-dark);
+  --bg: var(--parchment);
+  --text: var(--parchment-text);
+  --text-secondary: var(--parchment-text-secondary);
+  --border: var(--fold-line);
+}
+
+/* Note: the old repeating-stripe paper texture is removed.
+   The background is now flat parchment — cleaner, editorial, not kitsch. */
+
+.memorial-body {
+  font-family: var(--font-body);
+  color: var(--parchment-text);
+  line-height: 1.85;
+  font-size: 0.95rem;
+}
+
+.memorial-body h1,
+.memorial-body h2,
+.memorial-body h3 {
+  color: var(--parchment-text);
+}
+
+.fold-crease {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 0;
+  user-select: none;
+}
+.fold-crease::before,
+.fold-crease::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--fold-line);
+}
+.fold-crease-text {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+}
+
+/* ── Seal Stamp — UPRIGHT, imperial-grade ───── */
+
+.seal-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--vermillion);
+  color: var(--vermillion);
+  background: transparent;
+  border-radius: 2px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  letter-spacing: 0.25em;
+  /* UPRIGHT — imperial archives are not tilted. */
+  transform: none;
+  box-shadow: none;
+}
+
+.seal-stamp-large {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--vermillion);
+  color: var(--vermillion);
+  background: transparent;
+  border-radius: 2px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 14px;
+  letter-spacing: 0.25em;
+  transform: none;
+}
+
+.seal-stamp-animated {
+  animation: stampPress 0.35s ease-out both;
+}
+
+.vermillion-text {
+  color: var(--vermillion);
+  font-family: var(--font-body);
+}
+
+.annotation-card {
+  border-left: 2px solid var(--vermillion);
+  background: var(--vermillion-light);
+  border-radius: 0;
+  padding: 14px 18px;
+  animation: annotationSlide 0.25s ease-out both;
+}
+
+/* ── Scrollbar hide utility ─────────────────────── */
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Respect reduced-motion ──────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

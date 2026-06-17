@@ -1,0 +1,168 @@
+@import "tailwindcss";
+
+@theme {
+  /* 书页纸感的暖白 + 深墨色正文 + 朱砂印章式 accent */
+  --color-paper: oklch(98% 0.01 80);
+  --color-paper-raised: oklch(99.4% 0.006 80); /* 比纸略亮的卡片面，叠出层次 */
+  --color-paper-sunken: oklch(96.5% 0.012 80); /* 略凹的底，用于嵌入区 */
+  --color-ink: oklch(20% 0.02 40);
+  --color-ink-muted: oklch(45% 0.02 40);
+  --color-seal: oklch(50% 0.18 30); /* 朱砂红 */
+  --color-seal-soft: oklch(50% 0.18 30 / 0.09); /* 朱砂淡底 */
+  --color-rule: oklch(88% 0.01 60);
+  --color-desk: oklch(86% 0.028 64); /* 案头底色——明显深的暖木色，衬出摊开的册页浮起来 */
+  --color-case: oklch(94.5% 0.018 72); /* 函套色——左栏，比主区略深的暖调 */
+  --color-folio-edge: oklch(83% 0.02 60); /* 册页描边 */
+
+  --font-display: "PingFang SC", "Noto Serif CJK SC", "Source Han Serif SC",
+    "STZhongsong", "Songti SC", serif;
+  --font-body: "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC",
+    system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* 纸上叠纸的柔影——低饱和墨色、扩散大、不像 material 硬投影 */
+  --shadow-soft: 0 1px 2px oklch(30% 0.03 40 / 0.04),
+    0 6px 20px oklch(30% 0.03 40 / 0.05);
+  --shadow-raised: 0 2px 6px oklch(30% 0.03 40 / 0.06),
+    0 16px 40px oklch(30% 0.03 40 / 0.09);
+  /* 册页浮在案头上的厚影——比卡片影更深更扩散，给"摊开一本书"的实体感 */
+  --shadow-folio: 0 2px 10px oklch(28% 0.04 40 / 0.08),
+    0 24px 64px oklch(28% 0.04 40 / 0.2);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  /* 案头底色——深一点的暖木调 + 极淡斜晕，让中间摊开的册页浮起来 */
+  background-color: var(--color-desk);
+  background-image: linear-gradient(
+    135deg,
+    oklch(94% 0.02 70 / 0.5),
+    transparent 62%
+  );
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-feature-settings: "palt";
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 册页：摊在案头上的那本善本——纸面 + 极淡墨点纹理（纹理放这层，不放案头） */
+.folio {
+  background-color: var(--color-paper);
+  background-image: radial-gradient(
+    oklch(30% 0.03 40 / 0.012) 0.5px,
+    transparent 0.6px
+  );
+  background-size: 3px 3px;
+}
+
+/* 桌面端才给册页描边 + 圆角 + 厚影；手机端册页满屏不框 */
+@media (min-width: 768px) {
+  .folio {
+    border: 1px solid var(--color-folio-edge);
+    border-radius: 16px;
+    box-shadow: var(--shadow-folio);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 入场动效——淡入 + 微微上浮。整页 / 区块 / 列表项都用这一条，节奏统一。
+ * ------------------------------------------------------------------------- */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes seal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86) rotate(-6deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+/* 运行过程：不确定进度的朱砂扫光（不伪造百分比，只表示"在跑"） */
+@keyframes run-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(420%);
+  }
+}
+
+.reveal {
+  animation: reveal-up 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* 子项依次浮现（区头 + 内容错落入场）*/
+.stagger > * {
+  animation: reveal-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.stagger > *:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 0.19s;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 0.26s;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 0.33s;
+}
+.stagger > *:nth-child(n + 6) {
+  animation-delay: 0.4s;
+}
+
+.seal-stamp {
+  animation: seal-in 0.6s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+
+/* 通用：可交互元素的顺滑过渡（hover/focus 不再生硬）*/
+a,
+button {
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+/* 键盘可达——朱砂焦点环 */
+:focus-visible {
+  outline: 2px solid var(--color-seal);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* 无障碍：尊重"减少动态"偏好，一律静态呈现 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

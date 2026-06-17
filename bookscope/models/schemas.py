@@ -1,0 +1,280 @@
+"""Pydantic data schemas for BookScope.
+
+Data flow:
+    raw .txt file
+        │
+        ▼
+    BookText         — full text + metadata
+        │
+        ▼
+    list[ChunkResult] — text split into analysis units (paragraphs / fixed-size)
+        │
+        ▼
+    EmotionScore      — 8-dimensional Plutchik emotion vector per chunk
+"""
+
+import re
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+# 检测 CJK 表意字符（中日文）：出现即按字符数统计 word_count
+_CJK_RE = re.compile(r"[一-鿿]")
+
+
+class BookText(BaseModel):
+    """Represents a loaded book before chunking."""
+
+    title: str
+    raw_text: str
+    encoding: str = "utf-8"
+    language: str = "unknown"  # "en", "zh", "ja", or BCP-47 code
+    word_count: int = Field(default=0)
+
+    def model_post_init(self, __context: object) -> None:
+        if self.word_count == 0:
+            if self.language in ("zh", "ja") or _CJK_RE.search(self.raw_text[:500]):
+                # CJK 文本：以非空白字符数作为字数（中文无空格分词，split() 严重偏低）
+                self.word_count = len("".join(self.raw_text.split()))
+            else:
+                self.word_count = len(self.raw_text.split())
+
+
+class ChunkResult(BaseModel):
+    """A single analysis unit (paragraph or fixed window) within a book.
+
+    ``chapter`` carries the **raw** chapter number as produced by
+    :func:`bookscope.ingest.book_chunker.detect_chapters` — ``0`` for a
+    detected prologue, ``1+`` for regular chapters.  ``None`` means the
+    chunk was produced before this field existed or by a pipeline that
+    did not populate it; consumers that need chapter context must then
+    fall back to parsing the chunk header or external injection.  The
+    r1 assembly layer (``R0BookAssembler``) normalises ``0``-based
+    raw numbers to the ``>=1`` contract required by agent tool schemas;
+    callers should not second-guess that normalisation here.
+    """
+
+    index: int
+    text: str
+    word_count: int = Field(default=0)
+    chapter: int | None = Field(default=None, ge=0)
+
+    def model_post_init(self, __context: object) -> None:
+        if self.word_count == 0:
+            self.word_count = len(self.text.split())
+
+
+class EmotionScore(BaseModel):
+    """8-dimensional Plutchik emotion vector for one chunk.
+
+    Scores are normalized to [0.0, 1.0] proportions (each emotion / total
+    emotional-word count).  A chunk with few emotional words and one with
+    many can share the same proportional shape — use ``emotion_density`` to
+    distinguish intensity from distribution.
+
+    emotion_density: fraction of words that carry any NRC emotion signal
+                     (emotional_word_count / total_word_count).  Defaults
+                     to 0.0 for empty chunks or chunks with no signal.
+    """
+
+    chunk_index: int
+    anger: float = 0.0
+    anticipation: float = 0.0
+    disgust: float = 0.0
+    fear: float = 0.0
+    joy: float = 0.0
+    sadness: float = 0.0
+    surprise: float = 0.0
+    trust: float = 0.0
+    emotion_density: float = 0.0  # fraction of words with any emotion signal
+
+    @property
+    def dominant_emotion(self) -> str:
+        """Return the name of the highest-scoring emotion."""
+        scores = {
+            "anger": self.anger,
+            "anticipation": self.anticipation,
+            "disgust": self.disgust,
+            "fear": self.fear,
+            "joy": self.joy,
+            "sadness": self.sadness,
+            "surprise": self.surprise,
+            "trust": self.trust,
+        }
+        return max(scores, key=lambda k: scores[k])
+
+    def to_dict(self) -> dict[str, float]:
+        return {
+            "anger": self.anger,
+            "anticipation": self.anticipation,
+            "disgust": self.disgust,
+            "fear": self.fear,
+            "joy": self.joy,
+            "sadness": self.sadness,
+            "surprise": self.surprise,
+            "trust": self.trust,
+        }
+
+
+class StyleScore(BaseModel):
+    """Surface-level stylometric fingerprint for one chunk.
+
+    Metrics:
+        avg_sentence_length: Mean word count per sentence.
+        ttr:                 Type-Token Ratio (unique / total alpha words).
+        noun_ratio:          Fraction of alpha tokens tagged NN*.
+        verb_ratio:          Fraction of alpha tokens tagged VB*.
+        adj_ratio:           Fraction of alpha tokens tagged JJ*.
+        adv_ratio:           Fraction of alpha tokens tagged RB*.
+    """
+
+    chunk_index: int
+    avg_sentence_length: float = 0.0
+    ttr: float = 0.0
+    noun_ratio: float = 0.0
+    verb_ratio: float = 0.0
+    adj_ratio: float = 0.0
+    adv_ratio: float = 0.0
+
+    def to_dict(self) -> dict[str, float]:
+        return {
+            "avg_sentence_length": self.avg_sentence_length,
+            "ttr": self.ttr,
+            "noun_ratio": self.noun_ratio,
+            "verb_ratio": self.verb_ratio,
+            "adj_ratio": self.adj_ratio,
+            "adv_ratio": self.adv_ratio,
+        }
+
+
+class ReaderVerdict(BaseModel):
+    """Human-readable reading verdict derived from emotion arc + style data.
+
+    Generated locally with zero LLM dependency.  Translates quantitative
+    analysis (arc pattern, dominant emotion, style fingerprint) into a plain-
+    language judgment for readers asking "will I enjoy this book?".
+
+    confidence:
+        1.0 — full arc + emotion + style data available
+        0.0 — arc=UNKNOWN *and* style_scores=[] (double fallback)
+    """
+
+    sentence: str = ""       # "步步收紧的心理张力，走向无法挽回的结局"
+    for_you: str = ""        # "适合喜欢高张力、情绪浓郁的读者"
+    not_for_you: str = ""    # "不适合要求快节奏、情节驱动的读者"
+    confidence: float = 0.0  # 0.0 = insufficient data; 1.0 = full match
+
+
+class BookClubPack(BaseModel):
+    """Structured Book Club Pack generated by LLM for export card."""
+
+    questions: list[str] = Field(..., min_length=3, max_length=5)
+    difficulty: Literal["Easy", "Medium", "Challenging"]
+    target_audience: str = Field(..., max_length=60)
+    arc_summary: str = Field(..., max_length=120)
+
+
+# ── v3: Book Soul Engine schemas ────────────────────────────────────────────
+
+
+class ChapterSummary(BaseModel):
+    """LLM-generated summary for a single chunk / chapter segment."""
+
+    chunk_index: int
+    title: str = ""              # 推断的章节标题（如无则为空）
+    summary: str = ""            # 本段主要内容概述
+    key_events: list[str] = Field(default_factory=list)   # 关键事件列表
+    characters_mentioned: list[str] = Field(default_factory=list)  # 出现的人物名
+
+
+class EmotionalStage(BaseModel):
+    """A single stage in a character's emotional arc."""
+
+    stage: str = ""      # "early" / "middle" / "late"
+    emotion: str = ""    # "fearful" / "determined"
+    event: str = ""      # "orphaned at age 5"
+
+
+class CharacterProfile(BaseModel):
+    """Merged character profile across all chunks."""
+
+    name: str                                  # 主名称
+    aliases: list[str] = Field(default_factory=list)  # 别名/昵称
+    description: str = ""                      # 一句话描述
+    voice_style: str = ""                      # 说话风格特征
+    motivations: list[str] = Field(default_factory=list)  # 核心动机
+    key_chapter_indices: list[int] = Field(default_factory=list)  # 主要出场章节
+    arc_summary: str = ""                      # 人物弧光概述
+    # ── Soul Engine (Stage 2) ──
+    personality_type: str = ""                 # "INTJ — 策略家"
+    key_quotes: list[str] = Field(default_factory=list)  # 3-5 条代表性语录
+    values: list[str] = Field(default_factory=list)      # 核心价值观/信念
+    emotional_stages: list[EmotionalStage] = Field(default_factory=list)
+
+
+class ChapterAnalysis(BaseModel):
+    """Deep analysis of a real chapter (may span multiple chunks)."""
+
+    chapter_index: int                         # 1-based chapter number
+    title: str = ""                            # 章节标题
+    chunk_indices: list[int] = Field(default_factory=list)  # 属于此章的 chunk indices
+    analysis: str = ""                         # 300-800 字深度分析
+    key_points: list[str] = Field(default_factory=list)     # 3-5 个核心要点
+    characters_involved: list[str] = Field(default_factory=list)
+    significance: str = ""                     # 本章在全书中的意义
+
+
+class ThemeDescription(BaseModel):
+    """A theme with description, not just a label."""
+
+    theme: str = ""
+    description: str = ""
+
+
+class NarrativePoint(BaseModel):
+    """A single point on the narrative rhythm chart.
+
+    Replaces abstract valence numbers with concrete event annotations.
+    Generated from chapter analyses by LLM.
+    """
+
+    chapter_index: int                         # 1-based chapter number
+    title: str = ""                            # 章节标题
+    intensity: float = 0.5                     # 0.0-1.0 叙事张力/重要性
+    event_label: str = ""                      # 具体事件标注 ("靖难之役", "宝黛初会")
+    # setup / rising / climax / turning / falling / resolution
+    point_type: str = "narrative"
+
+
+class ChunkScanResult(BaseModel):
+    """Phase 1 lightweight per-chunk metadata from full scan.
+
+    Extracted by cheap/fast model (Haiku/DeepSeek) for EVERY chunk.
+    Used to drive Phase 2 smart selection and Phase 3 deep analysis.
+    """
+
+    chunk_index: int
+    characters: list[dict] = Field(default_factory=list)
+    # Each: {"name": str, "action": str, "role": "main"/"supporting"/"mentioned"}
+    events: list[dict] = Field(default_factory=list)
+    # Each: {"event": str (5-15 chars), "importance": float 0-1}
+    tension: float = 0.5                       # 0.0-1.0 narrative tension
+    themes: list[str] = Field(default_factory=list)  # 1-3 theme keywords
+    summary: str = ""                          # 1-2 sentence brief summary
+
+
+class BookKnowledgeGraph(BaseModel):
+    """Aggregated knowledge graph for a single book."""
+
+    book_title: str
+    language: str = "zh"
+    # Chunk-level summaries (kept for RAG retrieval)
+    chapter_summaries: list[ChapterSummary] = Field(default_factory=list)
+    # Deep chapter-level analysis (new)
+    chapter_analyses: list[ChapterAnalysis] = Field(default_factory=list)
+    characters: list[CharacterProfile] = Field(default_factory=list)
+    overall_summary: str = ""                  # 旧字段，保留兼容
+    book_outline: str = ""                     # 500-1000 字结构化全书大纲
+    themes: list[str] = Field(default_factory=list)  # 旧字段，简单标签
+    theme_analyses: list[ThemeDescription] = Field(default_factory=list)  # 主题深度描述
+    narrative_rhythm: list[NarrativePoint] = Field(default_factory=list)  # 叙事节奏标注

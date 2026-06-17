@@ -1,0 +1,8 @@
+{
+  "schema": "bookscope-writing-technique-probe/v1",
+  "timestamp": "2026-06-16T14:45:56",
+  "model": "deepseek-v4-flash",
+  "pos_citation_truth_pct": 94.1,
+  "fp_rate_pct": 0.0,
+  "verdict": "GO"
+}

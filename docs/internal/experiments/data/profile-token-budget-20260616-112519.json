@@ -1,0 +1,65 @@
+{
+  "schema": "bookscope-token-profile/v1",
+  "timestamp": "2026-06-16T11:25:19",
+  "model": "deepseek-v4-flash",
+  "questions": 3,
+  "per_question": [
+    {
+      "id": "g1",
+      "duration_s": 39.5,
+      "outcome": "success",
+      "iterations": 3,
+      "total_input_tokens": 65283,
+      "cache_hit_tokens": 31360,
+      "cache_miss_tokens": 33923,
+      "tool_result_tokens_est_by_tool": {
+        "search_chunks": 28240
+      },
+      "tool_calls_by_tool": {
+        "search_chunks": 3
+      }
+    },
+    {
+      "id": "s1",
+      "duration_s": 24.2,
+      "outcome": "success",
+      "iterations": 3,
+      "total_input_tokens": 57397,
+      "cache_hit_tokens": 32768,
+      "cache_miss_tokens": 24629,
+      "tool_result_tokens_est_by_tool": {
+        "search_chunks": 20264
+      },
+      "tool_calls_by_tool": {
+        "search_chunks": 2
+      }
+    },
+    {
+      "id": "c1",
+      "duration_s": 27.6,
+      "outcome": "success",
+      "iterations": 3,
+      "total_input_tokens": 70693,
+      "cache_hit_tokens": 32512,
+      "cache_miss_tokens": 38181,
+      "tool_result_tokens_est_by_tool": {
+        "search_chunks": 9877,
+        "get_chapter_range": 20461
+      },
+      "tool_calls_by_tool": {
+        "search_chunks": 1,
+        "get_chapter_range": 1
+      }
+    }
+  ],
+  "agg_result_tokens_est_by_tool": {
+    "search_chunks": 58381,
+    "get_chapter_range": 20461
+  },
+  "agg_tool_calls_by_tool": {
+    "search_chunks": 6,
+    "get_chapter_range": 1
+  },
+  "real_cache_miss_tokens": 96733,
+  "real_cache_hit_tokens": 96640
+}

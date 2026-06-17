@@ -1,0 +1,489 @@
+{
+  "book": "kuicheng",
+  "retrieval_mode": "hybrid",
+  "top_k": 10,
+  "date": "2026-06-12",
+  "golden_set": "golden-retrieval-kuicheng.json",
+  "golden_annotated_at_commit": "9a9778d",
+  "n_chunks": 4315,
+  "summary": {
+    "n_queries": 18,
+    "recall_at_5": 0.4074,
+    "recall_at_10": 0.4444,
+    "mrr": 0.4,
+    "by_type": {
+      "semantic": {
+        "n": 10,
+        "recall_at_5": 0.5167,
+        "recall_at_10": 0.5167,
+        "mrr": 0.5333
+      },
+      "positional": {
+        "n": 4,
+        "recall_at_5": 0.375,
+        "recall_at_10": 0.375,
+        "mrr": 0.175
+      },
+      "character": {
+        "n": 4,
+        "recall_at_5": 0.1667,
+        "recall_at_10": 0.3333,
+        "mrr": 0.2917
+      }
+    }
+  },
+  "per_query": [
+    {
+      "query": "裴谦的财富转换系统盈亏转换比例是多少？有哪些违规行为限制？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        1
+      ],
+      "retrieved_indices": [
+        1,
+        2981,
+        147,
+        1117,
+        53,
+        16,
+        661,
+        1669,
+        1668,
+        374
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        1
+      ]
+    },
+    {
+      "query": "《孤独的沙漠公路》这款烂游戏是怎么意外火起来的？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        8,
+        11,
+        13
+      ],
+      "retrieved_indices": [
+        13,
+        15,
+        1915,
+        8,
+        1022,
+        21,
+        4,
+        46,
+        1055,
+        52
+      ],
+      "recall_at_5": 0.6666666666666666,
+      "recall_at_10": 0.6666666666666666,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        8,
+        13
+      ]
+    },
+    {
+      "query": "裴谦给《回头是岸》起这个名字的用意是什么？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        382,
+        383
+      ],
+      "retrieved_indices": [
+        3198,
+        429,
+        2839,
+        619,
+        2833,
+        650,
+        2556,
+        656,
+        643,
+        3254
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "摸鱼网咖的 Logo 是什么样的？开业搞了什么活动？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        200,
+        203
+      ],
+      "retrieved_indices": [
+        1337,
+        649,
+        366,
+        300,
+        979,
+        535,
+        1002,
+        1350,
+        2955,
+        2584
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "《裴总的日常》第一季第一集的剧本是什么画风？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        174
+      ],
+      "retrieved_indices": [
+        174,
+        241,
+        188,
+        1641,
+        219,
+        678,
+        1645,
+        173,
+        243,
+        2421
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        174
+      ]
+    },
+    {
+      "query": "裴谦发现《裴总的日常》要火，想撤资的时候系统怎么回应？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        176
+      ],
+      "retrieved_indices": [
+        176,
+        1653,
+        1645,
+        246,
+        497,
+        186,
+        160,
+        243,
+        3559,
+        289
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        176
+      ]
+    },
+    {
+      "query": "《海上堡垒》这个游戏名字是谁起的？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        88
+      ],
+      "retrieved_indices": [
+        88,
+        2084,
+        2086,
+        134,
+        135,
+        361,
+        149,
+        3267,
+        136,
+        341
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        88
+      ]
+    },
+    {
+      "query": "《海上堡垒》是怎么开发的？资源从哪来？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        90,
+        98
+      ],
+      "retrieved_indices": [
+        115,
+        135,
+        2086,
+        111,
+        136,
+        149,
+        3267,
+        104,
+        2083,
+        114
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "腾达精神对 996 和加班是什么态度？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        665,
+        667
+      ],
+      "retrieved_indices": [
+        1876,
+        1875,
+        665,
+        886,
+        4304,
+        948,
+        834,
+        727,
+        836,
+        833
+      ],
+      "recall_at_5": 0.5,
+      "recall_at_10": 0.5,
+      "reciprocal_rank": 0.3333333333333333,
+      "hit_indices": [
+        665
+      ]
+    },
+    {
+      "query": "摸鱼网咖的装潢方案是谁负责的？里面都配了什么？",
+      "query_type": "semantic",
+      "expected_chunk_indices": [
+        174,
+        178
+      ],
+      "retrieved_indices": [
+        436,
+        300,
+        370,
+        2728,
+        536,
+        366,
+        649,
+        1273,
+        1343,
+        275
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "小说第 1 章开头，裴谦重生回到了什么时间和地点？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        0
+      ],
+      "retrieved_indices": [
+        870,
+        3688,
+        2283,
+        594,
+        2277,
+        650,
+        2959,
+        513,
+        1704,
+        612
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "第 999 章'委以重任'讲了什么？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        2566,
+        2567
+      ],
+      "retrieved_indices": [
+        2568,
+        2566,
+        3813,
+        2958,
+        2937,
+        2867,
+        1705,
+        807,
+        1250,
+        4021
+      ],
+      "recall_at_5": 0.5,
+      "recall_at_10": 0.5,
+      "reciprocal_rank": 0.5,
+      "hit_indices": [
+        2566
+      ]
+    },
+    {
+      "query": "第 190 章裴谦立项了哪款游戏？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        382,
+        383
+      ],
+      "retrieved_indices": [
+        1018,
+        1020,
+        824,
+        1055,
+        267,
+        713,
+        401,
+        1254,
+        714,
+        2963
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "第 35 章'面试'开头，黄思博到了什么地方？",
+      "query_type": "positional",
+      "expected_chunk_indices": [
+        68
+      ],
+      "retrieved_indices": [
+        69,
+        209,
+        2959,
+        727,
+        68,
+        70,
+        606,
+        71,
+        713,
+        652
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "reciprocal_rank": 0.2,
+      "hit_indices": [
+        68
+      ]
+    },
+    {
+      "query": "黄思博面试腾达的时候为什么被'反向砍价'惊到？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        70,
+        71,
+        72
+      ],
+      "retrieved_indices": [
+        652,
+        68,
+        209,
+        69,
+        792,
+        70,
+        4256,
+        72,
+        76,
+        638
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.6666666666666666,
+      "reciprocal_rank": 0.16666666666666666,
+      "hit_indices": [
+        70,
+        72
+      ]
+    },
+    {
+      "query": "裴谦把林晚派到觞洋游戏去的真实目的是什么？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        390,
+        391
+      ],
+      "retrieved_indices": [
+        2532,
+        669,
+        1318,
+        2576,
+        401,
+        397,
+        1202,
+        342,
+        273,
+        674
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "乔老湿是个什么样的 UP 主？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        6,
+        7
+      ],
+      "retrieved_indices": [
+        2938,
+        227,
+        390,
+        563,
+        1597,
+        609,
+        606,
+        228,
+        226,
+        505
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "reciprocal_rank": 0.0,
+      "hit_indices": []
+    },
+    {
+      "query": "田默是怎么被裴谦招进腾达的？入职后第一天干了什么？",
+      "query_type": "character",
+      "expected_chunk_indices": [
+        2564,
+        2566,
+        2568
+      ],
+      "retrieved_indices": [
+        2568,
+        2567,
+        2570,
+        2605,
+        2566,
+        2569,
+        3560,
+        3351,
+        2571,
+        2634
+      ],
+      "recall_at_5": 0.6666666666666666,
+      "recall_at_10": 0.6666666666666666,
+      "reciprocal_rank": 1.0,
+      "hit_indices": [
+        2566,
+        2568
+      ]
+    }
+  ]
+}

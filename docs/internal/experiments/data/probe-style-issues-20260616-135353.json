@@ -1,0 +1,9 @@
+{
+  "schema": "bookscope-style-probe/v1",
+  "timestamp": "2026-06-16T13:53:53",
+  "model": "deepseek-v4-flash",
+  "pos_verify_pct": 100.0,
+  "avg_issues": 0.3,
+  "fp_rate_pct": 0.0,
+  "verdict": "GO"
+}

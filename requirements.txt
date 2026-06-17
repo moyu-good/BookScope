@@ -1,0 +1,24 @@
+# BookScope runtime dependencies
+# Used by Streamlit Cloud (which uses pip, not uv)
+# Keep in sync with pyproject.toml [project.dependencies]
+#
+# spaCy + model: enables better character NER in Quick Insight fiction cards.
+# The model wheel must match the installed spaCy major.minor version.
+spacy>=3.7.0,<4.0.0
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+
+streamlit>=1.32.0
+plotly>=5.20.0
+pydantic>=2.6.0
+nrclex>=4.0.0
+textblob>=0.17.0
+nltk>=3.9.0
+numpy>=1.26.0
+ebooklib>=0.18
+langdetect>=1.0.9
+jieba>=0.42.1
+janome>=0.4.2
+pymupdf>=1.23.0
+requests>=2.31.0
+trafilatura>=1.6.0
+anthropic>=0.25

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Download NLTK / TextBlob corpora (required by nrclex 4.x)
+        run: python -m textblob.download_corpora
+
+      - name: Lint with ruff
+        run: ruff check bookscope tests
+
+      - name: Run tests with coverage
+        run: pytest tests/ --cov=bookscope --cov-report=term-missing -q
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.14'
+        with:
+          name: coverage-report
+          path: .coverage
+          retention-days: 7
+
+      # benchmark 工具链 smoke：dry-run 不真打 LLM，只验证脚本能跑通
+      # 真实性能数据走 .github/workflows/benchmark.yml 周期触发
+      - name: Benchmark dry-run smoke test
+        if: matrix.python-version == '3.14'
+        env:
+          BOOKSCOPE_BENCHMARK_DRY_RUN: "1"
+        run: |
+          mkdir -p benchmark-dry-run
+          python scripts/benchmark_run_and_report.py \
+            --output-dir benchmark-dry-run/ \
+            --label "ci-pr-${{ github.event.pull_request.number || github.sha }}"
+          ls -la benchmark-dry-run/
+          test -n "$(ls benchmark-dry-run/*.json 2>/dev/null)" || (echo "no JSON output" && exit 1)
+          test -n "$(ls benchmark-dry-run/*.md 2>/dev/null)" || (echo "no Markdown output" && exit 1)

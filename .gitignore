@@ -1,0 +1,63 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+*.egg
+
+# Data directories (saved analyses + demo books)
+data/analyses/
+data/demo/
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# 本地 BYOK key（DEEPSEEK_API_KEY / SILICONFLOW_API_KEY 等）——绝不入库
+.env
+.env.local
+
+# Hypothesis property-test data
+.hypothesis/
+
+# 本地 AI 运作配置 + 手册——保留在本地，不公开
+/CLAUDE.md
+/.claude/
+
+# Scratch / test files
+test_book.txt
+inject_mingchao.py
+
+# 一次性探针脚本 + 截图（不入库）
+scripts/_tmp_*
+scripts/_shot_*
+
+# 发布脚本含真名扫描模式 + 仅本地运维用，绝不入库（同 CLAUDE.md 道理）
+scripts/publish-public.sh
+
+# Session data
+data/sessions/
+
+# Sprint 8 L2 LLM 调用缓存 SQLite 文件
+.bookscope_cache/
+
+# Vite boilerplate README
+bookscope-frontend/README.md
+
+# Design experiments / one-off scripts (not part of the package)
+render_gilded_library.py
+.context/
+
+# OS
+.DS_Store
+Thumbs.db
+.gstack/
+node_modules/
+test*.epub
+test*.txt
+test-arxiv-*.pdf
+

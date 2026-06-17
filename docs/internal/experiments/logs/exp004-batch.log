@@ -1,0 +1,397 @@
+=== [orchestrator] mingchao run1 start 17:26:48 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.540 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test明朝那些事儿.epub
+[smoke] 书名: 明朝那些事儿，字数: 32164
+[smoke] 切分 chunk 数: 1069
+[batch] book = 明朝那些事儿 (32164 字 / 1069 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [2/5] q2 [支线密度] 完成 → dur=44.3s cite=14 total=23 
+[batch] [1/5] q1 [节奏评估] 完成 → dur=48.6s cite=12 total=23 
+[batch] [4/5] q4 [角色转变可信度] 完成 → dur=54.6s cite=13 total=25 
+[batch] [3/5] q3 [伏笔回收] 完成 → dur=52.9s cite=12 total=21 
+[batch] [5/5] q5 [设定漂移] 完成 → dur=56.2s cite=9 total=24 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-mingchao-run1.json
+[batch] 总耗时 67.8s
+[batch] 平均 total = 23.2
+=== [orchestrator] mingchao run1 exit=0 17:28:10 ===
+=== [orchestrator] mingchao run2 start 17:28:11 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.521 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test明朝那些事儿.epub
+[smoke] 书名: 明朝那些事儿，字数: 32164
+[smoke] 切分 chunk 数: 1069
+[batch] book = 明朝那些事儿 (32164 字 / 1069 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [4/5] q4 [角色转变可信度] 完成 → dur=46.1s cite=9 total=24 
+[batch] [1/5] q1 [节奏评估] 完成 → dur=50.8s cite=12 total=23 
+[batch] [2/5] q2 [支线密度] 完成 → dur=51.8s cite=16 total=23 
+[batch] [5/5] q5 [设定漂移] 完成 → dur=54.4s cite=7 total=22 
+[batch] [3/5] q3 [伏笔回收] 完成 → dur=56.2s cite=15 total=20 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-mingchao-run2.json
+[batch] 总耗时 72.4s
+[batch] 平均 total = 22.4
+=== [orchestrator] mingchao run2 exit=0 17:29:39 ===
+=== [orchestrator] mingchao run3 start 17:29:40 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.560 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test明朝那些事儿.epub
+[smoke] 书名: 明朝那些事儿，字数: 32164
+[smoke] 切分 chunk 数: 1069
+[batch] book = 明朝那些事儿 (32164 字 / 1069 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [2/5] q2 [支线密度] 完成 → dur=36.5s cite=15 total=23 
+[batch] [1/5] q1 [节奏评估] 完成 → dur=51.8s cite=13 total=22 
+[batch] [3/5] q3 [伏笔回收] 完成 → dur=58.9s cite=12 total=23 
+[batch] [4/5] q4 [角色转变可信度] 完成 → dur=62.7s cite=13 total=21 
+[batch] [5/5] q5 [设定漂移] 完成 → dur=68.7s cite=12 total=24 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-mingchao-run3.json
+[batch] 总耗时 79.7s
+[batch] 平均 total = 22.6
+=== [orchestrator] mingchao run3 exit=0 17:31:15 ===
+=== [orchestrator] anshi run1 start 17:31:17 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.539 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test安史之乱  历史、宣传与神话 (张诗坪, 胡可奇).epub
+[smoke] 书名: 安史之乱：历史、宣传与神话，字数: 3134
+[smoke] 切分 chunk 数: 267
+[batch] book = 安史之乱：历史、宣传与神话 (3134 字 / 267 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [2/5] q2 [] 完成 → dur=42.3s cite=12 total=23 
+[batch] [4/5] q4 [] 完成 → dur=50.2s cite=13 total=22 
+[batch] [5/5] q5 [] 完成 → dur=66.1s cite=15 total=21 
+[batch] [3/5] q3 [] 完成 → dur=70.6s cite=12 total=23 
+[batch] [1/5] q1 [] 完成 → dur=85.2s cite=14 total=23 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-anshi-run1.json
+[batch] 总耗时 99.0s
+[batch] 平均 total = 22.4
+=== [orchestrator] anshi run1 exit=0 17:33:07 ===
+=== [orchestrator] anshi run2 start 17:33:08 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.555 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test安史之乱  历史、宣传与神话 (张诗坪, 胡可奇).epub
+[smoke] 书名: 安史之乱：历史、宣传与神话，字数: 3134
+[smoke] 切分 chunk 数: 267
+[batch] book = 安史之乱：历史、宣传与神话 (3134 字 / 267 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [2/5] q2 [] 完成 → dur=43.8s cite=12 total=21 
+[batch] [4/5] q4 [] 完成 → dur=47.8s cite=12 total=24 
+[batch] [5/5] q5 [] 完成 → dur=58.0s cite=11 total=23 
+[batch] [3/5] q3 [] 完成 → dur=66.4s cite=13 total=23 
+[batch] [1/5] q1 [] 完成 → dur=67.0s cite=19 total=24 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-anshi-run2.json
+[batch] 总耗时 81.9s
+[batch] 平均 total = 23.0
+=== [orchestrator] anshi run2 exit=0 17:34:41 ===
+=== [orchestrator] anshi run3 start 17:34:42 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.900 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test安史之乱  历史、宣传与神话 (张诗坪, 胡可奇).epub
+[smoke] 书名: 安史之乱：历史、宣传与神话，字数: 3134
+[smoke] 切分 chunk 数: 267
+[batch] book = 安史之乱：历史、宣传与神话 (3134 字 / 267 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [2/5] q2 [] 完成 → dur=33.2s cite=11 total=24 
+[batch] [4/5] q4 [] 完成 → dur=50.7s cite=15 total=24 
+[batch] [1/5] q1 [] 完成 → dur=54.9s cite=15 total=N/A ERR=reviewer_format_error: reviewer JSON parse failed and autofix did not apply
+[batch] [3/5] q3 [] 完成 → dur=58.7s cite=14 total=23 
+[batch] [5/5] q5 [] 完成 → dur=56.6s cite=10 total=20 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-anshi-run3.json
+[batch] 总耗时 72.1s
+[batch] 平均 total = 22.75
+=== [orchestrator] anshi run3 exit=0 17:36:11 ===
+=== [orchestrator] zhinei run1 start 17:36:14 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.575 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关） (郑永... (z-library.sk, 1lib.sk, z-lib.sk).epub
+[smoke] 书名: 制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关），字数: 15441
+[smoke] 切分 chunk 数: 319
+[batch] book = 制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关） (15441 字 / 319 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [4/5] q4 [] 完成 → dur=47.4s cite=12 total=20 
+[batch] [2/5] q2 [] 完成 → dur=53.4s cite=15 total=23 
+[batch] [5/5] q5 [] 完成 → dur=54.3s cite=10 total=21 
+[batch] [3/5] q3 [] 完成 → dur=55.8s cite=14 total=23 
+[batch] [1/5] q1 [] 完成 → dur=55.2s cite=16 total=17 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-zhinei-run1.json
+[batch] 总耗时 70.4s
+[batch] 平均 total = 20.8
+=== [orchestrator] zhinei run1 exit=0 17:37:36 ===
+=== [orchestrator] zhinei run2 start 17:37:37 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.494 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关） (郑永... (z-library.sk, 1lib.sk, z-lib.sk).epub
+[smoke] 书名: 制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关），字数: 15441
+[smoke] 切分 chunk 数: 319
+[batch] book = 制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关） (15441 字 / 319 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [4/5] q4 [] 完成 → dur=42.7s cite=12 total=20 
+[batch] [1/5] q1 [] 完成 → dur=43.7s cite=15 total=17 
+[batch] [5/5] q5 [] 完成 → dur=49.1s cite=11 total=N/A ERR=reviewer_format_error: reviewer output has no valid JSON object
+[batch] [3/5] q3 [] 完成 → dur=57.0s cite=12 total=21 
+[batch] [2/5] q2 [] 完成 → dur=59.7s cite=10 total=18 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-zhinei-run2.json
+[batch] 总耗时 72.8s
+[batch] 平均 total = 19.0
+=== [orchestrator] zhinei run2 exit=0 17:39:03 ===
+=== [orchestrator] zhinei run3 start 17:39:04 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.547 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关） (郑永... (z-library.sk, 1lib.sk, z-lib.sk).epub
+[smoke] 书名: 制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关），字数: 15441
+[smoke] 切分 chunk 数: 319
+[batch] book = 制内市场：中国国家主导型政治经济学（中国问题专家、高层智库郑永年权威解读，中国经济2020年如何实现超预期增长，突破百万亿元大关） (15441 字 / 319 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [1/5] q1 [] 完成 → dur=38.2s cite=14 total=20 
+[batch] [2/5] q2 [] 完成 → dur=41.2s cite=12 total=24 
+[batch] [4/5] q4 [] 完成 → dur=43.0s cite=13 total=23 
+[batch] [5/5] q5 [] 完成 → dur=51.9s cite=12 total=23 
+[batch] [3/5] q3 [] 完成 → dur=62.0s cite=12 total=20 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-zhinei-run3.json
+[batch] 总耗时 74.2s
+[batch] 平均 total = 22.0
+=== [orchestrator] zhinei run3 exit=0 17:40:29 ===
+=== [orchestrator] kuicheng run1 start 17:40:32 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.571 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test亏成首富从游戏开始 (青衫取醉) (z-library.sk, 1lib.sk, z-lib.sk).epub
+[smoke] 书名: 亏成首富从游戏开始，字数: 160443
+[smoke] 切分 chunk 数: 4315
+[batch] book = 亏成首富从游戏开始 (160443 字 / 4315 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [5/5] q5 [] 完成 → dur=51.4s cite=10 total=24 
+[batch] [2/5] q2 [] 完成 → dur=56.0s cite=13 total=23 
+[batch] [4/5] q4 [] 完成 → dur=53.7s cite=9 total=23 
+[batch] [1/5] q1 [] 完成 → dur=63.2s cite=15 total=24 
+[batch] [3/5] q3 [] 完成 → dur=67.5s cite=13 total=14 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-kuicheng-run1.json
+[batch] 总耗时 83.7s
+[batch] 平均 total = 21.6
+=== [orchestrator] kuicheng run1 exit=0 17:42:26 ===
+=== [orchestrator] kuicheng run2 start 17:42:27 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.745 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test亏成首富从游戏开始 (青衫取醉) (z-library.sk, 1lib.sk, z-lib.sk).epub
+[smoke] 书名: 亏成首富从游戏开始，字数: 160443
+[smoke] 切分 chunk 数: 4315
+[batch] book = 亏成首富从游戏开始 (160443 字 / 4315 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [1/5] q1 [] 完成 → dur=37.9s cite=10 total=23 
+[batch] [4/5] q4 [] 完成 → dur=52.8s cite=14 total=22 
+[batch] [3/5] q3 [] 完成 → dur=54.4s cite=13 total=23 
+[batch] [2/5] q2 [] 完成 → dur=52.5s cite=13 total=22 
+[batch] [5/5] q5 [] 完成 → dur=71.9s cite=12 total=24 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-kuicheng-run2.json
+[batch] 总耗时 86.0s
+[batch] 平均 total = 22.8
+=== [orchestrator] kuicheng run2 exit=0 17:44:29 ===
+=== [orchestrator] kuicheng run3 start 17:44:30 ===
+C:\Users\user\AppData\Local\Programs\Python\Python313\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\user\AppData\Local\Temp\jieba.cache
+Loading model cost 0.518 seconds.
+Prefix dict has been built successfully.
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+question_processor fallback: ValueError: response missing 'content' field
+[batch] generator provider = deepseek
+[batch] generator model = deepseek-chat
+[batch] reviewer provider = deepseek
+[batch] reviewer model = deepseek-chat
+[batch] 加载书 + 装配 backends ...
+[smoke] 加载 epub: test亏成首富从游戏开始 (青衫取醉) (z-library.sk, 1lib.sk, z-lib.sk).epub
+[smoke] 书名: 亏成首富从游戏开始，字数: 160443
+[smoke] 切分 chunk 数: 4315
+[batch] book = 亏成首富从游戏开始 (160443 字 / 4315 chunk)
+[batch] 共 5 题，并发 5 跑
+================================================================
+[batch] [5/5] q5 [] 完成 → dur=73.0s cite=12 total=24 
+[batch] [4/5] q4 [] 完成 → dur=75.0s cite=9 total=22 
+[batch] [1/5] q1 [] 完成 → dur=80.2s cite=15 total=22 
+[batch] [2/5] q2 [] 完成 → dur=81.0s cite=14 total=23 
+[batch] [3/5] q3 [] 完成 → dur=85.5s cite=12 total=23 
+================================================================
+[batch] 完成，写出 docs\experiments\data\exp004-kuicheng-run3.json
+[batch] 总耗时 98.6s
+[batch] 平均 total = 22.8
+=== [orchestrator] kuicheng run3 exit=0 17:46:44 ===
+=== [orchestrator] ALL DONE 17:46:45 ===

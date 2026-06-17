@@ -1,0 +1,129 @@
+{
+  "probe": "exp015-claim-precision",
+  "model": "deepseek-v4-flash",
+  "runs_per_pair": 3,
+  "false_positive": "0/4",
+  "recall": "6/6",
+  "records": [
+    {
+      "id": "P1",
+      "expect": "supported",
+      "kind": "genuine",
+      "verdicts": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "mode": "supported",
+      "correct": true
+    },
+    {
+      "id": "P2",
+      "expect": "supported",
+      "kind": "genuine",
+      "verdicts": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "mode": "supported",
+      "correct": true
+    },
+    {
+      "id": "P3",
+      "expect": "supported",
+      "kind": "genuine",
+      "verdicts": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "mode": "supported",
+      "correct": true
+    },
+    {
+      "id": "P4",
+      "expect": "supported",
+      "kind": "genuine",
+      "verdicts": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "mode": "supported",
+      "correct": true
+    },
+    {
+      "id": "N1",
+      "expect": "unsupported",
+      "kind": "无关",
+      "verdicts": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "mode": "unsupported",
+      "correct": true
+    },
+    {
+      "id": "N2",
+      "expect": "unsupported",
+      "kind": "无关",
+      "verdicts": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "mode": "unsupported",
+      "correct": true
+    },
+    {
+      "id": "N3",
+      "expect": "unsupported",
+      "kind": "提到不撑",
+      "verdicts": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "mode": "unsupported",
+      "correct": true
+    },
+    {
+      "id": "N4",
+      "expect": "unsupported",
+      "kind": "提到不撑",
+      "verdicts": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "mode": "unsupported",
+      "correct": true
+    },
+    {
+      "id": "N5",
+      "expect": "unsupported",
+      "kind": "过度声称",
+      "verdicts": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "mode": "unsupported",
+      "correct": true
+    },
+    {
+      "id": "N6",
+      "expect": "unsupported",
+      "kind": "过度声称",
+      "verdicts": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "mode": "unsupported",
+      "correct": true
+    }
+  ]
+}

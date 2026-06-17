@@ -1,0 +1,52 @@
+{
+  "schema": "bookscope-kg-cache-probe/v1",
+  "probe": "timing",
+  "book": "anshi",
+  "cache_state": "empty",
+  "runs": [
+    {
+      "total_seconds": 79.74,
+      "batch_cache_hits_delta": 0,
+      "batch_cache_misses_delta": 5,
+      "book_cache_hits_delta": 0,
+      "book_cache_misses_delta": 1,
+      "llm_call_count": 5,
+      "kg_character_count": 81,
+      "run_idx": 1
+    },
+    {
+      "total_seconds": 0.12,
+      "batch_cache_hits_delta": 0,
+      "batch_cache_misses_delta": 0,
+      "book_cache_hits_delta": 1,
+      "book_cache_misses_delta": 0,
+      "llm_call_count": 0,
+      "kg_character_count": 81,
+      "run_idx": 2
+    },
+    {
+      "total_seconds": 0.13,
+      "batch_cache_hits_delta": 0,
+      "batch_cache_misses_delta": 0,
+      "book_cache_hits_delta": 1,
+      "book_cache_misses_delta": 0,
+      "llm_call_count": 0,
+      "kg_character_count": 81,
+      "run_idx": 3
+    }
+  ],
+  "summary": {
+    "n_runs": 3,
+    "mean_seconds": 26.66,
+    "std_seconds": 45.97,
+    "min_seconds": 0.12,
+    "max_seconds": 79.74
+  },
+  "config": {
+    "book_title": "安史之乱：历史、宣传与神话",
+    "chunk_count": 267,
+    "model": "MiniMax-M2.7",
+    "min_speedup_threshold": 10.0
+  },
+  "timestamp": "2026-05-18T10:35:23"
+}

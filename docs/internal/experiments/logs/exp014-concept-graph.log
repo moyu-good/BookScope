@@ -1,0 +1,17 @@
+[probe] zhinei 全文 466951 字符；3 case × 3 次；模型 deepseek-v4-flash
+
+[Q1#1]  36.0s out=1986 finish=stop len=1919
+[Q1#2]  46.0s out=4021 finish=stop len=5059
+[Q1#3]  18.9s out=1757 finish=stop len=3176
+[N1#1]   3.2s out=54 finish=stop len=44
+[N1#2]   3.9s out=129 finish=stop len=31
+[N1#3]   3.6s out=92 finish=stop len=45
+[N2#1]   4.8s out=246 finish=stop len=114
+[N2#2]   3.8s out=132 finish=stop len=53
+[N2#3]   4.5s out=228 finish=stop len=159
+
+============================================================
+9/9 成功
+判分人工：Q1 看收敛(制内市场中心)+每边证据率+复现；N1/N2 看编没编跨域关系
+============================================================
+[probe] 写入 C:\project file\BookScope\docs\experiments\data\exp014-concept-graph-zhinei.json

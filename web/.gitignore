@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+.DS_Store
+
+# tsc -b 增量编译 + vite.config 编译产物（不入仓）
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# 依赖锁文件暂不入仓（团队尚未约定）
+package-lock.json
+
+# 试用书 epub —— 二进制不入仓；本地从仓库根 test*.epub 手动拷
+public/sample/*.epub
