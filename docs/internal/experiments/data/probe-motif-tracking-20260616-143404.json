@@ -1,8 +1,0 @@
-{
-  "schema": "bookscope-motif-probe/v1",
-  "timestamp": "2026-06-16T14:34:04",
-  "model": "deepseek-v4-flash",
-  "pos_citation_truth_pct": 95.8,
-  "fp_rate_pct": 0.0,
-  "verdict": "GO"
-}

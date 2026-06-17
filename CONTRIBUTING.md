@@ -49,7 +49,7 @@ cd ..
 动手改之前先确认环境干净：
 
 ```bash
-pytest                                   # 应该看到 526 passed
+pytest                                   # 应该看到 1080 passed, 3 skipped
 ruff check bookscope tests               # 应该 0 error
 cd web && npm run build && cd ..         # FE 改之前确认能 build
 ```
@@ -79,7 +79,7 @@ BookScope 用代际制管理大方向：
 - **性能优化**——必须带 benchmark 对比数据，参考 `scripts/benchmark_compare.py`。BookScope 把延迟当产品级问题，没有数据的"提速"不收
 - **文档改进**——README / USER_GUIDE / 案例研究**草稿章节**润色、补例子、改错字
 - **测试用例补强**——补缺失的边界 case、provider failure 模拟、SSE 流式断连等
-- **翻译**——`README.en.md` 现在是占位文件，欢迎接手英文版
+- **翻译 / 英文化**——`README.en.md` 是简短英文入口，欢迎补充更完整的英文文档
 - **前端视觉 / 交互细节**——保持现有视觉词（印章红主色 + PingFang），不做风格全换
 
 ---
@@ -92,7 +92,6 @@ BookScope 用代际制管理大方向：
 - **引入 GPU 依赖**——Web 产品要在普通 CPU 上能跑，强制 GPU 的方案不收
 - **破坏匿名化**——产出不得出现真实姓名 / 公司名（项目 CLAUDE.md 第一条硬规则）
 - **改 `docs/internal/NORTH_STAR.md`**——作者每月手动更新，不走 PR 流程
-- **改 `CLAUDE.md` 顶部硬规则段**——session 必读不能动；如果觉得规则有问题，开 issue 讨论
 - **案例研究定稿章节直接 PR**——草稿可改，定稿是 Sprint 10 由作者亲笔的里程碑事件
 - **r2 代际级实施**——等 ADR-007 签字
 - **过度抽象 / 为假想未来设计的 PR**——CLAUDE.md 有"不为假想未来设计"硬规则。一个 PR 引入三层抽象只为应付"以后可能要"——不收
@@ -202,23 +201,18 @@ BookScope 用代际制管理大方向：
 **入门（30 分钟）**：
 
 1. [README.md](README.md)
-2. [docs/internal/NORTH_STAR.md](docs/internal/NORTH_STAR.md)
+2. [docs/internal/NORTH_STAR.md](docs/internal/NORTH_STAR.md)——项目定位与不变量
 3. [docs/internal/case-study/chapter-01-r1-launch-and-api-first-pivot.md](docs/internal/case-study/chapter-01-r1-launch-and-api-first-pivot.md)
 
 **工程理解（1-2 小时）**：
 
-4. [CLAUDE.md](CLAUDE.md)——项目所有硬规则在这
-5. [docs/internal/WORKFLOW.md](docs/internal/WORKFLOW.md)——工作手册
+4. [docs/internal/WORKFLOW.md](docs/internal/WORKFLOW.md)——工作手册
+5. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)——传书 / 提问两条链路、引用核验、缓存
 6. [docs/architecture-decisions/](docs/architecture-decisions/)——所有 ADR
 
 **Sprint 视角**：
 
 7. [docs/internal/ROADMAP.md](docs/internal/ROADMAP.md)——22 周 / 11 sprint 时间线
-8. [docs/internal/STATE.md](docs/internal/STATE.md)——当前进度
-
-**给作者发 PR 前最好读**：
-
-9. [docs/internal/DEPUTY_MANAGER.md](docs/internal/DEPUTY_MANAGER.md)——理解副管理姿态，知道 review 时会被怎么质询
 
 ---
 

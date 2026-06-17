@@ -28,6 +28,14 @@ data/demo/
 /CLAUDE.md
 /.claude/
 
+# 内部工作文档不公开：只发布方向（NORTH_STAR / ROADMAP / WORKFLOW）+ 案例研究（portfolio）。
+# STATE / FLAGS / DEPUTY_MANAGER / AUTOLOOP / 实验数据 / 工作笔记等内部内容不进公开仓。
+/docs/internal/*
+!/docs/internal/NORTH_STAR.md
+!/docs/internal/ROADMAP.md
+!/docs/internal/WORKFLOW.md
+!/docs/internal/case-study/
+
 # Scratch / test files
 test_book.txt
 inject_mingchao.py
