@@ -97,8 +97,8 @@ def test_load_latin1(tmp_path):
 
 
 def test_unsupported_extension_raises(tmp_path):
-    f = tmp_path / "book.docx"
-    f.write_bytes(b"PK\x03\x04")
+    f = tmp_path / "book.rtf"
+    f.write_bytes(b"{\\rtf1}")
     with pytest.raises(ValueError, match="Unsupported file type"):
         load_text(f)
 

@@ -1,16 +1,20 @@
-"""Load plain-text, EPUB, PDF, and URL sources into BookText objects.
+"""Load plain-text, EPUB, PDF, DOCX, Markdown, multi-file series, and URL sources.
 
 Supported formats:
-  .txt   — UTF-8 / latin-1 / cp1252 with automatic fallback
-  .epub  — extracted via ebooklib + HTML tag stripping
-  .pdf   — extracted via PyMuPDF (pymupdf)
-  URL    — fetched via requests; HTML stripped or trafilatura if available
+  .txt        — UTF-8 / latin-1 / cp1252 with automatic fallback
+  .epub       — extracted via ebooklib + HTML tag stripping
+  .pdf        — extracted via PyMuPDF (pymupdf)
+  .docx       — extracted via python-docx（正文段落 + 标题样式）
+  .md/.markdown — 标准库 + 正则剥 front-matter / 代码栅栏，标题转检测器友好形态
+  多文件系列  — 一个文件夹 / 一组文件 → 按文件名数字序拼成一本书（load_series）
+  URL         — fetched via requests; HTML stripped or trafilatura if available
 """
 
 import re
 from html.parser import HTMLParser
 from pathlib import Path
 
+from bookscope.ingest.book_chunker import chinese_numeral_to_int
 from bookscope.models import BookText
 
 
@@ -70,12 +74,14 @@ def normalize_book_title(title: str) -> str:
 
 
 def load_text(path: Path | str, title: str | None = None) -> BookText:
-    """Read a .txt, .epub, or .pdf file and return a BookText.
+    """Read a single book file and return a BookText.
 
     Dispatches to the appropriate loader based on file extension.
+    支持 .txt / .epub / .pdf / .docx / .md / .markdown。多文件系列走
+    :func:`load_series`。
 
     Args:
-        path: Path to the .txt, .epub, or .pdf file.
+        path: Path to the source file.
         title: Display title. Defaults to the filename stem.
 
     Raises:
@@ -92,9 +98,16 @@ def load_text(path: Path | str, title: str | None = None) -> BookText:
         return _load_epub(path, title)
     if suffix == ".pdf":
         return _load_pdf(path, title)
+    if suffix == ".docx":
+        return _load_docx(path, title)
+    if suffix in (".md", ".markdown"):
+        return _load_markdown(path, title)
     if suffix in (".txt", ""):
         return _load_txt(path, title)
-    raise ValueError(f"Unsupported file type: {suffix!r}. Supported: .txt, .epub, .pdf")
+    raise ValueError(
+        f"Unsupported file type: {suffix!r}. "
+        "Supported: .txt, .epub, .pdf, .docx, .md, .markdown"
+    )
 
 
 def load_url(url: str, title: str | None = None) -> BookText:
@@ -144,6 +157,132 @@ def load_url(url: str, title: str | None = None) -> BookText:
         raise EmptyTextError(f"URL returned no readable text: {url}")
 
     return BookText(title=title, raw_text=raw_text)
+
+
+# ---------------------------------------------------------------------------
+# 多文件系列：一组分章文件 → 一本连续的书
+# ---------------------------------------------------------------------------
+
+# 单文件可作系列成员的后缀（系列里不混 epub/pdf——它们自带章节结构，不靠文件分隔）
+_SERIES_MEMBER_SUFFIXES = frozenset({".txt", ".md", ".markdown", ".docx", ""})
+
+
+def load_series(
+    source: Path | str | list[Path | str],
+    title: str | None = None,
+) -> BookText:
+    """把一组分章文件按文件名**数字序**拼成一本连续的书。
+
+    网文连载的常态是几十上百个分章文件（``第001章.txt``、``第002章.txt`` …），
+    要当**一本书**处理而不是几十本散文件。每个文件 = 一章，**章节边界由文件
+    给定**，不靠正则猜——这比单文件靠 ``_CHAPTER_RE`` 猜更可靠。
+
+    Args:
+        source: 一个文件夹路径（取其中所有受支持成员文件），或一组文件路径。
+        title: 书名。默认取文件夹名 / 第一个文件所在目录名。
+
+    排序：按文件名里的数字（阿拉伯 / 全角 / 中文数字，复用
+    ``chinese_numeral_to_int``）做**数字感知排序**——``第10章`` 排在 ``第2章``
+    之后，不按字典序。解析不出数字的文件按文件名字典序排到末尾（保持稳定）。
+
+    章号：每个文件边界处合成一行 ``第N章 <文件名>`` 标题。N 取文件名里解析出的
+    数字；同一组里所有文件都解析不出数字时，回退用 1-based 位置序号。合成标题交给
+    下游 ``detect_chapters`` 用现有 ``_CHAPTER_RE`` 识别——**不动正则**。章号准确性
+    是这件事对 evidence-first 的全部责任。
+
+    Raises:
+        FileNotFoundError: source 不存在 / 文件夹里没有受支持的成员文件。
+        EmptyTextError: 所有成员文件都没有可用文本。
+        ValueError: source 是空列表。
+    """
+    files = _collect_series_files(source)
+
+    # 解析每个文件的文件名数字（用于排序 + 章号）
+    indexed: list[tuple[int | None, str, Path]] = []
+    for f in files:
+        num = _filename_to_number(f.stem)
+        indexed.append((num, f.name, f))
+
+    # 数字感知排序：有数字的按数字升序在前，无数字的按文件名字典序排末尾
+    indexed.sort(key=lambda t: (t[0] is None, t[0] if t[0] is not None else 0, t[1]))
+
+    any_number = any(num is not None for num, _, _ in indexed)
+
+    parts: list[str] = []
+    loaded_any = False
+    for position, (num, _name, f) in enumerate(indexed, start=1):
+        try:
+            member = load_text(f)
+        except EmptyTextError:
+            continue  # 跳过空成员，不让一章空把整本书拖崩
+        loaded_any = True
+        # 章号：优先文件名数字；整组都无数字才回退位置序号
+        chapter_no = num if (any_number and num is not None) else position
+        heading = f"第{chapter_no}章 {f.stem}"
+        parts.append(f"{heading}\n{member.raw_text.strip()}")
+
+    if not loaded_any:
+        raise EmptyTextError(f"No readable text in series: {source}")
+
+    raw_text = "\n\n".join(parts)
+    final_title = normalize_book_title(title or _series_default_title(source, files))
+    return BookText(title=final_title, raw_text=raw_text, encoding="utf-8")
+
+
+def _collect_series_files(source: Path | str | list[Path | str]) -> list[Path]:
+    """把 source 归一成一个受支持的成员文件列表（未排序）。"""
+    if isinstance(source, list):
+        if not source:
+            raise ValueError("load_series got an empty file list")
+        files = [Path(p) for p in source]
+        for f in files:
+            if not f.exists():
+                raise FileNotFoundError(f"Series member not found: {f}")
+        return [f for f in files if f.suffix.lower() in _SERIES_MEMBER_SUFFIXES]
+
+    root = Path(source)
+    if not root.exists():
+        raise FileNotFoundError(f"Series source not found: {root}")
+    if root.is_dir():
+        members = [
+            p
+            for p in root.iterdir()
+            if p.is_file() and p.suffix.lower() in _SERIES_MEMBER_SUFFIXES
+        ]
+        if not members:
+            raise FileNotFoundError(f"No supported series files in directory: {root}")
+        return members
+    # 单个文件当成一元系列
+    return [root]
+
+
+_FILENAME_NUM_RE = re.compile(rf"([0-9０-９]+|[{'一二三四五六七八九十百千万零〇两'}]+)")
+
+
+def _filename_to_number(stem: str) -> int | None:
+    """从文件名（去后缀）里抽出章号数字；抽不出返回 None。
+
+    ``第012章`` → 12、``chapter_5`` → 5、``第十二回`` → 12。取文件名里第一个能解析
+    成数字的串（阿拉伯 / 全角 / 中文数字均可）。
+    """
+    for token in _FILENAME_NUM_RE.findall(stem):
+        n = chinese_numeral_to_int(token)
+        if n is not None:
+            return n
+    return None
+
+
+def _series_default_title(
+    source: Path | str | list[Path | str], files: list[Path]
+) -> str:
+    """系列书名兜底：文件夹名 > 成员文件的公共父目录名。"""
+    if not isinstance(source, list):
+        root = Path(source)
+        if root.is_dir():
+            return root.name
+    if files:
+        return files[0].parent.name or files[0].stem
+    return "series"
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +402,97 @@ def _load_epub(path: Path, title: str | None) -> BookText:
         raise EmptyTextError(f"EPUB contains no readable text: {path}")
 
     return BookText(title=title, raw_text=raw_text, encoding="utf-8")
+
+
+def _load_docx(path: Path, title: str | None) -> BookText:
+    """Extract plain text from a .docx file via python-docx.
+
+    取每个段落的纯文本，段落之间留空行（``\\n\\n``）让切块器按段切。Word 的
+    章标题常靠**样式**（Heading 1/2）而非文字 ``第X章``——标题段落原样保留成
+    独立行：若标题文字本身就是 ``第X章`` / ``Chapter N``，现有 ``_CHAPTER_RE``
+    自然认得；纯样式标题（无章节字样）保留为短独立行，至少守住段落边界，不
+    凭空编造章号（章号错下游 evidence-first 全错，宁缺毋滥）。
+
+    Word 的核心稿件信号是段落文本；表格 / 页眉页脚 / 图片不当正文塞进来。
+    """
+    try:
+        import docx  # python-docx
+    except ImportError as exc:
+        raise ImportError(
+            "python-docx is required for .docx support. "
+            "Install it with: pip install python-docx"
+        ) from exc
+
+    document = docx.Document(str(path))
+
+    if title is None:
+        meta_title = (document.core_properties.title or "").strip()
+        title = meta_title or path.stem
+    title = normalize_book_title(title)
+
+    parts: list[str] = []
+    for para in document.paragraphs:
+        text = para.text.strip()
+        if text:
+            parts.append(text)
+
+    raw_text = "\n\n".join(parts)
+    if not raw_text.strip():
+        raise EmptyTextError(f"DOCX contains no readable text: {path}")
+
+    return BookText(title=title, raw_text=raw_text, encoding="utf-8")
+
+
+# Markdown 预处理用的正则（纯标准库，不引 markdown 渲染库）
+_MD_FRONT_MATTER_RE = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.DOTALL)
+_MD_CODE_FENCE_RE = re.compile(r"^\s*(```|~~~).*$", re.MULTILINE)
+_MD_ATX_HEADING_RE = re.compile(r"^[ \t]{0,3}(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$", re.MULTILINE)
+
+
+def _load_markdown(path: Path, title: str | None) -> BookText:
+    """Load a Markdown file as plain text, chapter-detector friendly.
+
+    Markdown 本就是文本，纯正则处理即可，不引渲染库：
+
+    - 剥掉文件开头的 YAML front-matter（``---`` ... ``---``）——它是元数据不是正文；
+    - 把 ATX 标题（``# 第三章`` / ``## 楔子``）的 ``#`` 标记去掉，只留标题文字成
+      独立行——``第X章`` 字样会被现有 ``_CHAPTER_RE`` 认出，纯文字标题也守住段落边界，
+      不动正则、不碰所有书；
+    - 代码栅栏标记（``` ``` ``` / ``~~~``）去掉，但**保留栅栏内代码内容**（技术书的
+      代码是正文的一部分，网文不会有，默认保留）。
+
+    其余 Markdown 语法（加粗 / 链接等）保持原样——它们是行内文本，不影响章节切分。
+    """
+    raw_text: str | None = None
+    used_encoding = "utf-8"
+    for enc in FALLBACK_ENCODINGS:
+        try:
+            raw_text = path.read_text(encoding=enc)
+            used_encoding = enc
+            break
+        except UnicodeDecodeError:
+            continue
+    if raw_text is None:
+        raw_text = path.read_text(encoding="utf-8", errors="ignore")
+        used_encoding = "utf-8"
+
+    processed = _strip_markdown_scaffolding(raw_text)
+    if not processed.strip():
+        raise EmptyTextError(f"Markdown file is empty or contains only whitespace: {path}")
+
+    final_title = normalize_book_title(title or path.stem)
+    return BookText(title=final_title, raw_text=processed, encoding=used_encoding)
+
+
+def _strip_markdown_scaffolding(text: str) -> str:
+    """剥 front-matter / 栅栏标记，把 ATX 标题降成纯文字独立行。"""
+    # 1. front-matter 仅在文件最开头才算（行内 "---" 是分隔线，不动）
+    text = _MD_FRONT_MATTER_RE.sub("", text)
+    # 2. 去掉代码栅栏行本身，保留栅栏内代码内容
+    text = _MD_CODE_FENCE_RE.sub("", text)
+    # 3. ATX 标题：去掉前导 #，保留标题文字（让 _CHAPTER_RE 能认 "第X章" 字样）
+    text = _MD_ATX_HEADING_RE.sub(lambda m: m.group(2).strip(), text)
+    return text
 
 
 class _HTMLTextExtractor(HTMLParser):
