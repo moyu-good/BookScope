@@ -6,13 +6,15 @@
 
 [中文（full docs）](README.md) · English
 
-> Drop a long book into your browser and interrogate it — every claim points back to the source text, **shown only after the quote is checked character-by-character against the original.** Fabricated citations get caught.
+> Drop a long book into your browser and ask it anything. Every quote is checked character-by-character against the source text, and only verified quotes are shown.
 
 ![BookScope overview](docs/images/overview.png)
 
-Upload a book (novel, history, paper, theory) and ask anything — or use 13 built-in lenses: character graphs, timelines, pacing curves, consistency scans, foreshadow tracking, argument structure, and more.
+BookScope is a local tool for deep-reading long texts. Upload an epub / txt / pdf, ask open questions, or use 13 built-in lenses — character graphs, timelines, pacing curves, consistency scans, foreshadow tracking, argument structure, and more.
 
-What sets it apart from "chat with your PDF": a quote is never trusted on the model's word — a program checks it against the original, and only verified quotes display. That's why it works where ChatGPT guesses: your unpublished draft, last week's paper, an obscure theory book. Bring your own key, runs locally, no GPU — your manuscript never leaves.
+The difference from "chat with your PDF": every quote the model produces is checked against the original by a program. Matches are shown and stamped with a 「鉴」 (verification) seal; mismatches are dropped. The 鉴 in the name is that seal.
+
+Bring your own key, runs locally. The book text goes straight to the LLM provider you choose — no middleman server.
 
 > The UI is Chinese-first (中文优先 is a project invariant). This is a short English entry point; full docs are in Chinese.
 
@@ -31,7 +33,7 @@ uvicorn bookscope.api.app:create_app --factory --reload --port 8000
 cd web && npm install && npm run dev          # http://localhost:5173
 ```
 
-Open `http://localhost:5173`, drop in your LLM key, upload a book, ask. Default model: DeepSeek `deepseek-v4-flash`.
+Open `http://localhost:5173`, add your LLM key in settings, upload a book, ask. Default model: DeepSeek `deepseek-v4-flash`.
 
 ## Bring your own key
 
@@ -39,16 +41,10 @@ No vendor key is bundled. Eight providers preset — DeepSeek (default), GLM, Qw
 
 ## How it works
 
-Light index on upload; at query time the agent reads the source live and verifies every citation:
+A light index is built on upload. At query time the agent reads the source live and verifies every citation:
 
-- fits the context window → whole book goes in the prompt (≥90% cache hit on repeats)
+- fits the context window → the whole book goes into the prompt, behind a stable prefix cache that saves tokens on repeat questions
 - too large → BM25 + vector hybrid retrieval
-
-Runs on CPU. No GPU.
-
-## Where it sits
-
-"Chat with PDF" RAG tools cite retrieved chunks but never re-verify the model's quote. Open-source NotebookLM alternatives are general document Q&A. AI tools for novelists are mostly closed and write-oriented. BookScope is **verified-citation, query-time deep reading of one long book** — open source, BYOK, GPU-free.
 
 ## Docs
 
