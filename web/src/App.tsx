@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { BookShelf } from "./BookShelf";
 import type { SessionMetadata } from "./BookShelf";
 import { ArgumentStructure } from "./ArgumentStructure";
+import { CharacterFlow } from "./CharacterFlow";
 import { CharacterGraph } from "./CharacterGraph";
 import { ConceptEvolution } from "./ConceptEvolution";
 import { ConsistencyScan } from "./ConsistencyScan";
@@ -660,6 +661,7 @@ export function App() {
     | "library"
     | "ask"
     | "graph"
+    | "flow"
     | "timeline"
     | "entity"
     | "pacing"
@@ -1241,6 +1243,20 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "flow" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="叙事流"
+                  subtitle="每人一条横线穿过全书——同章同场聚成束、退场线止。一眼看见谁何时入场、哪几章是群戏，点束看原文。"
+                />
+                <CharacterFlow
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "timeline" ? "" : "hidden"}>
                 <CanvasHeader
                   title="时间线"
@@ -1424,6 +1440,7 @@ type Mode =
   | "library"
   | "ask"
   | "graph"
+  | "flow"
   | "timeline"
   | "entity"
   | "pacing"
@@ -1439,6 +1456,7 @@ type Mode =
 const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "ask", label: "问书" },
   { id: "graph", label: "关系图" },
+  { id: "flow", label: "叙事流" },
   { id: "timeline", label: "时间线" },
   { id: "entity", label: "实体回溯" },
   { id: "recap", label: "前情回顾" },
@@ -1473,6 +1491,12 @@ function NavIcon({
         <circle cx="18" cy="8" r="2" />
         <circle cx="10" cy="18" r="2" />
         <path d="M7.7 8.1 16.1 8.4M8.7 16.4 9.6 9.9" />
+      </>
+    ),
+    flow: (
+      <>
+        <path d="M3 6h6c2 0 2 6 4 6s2-6 4-6h4" />
+        <path d="M3 18h6c2 0 2-6 4-6" />
       </>
     ),
     timeline: (

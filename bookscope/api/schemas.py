@@ -278,6 +278,52 @@ class CharacterGraphResponse(BaseModel):
     )
 
 
+class CharacterFlowRequest(BaseModel):
+    """POST /api/agent/character-flow 请求体（WP-character-narrative-flow）。
+
+    BYOK 同 CharacterGraphRequest——抽逐章同场结构也要调 LLM（整本进 context）。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；服务端不持久化。")
+    model: str | None = Field(default=None, description="覆盖默认 model（可选）。")
+    base_url: str | None = Field(
+        default=None, description="OpenAI 兼容 endpoint 覆盖（可选）。"
+    )
+
+
+class CharacterFlowResponse(BaseModel):
+    """POST /api/agent/character-flow 响应体。
+
+    ``chapters`` 是逐章同场结构，给前端画 storyline（横轴章节、每人一条横线、同场聚束）：
+    每章一条 ``{chapter, present, pairs}``，``present`` 是这章登场的主要人物名，
+    ``pairs`` 是这章同场互动的人物对，每对 ``{a, b, evidence, verified, match_score,
+    chapter}``——``evidence`` 过原文核验，``verified=false`` 的同场对留着但前端标灰
+    （evidence-first：核不过的不进束）。
+    """
+
+    chapters: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "逐章同场结构，按章号排序。每条 {chapter:int, present:[人名], "
+            "pairs:[{a, b, evidence, verified, match_score, chapter}]}；"
+            "pair 的 evidence 过原文核验，verified=false 的标灰。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否成功抽取。false=失败/书太大，前端提示重试；区别于扫过但空（scanned=true、空列表）。",
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class CheckCitationsRequest(BaseModel):
     """POST /api/agent/check-citations 请求体（claim precision，exp-015 GO）。
 
@@ -789,6 +835,8 @@ __all__ = [
     "AgentAskRequest",
     "AgentAskResponse",
     "BookUploadResponse",
+    "CharacterFlowRequest",
+    "CharacterFlowResponse",
     "CharacterGraphRequest",
     "CharacterGraphResponse",
     "CheckCitationsRequest",

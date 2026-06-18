@@ -48,6 +48,7 @@ from bookscope.agent import (
 )
 from bookscope.agent.argument_structure import generate_argument_structure
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
+from bookscope.agent.character_flow import generate_character_flow
 from bookscope.agent.character_graph import extract_character_graph
 from bookscope.agent.claim_support import check_claim_support
 from bookscope.agent.concept_evolution import generate_concept_evolution
@@ -82,6 +83,8 @@ from bookscope.api.schemas import (
     AgentAskResponse,
     ArgumentStructureRequest,
     ArgumentStructureResponse,
+    CharacterFlowRequest,
+    CharacterFlowResponse,
     CharacterGraphRequest,
     CharacterGraphResponse,
     CheckCitationsRequest,
@@ -626,6 +629,67 @@ async def agent_character_graph(
             "total_edges": len(result.edges),
             "verified_edges": verified_edges,
         },
+    )
+
+
+@agent_router.post("/agent/character-flow", response_model=CharacterFlowResponse)
+async def agent_character_flow(
+    request: CharacterFlowRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> CharacterFlowResponse:
+    """抽一本书的人物叙事流（逐章同场结构，WP-character-narrative-flow，probe GO）。
+
+    整本进 context 让模型逐章吐"同场人物 + 同场对"，每条同场对的原文出处过
+    verify_citations（核不过的标灰）。只支持塞得进 context 的书；大书返空列表
+    （``scanned=false``，前端提示重试）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    if not _book_fits_long_context(assembler):
+        return CharacterFlowResponse(
+            chapters=[], scanned=False, book_session_id=request.book_session_id
+        )
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    chapters = generate_character_flow(
+        full_text=full_text,
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        session_id=request.book_session_id,
+    )
+    return CharacterFlowResponse(
+        chapters=chapters or [],
+        scanned=chapters is not None,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
     )
 
 
