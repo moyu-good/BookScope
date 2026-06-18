@@ -38,6 +38,9 @@ PROVIDER = "deepseek"
 MODEL = "deepseek-v4-flash"  # 最便宜的大众档
 OUT_PATH = Path("web/src/demo/captured-fixtures.json")
 
+from dotenv import load_dotenv  # 从 gitignored .env 读 key（不进命令行/transcript）
+
+load_dotenv()
 API_KEY = os.environ.get("DEEPSEEK_API_KEY", "").strip()
 if not API_KEY:
     print("ERROR: 环境变量 DEEPSEEK_API_KEY 未设置。", file=sys.stderr)
@@ -328,6 +331,14 @@ def main() -> None:
             dict(base),
             LONG_TIMEOUT,
         ),
+        # —— 下一程·可视化深化新增的 7 个端点（批量 live-verify + demo fixture）——
+        ("POST /api/agent/character-flow", "/api/agent/character-flow", dict(base), LONG_TIMEOUT),
+        ("POST /api/agent/narrative-curve", "/api/agent/narrative-curve", dict(base), LONG_TIMEOUT),
+        ("POST /api/agent/relationship-timeline", "/api/agent/relationship-timeline", dict(base), LONG_TIMEOUT),
+        ("POST /api/agent/character-arc", "/api/agent/character-arc", dict(base), LONG_TIMEOUT),
+        ("POST /api/agent/foreshadow-arcs", "/api/agent/foreshadow-arcs", dict(base), LONG_TIMEOUT),
+        ("POST /api/agent/subplot-weave", "/api/agent/subplot-weave", dict(base), LONG_TIMEOUT),
+        ("POST /api/agent/character-voice", "/api/agent/character-voice", {**base, "character": "诸葛亮"}, LONG_TIMEOUT),
     ]
 
     # 跳过已捕获成功的（增量重跑）
