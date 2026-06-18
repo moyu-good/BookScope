@@ -56,6 +56,7 @@ from bookscope.agent.concept_evolution import generate_concept_evolution
 from bookscope.agent.consistency_scan import generate_consistency_scan
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
+from bookscope.agent.foreshadow_arcs import generate_foreshadow_arcs
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.narrative_curve import generate_narrative_curve
@@ -100,6 +101,8 @@ from bookscope.api.schemas import (
     ConsistencyScanResponse,
     EntityRecallRequest,
     EntityRecallResponse,
+    ForeshadowArcsRequest,
+    ForeshadowArcsResponse,
     GraphEdge,
     MotifTrackingRequest,
     MotifTrackingResponse,
@@ -917,6 +920,68 @@ async def agent_narrative_curve(
     return NarrativeCurveResponse(
         chapters=chapters or [],
         scanned=chapters is not None,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/foreshadow-arcs", response_model=ForeshadowArcsResponse)
+async def agent_foreshadow_arcs(
+    request: ForeshadowArcsRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> ForeshadowArcsResponse:
+    """据整本书抽伏笔→回收弧线（WP-foreshadow-payoff-arcs，伏笔判定 exp-008 GO）。
+
+    整本进 context 让模型抽每条伏笔的埋点章 + 回收点章 + 两端原文，两端各过
+    verify_citations。埋点核不过的整条丢；回收点核不过 / 模型说没回收 = 断弧
+    （``status="dangling"``，埋了没回收，前端画灰虚线悬空）。只支持塞得进 context
+    的书；大书返空列表（``scanned=false``，前端提示重试）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    if not _book_fits_long_context(assembler):
+        return ForeshadowArcsResponse(
+            arcs=[], scanned=False, book_session_id=request.book_session_id
+        )
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    arcs = generate_foreshadow_arcs(
+        full_text=full_text,
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        session_id=request.book_session_id,
+    )
+    return ForeshadowArcsResponse(
+        arcs=arcs or [],
+        scanned=arcs is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )

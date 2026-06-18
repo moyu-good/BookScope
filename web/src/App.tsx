@@ -10,6 +10,7 @@ import { ConceptEvolution } from "./ConceptEvolution";
 import { ConsistencyScan } from "./ConsistencyScan";
 import { EntityRecall } from "./EntityRecall";
 import { ErrorBanner } from "./ErrorBanner";
+import { ForeshadowArcs } from "./ForeshadowArcs";
 import { NarrativeCurve } from "./NarrativeCurve";
 import { PacingCurve } from "./PacingCurve";
 import { Timeline } from "./Timeline";
@@ -667,6 +668,7 @@ export function App() {
     | "flow"
     | "reltime"
     | "chararc"
+    | "foreshadow"
     | "timeline"
     | "entity"
     | "pacing"
@@ -1291,6 +1293,21 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "foreshadow" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="伏笔回收"
+                  feature="foreshadow"
+                  subtitle="每条伏笔从埋点章拱到回收点章画一道弧——埋了没回收的画成灰虚线悬空，一眼挑出没填的坑，点弧看两端原文。"
+                />
+                <ForeshadowArcs
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "timeline" ? "" : "hidden"}>
                 <CanvasHeader
                   title="时间线"
@@ -1492,6 +1509,7 @@ type Mode =
   | "flow"
   | "reltime"
   | "chararc"
+  | "foreshadow"
   | "timeline"
   | "entity"
   | "pacing"
@@ -1511,6 +1529,7 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "reltime", label: "关系演变" },
   { id: "flow", label: "叙事流" },
   { id: "chararc", label: "人物弧线" },
+  { id: "foreshadow", label: "伏笔回收" },
   { id: "timeline", label: "时间线" },
   { id: "entity", label: "实体回溯" },
   { id: "recap", label: "前情回顾" },
@@ -1569,6 +1588,14 @@ function NavIcon({
         <circle cx="9" cy="7" r="1.2" />
         <circle cx="15" cy="12" r="1.2" />
         <path d="M3 20h18" />
+      </>
+    ),
+    foreshadow: (
+      <>
+        <path d="M4 18c0-6 12-6 12 0" />
+        <path d="M16 18c0-3 4-4 4-7" strokeDasharray="2 2" />
+        <circle cx="4" cy="18" r="1.4" />
+        <circle cx="16" cy="18" r="1.4" />
       </>
     ),
     timeline: (
@@ -1905,6 +1932,8 @@ const FEATURE_INFO: Record<string, string> = {
     "一个人 / 物 / 概念在全书每次出现的轨迹——在哪章、在做什么、原文为证。",
   recap: "读到第几章就回顾到第几章的前情要点——后文一个字都不剧透。",
   motif: "一个主题 / 母题在全书哪些地方复现、各处怎么体现，每处钉原文。",
+  foreshadow:
+    "每条伏笔从埋点章拱到回收点章画一道弧——埋了没回收的画成灰虚线悬空，一眼挑出没填的坑，点弧看两端原文。",
   pacing: "逐章的张力曲线——哪几章松（拖沓）、哪几章是高潮，点柱看依据。",
   narrative:
     "一道横轴叠四维——张力起落 + 情感正负 + 视角切换 + 主/支线，看出整本书是个什么形状，每章钉原文。",

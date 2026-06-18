@@ -447,6 +447,53 @@ class NarrativeCurveResponse(BaseModel):
     )
 
 
+class ForeshadowArcsRequest(BaseModel):
+    """POST /api/agent/foreshadow-arcs 请求体（伏笔→回收弧线图，WP-foreshadow-payoff-arcs）。
+
+    据整本书抽每条伏笔的埋点章 + 回收点章 + 两端原文，给前端画跨章 arc diagram。BYOK。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class ForeshadowArcsResponse(BaseModel):
+    """POST /api/agent/foreshadow-arcs 响应体。
+
+    ``arcs`` 是每条伏笔的埋点→回收配对，给前端画跨章弧线图：每条
+    ``{description, setup_chapter, payoff_chapter|null, setup_evidence, payoff_evidence,
+    status, setup_verified, payoff_verified, setup_match_score, payoff_match_score}``——
+    ``status="resolved"`` = 已回收实弧（两端都挂上原文）；``status="dangling"`` = 断弧
+    （埋了没回收，回收端 ``payoff_chapter`` 为 null、前端画灰虚线悬空）。埋点核不过的弧
+    已在 BE 滤掉（evidence-first：挂不上原文的伏笔不画）。
+    """
+
+    arcs: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "逐条伏笔弧，按 setup_chapter 排序。每条 {description:str, "
+            "setup_chapter:int, payoff_chapter:int|null, setup_evidence:str, "
+            "payoff_evidence:str, status:'resolved'|'dangling', setup_verified:bool, "
+            "payoff_verified:bool, setup_match_score:float, payoff_match_score:float}；"
+            "两端 evidence 过原文核验，status=dangling 是断弧（埋了没回收）。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否成功抽取。false=失败/书太大，前端提示重试；区别于扫过但空（scanned=true、空列表）。",
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class CharacterArcRequest(BaseModel):
     """POST /api/agent/character-arc 请求体（戏份/人物弧线曲线，WP-character-arc-curves）。
 
@@ -979,6 +1026,8 @@ __all__ = [
     "ConsistencyScanRequest",
     "ConsistencyScanResponse",
     "ErrorResponse",
+    "ForeshadowArcsRequest",
+    "ForeshadowArcsResponse",
     "GraphEdge",
     "HealthResponse",
     "NarrativeCurveRequest",
