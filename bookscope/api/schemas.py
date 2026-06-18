@@ -324,6 +324,63 @@ class CharacterFlowResponse(BaseModel):
     )
 
 
+class SubplotWeaveRequest(BaseModel):
+    """POST /api/agent/subplot-weave 请求体（支线编织图，WP-subplot-weave，probe GO）。
+
+    BYOK 同 CharacterFlowRequest——抽支线 + 逐章活跃 + 交汇也要调 LLM（整本进 context）。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；服务端不持久化。")
+    model: str | None = Field(default=None, description="覆盖默认 model（可选）。")
+    base_url: str | None = Field(
+        default=None, description="OpenAI 兼容 endpoint 覆盖（可选）。"
+    )
+
+
+class SubplotWeaveResponse(BaseModel):
+    """POST /api/agent/subplot-weave 响应体。
+
+    给前端画 braided narrative：每条支线一条横向泳道（``active_chapters`` 决定哪几章亮
+    实心点睛色、其余休眠灰断），两条支线同章交汇画一个连接节点。两组证据处理不同：
+
+    - ``subplots``：保留全部，``verified=false`` 的整条泳道前端淡化（支线判定是主观构念，
+      存在性描述留给读者自己核，不剔）。
+    - ``intersections``：BE 已双端 verify-filter（两条 evidence 都核验命中才保留），列表里
+      全是双端 verified——交汇是最易编的部分，一条腿站不住的不画（命根子，probe 守住的）。
+    """
+
+    subplots: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "情节支线列表（含主线）。每条 {name:str, active_chapters:[int], evidence:str, "
+            "verified:bool, match_score:float}；active_chapters 是这条支线活跃的章号（升序），"
+            "evidence 过原文核验，verified=false 的前端淡化（不剔）。"
+        ),
+    )
+    intersections: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "支线交汇点，按章号排序。每条 {subplots:[name,name], chapter:int, "
+            "a_evidence:str, b_evidence:str, a_verified:bool, b_verified:bool, "
+            "a_match_score:float, b_match_score:float}；BE 已双端 verify-filter，"
+            "全部 a_verified+b_verified（两端原文都核验命中才画交汇）。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否成功抽取。false=失败/书太大，前端提示重试；区别于扫过但空（scanned=true、空列表）。",
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class CheckCitationsRequest(BaseModel):
     """POST /api/agent/check-citations 请求体（claim precision，exp-015 GO）。
 
@@ -1113,6 +1170,8 @@ __all__ = [
     "ReviewDimensionScore",
     "SessionListResponse",
     "SessionMetadata",
+    "SubplotWeaveRequest",
+    "SubplotWeaveResponse",
     "SuggestQuestionsRequest",
     "SuggestQuestionsResponse",
     "TimelineRequest",

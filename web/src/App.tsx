@@ -32,6 +32,7 @@ import { RouteDecisionBanner } from "./RouteDecisionBanner";
 import { SealMark } from "./SealMark";
 import { StudyCards } from "./StudyCards";
 import { StyleIssues } from "./StyleIssues";
+import { SubplotWeave } from "./SubplotWeave";
 import { WritingTechnique } from "./WritingTechnique";
 import type {
   RouteDecisionState,
@@ -671,6 +672,7 @@ export function App() {
     | "chararc"
     | "charvoice"
     | "foreshadow"
+    | "subplot"
     | "timeline"
     | "entity"
     | "pacing"
@@ -1324,6 +1326,21 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "subplot" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="支线编织"
+                  feature="subplot"
+                  subtitle="每条情节支线一条横向泳道——活跃段亮、休眠段灰断，两条线同章交汇画连接节点。一眼看见哪条支线断更太久、哪几章是多线交汇的高潮，点活跃段 / 交汇看原文。"
+                />
+                <SubplotWeave
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "timeline" ? "" : "hidden"}>
                 <CanvasHeader
                   title="时间线"
@@ -1527,6 +1544,7 @@ type Mode =
   | "chararc"
   | "charvoice"
   | "foreshadow"
+  | "subplot"
   | "timeline"
   | "entity"
   | "pacing"
@@ -1548,6 +1566,7 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "chararc", label: "人物弧线" },
   { id: "charvoice", label: "声口一致" },
   { id: "foreshadow", label: "伏笔回收" },
+  { id: "subplot", label: "支线编织" },
   { id: "timeline", label: "时间线" },
   { id: "entity", label: "实体回溯" },
   { id: "recap", label: "前情回顾" },
@@ -1621,6 +1640,13 @@ function NavIcon({
         <path d="M16 18c0-3 4-4 4-7" strokeDasharray="2 2" />
         <circle cx="4" cy="18" r="1.4" />
         <circle cx="16" cy="18" r="1.4" />
+      </>
+    ),
+    subplot: (
+      <>
+        <path d="M3 8c5 0 5 8 10 8s5-8 8-8" />
+        <path d="M3 16c5 0 5-8 10-8s5 8 8 8" />
+        <circle cx="13" cy="12" r="1.5" />
       </>
     ),
     timeline: (
@@ -1959,6 +1985,8 @@ const FEATURE_INFO: Record<string, string> = {
   motif: "一个主题 / 母题在全书哪些地方复现、各处怎么体现，每处钉原文。",
   foreshadow:
     "每条伏笔从埋点章拱到回收点章画一道弧——埋了没回收的画成灰虚线悬空，一眼挑出没填的坑，点弧看两端原文。",
+  subplot:
+    "每条情节支线一条横向泳道——活跃段亮、休眠段灰断，两条线同章交汇画连接节点。一眼看见哪条支线断更太久、哪几章是多线交汇的高潮，点活跃段 / 交汇看两段勾连原文。",
   pacing: "逐章的张力曲线——哪几章松（拖沓）、哪几章是高潮，点柱看依据。",
   narrative:
     "一道横轴叠四维——张力起落 + 情感正负 + 视角切换 + 主/支线，看出整本书是个什么形状，每章钉原文。",

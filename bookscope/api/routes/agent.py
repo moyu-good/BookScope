@@ -67,6 +67,7 @@ from bookscope.agent.recap import generate_recap
 from bookscope.agent.relationship_timeline import generate_relationship_timeline
 from bookscope.agent.study_cards import generate_study_cards
 from bookscope.agent.style_issues import generate_style_issues
+from bookscope.agent.subplot_weave import generate_subplot_weave
 from bookscope.agent.suggested_questions import generate_book_questions
 from bookscope.agent.timeline import generate_timeline
 from bookscope.agent.writing_technique import generate_writing_technique
@@ -124,6 +125,8 @@ from bookscope.api.schemas import (
     StudyCardsResponse,
     StyleIssuesRequest,
     StyleIssuesResponse,
+    SubplotWeaveRequest,
+    SubplotWeaveResponse,
     SuggestQuestionsRequest,
     SuggestQuestionsResponse,
     TimelineRequest,
@@ -703,6 +706,72 @@ async def agent_character_flow(
     return CharacterFlowResponse(
         chapters=chapters or [],
         scanned=chapters is not None,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/subplot-weave", response_model=SubplotWeaveResponse)
+async def agent_subplot_weave(
+    request: SubplotWeaveRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> SubplotWeaveResponse:
+    """抽一本书的支线编织结构（支线 + 逐章活跃 + 交汇，WP-subplot-weave，probe GO）。
+
+    整本进 context 让模型抽情节支线、每条逐章活跃段、两条支线同章交汇。支线 evidence 过
+    verify_citations（核不过的整条泳道前端淡化，但仍画——支线是主观构念）；交汇双端证据都
+    过核验，**两端都命中才画交汇节点**（命根子：编的交汇被滤掉）。只支持塞得进 context 的
+    书；大书返空（``scanned=false``，前端提示重试）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    if not _book_fits_long_context(assembler):
+        return SubplotWeaveResponse(
+            subplots=[],
+            intersections=[],
+            scanned=False,
+            book_session_id=request.book_session_id,
+        )
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    weave = generate_subplot_weave(
+        full_text=full_text,
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        session_id=request.book_session_id,
+    )
+    return SubplotWeaveResponse(
+        subplots=(weave or {}).get("subplots", []),
+        intersections=(weave or {}).get("intersections", []),
+        scanned=weave is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
