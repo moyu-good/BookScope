@@ -5,7 +5,7 @@
 // 每阶段带章节 / 怎么发展 / 原文出处，核验过盖钤印（核验不过的已在后端丢）。近 EntityRecall。
 // ---------------------------------------------------------------------------
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
 
@@ -23,6 +23,8 @@ interface ConceptEvolutionProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  /** 从 agent 编排 drill-into 进来时预填的概念名 + 一个变化令牌，到了就自动跑一次。 */
+  prefill?: { value: string; token: number } | null;
 }
 
 export function ConceptEvolution({
@@ -31,6 +33,7 @@ export function ConceptEvolution({
   apiKey,
   model,
   baseUrl,
+  prefill,
 }: ConceptEvolutionProps) {
   const [concept, setConcept] = useState("");
   const [queried, setQueried] = useState<string | null>(null);
@@ -41,8 +44,20 @@ export function ConceptEvolution({
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [trace, setTrace] = useState<RunTrace | null>(null);
 
+  // drill-into：prefill 令牌变化时填入概念名并自动跑（apiKey 缺时只填不跑）。
+  useEffect(() => {
+    if (!prefill || !prefill.value.trim()) return;
+    setConcept(prefill.value);
+    if (apiKey) void loadFor(prefill.value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.token]);
+
   async function load() {
-    const c = concept.trim();
+    await loadFor(concept);
+  }
+
+  async function loadFor(raw: string) {
+    const c = raw.trim();
     if (!c) return;
     setLoading(true);
     setError(null);

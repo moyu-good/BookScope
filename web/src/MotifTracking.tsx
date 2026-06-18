@@ -5,7 +5,7 @@
 // 每处带章节 / 怎么体现 / 原文出处，核验过盖钤印（核验不过的已在后端丢）。近 ConceptEvolution。
 // ---------------------------------------------------------------------------
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
 
@@ -23,6 +23,8 @@ interface MotifTrackingProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  /** 从 agent 编排 drill-into 进来时预填的母题名 + 一个变化令牌，到了就自动跑一次。 */
+  prefill?: { value: string; token: number } | null;
 }
 
 export function MotifTracking({
@@ -31,6 +33,7 @@ export function MotifTracking({
   apiKey,
   model,
   baseUrl,
+  prefill,
 }: MotifTrackingProps) {
   const [motif, setMotif] = useState("");
   const [queried, setQueried] = useState<string | null>(null);
@@ -41,8 +44,20 @@ export function MotifTracking({
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [trace, setTrace] = useState<RunTrace | null>(null);
 
+  // drill-into：prefill 令牌变化时填入母题名并自动跑（apiKey 缺时只填不跑）。
+  useEffect(() => {
+    if (!prefill || !prefill.value.trim()) return;
+    setMotif(prefill.value);
+    if (apiKey) void loadFor(prefill.value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.token]);
+
   async function load() {
-    const m = motif.trim();
+    await loadFor(motif);
+  }
+
+  async function loadFor(raw: string) {
+    const m = raw.trim();
     if (!m) return;
     setLoading(true);
     setError(null);

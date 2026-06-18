@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BookShelf } from "./BookShelf";
 import type { SessionMetadata } from "./BookShelf";
+import { AgentOrchestrate } from "./AgentOrchestrate";
+import type { DrillInfo } from "./AgentOrchestrate";
 import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
@@ -722,6 +724,16 @@ export function App() {
     null,
   );
 
+  // 问书两条路：question=随便问（原 ask 路径，不动）；goal=给目标（agent 编排路径）
+  const [askMode, setAskMode] = useState<"question" | "goal">("question");
+
+  // drill-into：四个要参数的功能（实体回溯 / 概念演进 / 母题追踪 / 声口一致）
+  // 点「点开看完整 X 视图」时把参数预填进去并自动跑。token 每次递增触发那个视图的 effect。
+  const [entityPrefill, setEntityPrefill] = useState<{ value: string; token: number } | null>(null);
+  const [conceptPrefill, setConceptPrefill] = useState<{ value: string; token: number } | null>(null);
+  const [motifPrefill, setMotifPrefill] = useState<{ value: string; token: number } | null>(null);
+  const [voicePrefill, setVoicePrefill] = useState<{ value: string; token: number } | null>(null);
+
   // 问答区
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
@@ -869,6 +881,24 @@ export function App() {
 
   const handleAutoSelected = useCallback(() => {
     setPendingAutoSelectId(null);
+  }, []);
+
+  // drill-into：agent 编排某个 step → 跳进该功能的完整视图。要参数的功能（实体 / 概念 /
+  // 母题 / 声口）把参数预填进去并自动跑；不要参数的功能直接切过去（用户在那个视图点跑）。
+  const drillInto = useCallback((drill: DrillInfo) => {
+    const targetMode = FEATURE_TO_MODE[drill.feature];
+    if (!targetMode) return;
+    const prefillKey = FEATURE_PREFILL_KEY[drill.feature];
+    if (prefillKey) {
+      const value = (drill.params?.[prefillKey] ?? "").trim();
+      const next = { value, token: Date.now() };
+      if (drill.feature === "entity_recall") setEntityPrefill(next);
+      else if (drill.feature === "concept_evolution") setConceptPrefill(next);
+      else if (drill.feature === "motif") setMotifPrefill(next);
+      else if (drill.feature === "character_voice") setVoicePrefill(next);
+    }
+    setMode(targetMode);
+    setSidebarOpen(false);
   }, []);
 
   function effectiveBaseUrl(): string {
@@ -1210,39 +1240,56 @@ export function App() {
                   subtitle={`在读《${currentSession.book_title}》——带原文证据答深问题，没出处的结论一概不给。`}
                 />
                 <Onboarding type="first_upload" triggered={hasUploaded} />
-                <SuggestedQuestions
-                  bookTitle={currentSession.book_title}
-                  disabled={asking}
-                  onPick={(q) => setQuestion(q)}
-                  bookQuestions={bookQuestions}
-                  bookQuestionsLoading={bookQuestionsLoading}
-                  onGenerateBookQuestions={generateBookQuestions}
-                />
-                <AskForm
-                  question={question}
-                  setQuestion={setQuestion}
-                  asking={asking}
-                  onSubmit={handleAsk}
-                  canSubmit={!!question.trim() && !!apiKey}
-                />
-                {(asking ||
-                  progress.length > 0 ||
-                  routeDecision ||
-                  questionProcessed) && (
-                  <ProgressTimeline
-                    progress={progress}
-                    done={!asking}
-                    routeDecision={routeDecision}
-                    questionProcessed={questionProcessed}
-                    finalDurationMs={finalDurationMs}
+                {/* 随便问 ↔ 给目标：前者走原问答（不动）；后者让 agent 自己编排该跑哪几个分析 */}
+                {!DEMO && (
+                  <AskModeToggle mode={askMode} onChange={setAskMode} />
+                )}
+                {askMode === "question" || DEMO ? (
+                  <>
+                    <SuggestedQuestions
+                      bookTitle={currentSession.book_title}
+                      disabled={asking}
+                      onPick={(q) => setQuestion(q)}
+                      bookQuestions={bookQuestions}
+                      bookQuestionsLoading={bookQuestionsLoading}
+                      onGenerateBookQuestions={generateBookQuestions}
+                    />
+                    <AskForm
+                      question={question}
+                      setQuestion={setQuestion}
+                      asking={asking}
+                      onSubmit={handleAsk}
+                      canSubmit={!!question.trim() && !!apiKey}
+                    />
+                    {(asking ||
+                      progress.length > 0 ||
+                      routeDecision ||
+                      questionProcessed) && (
+                      <ProgressTimeline
+                        progress={progress}
+                        done={!asking}
+                        routeDecision={routeDecision}
+                        questionProcessed={questionProcessed}
+                        finalDurationMs={finalDurationMs}
+                      />
+                    )}
+                    {answer && <AnswerBlock answer={answer} />}
+                    <HistoryPanel
+                      bookSessionId={currentSession.session_id}
+                      onSelect={handleSelectHistory}
+                      refreshTrigger={historyRefresh}
+                    />
+                  </>
+                ) : (
+                  <AgentOrchestrate
+                    sessionId={currentSession.session_id}
+                    provider={provider}
+                    apiKey={apiKey}
+                    model={model.trim()}
+                    baseUrl={effectiveBaseUrl()}
+                    onDrill={drillInto}
                   />
                 )}
-                {answer && <AnswerBlock answer={answer} />}
-                <HistoryPanel
-                  bookSessionId={currentSession.session_id}
-                  onSelect={handleSelectHistory}
-                  refreshTrigger={historyRefresh}
-                />
               </div>
 
               <div className={mode === "annotate" ? "" : "hidden"}>
@@ -1326,6 +1373,7 @@ export function App() {
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
+                  prefill={voicePrefill}
                 />
               </div>
 
@@ -1386,6 +1434,7 @@ export function App() {
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
+                  prefill={entityPrefill}
                 />
               </div>
 
@@ -1416,6 +1465,7 @@ export function App() {
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
+                  prefill={motifPrefill}
                 />
               </div>
 
@@ -1491,6 +1541,7 @@ export function App() {
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
+                  prefill={conceptPrefill}
                 />
               </div>
 
@@ -1617,6 +1668,36 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "style", label: "文体体检" },
   { id: "revision", label: "改稿清单" },
 ];
+
+// agent 编排菜单的功能名（后端 orchestrate FEATURE_MENU 的键）→ App 的 mode。
+// drill-into 用：点「点开看完整 X 视图」时据功能名跳进左栏那个功能的完整视图。
+const FEATURE_TO_MODE: Record<string, Mode> = {
+  character_graph: "graph",
+  character_flow: "flow",
+  timeline: "timeline",
+  consistency: "consistency",
+  entity_recall: "entity",
+  concept_evolution: "concept",
+  motif: "motif",
+  argument_structure: "argument",
+  writing_technique: "technique",
+  study_cards: "cards",
+  style_issues: "style",
+  narrative_curve: "narrative",
+  relationship_timeline: "reltime",
+  character_arc: "chararc",
+  character_voice: "charvoice",
+  subplot_weave: "subplot",
+  foreshadow: "foreshadow",
+};
+
+// 哪些功能 drill 时要把参数预填进它的输入框（功能名 → params 里取哪个键）。
+const FEATURE_PREFILL_KEY: Record<string, "entity" | "concept" | "motif" | "character"> = {
+  entity_recall: "entity",
+  concept_evolution: "concept",
+  motif: "motif",
+  character_voice: "character",
+};
 
 // 细线 SVG 导航图标——不用 emoji、不引图标库
 function NavIcon({
@@ -2673,6 +2754,58 @@ function SuggestedQuestions(props: {
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+// 随便问 ↔ 给目标 的小切换。给目标 = 让 agent 自己规划该跑哪几个分析、串起来综合。
+function AskModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: "question" | "goal";
+  onChange: (m: "question" | "goal") => void;
+}) {
+  const tabs: { id: "question" | "goal"; label: string; hint: string }[] = [
+    { id: "question", label: "随便问", hint: "问一个具体问题" },
+    { id: "goal", label: "给目标", hint: "让 agent 编排着跑" },
+  ];
+  return (
+    <div className="mb-4">
+      <div
+        className="inline-flex rounded-md border p-0.5"
+        style={{ borderColor: "var(--color-rule)", background: "var(--color-surface)" }}
+        role="tablist"
+        aria-label="问书模式"
+      >
+        {tabs.map((t) => {
+          const active = mode === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onChange(t.id)}
+              className="px-3.5 py-1.5 rounded text-sm transition-colors"
+              style={
+                active
+                  ? { background: "var(--color-seal)", color: "white" }
+                  : { color: "var(--color-ink-muted)" }
+              }
+            >
+              <span style={{ fontFamily: "var(--font-display)", fontWeight: active ? 600 : 400 }}>
+                {t.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-[var(--color-ink-muted)] leading-relaxed">
+        {mode === "question"
+          ? "问一个具体问题，后端自动判要不要深查——这是原来的问书。"
+          : "说一个目标（不知道点哪个功能也行），agent 会自己挑该跑哪几个分析、串起来跑、综合成带原文证据的结论，每块还能点进完整视图。"}
+      </p>
     </div>
   );
 }

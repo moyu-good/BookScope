@@ -6,7 +6,7 @@
 // 与「全书透视」一键功能的区别：要先输实体名再跑。沿用时间线竖向样式 + SealMark。
 // ---------------------------------------------------------------------------
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
 
@@ -24,6 +24,8 @@ interface EntityRecallProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  /** 从 agent 编排 drill-into 进来时预填的实体名 + 一个变化令牌，到了就自动跑一次。 */
+  prefill?: { value: string; token: number } | null;
 }
 
 export function EntityRecall({
@@ -32,6 +34,7 @@ export function EntityRecall({
   apiKey,
   model,
   baseUrl,
+  prefill,
 }: EntityRecallProps) {
   const [entity, setEntity] = useState("");
   const [queried, setQueried] = useState<string | null>(null);
@@ -42,8 +45,20 @@ export function EntityRecall({
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [trace, setTrace] = useState<RunTrace | null>(null);
 
+  // drill-into：prefill 令牌变化时填入实体名并自动跑（apiKey 缺时只填不跑）。
+  useEffect(() => {
+    if (!prefill || !prefill.value.trim()) return;
+    setEntity(prefill.value);
+    if (apiKey) void loadFor(prefill.value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.token]);
+
   async function load() {
-    const e = entity.trim();
+    await loadFor(entity);
+  }
+
+  async function loadFor(raw: string) {
+    const e = raw.trim();
     if (!e) return;
     setLoading(true);
     setError(null);
