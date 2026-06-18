@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from bookscope.agent.citation_check import normalize_text
 from bookscope.agent.consistency_scan import generate_consistency_scan
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.foreshadow_arcs import generate_foreshadow_arcs
@@ -224,6 +225,41 @@ def _chapter_texts_for(
     ]
 
 
+def _tag_anchors(
+    annotations: list[dict[str, Any]],
+    chapters: list[dict[str, Any]],
+) -> None:
+    """给每条注释打 anchor：snippet 是它所属章原文的逐字子串就是 exact，否则 approx。
+
+    判逐字用 citation_check 的 normalize_text（去空白 + 全半角标点归一）——和系统其它
+    地方判"引用来自原文"同一把尺。所属章原文取不到时（理论上章号纠偏后总有）保守判
+    approx。跨章注释同理对 target_snippet 在 target_chapter 原文里判 target_anchor。
+
+    只有逐字可定位的（exact）才配在行间挂精确朱砂记号；转述类（approx）退批注栏，
+    免得转述句乱挂章首冒充精确位置（WP §35）。
+    """
+    # 章原文归一化只做一遍（chapters 是 _chapter_texts_for 拼好的，已含 target 章）
+    norm_by_chapter = {
+        c["chapter"]: normalize_text(c.get("text", "")) for c in chapters
+    }
+
+    def _judge(snippet: str | None, chapter: object) -> str:
+        if not snippet or not isinstance(chapter, int):
+            return "approx"
+        chap_text = norm_by_chapter.get(chapter)
+        if not chap_text:
+            return "approx"  # 拿不到所属章原文，保守判 approx
+        return "exact" if normalize_text(snippet) in chap_text else "approx"
+
+    for a in annotations:
+        a["anchor"] = _judge(a.get("snippet"), a.get("chapter"))
+        # 跨章注释：对 target_snippet 在 target_chapter 原文里判；无 target 留 None
+        if a.get("target_snippet") and a.get("target_chapter") is not None:
+            a["target_anchor"] = _judge(a.get("target_snippet"), a.get("target_chapter"))
+        else:
+            a["target_anchor"] = None
+
+
 def generate_annotations(
     *,
     layers: list[str],
@@ -255,7 +291,10 @@ def generate_annotations(
         ``{"annotations": [...], "chapters": [{"chapter", "text"}], "scanned": list[str]}``：
 
         - ``annotations``：按 ``(chapter, layer)`` 排序的注释列表，每条
-          ``{layer, type, chapter, snippet, summary, target_chapter|None, target_snippet|None}``。
+          ``{layer, type, chapter, snippet, summary, target_chapter|None, target_snippet|None,
+          anchor, target_anchor|None}``。``anchor`` = ``"exact"``（snippet 是所属章原文逐字
+          子串，可挂精确行间记号）/ ``"approx"``（转述类，退批注栏不进行间，WP §35）；
+          ``target_anchor`` 对跨章 ``target_snippet`` 同理判，无 target 为 ``None``。
         - ``chapters``：只含有注释牵涉到的章（含跨章 target 章）的原文，按章号排序。
         - ``scanned``：实际跑成功了的图层名列表（某层数据源抛错被跳过则不在其中）。
     """
@@ -297,6 +336,8 @@ def generate_annotations(
     # 按章号分组排序，同章内按图层名稳定排序（前端逐章渲染、章内逐条挂记号）。
     annotations.sort(key=lambda a: (a.get("chapter") or 0, a.get("layer", "")))
     chapters = _chapter_texts_for(annotations, chunks)
+    # chapters 拼好后才有所属章原文，这时给每条注释打 anchor（exact / approx，WP §35）
+    _tag_anchors(annotations, chapters)
     return {"annotations": annotations, "chapters": chapters, "scanned": scanned}
 
 

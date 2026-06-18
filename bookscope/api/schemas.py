@@ -1075,8 +1075,11 @@ class AnnotationsResponse(BaseModel):
         default_factory=list,
         description=(
             "行间注释，按 (chapter, layer) 排序。每条 {layer:str, type:str, chapter:int, "
-            "snippet:str, summary:str, target_chapter:int|null, target_snippet:str|null}；"
-            "snippet 是该注释挂的原文逐字片段（已核验），跨章类的 target_* 指向另一处。"
+            "snippet:str, summary:str, target_chapter:int|null, target_snippet:str|null, "
+            "anchor:str, target_anchor:str|null}；snippet 是该注释挂的原文片段（已核验），"
+            "跨章类的 target_* 指向另一处。anchor='exact' 表示 snippet 是所属章原文的逐字"
+            "子串、可挂精确行间记号；'approx' 表示转述类、退批注栏不进行间（WP §35）。"
+            "target_anchor 对跨章 target_snippet 同理判，无 target 为 null。"
         ),
     )
     chapters: list[dict] = Field(

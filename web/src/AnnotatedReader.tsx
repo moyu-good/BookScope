@@ -23,6 +23,9 @@ interface Annotation {
   summary: string;
   target_chapter: number | null;
   target_snippet: string | null;
+  // 逐字可定位（exact）才挂行间朱砂记号；转述类（approx）退章末批注、不进行间（WP §35）
+  anchor: "exact" | "approx";
+  target_anchor: "exact" | "approx" | null;
 }
 
 interface ChapterText {
@@ -382,9 +385,12 @@ function LayerToggles({
 // ---------------------------------------------------------------------------
 // 一章原文 + 行间记号
 //
-// 把章原文按段（双换行 / 单换行）切，每段定位它命中的注释——snippet 归一化后是
-// 该段归一化文本的子串就算落在这段。段尾挂记号（密度超上限折叠成「本段 N 条」）。
-// 定位不到段的注释兜底挂到章首段，绝不丢（evidence-first：每条都点得开）。
+// 行间只挂逐字可定位（anchor==="exact"）的注释：把章原文按段（双换行 / 单换行）切，
+// 每段定位它命中的注释——snippet 归一化后是该段归一化文本的子串就算落在这段。段尾挂
+// 记号（密度超上限折叠成「本段 N 条」）。
+//
+// 转述类（anchor==="approx"）不进行间——收进章末一个可折叠区「本章另有 N 条非逐字批注」，
+// 点开走同一个批注栏看内容 + 原文证据，免得转述句乱挂章首冒充精确位置（WP §35）。
 // ---------------------------------------------------------------------------
 function ChapterBody({
   text,
@@ -402,12 +408,23 @@ function ChapterBody({
     return split.length > 0 ? split : [text];
   }, [text]);
 
-  // 每段对应哪些注释（按 snippet 子串定位）；定位不到的注释收集起来挂章首段。
+  // 先按 anchor 分流：exact 进行间定位，approx 退章末批注区。
+  const { exact, approx } = useMemo(() => {
+    const ex: { a: Annotation; i: number }[] = [];
+    const ap: { a: Annotation; i: number }[] = [];
+    for (const item of annotations) {
+      if (item.a.anchor === "exact") ex.push(item);
+      else ap.push(item);
+    }
+    return { exact: ex, approx: ap };
+  }, [annotations]);
+
+  // 逐字注释每段对应哪些（按 snippet 子串定位）；定位不到的兜底挂章首段。
   const { perPara } = useMemo(() => {
     const buckets: { a: Annotation; i: number }[][] = paras.map(() => []);
     const normParas = paras.map(norm);
     const unplaced: { a: Annotation; i: number }[] = [];
-    for (const item of annotations) {
+    for (const item of exact) {
       const needle = norm(item.a.snippet);
       let placed = false;
       if (needle.length >= 2) {
@@ -424,7 +441,7 @@ function ChapterBody({
     // 定位不到的兜底挂到首段（仍点得开）
     if (unplaced.length > 0 && buckets.length > 0) buckets[0].push(...unplaced);
     return { perPara: buckets };
-  }, [paras, annotations]);
+  }, [paras, exact]);
 
   return (
     <div
@@ -441,6 +458,61 @@ function ChapterBody({
           />
         </p>
       ))}
+      <ApproxNotes items={approx} selected={selected} onSelect={onSelect} />
+    </div>
+  );
+}
+
+// 章末「本章另有 N 条非逐字批注」可折叠区——转述类注释退到这里，点开走同一个批注栏。
+function ApproxNotes({
+  items,
+  selected,
+  onSelect,
+}: {
+  items: { a: Annotation; i: number }[];
+  selected: number | null;
+  onSelect: (i: number | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-dashed border-[var(--color-rule)]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+      >
+        {open ? "收起" : "展开"}本章另有 {items.length} 条非逐字批注（无法精确定位行间，点开看内容 + 原文证据）
+      </button>
+      {open && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {items.map(({ a, i }) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onSelect(selected === i ? null : i)}
+              className="text-[11px] px-2 py-0.5 rounded border transition-colors"
+              style={
+                selected === i
+                  ? {
+                      background: "var(--color-seal-soft)",
+                      borderColor: "var(--color-seal)",
+                      color: "var(--color-seal)",
+                    }
+                  : {
+                      background: "var(--color-paper)",
+                      borderColor: "var(--color-rule)",
+                      color: "var(--color-ink-muted)",
+                    }
+              }
+              title={a.summary || a.snippet}
+            >
+              {a.type}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

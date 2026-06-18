@@ -64,6 +64,9 @@ def test_foreshadow_resolved_arc_maps_with_target(monkeypatch):
     assert a["snippet"] == "墙角断剑落满灰尘"
     assert a["target_chapter"] == 9
     assert a["target_snippet"] == "少年拔起断剑认主"
+    # 两侧都是所属章原文的逐字子串 → anchor / target_anchor 都 exact
+    assert a["anchor"] == "exact"
+    assert a["target_anchor"] == "exact"
     # chapters：埋点章 + 回收章都返
     assert [c["chapter"] for c in r["chapters"]] == [2, 9]
 
@@ -85,7 +88,40 @@ def test_foreshadow_dangling_arc_no_target(monkeypatch):
     assert a["chapter"] == 4
     assert a["target_chapter"] is None
     assert a["target_snippet"] is None
+    # 逐字命中第四章原文 → exact；没 target → target_anchor 为 None
+    assert a["anchor"] == "exact"
+    assert a["target_anchor"] is None
     assert [c["chapter"] for c in r["chapters"]] == [4]
+
+
+def test_anchor_approx_when_snippet_not_verbatim_in_chapter(monkeypatch):
+    """snippet 不是所属章原文的逐字子串（转述）→ anchor=approx，不冒充精确位置。"""
+    _no_llm(monkeypatch)
+    monkeypatch.setattr(ann, "generate_foreshadow_arcs", lambda **_: [
+        {
+            # setup_evidence 是转述、不是第二章原文逐字（原文是"墙角断剑落满灰尘"）
+            "description": "断剑转述", "setup_chapter": 2, "payoff_chapter": None,
+            "setup_evidence": "墙角有一柄落灰的断剑", "payoff_evidence": "",
+            "status": "dangling", "setup_verified": True, "payoff_verified": False,
+            "setup_match_score": 0.7, "payoff_match_score": 0.0,
+        },
+    ])
+    r = _run(["foreshadow"])
+    a = r["annotations"][0]
+    assert a["chapter"] == 2
+    assert a["anchor"] == "approx"  # 退批注栏，不进行间
+
+
+def test_anchor_exact_handles_fullwidth_and_whitespace(monkeypatch):
+    """逐字判定走 normalize_text：全半角标点差异 + 空白差异不该让 exact 退成 approx。"""
+    _no_llm(monkeypatch)
+    monkeypatch.setattr(ann, "generate_motif_tracking", lambda **_: [
+        # 原文"墙角断剑落满灰尘"，这里掺空白；只要归一化后是逐字子串就算 exact
+        {"order": 1, "chapter": 2, "manifestation": "x",
+         "snippet": "墙角断剑 落满灰尘", "verified": True},
+    ])
+    r = _run(["motif"], motif="断剑")
+    assert r["annotations"][0]["anchor"] == "exact"
 
 
 def test_foreshadow_failure_returns_no_annotations(monkeypatch):
@@ -116,6 +152,26 @@ def test_contradiction_maps_both_sides(monkeypatch):
     assert a["target_chapter"] == 9
     assert a["target_snippet"] == "少年拔起断剑认主"
     assert a["summary"] == "第2章说断剑无主、第9章说认主"
+    # 两侧都逐字命中各自章原文
+    assert a["anchor"] == "exact"
+    assert a["target_anchor"] == "exact"
+
+
+def test_target_anchor_approx_when_target_not_verbatim(monkeypatch):
+    """跨章 target_snippet 不是 target 章原文逐字 → target_anchor=approx（独立于 anchor）。"""
+    _no_llm(monkeypatch)
+    monkeypatch.setattr(ann, "generate_consistency_scan", lambda **_: [
+        {
+            "topic": "x", "conflict": "y",
+            # a 侧逐字命中第二章，b 侧是第九章原文的转述（原文"少年拔起断剑认主"）
+            "a": {"snippet": "墙角断剑落满灰尘", "chapter": 2, "verified": True},
+            "b": {"snippet": "那少年把断剑拔起来认了主", "chapter": 9, "verified": True},
+        },
+    ])
+    r = _run(["contradiction"])
+    a = r["annotations"][0]
+    assert a["anchor"] == "exact"
+    assert a["target_anchor"] == "approx"
 
 
 def test_contradiction_drops_unverified_side(monkeypatch):
