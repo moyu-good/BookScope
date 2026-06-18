@@ -1100,6 +1100,30 @@ class AnnotationsResponse(BaseModel):
     )
 
 
+class OrchestrateRequest(BaseModel):
+    """POST /api/agent/orchestrate 请求体（agent 模式，WP-agent-mode §10）。
+
+    用户说一个自然语言目标，编排器规划该跑哪几个已有分析、串起来跑、综合成带原文
+    证据的回答。BYOK 同 AgentAskRequest。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    goal: str = Field(
+        ...,
+        min_length=1,
+        max_length=2000,
+        description="自然语言分析目标（如「这本书伏笔铺得怎么样」「这书在论证什么、证据扎不扎实」）。",
+    )
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；服务端不持久化。")
+    model: str | None = Field(default=None, description="覆盖默认 model（可选）。")
+    base_url: str | None = Field(
+        default=None, description="OpenAI 兼容 endpoint 覆盖（可选）。"
+    )
+
+
 class HealthResponse(BaseModel):
     """GET /api/health 响应体。"""
 
@@ -1232,6 +1256,7 @@ __all__ = [
     "HealthResponse",
     "NarrativeCurveRequest",
     "NarrativeCurveResponse",
+    "OrchestrateRequest",
     "PacingCurveRequest",
     "PacingCurveResponse",
     "PreviousReviewHint",

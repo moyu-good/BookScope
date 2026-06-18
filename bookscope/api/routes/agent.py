@@ -62,6 +62,7 @@ from bookscope.agent.foreshadow_arcs import generate_foreshadow_arcs
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.narrative_curve import generate_narrative_curve
+from bookscope.agent.orchestrate import orchestrate
 from bookscope.agent.pacing_curve import generate_pacing_curve
 from bookscope.agent.question_processor import rewrite_followup
 from bookscope.agent.recap import generate_recap
@@ -115,6 +116,7 @@ from bookscope.api.schemas import (
     MotifTrackingResponse,
     NarrativeCurveRequest,
     NarrativeCurveResponse,
+    OrchestrateRequest,
     PacingCurveRequest,
     PacingCurveResponse,
     PreviousReviewHint,
@@ -555,6 +557,150 @@ async def agent_ask_stream(
             "X-Accel-Buffering": "no",  # 让 nginx 类反代关闭缓冲
         },
     )
+
+
+@agent_router.post("/agent/orchestrate")
+async def agent_orchestrate(
+    request: OrchestrateRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> StreamingResponse:
+    """agent 模式：说目标 → 编排已有分析 → 综合（WP-agent-mode §10），SSE 流式。
+
+    三步（全在 :func:`bookscope.agent.orchestrate.orchestrate` 里，本端点只搭基建）：
+    规划（一次 LLM 挑功能）→ 跑（调对应 generate_* 收已核验发现，复用不造新分析）→
+    综合（一次 LLM 据发现写带原文证据的回答）。evidence-first：综合每条结论挂得到原文。
+
+    SSE 事件序列（``event: <type>\\ndata: <json>\\n\\n``）：
+
+    - ``plan``：规划挑了哪几个功能 + why
+    - ``step``：每个功能跑完一帧（功能名 + 一句话结果 + drill 信息，前端据此点进完整视图）
+    - ``synthesis``：综合文 + citations（每条指回某条已核验发现）
+    - ``done``：收尾帧，带 trace（token 用量 / 耗时，口径同其它端点）
+    - ``error``：出错帧
+
+    Setup-time 错误（session 不存在 / 书太大 / SDK 缺失）走 HTTPException——SSE 头未发，
+    客户端能收到正常状态码。只支持塞得进 context 的书（编排的整本功能都要长上下文）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    if not _book_fits_long_context(assembler):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_type": "BookTooLargeForOrchestrate",
+                "message": (
+                    "这本书太大，暂不支持 agent 模式——编排要把整本书进上下文，"
+                    "超大书（如几百万字）目前走不了。可以直接用单个分析功能。"
+                ),
+                "details": None,
+            },
+        )
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+
+    queue: asyncio.Queue[dict | object] = asyncio.Queue(maxsize=200)
+    done_sentinel = object()
+    asyncio_loop = asyncio.get_running_loop()
+
+    def _safe_put(item: Any) -> None:
+        try:
+            queue.put_nowait(item)
+        except asyncio.QueueFull:
+            logger.warning("orchestrate SSE event queue full; dropping event")
+
+    def on_event(event: dict) -> None:
+        # orchestrate 跑在 worker thread；call_soon_threadsafe 跨线程入队
+        asyncio_loop.call_soon_threadsafe(_safe_put, event)
+
+    def run_in_thread_target() -> None:
+        _t0 = time.monotonic()
+        try:
+            orchestrate(
+                goal=request.goal,
+                full_text=full_text,
+                chunks=chunks,
+                llm_client=rec,
+                model=model,
+                session_id=request.book_session_id,
+                on_event=on_event,
+            )
+        except Exception as exc:  # noqa: BLE001 — 整体失败 emit error 帧
+            logger.warning(
+                "orchestrate raised %s: %s", type(exc).__name__, exc
+            )
+            on_event({
+                "type": "error",
+                "message": f"{type(exc).__name__}: {exc}",
+            })
+            return
+        # 正常收尾：补一帧 done 带 trace（口径同其它端点）
+        on_event({"type": "done", "trace": _run_trace(rec, full_text, _t0)})
+
+    async def run_orchestrate_in_thread() -> None:
+        try:
+            await asyncio.to_thread(run_in_thread_target)
+        finally:
+            asyncio_loop.call_soon_threadsafe(_safe_put, done_sentinel)
+
+    task = asyncio.create_task(run_orchestrate_in_thread())
+
+    async def event_generator() -> Any:
+        try:
+            while True:
+                item = await queue.get()
+                if item is done_sentinel:
+                    break
+                yield _format_sse_dict(item)  # type: ignore[arg-type]
+        finally:
+            if not task.done():
+                pass
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+def _format_sse_dict(event: dict) -> str:
+    """把 orchestrate 的 dict 事件编码成一帧 SSE。
+
+    格式同 ``_format_sse``：``event: <type>\\ndata: <json>\\n\\n``。事件的 ``type``
+    字段当 SSE event 名（plan / step / synthesis / done / error）；``data`` 是整个
+    事件 dict 的单行 JSON（``ensure_ascii=False`` 保中文可读）。
+    """
+    event_name = str(event.get("type", "message"))
+    payload = json.dumps(event, ensure_ascii=False)
+    return f"event: {event_name}\ndata: {payload}\n\n"
 
 
 def _format_sse(event: LoopEvent) -> str:
