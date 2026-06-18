@@ -339,6 +339,8 @@ def main() -> None:
         ("POST /api/agent/foreshadow-arcs", "/api/agent/foreshadow-arcs", dict(base), LONG_TIMEOUT),
         ("POST /api/agent/subplot-weave", "/api/agent/subplot-weave", dict(base), LONG_TIMEOUT),
         ("POST /api/agent/character-voice", "/api/agent/character-voice", {**base, "character": "诸葛亮"}, LONG_TIMEOUT),
+        # —— #7 精读注释层:编排已有源端点,默认伏笔+矛盾两层 ——
+        ("POST /api/agent/annotations", "/api/agent/annotations", {**base, "layers": ["foreshadow", "contradiction"]}, LONG_TIMEOUT),
     ]
 
     # 跳过已捕获成功的（增量重跑）
