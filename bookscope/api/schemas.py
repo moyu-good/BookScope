@@ -1031,6 +1031,72 @@ class StudyCardsResponse(BaseModel):
     )
 
 
+class AnnotationsRequest(BaseModel):
+    """POST /api/agent/annotations 请求体（精读注释层，WP-annotated-reading）。
+
+    按选中的 ``layers`` 编排已有整本书分析、把已核验结论摆成行间注释。BYOK。
+    ``entity`` / ``motif`` 仅在对应图层选中时需要——没选那一层不必传。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    layers: list[str] = Field(
+        default_factory=lambda: ["foreshadow", "contradiction"],
+        description=(
+            "想看的注释图层子集，取值 'foreshadow' / 'motif' / 'contradiction' / "
+            "'entity'。默认只开伏笔 + 矛盾两层（治'糊一脸' + 控延迟）；未知名忽略。"
+        ),
+    )
+    entity: str | None = Field(
+        default=None,
+        max_length=100,
+        description="选 'entity' 图层时要回溯的实体名；没选那层可不传。",
+    )
+    motif: str | None = Field(
+        default=None,
+        max_length=100,
+        description="选 'motif' 图层时要追踪的母题名；没选那层可不传。",
+    )
+    provider: Literal["deepseek", "anthropic"] = Field(default="deepseek")
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class AnnotationsResponse(BaseModel):
+    """POST /api/agent/annotations 响应体。
+
+    ``annotations`` 是贴回原文行间的注释，每条由某个已建分析的一条**已核验**结论生成——
+    verified=false 的不进（evidence-first，阅读视图里直接不出现）。跨章类（伏笔回收、设定
+    矛盾）带 ``target_chapter`` / ``target_snippet`` 指向它牵连的另一处。``chapters`` 只含
+    有注释牵涉到的章（含跨章 target 章）的原文，给阅读视图连续滚动显示。
+    """
+
+    annotations: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "行间注释，按 (chapter, layer) 排序。每条 {layer:str, type:str, chapter:int, "
+            "snippet:str, summary:str, target_chapter:int|null, target_snippet:str|null}；"
+            "snippet 是该注释挂的原文逐字片段（已核验），跨章类的 target_* 指向另一处。"
+        ),
+    )
+    chapters: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "有注释牵涉到的章的原文，每条 {chapter:int, text:str}，按章号排序。"
+            "只返有注释的章（含跨章 target 章），有界、demo 友好。"
+        ),
+    )
+    scanned: list[str] = Field(
+        default_factory=list,
+        description="实际跑成功的图层名列表；某层数据源失败被跳过则不在其中。",
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class HealthResponse(BaseModel):
     """GET /api/health 响应体。"""
 
@@ -1141,6 +1207,8 @@ class ErrorResponse(BaseModel):
 __all__ = [
     "AgentAskRequest",
     "AgentAskResponse",
+    "AnnotationsRequest",
+    "AnnotationsResponse",
     "BookUploadResponse",
     "CharacterArcRequest",
     "CharacterArcResponse",

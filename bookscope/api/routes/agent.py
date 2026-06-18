@@ -46,6 +46,7 @@ from bookscope.agent import (
     route_question,
     run_fast_path,
 )
+from bookscope.agent.annotations import generate_annotations
 from bookscope.agent.argument_structure import generate_argument_structure
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.character_arc import generate_character_arc
@@ -87,6 +88,8 @@ from bookscope.api.dependencies import (
 from bookscope.api.schemas import (
     AgentAskRequest,
     AgentAskResponse,
+    AnnotationsRequest,
+    AnnotationsResponse,
     ArgumentStructureRequest,
     ArgumentStructureResponse,
     CharacterArcRequest,
@@ -1882,6 +1885,76 @@ async def agent_study_cards(
     return StudyCardsResponse(
         cards=cards or [],
         scanned=cards is not None,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/annotations", response_model=AnnotationsResponse)
+async def agent_annotations(
+    request: AnnotationsRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> AnnotationsResponse:
+    """精读注释层（WP-annotated-reading）——把已有分析按原文位置摆成行间注释。
+
+    **不跑新 LLM 抽取**：按选中的 ``layers`` 调已建的整本书分析当数据源（foreshadow /
+    motif / contradiction / entity），收**已核验**的结论映射成注释，verified=false 的
+    一律不进（evidence-first）。同时重建有注释那些章的原文供阅读视图显示。只支持塞得进
+    context 的书；大书返空（``scanned=[]``，前端提示重试）。v1 按选中 layer 现跑对应源
+    （每个整本、几分钟），多 layer 会慢——已知 v1 限制。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    if not _book_fits_long_context(assembler):
+        return AnnotationsResponse(
+            annotations=[],
+            chapters=[],
+            scanned=[],
+            book_session_id=request.book_session_id,
+        )
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = generate_annotations(
+        layers=request.layers,
+        full_text=full_text,
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        entity=request.entity,
+        motif=request.motif,
+        session_id=request.book_session_id,
+    )
+    return AnnotationsResponse(
+        annotations=result["annotations"],
+        chapters=result["chapters"],
+        scanned=result["scanned"],
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )

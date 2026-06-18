@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BookShelf } from "./BookShelf";
 import type { SessionMetadata } from "./BookShelf";
+import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
 import { CharacterFlow } from "./CharacterFlow";
@@ -667,6 +668,7 @@ export function App() {
   const [mode, setMode] = useState<
     | "library"
     | "ask"
+    | "annotate"
     | "graph"
     | "flow"
     | "reltime"
@@ -1243,6 +1245,20 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "annotate" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="精读"
+                  subtitle="读原文本身——读到某处行间浮一条带原文证据的批注（这里埋了伏笔、这句和别章矛盾、某母题又一次复现）。选要哪几层，点朱砂记号看批注 + 原文，跨章批注一键跳到它牵连的另一处。"
+                />
+                <AnnotatedReader
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "graph" ? "" : "hidden"}>
                 <CanvasHeader
                   title="关系图"
@@ -1555,6 +1571,7 @@ export function App() {
 type Mode =
   | "library"
   | "ask"
+  | "annotate"
   | "graph"
   | "flow"
   | "reltime"
@@ -1578,6 +1595,7 @@ type Mode =
 
 const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "ask", label: "问书" },
+  { id: "annotate", label: "精读" },
   { id: "graph", label: "关系图" },
   { id: "reltime", label: "关系演变" },
   { id: "flow", label: "叙事流" },
@@ -1613,6 +1631,13 @@ function NavIcon({
       <>
         <path d="M5 5h14v10H10l-4 4v-4H5z" />
         <path d="M9 9h6M9 12h4" />
+      </>
+    ),
+    annotate: (
+      <>
+        <path d="M4 4h9l3 3v13H4z" />
+        <path d="M7 9h5M7 12h6M7 15h4" />
+        <circle cx="17.5" cy="6.5" r="2.5" />
       </>
     ),
     graph: (
