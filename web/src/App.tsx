@@ -646,6 +646,27 @@ function savePersistedConfig(config: PersistedConfig): void {
   }
 }
 
+// 自动建议开关持久化——单独存一个布尔，默认开（没存过 / 解析失败都按开）。
+const AUTO_SUGGEST_STORAGE_KEY = "bookscope_auto_suggest_v1";
+
+function loadAutoSuggest(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(AUTO_SUGGEST_STORAGE_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function saveAutoSuggest(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(AUTO_SUGGEST_STORAGE_KEY, enabled ? "1" : "0");
+  } catch {
+    // 隐私模式 / 配额满 / SSR ——失败默默忽略
+  }
+}
+
 export function App() {
   // 配置区 —— 从 localStorage 恢复，刷新页面不丢
   const persisted = loadPersistedConfig();
@@ -726,6 +747,18 @@ export function App() {
 
   // 问书两条路：question=随便问（原 ask 路径，不动）；goal=给目标（agent 编排路径）
   const [askMode, setAskMode] = useState<"question" | "goal">("question");
+  // 互相递：从功能视图「把它跟别的维度串起来看」过来时，给 AgentOrchestrate 预填的目标 + 令牌。
+  const [goalPrefill, setGoalPrefill] = useState<{ goal: string; token: number } | null>(null);
+  // 自动建议总开关（默认开、可关），持久化到 localStorage。
+  const [autoSuggestEnabled, setAutoSuggestEnabled] = useState<boolean>(loadAutoSuggest);
+  useEffect(() => {
+    saveAutoSuggest(autoSuggestEnabled);
+  }, [autoSuggestEnabled]);
+  // 本书这次会话点过的不同功能（≥3 个就提示通盘检查）；换书清空。
+  const [visitedFeatures, setVisitedFeatures] = useState<Set<Mode>>(new Set());
+  // 两类自动建议各自的「这次会话先别再提」标记——关掉一次后这次会话不再弹同一类。
+  const [dismissedSweepHint, setDismissedSweepHint] = useState(false);
+  const [dismissedOpenHint, setDismissedOpenHint] = useState(false);
 
   // drill-into：四个要参数的功能（实体回溯 / 概念演进 / 母题追踪 / 声口一致）
   // 点「点开看完整 X 视图」时把参数预填进去并自动跑。token 每次递增触发那个视图的 effect。
@@ -759,7 +792,23 @@ export function App() {
   const [bookQuestionsLoading, setBookQuestionsLoading] = useState(false);
   useEffect(() => {
     setBookQuestions([]);
+    // 换书：通盘检查的足迹和两类建议的「这次别再提」标记都清空，重新开始。
+    setVisitedFeatures(new Set());
+    setDismissedSweepHint(false);
+    setDismissedOpenHint(false);
   }, [currentSession?.session_id]);
+
+  // 通盘检查足迹：每切到一个分析功能视图就记一笔（「问书」「书库」不算分析维度）。
+  useEffect(() => {
+    if (!currentSession) return;
+    if (mode === "ask" || mode === "library") return;
+    setVisitedFeatures((prev) => {
+      if (prev.has(mode)) return prev;
+      const next = new Set(prev);
+      next.add(mode);
+      return next;
+    });
+  }, [mode, currentSession]);
 
   // Onboarding 触发追踪：仅本次会话感知"是不是刚发生过"
   const [hasUploaded, setHasUploaded] = useState(false);
@@ -899,6 +948,16 @@ export function App() {
     }
     setMode(targetMode);
     setSidebarOpen(false);
+  }, []);
+
+  // 互相递 + 自动建议共用：带一个目标切到问书「给目标」模式并自动编排一次。
+  const relayToGoal = useCallback((goal: string) => {
+    const g = goal.trim();
+    if (!g) return;
+    setMode("ask");
+    setAskMode("goal");
+    setSidebarOpen(false);
+    setGoalPrefill({ goal: g, token: Date.now() });
   }, []);
 
   function effectiveBaseUrl(): string {
@@ -1143,6 +1202,8 @@ export function App() {
               setModel={setModel}
               baseUrl={baseUrl}
               setBaseUrl={setBaseUrl}
+              autoSuggestEnabled={autoSuggestEnabled}
+              setAutoSuggestEnabled={setAutoSuggestEnabled}
               onClose={() => setSettingsOpen(false)}
             />
           )}
@@ -1246,6 +1307,23 @@ export function App() {
                 )}
                 {askMode === "question" || DEMO ? (
                   <>
+                    {/* 自动建议·通盘检查：连点 ≥3 个不同功能、像在通盘审 → 温和提示编排总览 */}
+                    {!DEMO &&
+                      autoSuggestEnabled &&
+                      !dismissedSweepHint &&
+                      visitedFeatures.size >= 3 &&
+                      !asking && (
+                        <AgentSuggestHint
+                          text="看着像在做通盘检查——要不要我编排一遍、给你一份带原文证据的总览？"
+                          actionLabel="让 agent 编排总览"
+                          onAccept={() =>
+                            relayToGoal(
+                              "把这本书通盘审一遍：人物、关系、节奏、伏笔、设定一致性这些维度串起来，给我一份带原文证据的总览。",
+                            )
+                          }
+                          onDismiss={() => setDismissedSweepHint(true)}
+                        />
+                      )}
                     <SuggestedQuestions
                       bookTitle={currentSession.book_title}
                       disabled={asking}
@@ -1261,6 +1339,20 @@ export function App() {
                       onSubmit={handleAsk}
                       canSubmit={!!question.trim() && !!apiKey}
                     />
+                    {/* 自动建议·开放问法：当前问题像开放 / 跨维度 → 提示切「给目标」编排着跑 */}
+                    {!DEMO &&
+                      autoSuggestEnabled &&
+                      !dismissedOpenHint &&
+                      !asking &&
+                      !answer &&
+                      looksCrossDimensional(question) && (
+                        <AgentSuggestHint
+                          text="这问题挺开放的——要不要我规划着把相关的几个分析串起来跑、综合给你？"
+                          actionLabel="切到「给目标」编排"
+                          onAccept={() => relayToGoal(question)}
+                          onDismiss={() => setDismissedOpenHint(true)}
+                        />
+                      )}
                     {(asking ||
                       progress.length > 0 ||
                       routeDecision ||
@@ -1288,9 +1380,18 @@ export function App() {
                     model={model.trim()}
                     baseUrl={effectiveBaseUrl()}
                     onDrill={drillInto}
+                    prefill={goalPrefill}
                   />
                 )}
               </div>
+
+              {/* 互相递：在某个功能视图角落给一个轻入口，把它跟别的维度串起来看（升 agent）。
+                  单独渲染一次、据当前 mode 决定显不显，避免 22 个视图各塞一份。 */}
+              {!DEMO && CROSS_DIM_GOAL[mode] && (
+                <CrossDimRelay
+                  onRelay={() => relayToGoal(CROSS_DIM_GOAL[mode]!)}
+                />
+              )}
 
               <div className={mode === "annotate" ? "" : "hidden"}>
                 <CanvasHeader
@@ -1698,6 +1799,55 @@ const FEATURE_PREFILL_KEY: Record<string, "entity" | "concept" | "motif" | "char
   motif: "motif",
   character_voice: "character",
 };
+
+// 互相递（按钮视图 → agent）：每个功能视图角落「把它跟别的维度串起来看」预填的目标。
+// 按当前功能给一句合理的跨维度目标——让 agent 把这件事跟相关的几个维度串起来综合。
+// 没列进来的功能（如「问书」本身、「改稿清单」这种已经是综合视图的）不给互相递入口。
+const CROSS_DIM_GOAL: Partial<Record<Mode, string>> = {
+  graph: "把人物关系跟它随时间的演变、各人的戏份起落串起来，看这本书的人物网是怎么长成现在这样的。",
+  reltime: "把人物关系随时间的演变跟整体关系网、节奏起伏串起来，看哪几章是关系的转折点。",
+  flow: "把各人的出场退场跟戏份弧线、关系网串起来，看这本书的群戏结构和主次安排。",
+  chararc: "把主要角色的戏份和处境弧线跟关系演变、节奏起伏串起来，看人物成长跟全书节奏怎么咬合。",
+  charvoice: "把这个角色的说话腔调跟他的人物弧线、关系演变串起来，看口吻变化是不是剧情推着走的。",
+  foreshadow: "把伏笔的埋设和回收跟时间线、节奏起伏串起来，看哪些坑埋了没填、铺垫节奏稳不稳。",
+  subplot: "把各条支线的活跃休眠跟节奏、伏笔、时间线串起来，看哪条支线断更太久、几条线怎么交汇成高潮。",
+  timeline: "把事件的真实时间先后跟节奏起伏、伏笔铺设串起来，看这本书的叙事顺序是怎么安排的。",
+  entity: "把这个对象的全书轨迹跟时间线、人物关系串起来，看它在故事里起了什么作用。",
+  pacing: "把逐章的节奏松紧跟叙事曲线、伏笔和支线起落串起来，看这本书整体的张力是怎么铺排的。",
+  narrative: "把叙事曲线的四维起落跟节奏、人物弧线、支线编织串起来，看这本书整体是个什么形状。",
+  consistency: "把设定前后矛盾跟人物关系、时间线串起来，看这些矛盾是孤立笔误还是牵动了情节。",
+  argument: "把这本书的论证骨架跟关键概念的演进、全书有没有自相矛盾串起来，看它论证扎不扎实。",
+  concept: "把这个概念的演进跟全书论证结构、相关母题串起来，看它在书里的分量和脉络。",
+  motif: "把这个母题的全书复现跟叙事曲线、人物弧线串起来，看它怎么贯穿和呼应主题。",
+  technique: "把作者的写作手法跟节奏安排、伏笔铺设、叙事曲线串起来，看这本书的手艺好在哪。",
+  cards: "把这本书的知识要点跟论证结构、概念演进串起来，给一份带脉络的通盘梳理。",
+  style: "把文体毛病跟人物声口、支线安排串起来，看这些问题成不成系统、要不要统一改。",
+};
+
+// 自动建议（保守）：判一句普通提问是不是开放 / 跨维度的——是就温和提示「要不要编排着跑」。
+// 命中任一开放词，或一句话里没点名某个具体功能且偏长偏综合，就算开放。宁可漏报不误扰。
+const OPEN_QUESTION_HINTS = [
+  "整本",
+  "总览",
+  "通盘",
+  "审一遍",
+  "审一下",
+  "全书",
+  "有什么问题",
+  "怎么样",
+  "哪些",
+  "综合",
+  "全面",
+  "整体",
+  "通读",
+  "梳理一遍",
+];
+
+function looksCrossDimensional(question: string): boolean {
+  const q = question.trim();
+  if (q.length < 6) return false; // 太短的（如「主角是谁」）多半是具体问题，不打扰
+  return OPEN_QUESTION_HINTS.some((kw) => q.includes(kw));
+}
 
 // 细线 SVG 导航图标——不用 emoji、不引图标库
 function NavIcon({
@@ -2810,6 +2960,76 @@ function AskModeToggle({
   );
 }
 
+// 自动建议的温和提示条——是建议不是拦截：一句话 + 一键接受 + 一键关掉。
+// 用淡朱砂底色、低存在感，关掉后这次会话不再弹同一类（由父组件记 dismissed 标记）。
+function AgentSuggestHint({
+  text,
+  actionLabel,
+  onAccept,
+  onDismiss,
+}: {
+  text: string;
+  actionLabel: string;
+  onAccept: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      className="reveal mb-4 flex items-start gap-3 rounded-md border px-3.5 py-2.5"
+      style={{
+        borderColor: "color-mix(in oklch, var(--color-seal) 30%, transparent)",
+        background: "var(--color-seal-soft)",
+      }}
+    >
+      <span
+        className="mt-0.5 text-[var(--color-seal)] leading-none"
+        style={{ fontSize: "0.9rem" }}
+        aria-hidden
+      >
+        ❡
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm leading-relaxed text-[var(--color-ink)]">{text}</p>
+        <div className="mt-2 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onAccept}
+            className="text-xs px-3 py-1.5 rounded bg-[var(--color-seal)] text-white hover:brightness-110 transition-all"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {actionLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
+          >
+            不用了
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 互相递入口：功能视图角落一个轻链接，把当前这件事跟别的维度串起来看（升到 agent 编排）。
+// 要轻、不打扰——靠右一行小字链接，不抢功能本身的版面。
+function CrossDimRelay({ onRelay }: { onRelay: () => void }) {
+  return (
+    <div className="-mt-3 mb-4 flex justify-end">
+      <button
+        type="button"
+        onClick={onRelay}
+        className="inline-flex items-center gap-1.5 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+        title="让 agent 把这件事跟相关的几个维度串起来综合看"
+      >
+        <span aria-hidden>⇲</span>
+        把它跟别的维度串起来看
+      </button>
+    </div>
+  );
+}
+
 function AskForm(props: {
   question: string;
   setQuestion: (s: string) => void;
@@ -3205,9 +3425,16 @@ function SettingsDrawer(props: {
   setModel: (s: string) => void;
   baseUrl: string;
   setBaseUrl: (s: string) => void;
+  autoSuggestEnabled: boolean;
+  setAutoSuggestEnabled: (b: boolean) => void;
   onClose: () => void;
 }) {
-  const { onClose, ...config } = props;
+  const {
+    onClose,
+    autoSuggestEnabled,
+    setAutoSuggestEnabled,
+    ...config
+  } = props;
   return (
     <div
       className="reveal mt-6 rounded-lg border border-[var(--color-rule)] p-4"
@@ -3247,6 +3474,46 @@ function SettingsDrawer(props: {
       <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
         API key 只存在本地浏览器、随请求直发你选的 LLM，不经过 BookScope 服务器。
       </p>
+
+      <div
+        className="mt-4 pt-4 flex items-start justify-between gap-4"
+        style={{ borderTop: "1px solid var(--color-rule)" }}
+      >
+        <div className="min-w-0">
+          <div
+            className="text-sm text-[var(--color-ink)]"
+            style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
+          >
+            自动建议编排
+          </div>
+          <p className="mt-1 text-xs text-[var(--color-ink-muted)] leading-relaxed">
+            问到开放问题、或连看了好几个分析时，温和提示「要不要 agent 编排着跑」。只是建议、不打断你；不想看就关掉。
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={autoSuggestEnabled}
+          onClick={() => setAutoSuggestEnabled(!autoSuggestEnabled)}
+          className="relative shrink-0 mt-0.5 inline-flex h-6 w-11 items-center rounded-full transition-colors"
+          style={{
+            background: autoSuggestEnabled
+              ? "var(--color-seal)"
+              : "var(--color-rule)",
+          }}
+        >
+          <span
+            className="inline-block h-4.5 w-4.5 rounded-full bg-white transition-transform"
+            style={{
+              transform: autoSuggestEnabled
+                ? "translateX(1.4rem)"
+                : "translateX(0.18rem)",
+              width: "1.05rem",
+              height: "1.05rem",
+            }}
+          />
+        </button>
+      </div>
     </div>
   );
 }

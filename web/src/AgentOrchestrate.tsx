@@ -14,7 +14,7 @@
 // 可核验、盖印；drill-into 把功能名 + 参数交给父组件跳进 App 里那个功能的完整视图。
 // ---------------------------------------------------------------------------
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
 
@@ -175,6 +175,8 @@ interface AgentOrchestrateProps {
   baseUrl: string;
   /** drill-into：父组件据功能名 + 参数跳进 App 里那个功能的完整视图。 */
   onDrill: (drill: DrillInfo) => void;
+  /** 互相递：从某个功能视图「把它跟别的维度串起来看」过来时，预填一个目标 + 令牌，到了就自动编排一次。 */
+  prefill?: { goal: string; token: number } | null;
 }
 
 export function AgentOrchestrate({
@@ -184,6 +186,7 @@ export function AgentOrchestrate({
   model,
   baseUrl,
   onDrill,
+  prefill,
 }: AgentOrchestrateProps) {
   const [goal, setGoal] = useState("");
   const [running, setRunning] = useState(false);
@@ -196,8 +199,16 @@ export function AgentOrchestrate({
   const [trace, setTrace] = useState<RunTrace | null>(null);
   const [error, setError] = useState<ApiErrorLike | null>(null);
 
-  async function run() {
-    const g = goal.trim();
+  // 互相递：prefill 令牌变化时填入目标并自动编排一次（apiKey 缺时只填不跑）。
+  useEffect(() => {
+    if (!prefill || !prefill.goal.trim()) return;
+    setGoal(prefill.goal);
+    if (apiKey) void run(prefill.goal);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.token]);
+
+  async function run(override?: string) {
+    const g = (override ?? goal).trim();
     if (!g || !apiKey || running) return;
     setRunning(true);
     setError(null);
@@ -289,7 +300,7 @@ export function AgentOrchestrate({
           </p>
           <button
             type="button"
-            onClick={run}
+            onClick={() => run()}
             disabled={running}
             className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded text-sm bg-[var(--color-seal)] text-white hover:brightness-110 disabled:opacity-50 transition-all"
             style={{ fontFamily: "var(--font-display)" }}
