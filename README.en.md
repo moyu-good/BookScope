@@ -6,19 +6,19 @@
 
 [中文（full docs）](README.md) · English
 
-> Drop a long book into your browser and ask it anything. Every quote is checked character-by-character against the source text, and only verified quotes are shown.
+> Drop a long book into your browser and ask it anything. Every quote it gives is checked character-by-character against the source, and only the ones that match are shown.
 
-🔗 **Live demo**: [moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/) — click and play, preloaded with a real analysis of *Romance of the Three Kingdoms* (no install, no key). To analyze your own book, clone and run locally.
+**Live demo**: [moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/). A finished analysis of *Romance of the Three Kingdoms* you can click through, no install and no key. For your own book, clone and run it locally.
 
 ![BookScope overview](docs/images/overview.png)
 
-BookScope is a local tool for deep-reading long texts. Upload an epub / txt / pdf, ask open questions, or use 13 built-in lenses — character graphs, timelines, pacing curves, consistency scans, foreshadow tracking, argument structure, and more.
+BookScope is a local tool for deep-reading long texts. Upload an epub / txt / pdf and ask it open questions, or run any of 20+ built-in lenses: character graphs and arcs, timelines, pacing and narrative curves, foreshadow tracking, subplot weaves, consistency scans, an evidence-anchored close-reading view, and more.
 
-The difference from "chat with your PDF": every quote the model produces is checked against the original by a program. Matches are shown and stamped with a 「鉴」 (verification) seal; mismatches are dropped. The 鉴 in the name is that seal.
+The difference from "chat with your PDF": every quote the model produces is checked against the source by code. Matches are shown and stamped with a 「鉴」 (verify) seal; mismatches are dropped. The 鉴 in the name is that seal.
 
-Bring your own key, runs locally. The book text goes straight to the LLM provider you choose — no middleman server.
+Bring your own key, runs locally. The book text goes straight to the LLM provider you pick; there's no server in between, so nothing here ever touches your book or your key.
 
-> The UI is Chinese-first (中文优先 is a project invariant). This is a short English entry point; full docs are in Chinese.
+> The UI is Chinese-first (中文优先 is a project invariant). This is a short English entry point; the full docs are in Chinese.
 
 ## Quick start
 
@@ -35,11 +35,11 @@ uvicorn bookscope.api.app:create_app --factory --reload --port 8000
 cd web && npm install && npm run dev          # http://localhost:5173
 ```
 
-Open `http://localhost:5173`, add your LLM key in settings, upload a book, ask. Default model: DeepSeek `deepseek-v4-flash`.
+Open `http://localhost:5173`, add your LLM key in settings, upload a book, and ask. Default model: DeepSeek `deepseek-v4-flash`.
 
 ## Bring your own key
 
-No vendor key is bundled. Eight providers preset — DeepSeek (default), GLM, Qwen, Kimi, OpenAI, Gemini, Grok via OpenAI-compatible endpoints; Anthropic native — pick one and the base URL auto-fills. Your key stays in the browser and goes straight to the provider. No telemetry.
+No vendor key is bundled. Eight providers are preset: DeepSeek (default), GLM, Qwen, Kimi, OpenAI, Gemini, and Grok over OpenAI-compatible endpoints, plus Anthropic native. Pick one and the base URL fills itself in. Your key stays in the browser and goes straight to the provider. No telemetry.
 
 ## How it works
 
