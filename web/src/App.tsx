@@ -20,6 +20,7 @@ import type { QAEntry } from "./historyStorage";
 import { Onboarding } from "./Onboarding";
 import { QuestionBreakdown } from "./QuestionBreakdown";
 import { Recap } from "./Recap";
+import { RelationshipTimeline } from "./RelationshipTimeline";
 import type {
   Difficulty,
   QuestionProcessedState,
@@ -663,6 +664,7 @@ export function App() {
     | "ask"
     | "graph"
     | "flow"
+    | "reltime"
     | "timeline"
     | "entity"
     | "pacing"
@@ -1245,6 +1247,20 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "reltime" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="关系演变"
+                  subtitle="给关系网加一根时间轴——拖到第几章看那一刻谁和谁多亲近，或选一对人看关系怎么一章章走到这一步，每个转折钉在原文。"
+                />
+                <RelationshipTimeline
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "flow" ? "" : "hidden"}>
                 <CanvasHeader
                   title="叙事流"
@@ -1458,6 +1474,7 @@ type Mode =
   | "ask"
   | "graph"
   | "flow"
+  | "reltime"
   | "timeline"
   | "entity"
   | "pacing"
@@ -1474,6 +1491,7 @@ type Mode =
 const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "ask", label: "问书" },
   { id: "graph", label: "关系图" },
+  { id: "reltime", label: "关系演变" },
   { id: "flow", label: "叙事流" },
   { id: "timeline", label: "时间线" },
   { id: "entity", label: "实体回溯" },
@@ -1516,6 +1534,15 @@ function NavIcon({
       <>
         <path d="M3 6h6c2 0 2 6 4 6s2-6 4-6h4" />
         <path d="M3 18h6c2 0 2-6 4-6" />
+      </>
+    ),
+    reltime: (
+      <>
+        <circle cx="6" cy="7" r="2" />
+        <circle cx="17" cy="7" r="2" />
+        <path d="M8 7h7" />
+        <path d="M4 20h16" />
+        <path d="M9 20v-2.5M15 20v-2.5" />
       </>
     ),
     timeline: (

@@ -447,6 +447,52 @@ class NarrativeCurveResponse(BaseModel):
     )
 
 
+class RelationshipTimelineRequest(BaseModel):
+    """POST /api/agent/relationship-timeline 请求体（关系随时间演变，WP-relationship-over-time）。
+
+    据整本书逐对主要关系抽逐章强度 + 关键转折，给关系图加一根时间轴。BYOK。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class RelationshipTimelineResponse(BaseModel):
+    """POST /api/agent/relationship-timeline 响应体。
+
+    ``relations`` 是每对主要关系的逐章强度 + 关键转折，给前端在关系图上加时间维：
+    每条 ``{a, b, relation, points, turning_points}``——``points`` 是逐章强度
+    ``[{chapter, strength(0-10)}]``（连成强度曲线 / 拖时间轴时定连线粗细），
+    ``turning_points`` 是关键转折 ``[{chapter, change, evidence, verified, match_score}]``，
+    每个转折的 ``evidence`` 过原文核验，``verified=false`` 的前端标低置信/不画
+    （evidence-first：挂不上原文的转折不当确定结论画）。
+    """
+
+    relations: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "逐对关系的演变。每条 {a:str, b:str, relation:str, "
+            "points:[{chapter:int, strength:0-10}], "
+            "turning_points:[{chapter:int, change:str, evidence:str, verified:bool, "
+            "match_score:float}]}；转折的 evidence 过原文核验，verified=false 的标低置信。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否成功抽取。false=失败/书太大，前端提示重试；区别于扫过但空（scanned=true、空列表）。",
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class ConsistencyScanRequest(BaseModel):
     """POST /api/agent/consistency-scan 请求体（设定一致性扫描，exp-011 GO）。
 
@@ -894,6 +940,8 @@ __all__ = [
     "PacingCurveRequest",
     "PacingCurveResponse",
     "PreviousReviewHint",
+    "RelationshipTimelineRequest",
+    "RelationshipTimelineResponse",
     "Review",
     "ReviewDimensionScore",
     "SessionListResponse",
