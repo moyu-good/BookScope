@@ -9,6 +9,7 @@ import { ConceptEvolution } from "./ConceptEvolution";
 import { ConsistencyScan } from "./ConsistencyScan";
 import { EntityRecall } from "./EntityRecall";
 import { ErrorBanner } from "./ErrorBanner";
+import { NarrativeCurve } from "./NarrativeCurve";
 import { PacingCurve } from "./PacingCurve";
 import { Timeline } from "./Timeline";
 import type { ApiError } from "./ErrorBanner";
@@ -665,6 +666,7 @@ export function App() {
     | "timeline"
     | "entity"
     | "pacing"
+    | "narrative"
     | "consistency"
     | "argument"
     | "style"
@@ -1332,6 +1334,21 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "narrative" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="叙事曲线"
+                  feature="narrative"
+                  subtitle="一道章节横轴叠四维——张力起落、情感正负、视角切换、主/支线，看出整本书的形状，点章看依据。"
+                />
+                <NarrativeCurve
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "consistency" ? "" : "hidden"}>
                 <CanvasHeader
                   title="设定一致性"
@@ -1444,6 +1461,7 @@ type Mode =
   | "timeline"
   | "entity"
   | "pacing"
+  | "narrative"
   | "consistency"
   | "argument"
   | "style"
@@ -1462,6 +1480,7 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "recap", label: "前情回顾" },
   { id: "motif", label: "母题追踪" },
   { id: "pacing", label: "节奏" },
+  { id: "narrative", label: "叙事曲线" },
   { id: "consistency", label: "一致性" },
   { id: "argument", label: "论点结构" },
   { id: "concept", label: "概念演进" },
@@ -1514,6 +1533,12 @@ function NavIcon({
       </>
     ),
     pacing: <path d="M5 20v-9M10 20V5M15 20v-6M20 20V8" />,
+    narrative: (
+      <>
+        <path d="M3 12c2-7 4 5 6-1s4 4 6-2 4 3 6-1" />
+        <path d="M3 18h18" />
+      </>
+    ),
     consistency: (
       <>
         <path d="M12 4 21 19H3z" />
@@ -1828,6 +1853,8 @@ const FEATURE_INFO: Record<string, string> = {
   recap: "读到第几章就回顾到第几章的前情要点——后文一个字都不剧透。",
   motif: "一个主题 / 母题在全书哪些地方复现、各处怎么体现，每处钉原文。",
   pacing: "逐章的张力曲线——哪几章松（拖沓）、哪几章是高潮，点柱看依据。",
+  narrative:
+    "一道横轴叠四维——张力起落 + 情感正负 + 视角切换 + 主/支线，看出整本书是个什么形状，每章钉原文。",
   consistency:
     "全书前后矛盾的两处对照（如第 5 章左撇子、第 80 章用右手），编的会被滤掉。",
   argument: "作者的论证骨架——主张 + 撑住它的原文 + 在哪章，一条条理清。",

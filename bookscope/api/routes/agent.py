@@ -57,6 +57,7 @@ from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.motif_tracking import generate_motif_tracking
+from bookscope.agent.narrative_curve import generate_narrative_curve
 from bookscope.agent.pacing_curve import generate_pacing_curve
 from bookscope.agent.question_processor import rewrite_followup
 from bookscope.agent.recap import generate_recap
@@ -98,6 +99,8 @@ from bookscope.api.schemas import (
     GraphEdge,
     MotifTrackingRequest,
     MotifTrackingResponse,
+    NarrativeCurveRequest,
+    NarrativeCurveResponse,
     PacingCurveRequest,
     PacingCurveResponse,
     PreviousReviewHint,
@@ -847,6 +850,67 @@ async def agent_pacing_curve(
     )
     return PacingCurveResponse(
         points=points or [],
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/narrative-curve", response_model=NarrativeCurveResponse)
+async def agent_narrative_curve(
+    request: NarrativeCurveRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> NarrativeCurveResponse:
+    """据整本书逐章抽多维叙事曲线（WP-multidim-narrative-curve，probe GO）。
+
+    整本进 context 让模型逐章判张力 + 情感方向 + 主导 POV + 主/支线，每章判定挂原文
+    片段过 verify_citations（核不过的标低置信）。只支持塞得进 context 的书；大书返空列表
+    （``scanned=false``，前端提示重试）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    if not _book_fits_long_context(assembler):
+        return NarrativeCurveResponse(
+            chapters=[], scanned=False, book_session_id=request.book_session_id
+        )
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    chapters = generate_narrative_curve(
+        full_text=full_text,
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        session_id=request.book_session_id,
+    )
+    return NarrativeCurveResponse(
+        chapters=chapters or [],
+        scanned=chapters is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )

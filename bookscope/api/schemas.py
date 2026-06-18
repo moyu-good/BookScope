@@ -404,6 +404,49 @@ class PacingCurveResponse(BaseModel):
     )
 
 
+class NarrativeCurveRequest(BaseModel):
+    """POST /api/agent/narrative-curve 请求体（多维叙事曲线，WP-multidim-narrative-curve）。
+
+    据整本书逐章抽张力 + 情感方向 + 主导 POV + 主/支线，出多维曲线。BYOK。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class NarrativeCurveResponse(BaseModel):
+    """POST /api/agent/narrative-curve 响应体。
+
+    ``chapters`` 是逐章多维结构，给前端在节奏曲线之上叠维画整本书的"形状"：
+    每章一条 ``{chapter, tension(0-10), sentiment(-5..5), pov, mainline, evidence,
+    verified, match_score}``——``evidence`` 过原文核验，``verified=false`` 的章前端
+    标低置信/淡化（evidence-first：核不过的维度不当确定结论画）。
+    """
+
+    chapters: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "逐章多维结构，按章号排序。每条 {chapter:int, tension:0-10, "
+            "sentiment:-5..5, pov:str, mainline:bool, evidence:str, verified:bool, "
+            "match_score:float}；evidence 过原文核验，verified=false 的标低置信。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否成功抽取。false=失败/书太大，前端提示重试；区别于扫过但空（scanned=true、空列表）。",
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class ConsistencyScanRequest(BaseModel):
     """POST /api/agent/consistency-scan 请求体（设定一致性扫描，exp-011 GO）。
 
@@ -846,6 +889,8 @@ __all__ = [
     "ErrorResponse",
     "GraphEdge",
     "HealthResponse",
+    "NarrativeCurveRequest",
+    "NarrativeCurveResponse",
     "PacingCurveRequest",
     "PacingCurveResponse",
     "PreviousReviewHint",
