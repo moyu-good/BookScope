@@ -277,7 +277,8 @@ def _verify_turning_points(
     }
     for rel in relations:
         tps = rel["turning_points"]
-        tp_citations = [{"snippet": tp["evidence"]} for tp in tps]
+        # 带上每个转折 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）。
+        tp_citations = [{"snippet": tp["evidence"], "chapter": tp["chapter"]} for tp in tps]
         verify_citations(tp_citations, evidence)
         for tp, vc in zip(tps, tp_citations, strict=True):
             tp["verified"] = bool(vc.get("verified", False))

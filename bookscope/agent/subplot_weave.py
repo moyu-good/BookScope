@@ -273,9 +273,18 @@ def _parse_weave(text: str) -> dict[str, Any] | None:
     return None
 
 
-def _verify_one(snippet: str, evidence: dict[str, dict]) -> dict[str, Any]:
-    """核验一条原文片段：命中 → verified + 命中 chunk 的真章号；返附加字段 dict。"""
-    cits = [{"snippet": snippet}]
+def _verify_one(
+    snippet: str, evidence: dict[str, dict], self_chapter: object = None
+) -> dict[str, Any]:
+    """核验一条原文片段：命中 → verified + 命中 chunk 的真章号；返附加字段 dict。
+
+    ``self_chapter`` 是这条引用的 LLM 自报章号，当多命中消歧弱先验（真章号在 verify
+    后仍用 chunk_id 覆盖）；缺/非正整数时不传，退回确定性首个。
+    """
+    cit: dict[str, Any] = {"snippet": snippet}
+    if isinstance(self_chapter, int) and self_chapter > 0:
+        cit["chapter"] = self_chapter
+    cits = [cit]
     verify_citations(cits, evidence)
     vc = cits[0]
     cid = vc.get("chunk_id")
@@ -313,8 +322,9 @@ def _verify_intersections(
     """
     kept: list[dict[str, Any]] = []
     for it in intersections:
-        va = _verify_one(it["a_evidence"], evidence)
-        vb = _verify_one(it["b_evidence"], evidence)
+        # 交汇两端 evidence 同属这条交汇的自报章号，两腿都带上当消歧弱先验。
+        va = _verify_one(it["a_evidence"], evidence, it.get("chapter"))
+        vb = _verify_one(it["b_evidence"], evidence, it.get("chapter"))
         if not (va["verified"] and vb["verified"]):
             continue  # 双端守卫：任一端没命中 → 不画这个交汇
         it["a_verified"] = True

@@ -231,7 +231,8 @@ def _verify_pairs(
     }
     for chap in chapters:
         pairs = chap["pairs"]
-        pair_citations = [{"snippet": p["evidence"]} for p in pairs]
+        # 带上每条同场对 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）。
+        pair_citations = [{"snippet": p["evidence"], "chapter": p["chapter"]} for p in pairs]
         verify_citations(pair_citations, evidence)
         for pr, vc in zip(pairs, pair_citations, strict=True):
             pr["verified"] = bool(vc.get("verified", False))

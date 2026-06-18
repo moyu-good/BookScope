@@ -220,7 +220,13 @@ def generate_entity_recall(
             )
             continue
         for ap in appearances:
-            cits = [{"snippet": ap["snippet"]}]
+            # 带上 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）；
+            # chapter 为 0 = 模型没报，不传，退回确定性首个。
+            self_ch = ap.get("chapter")
+            cit: dict[str, Any] = {"snippet": ap["snippet"]}
+            if isinstance(self_ch, int) and self_ch > 0:
+                cit["chapter"] = self_ch
+            cits = [cit]
             verify_citations(cits, evidence_map)
             vc = cits[0]
             ap["verified"] = bool(vc.get("verified", False))

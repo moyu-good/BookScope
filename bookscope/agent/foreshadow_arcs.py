@@ -211,8 +211,13 @@ def _verify_endpoints(
         if c.get("chunk_id")
     }
 
-    def _verify_one(snippet: str) -> dict[str, Any]:
-        cite = [{"snippet": snippet}]
+    def _verify_one(snippet: str, self_chapter: object = None) -> dict[str, Any]:
+        # 带上 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）；
+        # 自报章号缺/非正整数时不传，退回确定性首个。
+        cit: dict[str, Any] = {"snippet": snippet}
+        if isinstance(self_chapter, int) and self_chapter > 0:
+            cit["chapter"] = self_chapter
+        cite = [cit]
         verify_citations(cite, evidence)
         vc = cite[0]
         verified = bool(vc.get("verified", False))
@@ -226,7 +231,7 @@ def _verify_endpoints(
 
     kept: list[dict[str, Any]] = []
     for arc in arcs:
-        setup_vc = _verify_one(arc["setup_evidence"])
+        setup_vc = _verify_one(arc["setup_evidence"], arc.get("setup_chapter"))
         if not setup_vc["verified"]:
             continue  # 埋点都核不过 → 整条丢
 
@@ -238,7 +243,7 @@ def _verify_endpoints(
         payoff_ch = arc.get("payoff_chapter")
         payoff_text = arc["payoff_evidence"]
         if payoff_ch is not None and payoff_text:
-            payoff_vc = _verify_one(payoff_text)
+            payoff_vc = _verify_one(payoff_text, payoff_ch)
             if payoff_vc["verified"]:
                 # 已回收实弧
                 arc["status"] = "resolved"

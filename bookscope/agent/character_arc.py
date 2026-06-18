@@ -247,7 +247,8 @@ def _verify_points(
     }
     for char in characters:
         points = char["points"]
-        citations = [{"snippet": p["evidence"]} for p in points]
+        # 带上每个点 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）。
+        citations = [{"snippet": p["evidence"], "chapter": p["chapter"]} for p in points]
         verify_citations(citations, evidence)
         for pt, vc in zip(points, citations, strict=True):
             pt["verified"] = bool(vc.get("verified", False))

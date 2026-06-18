@@ -215,7 +215,8 @@ def _verify_chapters(
         for c in chunks
         if c.get("chunk_id")
     }
-    citations = [{"snippet": c["evidence"]} for c in chapters]
+    # 带上每章 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）。
+    citations = [{"snippet": c["evidence"], "chapter": c["chapter"]} for c in chapters]
     verify_citations(citations, evidence)
     for chap, vc in zip(chapters, citations, strict=True):
         chap["verified"] = bool(vc.get("verified", False))
