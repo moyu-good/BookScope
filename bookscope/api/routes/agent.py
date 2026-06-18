@@ -48,6 +48,7 @@ from bookscope.agent import (
 )
 from bookscope.agent.argument_structure import generate_argument_structure
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
+from bookscope.agent.character_arc import generate_character_arc
 from bookscope.agent.character_flow import generate_character_flow
 from bookscope.agent.character_graph import extract_character_graph
 from bookscope.agent.claim_support import check_claim_support
@@ -85,6 +86,8 @@ from bookscope.api.schemas import (
     AgentAskResponse,
     ArgumentStructureRequest,
     ArgumentStructureResponse,
+    CharacterArcRequest,
+    CharacterArcResponse,
     CharacterFlowRequest,
     CharacterFlowResponse,
     CharacterGraphRequest,
@@ -914,6 +917,68 @@ async def agent_narrative_curve(
     return NarrativeCurveResponse(
         chapters=chapters or [],
         scanned=chapters is not None,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/character-arc", response_model=CharacterArcResponse)
+async def agent_character_arc(
+    request: CharacterArcRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> CharacterArcResponse:
+    """给主要角色逐章抽戏份/处境弧线曲线（WP-character-arc-curves，probe GO）。
+
+    整本进 context 让模型给主要角色逐章打戏份密度（presence 0-10）+ 处境弧线
+    （fortune -5..+5），每个点挂原文片段过 verify_citations（核不过的标低置信）。
+    把已验的 exp-010 弧线分析画成可核验曲线，不重造判定——平稳角色画平、不编波动。
+    只支持塞得进 context 的书；大书返空列表（``scanned=false``，前端提示重试）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    if not _book_fits_long_context(assembler):
+        return CharacterArcResponse(
+            characters=[], scanned=False, book_session_id=request.book_session_id
+        )
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    characters = generate_character_arc(
+        full_text=full_text,
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        session_id=request.book_session_id,
+    )
+    return CharacterArcResponse(
+        characters=characters or [],
+        scanned=characters is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )

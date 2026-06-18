@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { BookShelf } from "./BookShelf";
 import type { SessionMetadata } from "./BookShelf";
 import { ArgumentStructure } from "./ArgumentStructure";
+import { CharacterArc } from "./CharacterArc";
 import { CharacterFlow } from "./CharacterFlow";
 import { CharacterGraph } from "./CharacterGraph";
 import { ConceptEvolution } from "./ConceptEvolution";
@@ -665,6 +666,7 @@ export function App() {
     | "graph"
     | "flow"
     | "reltime"
+    | "chararc"
     | "timeline"
     | "entity"
     | "pacing"
@@ -1275,6 +1277,20 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "chararc" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="人物弧线"
+                  subtitle="给主要角色画两条曲线——戏份密度看谁何时主导这本书，处境升降看谁过得顺不顺。渐变写成平滑爬升、硬扳写成直角拐弯，点起伏点看原文。"
+                />
+                <CharacterArc
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "timeline" ? "" : "hidden"}>
                 <CanvasHeader
                   title="时间线"
@@ -1475,6 +1491,7 @@ type Mode =
   | "graph"
   | "flow"
   | "reltime"
+  | "chararc"
   | "timeline"
   | "entity"
   | "pacing"
@@ -1493,6 +1510,7 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "graph", label: "关系图" },
   { id: "reltime", label: "关系演变" },
   { id: "flow", label: "叙事流" },
+  { id: "chararc", label: "人物弧线" },
   { id: "timeline", label: "时间线" },
   { id: "entity", label: "实体回溯" },
   { id: "recap", label: "前情回顾" },
@@ -1543,6 +1561,14 @@ function NavIcon({
         <path d="M8 7h7" />
         <path d="M4 20h16" />
         <path d="M9 20v-2.5M15 20v-2.5" />
+      </>
+    ),
+    chararc: (
+      <>
+        <path d="M3 14c3 0 3-7 6-7s3 5 6 5 3-6 6-6" />
+        <circle cx="9" cy="7" r="1.2" />
+        <circle cx="15" cy="12" r="1.2" />
+        <path d="M3 20h18" />
       </>
     ),
     timeline: (

@@ -447,6 +447,50 @@ class NarrativeCurveResponse(BaseModel):
     )
 
 
+class CharacterArcRequest(BaseModel):
+    """POST /api/agent/character-arc 请求体（戏份/人物弧线曲线，WP-character-arc-curves）。
+
+    据整本书给主要角色逐章抽戏份密度 + 处境弧线，出可视化曲线。BYOK，同 NarrativeCurveRequest。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class CharacterArcResponse(BaseModel):
+    """POST /api/agent/character-arc 响应体。
+
+    ``characters`` 是 per 角色的逐章弧线，给前端画"谁何时主导（戏份密度）+ 谁过得顺不顺
+    （处境弧线）"两条曲线：每个角色一条 ``{name, points}``，``points`` 是逐章数值点
+    ``[{chapter, presence(0-10), fortune(-5..5), evidence, verified, match_score}]``——
+    ``evidence`` 过原文核验，``verified=false`` 的点前端标低置信/淡化（evidence-first：
+    核不过的不当确定结论画）。把已验过的 exp-010 弧线分析画成可核验的曲线，不重造判定。
+    """
+
+    characters: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "per 角色逐章弧线。每条 {name:str, points:[{chapter:int, presence:0-10, "
+            "fortune:-5..5, evidence:str, verified:bool, match_score:float}]}；"
+            "point 的 evidence 过原文核验，verified=false 的标低置信。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否成功抽取。false=失败/书太大，前端提示重试；区别于扫过但空（scanned=true、空列表）。",
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class RelationshipTimelineRequest(BaseModel):
     """POST /api/agent/relationship-timeline 请求体（关系随时间演变，WP-relationship-over-time）。
 
@@ -924,6 +968,8 @@ __all__ = [
     "AgentAskRequest",
     "AgentAskResponse",
     "BookUploadResponse",
+    "CharacterArcRequest",
+    "CharacterArcResponse",
     "CharacterFlowRequest",
     "CharacterFlowResponse",
     "CharacterGraphRequest",
