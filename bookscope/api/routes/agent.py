@@ -51,6 +51,7 @@ from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.character_arc import generate_character_arc
 from bookscope.agent.character_flow import generate_character_flow
 from bookscope.agent.character_graph import extract_character_graph
+from bookscope.agent.character_voice import generate_character_voice
 from bookscope.agent.claim_support import check_claim_support
 from bookscope.agent.concept_evolution import generate_concept_evolution
 from bookscope.agent.consistency_scan import generate_consistency_scan
@@ -93,6 +94,8 @@ from bookscope.api.schemas import (
     CharacterFlowResponse,
     CharacterGraphRequest,
     CharacterGraphResponse,
+    CharacterVoiceRequest,
+    CharacterVoiceResponse,
     CheckCitationsRequest,
     CheckCitationsResponse,
     ConceptEvolutionRequest,
@@ -1044,6 +1047,78 @@ async def agent_character_arc(
     return CharacterArcResponse(
         characters=characters or [],
         scanned=characters is not None,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/character-voice", response_model=CharacterVoiceResponse)
+async def agent_character_voice(
+    request: CharacterVoiceRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> CharacterVoiceResponse:
+    """给一个角色刻画声口 + 标"这句不像他说的"（WP-character-voice，probe GO）。
+
+    整本进 context 让模型归拢该角色对白、列语言特征（每条挂代表对白）、标 voice drift
+    （每条挂那句对白 + 章 + 为什么不像）。features 保留全部（核不过的标低置信），
+    drift_items 已 verify-filter（挂不上原文的不报，免得 cry wolf）。命根子写进 prompt：
+    合理的剧情驱动口吻变化不报、样本不足明说、不把别人的话算到他头上。
+    只支持塞得进 context 的书；大书返空（``scanned=false``，前端提示重试）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    if not _book_fits_long_context(assembler):
+        return CharacterVoiceResponse(
+            character=request.character,
+            sample_too_small=False,
+            features=[],
+            drift_items=[],
+            scanned=False,
+            book_session_id=request.book_session_id,
+        )
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = generate_character_voice(
+        character=request.character,
+        full_text=full_text,
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        session_id=request.book_session_id,
+    )
+    return CharacterVoiceResponse(
+        character=request.character,
+        sample_too_small=bool(result and result.get("sample_too_small")),
+        features=(result or {}).get("features", []),
+        drift_items=(result or {}).get("drift_items", []),
+        scanned=result is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )

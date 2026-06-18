@@ -538,6 +538,76 @@ class CharacterArcResponse(BaseModel):
     )
 
 
+class CharacterVoiceRequest(BaseModel):
+    """POST /api/agent/character-voice 请求体（声口一致，WP-character-voice）。
+
+    给一个角色，整本进 context 归拢其对白、刻画语言特征、标 voice drift。
+    BYOK，同 CharacterArcRequest——多一个 ``character`` 入参指定分析哪个角色。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    character: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="要分析声口的角色名（可复用人物图抽出的节点）。",
+    )
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class CharacterVoiceResponse(BaseModel):
+    """POST /api/agent/character-voice 响应体。
+
+    给前端画一张「X 的声口」面板：上半语言特征（每条挂代表对白），下半 voice drift
+    提示（每条挂那句对白 + 章 + 一句为什么不像，点开看原文核验）。两部分证据处理不同：
+
+    - ``features``：保留全部，``verified=false`` 的前端淡化（evidence-first：核不过的
+      不当确定结论，但描述性特征留给读者自己核）。
+    - ``drift_items``：BE 已 verify-filter（核不过的整条丢），列表里全是 verified——
+      挂不上原文的 drift 是工具一面之词，不报，免得 cry wolf。
+    - ``sample_too_small``：角色全书对白太少、不够刻画稳定腔调时为 true，前端明说
+      样本不足、不硬下 drift 判定（命根子，probe 守住的）。
+    """
+
+    character: str = Field(..., description="回显请求里的角色名。")
+    sample_too_small: bool = Field(
+        default=False,
+        description="该角色对白太少、不够刻画稳定声口时为 true，前端提示样本不足。",
+    )
+    features: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "语言特征，每条 {trait:str, evidence:str, verified:bool, match_score:float, "
+            "chapter:int}；evidence 过原文核验，verified=false 的前端淡化（不剔）。"
+        ),
+    )
+    drift_items: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "voice drift 提示，每条 {chapter:int, quote:str, reason:str, verified:bool, "
+            "match_score:float}，按章号排序。BE 已 verify-filter，全部 verified——"
+            "核不过的不报（这是提示不是定论，作家自己判断）。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description=(
+            "是否成功分析。false=失败/书太大，前端提示重试；"
+            "区别于分析过但声口很稳（scanned=true、drift 空列表）。"
+        ),
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class RelationshipTimelineRequest(BaseModel):
     """POST /api/agent/relationship-timeline 请求体（关系随时间演变，WP-relationship-over-time）。
 
@@ -1021,6 +1091,8 @@ __all__ = [
     "CharacterFlowResponse",
     "CharacterGraphRequest",
     "CharacterGraphResponse",
+    "CharacterVoiceRequest",
+    "CharacterVoiceResponse",
     "CheckCitationsRequest",
     "CheckCitationsResponse",
     "ConsistencyScanRequest",

@@ -6,6 +6,7 @@ import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
 import { CharacterFlow } from "./CharacterFlow";
 import { CharacterGraph } from "./CharacterGraph";
+import { CharacterVoice } from "./CharacterVoice";
 import { ConceptEvolution } from "./ConceptEvolution";
 import { ConsistencyScan } from "./ConsistencyScan";
 import { EntityRecall } from "./EntityRecall";
@@ -668,6 +669,7 @@ export function App() {
     | "flow"
     | "reltime"
     | "chararc"
+    | "charvoice"
     | "foreshadow"
     | "timeline"
     | "entity"
@@ -1293,6 +1295,20 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "charvoice" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="声口一致"
+                  subtitle="给一个角色归拢他全书的对白，刻画说话的腔调，再标出哪几句「不像他说的」——合理的剧情驱动口吻变化不报，每条挂原文，你自己判断。"
+                />
+                <CharacterVoice
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "foreshadow" ? "" : "hidden"}>
                 <CanvasHeader
                   title="伏笔回收"
@@ -1509,6 +1525,7 @@ type Mode =
   | "flow"
   | "reltime"
   | "chararc"
+  | "charvoice"
   | "foreshadow"
   | "timeline"
   | "entity"
@@ -1529,6 +1546,7 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "reltime", label: "关系演变" },
   { id: "flow", label: "叙事流" },
   { id: "chararc", label: "人物弧线" },
+  { id: "charvoice", label: "声口一致" },
   { id: "foreshadow", label: "伏笔回收" },
   { id: "timeline", label: "时间线" },
   { id: "entity", label: "实体回溯" },
@@ -1588,6 +1606,13 @@ function NavIcon({
         <circle cx="9" cy="7" r="1.2" />
         <circle cx="15" cy="12" r="1.2" />
         <path d="M3 20h18" />
+      </>
+    ),
+    charvoice: (
+      <>
+        <path d="M4 5h16v9H9l-4 4v-4H4z" />
+        <path d="M8 9h5" />
+        <path d="M8 11.5h3" strokeDasharray="1.4 1.4" />
       </>
     ),
     foreshadow: (
