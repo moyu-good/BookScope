@@ -811,7 +811,11 @@ def _ground_citations(
         if key in seen:
             continue
         seen.add(key)
-        grounded.append({"chapter": match["chapter"], "snippet": match["snippet"]})
+        # match 来自"只收 verified"的发现、snippet 已过各源 verify → 标 verified,
+        # 让前端能盖「鉴」、综合的 evidence-first 在数据上诚实(不靠前端 undefined 兜底)。
+        grounded.append({
+            "chapter": match["chapter"], "snippet": match["snippet"], "verified": True,
+        })
     return grounded
 
 

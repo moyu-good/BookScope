@@ -315,6 +315,7 @@ def test_synthesis_grounds_citations_to_findings(monkeypatch):
     assert len(cits) == 1
     assert cits[0]["chapter"] == 2
     assert cits[0]["snippet"] == "第二章原文。墙角断剑落满灰尘。"
+    assert cits[0]["verified"] is True  # 钉回已核验发现 → 标 verified，前端据此盖「鉴」
 
 
 def test_synthesis_empty_findings_no_fabrication(monkeypatch):
