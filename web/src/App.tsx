@@ -24,6 +24,7 @@ import { Onboarding } from "./Onboarding";
 import { QuestionBreakdown } from "./QuestionBreakdown";
 import { Recap } from "./Recap";
 import { RelationshipTimeline } from "./RelationshipTimeline";
+import { RevisionList } from "./RevisionList";
 import type {
   Difficulty,
   QuestionProcessedState,
@@ -685,6 +686,7 @@ export function App() {
     | "motif"
     | "technique"
     | "cards"
+    | "revision"
   >("library");
   // 手机端左栏收成抽屉，这个控制开合
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1520,6 +1522,21 @@ export function App() {
                   baseUrl={effectiveBaseUrl()}
                 />
               </div>
+
+              <div className={mode === "revision" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="改稿清单"
+                  subtitle="把扫出的矛盾 / 断伏笔 / 塌节奏 / 文体毛病攒成一份带原文的修改清单——逐条勾「待改 / 已改 / 不改」，改完一键导出带走。核不过原文的发现不进清单。"
+                />
+                <RevisionList
+                  sessionId={currentSession.session_id}
+                  bookTitle={currentSession.book_title}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
             </>
           )}
 
@@ -1556,7 +1573,8 @@ type Mode =
   | "concept"
   | "motif"
   | "technique"
-  | "cards";
+  | "cards"
+  | "revision";
 
 const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "ask", label: "问书" },
@@ -1579,6 +1597,7 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "technique", label: "写作手法" },
   { id: "cards", label: "知识卡片" },
   { id: "style", label: "文体体检" },
+  { id: "revision", label: "改稿清单" },
 ];
 
 // 细线 SVG 导航图标——不用 emoji、不引图标库
@@ -1711,6 +1730,13 @@ function NavIcon({
       <>
         <rect x="3" y="5" width="13" height="13" rx="2" />
         <path d="M8 5V3h13v13h-2" />
+      </>
+    ),
+    revision: (
+      <>
+        <path d="M8 4h8v3H8z" />
+        <path d="M6 5h2v0M16 5h2v15H6V5h0" />
+        <path d="M9 12l1.6 1.6L13.5 11M9 16.5h4" />
       </>
     ),
     library: (
