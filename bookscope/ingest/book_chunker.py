@@ -48,6 +48,7 @@ WARN_TOO_COARSE = "chapters_too_coarse"
 WARN_OVERDETECTION = "suspicious_overdetection"
 WARN_PARSE_INCONSISTENT = "parse_inconsistent"
 WARN_TOC_STRIPPED = "toc_headings_stripped"
+WARN_FRONTMATTER_STRIPPED = "frontmatter_headings_stripped"
 
 # Chinese chapter / volume heading patterns（WP3 Phase B 重构）
 #
@@ -327,10 +328,7 @@ def detect_chapters_with_stats(
         _apply_detection_warnings(stats, total_chars=len(text))
         return [(1, "", text)], stats
 
-    # 记原始首个章头位置（序章用），滤目录前定下来
-    original_first_head_start = heads[0][0].start()
-
-    # 先算每个章头的 body（到下一个章头之间的正文）
+    # 先算每个章头的 body（到下一个章头之间的正文），用于滤除目录条目
     head_bodies = [
         text[
             line_end + 1 : (heads[i + 1][0].start() if i + 1 < len(heads) else len(text))
@@ -338,30 +336,48 @@ def detect_chapters_with_stats(
         for i, (_m, _p, line_end) in enumerate(heads)
     ]
 
-    # 滤掉 body 为空的章头——目录条目 / 紧挨着的标题，不是真章节。带目录的书（全二册等）
-    # 整列回目会被正则当成成倍的章头、只有正文段才有 body；不滤会触发下面的单调性回退、
-    # 把章号摊成 1..2N，全书章号失真（实测三国 120 回被检成 240 章）。
+    # 类别 A——滤掉 body 为空的章头：目录条目 / 紧挨着的标题，不是真章节。带目录的书
+    # （全二册等）整列回目会被正则当成成倍章头、只有正文段才有 body；不滤会让目录条目混进
+    # 真章号序列、触发下面的单调性回退、把章号摊成 1..2N（实测三国 120 回被检成 240 章）。
     if any(head_bodies) and not all(head_bodies):
-        kept = [(h, b) for h, b in zip(heads, head_bodies, strict=True) if b]
-        heads = [h for h, _ in kept]
-        head_bodies = [b for _, b in kept]
+        heads = [h for h, b in zip(heads, head_bodies, strict=True) if b]
         stats.warnings.append(WARN_TOC_STRIPPED)
 
-    # Phase B: 真章号 + 单调性守护（在滤掉目录后的真章节上做）
-    parsed_ok = sum(1 for _, p, _ in heads if p is not None)
-    nums = [p if p is not None else i + 1 for i, (_, p, _) in enumerate(heads)]
+    parsed = [p for _, p, _ in heads]
+
+    # 类别 B——剥离卷首离群章头：真章号在最前却高于紧随其后的章（如三国卷首把"第五十六回
+    # 铜雀台"摘录排在"第一回"前），是被提前摘出的精彩片段 / teaser，不是正文起点。逐个剥到
+    # 开头不再"高开"为止；只剥这一处、不碰中段（中段非单调仍走下面的退序号守护，绝不丢章）。
+    # 被剥的章头落在首个真章节之前 → 其正文自然并入序章。
+    drop = 0
+    while (
+        drop + 1 < len(heads)
+        and parsed[drop] is not None
+        and parsed[drop + 1] is not None
+        and parsed[drop] > parsed[drop + 1]
+    ):
+        drop += 1
+    if drop:
+        heads = heads[drop:]
+        parsed = parsed[drop:]
+        stats.warnings.append(WARN_FRONTMATTER_STRIPPED)
+
+    # Phase B: 真章号 + 单调性守护（在滤目录、剥卷首摘录后的真章节上做）
+    parsed_ok = sum(1 for p in parsed if p is not None)
+    nums = [p if p is not None else i + 1 for i, p in enumerate(parsed)]
     if any(b <= a for a, b in zip(nums, nums[1:])):
-        # 重复 / 倒跳——整书回退检测序号，绝不混用两种语义
+        # 重复 / 倒跳——整书回退检测序号，绝不混用两种语义（保留全部章、不丢内容）
         nums = list(range(1, len(heads) + 1))
         stats.warnings.append(WARN_PARSE_INCONSISTENT)
 
     chapters: list[tuple[int, str, str]] = []
-    for i, (match, _parsed, line_end) in enumerate(heads):
+    for i, (match, _p, line_end) in enumerate(heads):
         ch_title_line = text[match.start():line_end].strip()
-        chapters.append((nums[i], ch_title_line, head_bodies[i]))
+        body_end = heads[i + 1][0].start() if i + 1 < len(heads) else len(text)
+        chapters.append((nums[i], ch_title_line, text[line_end + 1 : body_end].strip()))
 
-    # Include any text before the first chapter heading as "prologue"
-    prologue = text[:original_first_head_start].strip()
+    # 首个章头之前的正文（真序 + 被剥离的卷首摘录）= 序章
+    prologue = text[: heads[0][0].start()].strip()
     if prologue and len(prologue) > CHUNK_CHAR_MIN:
         chapters.insert(0, (0, "序", prologue))
 

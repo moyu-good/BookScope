@@ -138,3 +138,62 @@ def test_chunk_book_assigns_chapter_one_when_no_headings() -> None:
     assert chunks
     for c in chunks:
         assert c.chapter == 1
+
+
+# ---------------------------------------------------------------------------
+# 真实脏书鲁棒性（WP-robust-chapter-detection）—— 主干章号脊
+# ---------------------------------------------------------------------------
+
+
+def test_detect_chapters_strips_toc_double_counting() -> None:
+    """类别 A：目录整列回目（body 空）+ 正文回目 → 只留正文那批，真章号不翻倍。"""
+    toc = "第一回 甲\n第二回 乙\n第三回 丙\n"
+    body = (
+        "第一回 甲\n" + "甲的正文。" * 30 + "\n\n"
+        "第二回 乙\n" + "乙的正文。" * 30 + "\n\n"
+        "第三回 丙\n" + "丙的正文。" * 30 + "\n"
+    )
+    chapters = book_chunker.detect_chapters(toc + body)
+    real = [c[0] for c in chapters if c[0] != 0]
+    assert real == [1, 2, 3]  # 不是 1..6
+    body_by_num = {c[0]: c[2] for c in chapters}
+    assert "甲的正文" in body_by_num[1]
+    assert "丙的正文" in body_by_num[3]
+
+
+def test_detect_chapters_strips_frontmatter_excerpt() -> None:
+    """类别 B：正文前塞高章号精彩片段（有 body）→ 剥掉它，真章节回到 1..3，摘录并入序。"""
+    excerpt = "第五回 名场面\n" + "提前摘出的精彩片段正文。" * 30 + "\n\n"
+    main = (
+        "第一回 起\n" + "第一回正文。" * 30 + "\n\n"
+        "第二回 承\n" + "第二回正文。" * 30 + "\n\n"
+        "第三回 转\n" + "第三回正文。" * 30 + "\n"
+    )
+    chapters = book_chunker.detect_chapters(excerpt + main)
+    real = [c[0] for c in chapters if c[0] != 0]
+    assert real == [1, 2, 3]
+    body_by_num = {c[0]: c[2] for c in chapters}
+    assert "第一回正文" in body_by_num[1]
+
+
+def test_detect_chapters_volume_restart_falls_back_to_ordinal() -> None:
+    """类别 D：卷册重编号（1..2 两遍）→ 脊覆盖率仅半，退序号，不崩、不丢卷。"""
+    vol = (
+        "第一回 甲\n" + "甲正文。" * 30 + "\n\n"
+        "第二回 乙\n" + "乙正文。" * 30 + "\n\n"
+    )
+    chapters = book_chunker.detect_chapters(vol + vol)
+    real = [c[0] for c in chapters if c[0] != 0]
+    assert len(real) == 4          # 两卷四回都留住，没被脊吞掉
+    assert real == sorted(real)    # 退序号后仍单调（1..4）
+
+
+def test_detect_chapters_clean_book_uses_real_numbers_unchanged() -> None:
+    """干净书（真章号单调）→ 用真章号、脊=全部章头、行为不变。"""
+    text = (
+        "第一章 开端\n" + "开端正文。" * 30 + "\n\n"
+        "第二章 发展\n" + "发展正文。" * 30 + "\n\n"
+        "第三章 高潮\n" + "高潮正文。" * 30 + "\n"
+    )
+    chapters = book_chunker.detect_chapters(text)
+    assert [c[0] for c in chapters] == [1, 2, 3]
