@@ -194,3 +194,66 @@ class TestVerifyCitations:
         out = verify_citations(citations, _EVIDENCE)
         score = out[0]["match_score"]
         assert score == round(score, 2)
+
+
+# ---------------------------------------------------------------------------
+# verify_citations —— 多命中消歧（自报章号弱先验 tie-break）
+# ---------------------------------------------------------------------------
+
+# 同一句在两章逐字复现——母题回环 / 伏笔回收 / 同名不同事的典型形态。
+# 旧实现取字典首个（ch2），probe 实测这类锚错率 60%；消歧后用自报章号选对的那章。
+_DUP_EVIDENCE = {
+    "ch2": {
+        "chapter": 2,
+        "text": "话说天下大势，分久必合，合久必分，此乃古今不易之理。",
+    },
+    "ch8": {
+        "chapter": 8,
+        "text": "孔明叹曰：天下大势，分久必合，合久必分，今又当分矣。",
+    },
+}
+
+_DUP_SNIPPET = "天下大势，分久必合，合久必分"  # 两章都逐字含
+
+
+class TestVerifyCitationsDisambiguation:
+    def test_multi_exact_picks_chunk_matching_self_chapter(self) -> None:
+        """同句两章逐字命中：自报第 8 章 → 锚 ch8（旧实现会锚字典首个 ch2）。"""
+        citations = [{"chapter": 8, "snippet": _DUP_SNIPPET}]
+        out = verify_citations(citations, _DUP_EVIDENCE)
+        assert out[0]["verified"] is True
+        assert out[0]["chunk_id"] == "ch8"
+        assert out[0]["match_score"] == 1.0
+        assert out[0]["match_type"] == "quote"
+
+    def test_multi_exact_self_chapter_other_side(self) -> None:
+        """对称验证：自报第 2 章 → 锚 ch2。"""
+        out = verify_citations([{"chapter": 2, "snippet": _DUP_SNIPPET}], _DUP_EVIDENCE)
+        assert out[0]["chunk_id"] == "ch2"
+
+    def test_multi_exact_nearest_chapter_when_no_exact(self) -> None:
+        """自报章号谁都不等于 → 取最近：自报 7 → |2-7|=5 vs |8-7|=1 → ch8。"""
+        out = verify_citations([{"chapter": 7, "snippet": _DUP_SNIPPET}], _DUP_EVIDENCE)
+        assert out[0]["chunk_id"] == "ch8"
+
+    def test_multi_exact_no_prior_falls_back_to_first(self) -> None:
+        """不传 chapter（无先验）→ 退回确定性首个 ch2，与旧实现一致（向后兼容）。"""
+        out = verify_citations([{"snippet": _DUP_SNIPPET}], _DUP_EVIDENCE)
+        assert out[0]["verified"] is True
+        assert out[0]["chunk_id"] == "ch2"
+        assert out[0]["match_type"] == "quote"
+
+    def test_multi_exact_non_int_chapter_falls_back_to_first(self) -> None:
+        """chapter 非整数（None）→ 当无先验，退回首个。"""
+        out = verify_citations([{"chapter": None, "snippet": _DUP_SNIPPET}], _DUP_EVIDENCE)
+        assert out[0]["chunk_id"] == "ch2"
+
+    def test_single_exact_chapter_prior_does_not_misfire(self) -> None:
+        """单一命中时章号先验不改变结果（消歧只在多命中时起作用）。"""
+        # 整句只在 ch2 完整出现，自报一个不存在的章号也不该乱锚
+        citations = [
+            {"chapter": 99, "snippet": "话说天下大势，分久必合，合久必分，此乃古今不易之理。"}
+        ]
+        out = verify_citations(citations, _DUP_EVIDENCE)
+        assert out[0]["chunk_id"] == "ch2"
+        assert out[0]["verified"] is True
