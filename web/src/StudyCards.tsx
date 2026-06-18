@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// StudyCards — 知识点卡片 + 苏格拉底测我（学习者发明区，功能队列第 8 个）
+// StudyCards — 知识点卡片 + 启发测我（学习者发明区，功能队列第 8 个）
 //
 // 点"出卡片"→ 调 /api/agent/study-cards（整本出知识点卡）→ 卡片列表。
-// 每张正面显示知识点 + 苏格拉底自测题（先自己想），点"翻看"展开解释 + 原文 + 钤印。
+// 每张正面显示知识点 + 启发自测题（先自己想），点"翻看"展开解释 + 原文 + 钤印。
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
@@ -92,7 +92,7 @@ export function StudyCards({
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed pr-4">
-          据书出知识点卡——每张一道苏格拉底自测题，先自己想，再翻看解释和原文。
+          据书出知识点卡——每张一道启发自测题，先自己想，再翻看解释和原文。
         </p>
         <button
           type="button"

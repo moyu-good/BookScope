@@ -1497,7 +1497,7 @@ export function App() {
                 <CanvasHeader
                   title="知识卡片"
                   feature="cards"
-                  subtitle="据书出知识点卡——每张一道苏格拉底自测题，先自己想，再翻看解释和原文。"
+                  subtitle="据书出知识点卡——每张一道启发自测题，先自己想，再翻看解释和原文。"
                 />
                 <StudyCards
                   sessionId={currentSession.session_id}
@@ -2021,7 +2021,7 @@ const FEATURE_INFO: Record<string, string> = {
   argument: "作者的论证骨架——主张 + 撑住它的原文 + 在哪章，一条条理清。",
   concept: "一个概念在全书怎么从提出走到深化，分阶段、每段带原文。",
   technique: "作者怎么写——论证 / 结构 / 铺陈的手法，每条配一句原文例子。",
-  cards: "一组知识点卡，每张一道苏格拉底自测题，先自己想、再翻看解释和原文。",
+  cards: "一组知识点卡，每张一道启发自测题，先自己想、再翻看解释和原文。",
   style: "用词重复 / 视角越界 / 支线失踪的毛病单，保守只报清楚的、编的滤掉。",
 };
 

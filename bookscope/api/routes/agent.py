@@ -1832,7 +1832,7 @@ async def agent_study_cards(
     request: StudyCardsRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> StudyCardsResponse:
-    """据一本书出知识点卡片（学习者发明区：含苏格拉底自测题）。
+    """据一本书出知识点卡片（学习者发明区：含启发自测题）。
 
     整本进 context、列出知识点 + 自测题 + 原文依据，每条原文核验、核验不过的丢。
     ``scanned=false`` = 失败/书太大；``scanned=true`` + 空列表 = 没核验得了的知识点。
