@@ -25,8 +25,8 @@ from bookscope.agent.utils.json_parsing import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PACING_MAX_TOKENS = 4000
-"""逐章打分 + 一句依据，~25-30 章约 1500-2500 token；给 4000 留 reasoning 头。"""
+DEFAULT_PACING_MAX_TOKENS = 8000
+"""逐章打分 + 一句依据。要覆盖全书每一章——120 回的书约 5000-7000 token，给 8000 留头。"""
 
 _MAX_ATTEMPTS = 2
 
@@ -37,7 +37,8 @@ _SYSTEM_INSTRUCTION = (
     "并一句话说明依据（点名这章的具体内容）。只依据原文，不臆测。\n"
     "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
     '{"chapters": [{"chapter": 章号整数, "tension": 1到5整数, "note": "一句依据"}]}\n'
-    "按章号从小到大排列，覆盖主要章节（最多约 40 章）。"
+    "按章号从小到大排列，**覆盖全书每一章、一章都别漏**——书里有多少章就打多少章，"
+    "绝不要只挑前面几十章；章多就每章简短一句，也要给全。"
 )
 
 
