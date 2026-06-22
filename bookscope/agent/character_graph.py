@@ -161,6 +161,64 @@ def _finalize_nodes(nodes: list[str], edges: list[dict[str, Any]]) -> list[str]:
     return nodes
 
 
+# 穷尽化(1.4)合并后的边数安全帽——远高于旧单次的 30 帽,只防爆、不当摘要用。
+EXHAUSTIVE_MAX_EDGES = 300
+
+
+def _merge_graph_segments(
+    segments: list[tuple[list[str], list[dict[str, Any]]]],
+    *,
+    max_edges: int = EXHAUSTIVE_MAX_EDGES,
+) -> tuple[list[str], list[dict[str, Any]]]:
+    """REDUCE：把逐段抽出的 (nodes, edges) 合并成一张去重的图（WP-exhaustive-extraction）。
+
+    - **节点**：并集，保序去重。
+    - **边**：按规范化无向 key ``(min(s,t), max(s,t), relation)`` 去重——同一对人物的同一种
+      关系只留一条；合并时保 ``strength`` 最大、优先留**有 evidence** 的那条（evidence 要逐字
+      核验，没 evidence 的边 verified 永远 False）。每条边保留它首次出现时带的 ``chapter``。
+    - **不设 30 帽**（穷尽）；只留高位 ``max_edges`` 安全帽防爆，超了按 strength 降序截断。
+
+    纯函数、不调 LLM——REDUCE 的正确性先在这里钉死，MAP（逐段 LLM 抽边）再往上接。
+    """
+    nodes: list[str] = []
+    seen_nodes: set[str] = set()
+    by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+    for seg_nodes, seg_edges in segments:
+        for n in seg_nodes:
+            if n and n not in seen_nodes:
+                seen_nodes.add(n)
+                nodes.append(n)
+        for raw in seg_edges:
+            source = str(raw.get("source", "")).strip()
+            target = str(raw.get("target", "")).strip()
+            relation = str(raw.get("relation", "")).strip()
+            if not source or not target or not relation:
+                continue
+            a, b = (source, target) if source <= target else (target, source)
+            key = (a, b, relation)
+            existing = by_key.get(key)
+            if existing is None:
+                by_key[key] = dict(raw)
+                continue
+            # 已有同 key 边：没 evidence 而新边有 → 整条换成有 evidence 的；否则保 strength 最大
+            if not existing.get("evidence") and raw.get("evidence"):
+                by_key[key] = dict(raw)
+            else:
+                new_s = raw.get("strength", 3)
+                if isinstance(new_s, int) and new_s > existing.get("strength", 3):
+                    existing["strength"] = new_s
+
+    edges = sorted(
+        by_key.values(),
+        key=lambda e: e.get("strength", 3) if isinstance(e.get("strength"), int) else 3,
+        reverse=True,
+    )
+    if len(edges) > max_edges:
+        edges = edges[:max_edges]
+    return _finalize_nodes(nodes, edges), edges
+
+
 def _salvage_truncated_graph(
     text: str,
 ) -> tuple[list[str], list[dict[str, Any]]] | None:
