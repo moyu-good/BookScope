@@ -23,6 +23,8 @@ interface RecapProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  /** 阅读器里打开时把"你读到第几章"带进来，自动填好回顾终点（贴着在读处）。 */
+  prefillChapter?: number;
 }
 
 export function Recap({
@@ -31,8 +33,11 @@ export function Recap({
   apiKey,
   model,
   baseUrl,
+  prefillChapter,
 }: RecapProps) {
-  const [chapter, setChapter] = useState("");
+  const [chapter, setChapter] = useState(
+    prefillChapter && prefillChapter >= 1 ? String(prefillChapter) : "",
+  );
   const [queried, setQueried] = useState<number | null>(null);
   const [points, setPoints] = useState<RecapPoint[] | null>(null);
   const [scanned, setScanned] = useState(true);

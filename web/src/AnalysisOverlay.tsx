@@ -39,6 +39,8 @@ interface AnalysisOverlayProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  /** 你正读到第几章——带进来让能按章的功能（前情回顾）对准在读处。 */
+  currentChapter?: number | null;
   onClose: () => void;
 }
 
@@ -104,6 +106,7 @@ export function AnalysisOverlay({
   apiKey,
   model,
   baseUrl,
+  currentChapter,
   onClose,
 }: AnalysisOverlayProps) {
   const [active, setActive] = useState<string | null>(null);
@@ -114,7 +117,7 @@ export function AnalysisOverlay({
       case "orchestrate":
         return <AgentOrchestrate {...shared} onDrill={() => {}} />;
       case "recap":
-        return <Recap {...shared} />;
+        return <Recap {...shared} prefillChapter={currentChapter ?? undefined} />;
       case "annotate":
         return <AnnotatedReader {...shared} />;
       case "graph":
@@ -183,6 +186,7 @@ export function AnalysisOverlay({
             </span>
             <span className="text-xs text-[var(--color-ink-muted)] truncate hidden sm:inline">
               · {bookTitle}
+              {currentChapter ? ` · 你读到第 ${currentChapter} 章` : ""}
             </span>
           </div>
           <button

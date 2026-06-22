@@ -422,6 +422,7 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
           apiKey={apiKey}
           model={model}
           baseUrl={baseUrl}
+          currentChapter={current}
           onClose={() => setJianOpen(false)}
         />
       )}
