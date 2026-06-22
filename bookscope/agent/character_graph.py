@@ -396,4 +396,146 @@ def extract_character_graph(
     )
 
 
-__all__ = ["CharacterGraphResult", "DEFAULT_GRAPH_MAX_TOKENS", "extract_character_graph"]
+# 穷尽化(1.4)分段预算:每段原文的字符上限,控单次 LLM 输入大小。一章范围量级。
+SEGMENT_CHAR_BUDGET = 40000
+
+
+def _verify_edges_against_chunks(
+    edges: list[dict[str, Any]], chunks: list[dict[str, Any]]
+) -> None:
+    """对每条边的 evidence 跑 verify_citations（逐字核验）+ 章号纠偏。原地改 edges。"""
+    evidence = {
+        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
+        for c in chunks
+        if c.get("chunk_id")
+    }
+    edge_citations = [{"snippet": e.get("evidence", "")} for e in edges]
+    verify_citations(edge_citations, evidence)
+    for edge, vc in zip(edges, edge_citations, strict=True):
+        edge["verified"] = bool(vc.get("verified", False))
+        edge["match_score"] = vc.get("match_score", 0.0)
+        cid = vc.get("chunk_id")
+        true_chapter = evidence.get(cid, {}).get("chapter") if cid else None
+        if isinstance(true_chapter, int) and true_chapter > 0:
+            edge["chapter"] = true_chapter
+        else:
+            edge.setdefault("chapter", 0)
+
+
+def _segment_chunks(
+    chunks: list[dict[str, Any]], char_budget: int = SEGMENT_CHAR_BUDGET
+) -> list[list[dict[str, Any]]]:
+    """按字符预算把全书 chunks 切成若干段（保序，不打散 chunk）。"""
+    segments: list[list[dict[str, Any]]] = []
+    cur: list[dict[str, Any]] = []
+    cur_len = 0
+    for c in chunks:
+        t = str(c.get("text", ""))
+        if cur and cur_len + len(t) > char_budget:
+            segments.append(cur)
+            cur = []
+            cur_len = 0
+        cur.append(c)
+        cur_len += len(t)
+    if cur:
+        segments.append(cur)
+    return segments
+
+
+def _build_segment_system(segment_text: str, known_names: list[str], unit: str) -> str:
+    """逐段抽边的 system：已知人物清单 + 本段原文 + "本段内穷尽抽关系"指令。"""
+    word = "概念" if unit == "concept" else "人物"
+    rel_hint = (
+        "（定义/包含/对立/因果/递进/支撑等）"
+        if unit == "concept"
+        else "（君臣/政敌/父子/同盟/同僚/亲族/师徒等）"
+    )
+    names = "、".join(known_names[:120]) if known_names else "（无预设清单，自行从本段识别）"
+    return (
+        f"你在读一本书的其中一段原文。已知{word}有：{names}。\n"
+        f"只从下面这段原文里，抽这些{word}之间【在本段出现】的关系——本段内尽量抽全、"
+        f"不设条数上限，宁可多列也别漏。只依据本段原文、不臆测、不用本段外的知识。\n"
+        "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
+        '{"edges": [{"source": "名A", "target": "名B", '
+        f'"relation": "关系类型{rel_hint}", '
+        '"strength": 关系亲疏1到5整数, '
+        '"evidence": "本段原文里逐字出现的句子，原样摘录不改写"}]}\n'
+        f"source / target 尽量用上面清单里的名字。本段没有可依据原文的关系就返回 "
+        '{"edges": []}。\n\n'
+        f"=== 本段原文 ===\n{segment_text}"
+    )
+
+
+def extract_character_graph_exhaustive(
+    *,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    known_characters: list[str] | None = None,
+    unit: str = "person",
+    max_tokens: int = DEFAULT_GRAPH_MAX_TOKENS,
+    char_budget: int = SEGMENT_CHAR_BUDGET,
+) -> CharacterGraphResult | None:
+    """穷尽化（1.4）：逐段抽边 + 合并，不再单次摘要硬帽 30 条（WP-exhaustive-extraction）。
+
+    把全书按字符预算切段，每段单独抽段内关系（段小、可段内穷尽、不设上限），再用
+    :func:`_merge_graph_segments` 跨段去重合并，最后一次性 verify。节点底座来自 ``chunks``
+    里出现的人物 + 边端点；``known_characters``（上传时 KG 的 canonical 角色清单）喂进每段
+    prompt 当锚，减少别名碎裂。任一段失败跳过该段，不让整图全军覆没；全失败返 ``None``。
+
+    缓存：逐段一律关（``cache_enabled=False``）——段 JSON 偶发坏值不该被 L2 缓存住
+    （同整本功能"关缓存防 poison"守卫）。
+    """
+    start = time.monotonic()
+    segments = _segment_chunks(chunks, char_budget)
+    if not segments:
+        return None
+    known = known_characters or []
+    seg_results: list[tuple[list[str], list[dict[str, Any]]]] = []
+    in_tok = 0
+    out_tok = 0
+    for seg in segments:
+        seg_text = "".join(str(c.get("text", "")) for c in seg)
+        system = _build_segment_system(seg_text, known, unit)
+        try:
+            response = _invoke_client(
+                llm_client,
+                model=model,
+                system=system,
+                tools=[],
+                messages=[{"role": "user", "content": "请抽本段关系。"}],
+                max_tokens=max_tokens,
+                cache_enabled=False,
+            )
+        except Exception as exc:  # noqa: BLE001 — 单段失败跳过，不拖垮整图
+            logger.warning(
+                "exhaustive graph: 段 LLM 调用抛 %s: %s；跳过该段",
+                type(exc).__name__, exc,
+            )
+            continue
+        it, ot = llm_client.extract_usage_tokens(response)
+        in_tok += it or 0
+        out_tok += ot or 0
+        parsed = _parse_graph(llm_client.extract_final_text(response))
+        if parsed is not None:
+            seg_results.append(parsed)
+
+    if not seg_results:
+        return None
+    nodes, edges = _merge_graph_segments(seg_results)
+    _verify_edges_against_chunks(edges, chunks)
+    return CharacterGraphResult(
+        nodes=nodes,
+        edges=edges,
+        duration_ms=int((time.monotonic() - start) * 1000),
+        input_tokens=in_tok,
+        output_tokens=out_tok,
+    )
+
+
+__all__ = [
+    "CharacterGraphResult",
+    "DEFAULT_GRAPH_MAX_TOKENS",
+    "extract_character_graph",
+    "extract_character_graph_exhaustive",
+]
