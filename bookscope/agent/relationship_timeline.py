@@ -29,6 +29,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -46,7 +47,6 @@ DEFAULT_TIMELINE_MAX_TOKENS = 8000
 _MAX_ATTEMPTS = 2
 
 _SYSTEM_INSTRUCTION = (
-    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
     "请梳理书里**主要人物关系**随章节怎么变——不是只给一张最终的关系网，"
     "而是每一对重要关系一条贯穿全书的强度曲线，外加关键转折。每对关系给：\n"
     "1. relation（关系性质）：这两人是什么关系（君臣/政敌/父子/同盟/师徒等）。"
@@ -69,8 +69,6 @@ _SYSTEM_INSTRUCTION = (
     "只列书里真正重要的几对关系（最多约 12 对），每对的 points 按章号从小到大、"
     "turning_points 按章号从小到大；evidence 是原文里逐字出现的句子。宁可少而准，不必穷尽。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _clamp_int(value: Any, lo: int, hi: int, default: int) -> int:
@@ -316,7 +314,7 @@ def generate_relationship_timeline(
         任意失败 ``None``。
     """
     _ = session_id  # 关缓存：本任务出结构化 JSON，坏响应不该被缓存 poison
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请抽这本书主要人物关系随章节的演变。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

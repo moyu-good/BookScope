@@ -17,6 +17,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -36,7 +37,7 @@ _MAX_ATTEMPTS = 2
 _MAX_QUESTIONS = 8
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的诊断题助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
+    "你是 BookScope 的诊断题助手。"
     "请据这本书的**具体内容**，出 5-6 道『作家审稿 / 深度阅读会问』的诊断题——"
     "每道都要点名这本书里的**具体人物 / 支线 / 设定 / 章节**，不要泛泛而问。"
     "覆盖这几类（每类至多 1-2 道）：伏笔回收、人物弧线/动机、设定一致性、节奏张力、人物关系。\n"
@@ -44,8 +45,6 @@ _SYSTEM_INSTRUCTION = (
     '{"questions": [{"type": "伏笔回收", "question": "具体到这本书的问题"}]}\n'
     "type 用上面五类之一；question 必须具体到书内元素，能直接拿去问这本书。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 _VALID_TYPES = {"伏笔回收", "人物弧线", "设定一致性", "节奏张力", "人物关系"}
 
@@ -133,7 +132,7 @@ def generate_book_questions(
     Returns:
         ``[{"type": ..., "question": ...}, ...]``；任意失败 ``None``。
     """
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请据这本书出书内专属诊断题。"}]
     # cache_enabled=False：模型偶发吐坏 JSON，L2 缓存会把坏响应缓存住致持续失败
     # （poison cache）——本任务每书点一次、关缓存换可靠性。session_id 仅保留签名兼容。

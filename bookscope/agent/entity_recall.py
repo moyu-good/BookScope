@@ -20,6 +20,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -36,7 +37,7 @@ _MAX_ATTEMPTS = 2
 _MAX_APPEARANCES = 60
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的实体回溯助手。下面 === 全书原文 === 之后是一整本书的全文。"
+    "你是 BookScope 的实体回溯助手。"
     "用户会给一个实体（人物 / 地点 / 物件 / 概念）。请只根据这本书的原文，回溯该实体"
     "在全书的所有出现处，按章节先后排列。每处给：所在章节、该处在做什么（一句）、"
     "一句原文逐字依据。\n"
@@ -46,8 +47,6 @@ _SYSTEM_INSTRUCTION = (
     "order 从 1 起、按章节先后递增；snippet 必须是原文里逐字出现的句子。"
     '**书里没有这个实体就返回 {"appearances": []}——绝不为不存在的实体编造出现或原文。**'
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _resp_field(resp: Any, field: str) -> Any:
@@ -194,7 +193,7 @@ def generate_entity_recall(
         for c in chunks
         if c.get("chunk_id")
     }
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": f"请回溯实体「{entity}」在全书的出现处。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

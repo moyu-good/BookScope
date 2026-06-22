@@ -33,6 +33,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -49,7 +50,6 @@ DEFAULT_ARC_MAX_TOKENS = 8000
 _MAX_ATTEMPTS = 2
 
 _SYSTEM_INSTRUCTION = (
-    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
     "请挑出这本书的主要角色（约 3-6 个，戏份最重、最值得画弧线的），"
     "给每个角色逐章梳理两条曲线——每章给这个角色两个数值：\n"
     "1. presence（戏份密度，0-10 整数）：这章这个角色出场 / 被提及的强度。"
@@ -67,8 +67,6 @@ _SYSTEM_INSTRUCTION = (
     "每个角色的 points 按章号从小到大排列，覆盖该角色出场的主要章节（每个角色最多约 40 个点）；"
     "evidence 是原文里逐字出现的句子。宁可少而准，不必穷尽。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _clamp_int(value: Any, lo: int, hi: int, default: int) -> int:
@@ -286,7 +284,7 @@ def generate_character_arc(
         每个角色的 points 按章号排序；任意失败 ``None``。
     """
     _ = session_id  # 关缓存：本任务出结构化 JSON，坏响应不该被缓存 poison
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [
         {"role": "user", "content": "请给这本书的主要角色逐章抽戏份与处境弧线曲线。"}
     ]

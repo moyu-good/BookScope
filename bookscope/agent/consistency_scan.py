@@ -21,6 +21,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -35,7 +36,7 @@ DEFAULT_SCAN_MAX_TOKENS = 4000
 _MAX_ATTEMPTS = 2
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的设定一致性检查助手。下面 === 全书原文 === 之后是一整本书的全文。"
+    "你是 BookScope 的设定一致性检查助手。"
     "请扫描全书，找出**真正的前后矛盾**——同一个设定 / 人物 / 事实，在不同章节前后说法"
     "打架（如第 5 章说某人是左撇子、第 80 章用右手）。\n"
     "**只列真矛盾，宁缺毋滥。** 以下都【不算】矛盾，绝不要列：\n"
@@ -49,8 +50,6 @@ _SYSTEM_INSTRUCTION = (
     "snippet 必须是原文里逐字出现的句子。"
     "书里没有真矛盾，就返回空数组：{\"contradictions\": []}。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _resp_field(resp: Any, field: str) -> Any:
@@ -150,7 +149,7 @@ def generate_consistency_scan(
         for c in chunks
         if c.get("chunk_id")
     }
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请扫描全书的设定一致性，列出真正的前后矛盾。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

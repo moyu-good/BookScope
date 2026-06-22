@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -40,7 +41,6 @@ DEFAULT_GRAPH_MAX_TOKENS = 8000
 """图输出比单点判断长得多——exp-013 实测 ~5000-6000 token，4000 截断/空。"""
 
 _PERSON_SYSTEM_INSTRUCTION = (
-    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
     "请梳理书中主要人物之间的关系网，只依据原文，不臆测、不编造书里不存在的关系。\n"
     "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
     '{"nodes": [{"name": "人物名"}], '
@@ -60,7 +60,6 @@ _PERSON_SYSTEM_INSTRUCTION = (
 # 概念图：人物图的跨题材投影（exp-014 GO）。分析单位从人物换成概念，
 # 关系类型换成概念逻辑关系，其余机制（JSON 形态 + 边粒度证据）完全一致。
 _CONCEPT_SYSTEM_INSTRUCTION = (
-    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
     "请梳理书中核心概念之间的关系网，只依据原文，不臆测、不编造书里不存在的关系。\n"
     "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
     '{"nodes": [{"name": "概念名"}], '
@@ -86,9 +85,6 @@ _USER_MSG_BY_UNIT: dict[str, str] = {
     "person": "请抽取这本书的人物关系图。",
     "concept": "请抽取这本书的概念关系图。",
 }
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
-
 
 @dataclass(frozen=True)
 class CharacterGraphResult:
@@ -287,7 +283,7 @@ def extract_character_graph(
     start = time.monotonic()
     instruction = _INSTRUCTION_BY_UNIT.get(unit, _PERSON_SYSTEM_INSTRUCTION)
     user_msg = _USER_MSG_BY_UNIT.get(unit, _USER_MSG_BY_UNIT["person"])
-    system = instruction + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, instruction)
     messages = [{"role": "user", "content": user_msg}]
 
     try:

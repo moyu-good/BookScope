@@ -15,6 +15,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -30,7 +31,7 @@ _MAX_ATTEMPTS = 2
 _MAX_TECHNIQUES = 30
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的写作手法分析助手。下面 === 全书原文 === 之后是一本书全文。分析作者的"
+    "你是 BookScope 的写作手法分析助手。分析作者的"
     "主要写作手法——怎么论证、怎么结构、怎么铺陈/用语。每条给：手法名、怎么用的、一句原文"
     "逐字例子、所在章节。只据原文、不编，不评优劣。\n"
     "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
@@ -39,8 +40,6 @@ _SYSTEM_INSTRUCTION = (
     "order 从 1 起递增；snippet 必须是原文里逐字出现的句子。"
     '没有显著手法就返回 {"techniques": []}，绝不编造。'
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _resp_field(resp: Any, field: str) -> Any:
@@ -177,7 +176,7 @@ def generate_writing_technique(
         for c in chunks
         if c.get("chunk_id")
     }
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请分析这本书的主要写作手法。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

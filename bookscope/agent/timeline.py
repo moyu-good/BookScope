@@ -15,6 +15,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -31,7 +32,7 @@ _MAX_ATTEMPTS = 2
 _MAX_EVENTS = 40
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的时间线梳理助手。下面 === 全书原文 === 之后是一整本书的全文。"
+    "你是 BookScope 的时间线梳理助手。"
     "请按**时间先后**梳理书中的主要事件——多线叙事 / 倒叙也要还原成真实发生顺序。"
     "每条给：事件、发生时间（书里写明的，没写就留空）、所在章节、一句原文依据。\n"
     "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
@@ -40,8 +41,6 @@ _SYSTEM_INSTRUCTION = (
     "order 从 1 起、按真实时间先后递增。只列书里真有的主要事件（最多约 30 条），"
     "evidence 必须是原文里逐字出现的句子。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _resp_field(resp: Any, field: str) -> Any:
@@ -180,7 +179,7 @@ def generate_timeline(
         for c in chunks
         if c.get("chunk_id")
     }
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请据这本书按时序梳理主要事件。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

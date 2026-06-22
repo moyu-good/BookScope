@@ -15,6 +15,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -30,7 +31,7 @@ DEFAULT_PACING_MAX_TOKENS = 4000
 _MAX_ATTEMPTS = 2
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的节奏分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
+    "你是 BookScope 的节奏分析助手。"
     "请逐章（或逐主要部分）判断节奏张力的高低，给每章打 1-5 分"
     "（1=最松：铺垫/制度/背景多、冲突少；5=最紧：高潮/激烈冲突/转折），"
     "并一句话说明依据（点名这章的具体内容）。只依据原文，不臆测。\n"
@@ -38,8 +39,6 @@ _SYSTEM_INSTRUCTION = (
     '{"chapters": [{"chapter": 章号整数, "tension": 1到5整数, "note": "一句依据"}]}\n'
     "按章号从小到大排列，覆盖主要章节（最多约 40 章）。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _coerce_points(raw: Any) -> list[dict[str, Any]]:
@@ -110,7 +109,7 @@ def generate_pacing_curve(
         ``[{"chapter": int, "tension": 1-5, "note": str}, ...]`` 按章号排序；失败 ``None``。
     """
     _ = session_id
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请据这本书出逐章节奏张力曲线。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

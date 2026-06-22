@@ -30,6 +30,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -46,7 +47,6 @@ DEFAULT_WEAVE_MAX_TOKENS = 8000
 _MAX_ATTEMPTS = 2
 
 _SYSTEM_INSTRUCTION = (
-    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
     "请梳理这本书的**情节支线编织结构**——有哪几条情节支线、每条在哪些章活跃、"
     "哪些章两条支线交汇。\n"
     "一条**支线** = 一组围绕共同目标/冲突/人物群、有起有止地推进的事件序列"
@@ -70,8 +70,6 @@ _SYSTEM_INSTRUCTION = (
     "subplots 里的 name 要和 intersections 里引用的支线名一致。"
     "宁可少而准，不必穷尽。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _coerce_subplot(item: Any) -> dict[str, Any] | None:
@@ -371,7 +369,7 @@ def generate_subplot_weave(
         for c in chunks
         if c.get("chunk_id")
     }
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请抽这本书的情节支线编织结构。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

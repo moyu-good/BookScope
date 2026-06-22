@@ -18,6 +18,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -33,7 +34,7 @@ _MAX_ATTEMPTS = 2
 _MAX_STAGES = 50
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的概念演进助手。下面 === 全书原文 === 之后是一本书全文。用户会给一个"
+    "你是 BookScope 的概念演进助手。用户会给一个"
     "概念，回溯它在全书怎么一步步发展——每个阶段在哪章、概念被怎么用/深化/转义，按章节"
     "先后。只据原文、不编。\n"
     "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
@@ -42,8 +43,6 @@ _SYSTEM_INSTRUCTION = (
     "order 从 1 起递增；snippet 必须是原文里逐字出现的句子。"
     '**书里没有这个概念就返回 {"stages": []}，绝不编造演进。**'
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _resp_field(resp: Any, field: str) -> Any:
@@ -183,7 +182,7 @@ def generate_concept_evolution(
         for c in chunks
         if c.get("chunk_id")
     }
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": f"请回溯概念「{concept}」在全书的演进。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

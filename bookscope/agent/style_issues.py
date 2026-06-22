@@ -19,6 +19,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -35,7 +36,7 @@ _MAX_ISSUES = 40
 _VALID_TYPES = {"repetition", "pov", "dropped_thread"}
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的文体审稿助手。下面 === 全书原文 === 之后是一本书全文。"
+    "你是 BookScope 的文体审稿助手。"
     "扫文体级毛病，三类：repetition（用词重复，某词/短语成口头禅）、pov（视角越界，"
     "限知视角写了视角人物不该知道的内心/事）、dropped_thread（支线失踪，埋的支线/人物"
     "后文没交代）。**保守，只报清楚的、宁缺毋滥；没有就别凑。**\n"
@@ -45,8 +46,6 @@ _SYSTEM_INSTRUCTION = (
     "snippet 必须是原文里逐字出现的句子。没有清楚的毛病就返回 "
     '{"issues": []}，绝不为凑数编造。'
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _resp_field(resp: Any, field: str) -> Any:
@@ -184,7 +183,7 @@ def generate_style_issues(
         for c in chunks
         if c.get("chunk_id")
     }
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请扫这本书的文体毛病。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

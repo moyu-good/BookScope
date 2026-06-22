@@ -32,6 +32,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -51,7 +52,7 @@ _MAX_FEATURES = 12
 _MAX_DRIFT = 20
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的声口分析助手。下面 === 全书原文 === 之后是一整本书的全文。"
+    "你是 BookScope 的声口分析助手。"
     "用户会给一个角色。请只根据这本书的原文，做两件事：\n"
     "一、把这个角色全书的对白归拢起来，刻画他说话的腔调，列出几条语言特征"
     "（口头禅、句式长短、文白程度、用词偏好、语气）。每条特征挂 1 句最能代表"
@@ -74,8 +75,6 @@ _SYSTEM_INSTRUCTION = (
     '"reason": "为什么觉得不像他说的"}]}\n'
     "features 最多约 6 条、宁可少而准；drift 默认从严，没把握的不报、空数组也没关系。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _coerce_features(raw: Any) -> list[dict[str, Any]]:
@@ -322,7 +321,7 @@ def generate_character_voice(
     character = (character or "").strip()
     if not character:
         return None
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [
         {"role": "user", "content": f"请分析角色「{character}」的声口一致性。"}
     ]

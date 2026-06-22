@@ -26,6 +26,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -42,7 +43,6 @@ DEFAULT_FLOW_MAX_TOKENS = 8000
 _MAX_ATTEMPTS = 2
 
 _SYSTEM_INSTRUCTION = (
-    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
     "请逐章梳理人物的同场关系——每章里哪些人物**同场出现、有直接互动**"
     "（同一场景里照面、对话、交手才算；只是分别被提到、各在各的场景，不算同场）。"
     "只依据原文，不臆测、不编造书里不存在的同场。\n"
@@ -57,8 +57,6 @@ _SYSTEM_INSTRUCTION = (
     "按章号从小到大排列，覆盖主要章节（最多约 40 章）；"
     "每章只列最重要的核心人物与同场对，宁可少而准，不必穷尽次要人物。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _coerce_chapter(item: Any) -> dict[str, Any] | None:
@@ -268,7 +266,7 @@ def generate_character_flow(
         match_score, chapter}]}, ...]`` 按章号排序；任意失败 ``None``。
     """
     _ = session_id  # 关缓存：本任务出结构化 JSON，坏响应不该被缓存 poison
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请逐章抽这本书的人物同场叙事流。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

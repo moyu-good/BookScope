@@ -22,6 +22,7 @@ import time
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent._internal.loop_shared import elapsed_ms as _elapsed_ms
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.events import FinalAnswerEvent, IterationStartEvent, LoopCallback
@@ -44,7 +45,6 @@ _LONGCTX_RETRY_HINT = (
 # v1 内联指令（先验证路由，prompt 正式化留给 PE）。要求输出与 loop / fast_path
 # 同形的 {answer, citations[{chapter, snippet}]} JSON，好复用 parse_final_answer。
 _LONGCTX_SYSTEM_INSTRUCTION = (
-    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
     "只根据这本书的原文回答，不用书外知识、不臆测、不编。\n"
     "严格输出 JSON（不要别的话）：\n"
     '{"answer": "你的分析", "citations": [{"chapter": 章节号整数, '
@@ -52,9 +52,6 @@ _LONGCTX_SYSTEM_INSTRUCTION = (
     "每个判断都要有 citation 支撑；snippet 必须是原文里逐字出现的句子。"
     "找不到原文依据的结论不要输出。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
-
 
 def _resp_field(resp: Any, field: str) -> Any:
     """dict / 对象两种 response 形态统一取字段（同 fast_path._resp_field）。"""
@@ -109,10 +106,11 @@ def run_long_context(
 
     _safe_emit(IterationStartEvent(iteration=1, elapsed_ms=_elapsed_ms(start)))
 
-    # system 固定段 = 指令 + 整本书（稳定前缀，保缓存）；extra 拼书后（变化段）。
-    system = _LONGCTX_SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
-    if extra_system_prompt:
-        system = system + "\n\n" + extra_system_prompt
+    # book-first：前导 + 整本书构成跨功能稳定前缀（保 DeepSeek 前缀缓存），功能指令
+    # 挪到书后；extra（reviewer 批评等变化段）再拼指令之后。
+    system = build_longctx_system(
+        full_text, _LONGCTX_SYSTEM_INSTRUCTION, suffix=extra_system_prompt
+    )
 
     # 解析失败重试一次：纠正提示放 user 消息（不动 system 书前缀，保前缀缓存命中）。
     answer: str | None = None

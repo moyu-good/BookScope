@@ -16,6 +16,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -31,7 +32,7 @@ _MAX_ATTEMPTS = 2
 _MAX_CARDS = 30
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的学习卡片助手。下面 === 全书原文 === 之后是一本书全文。据书出知识点"
+    "你是 BookScope 的学习卡片助手。据书出知识点"
     "卡片，每张给：知识点名、解释、一道启发式自测题（启发读者自己想，不是直接给答案）、"
     "一句原文逐字依据、所在章节。只据原文、不编。\n"
     "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
@@ -40,8 +41,6 @@ _SYSTEM_INSTRUCTION = (
     "order 从 1 起递增；snippet 必须是原文里逐字出现的句子。"
     '没有可锚到原文的知识点就返回 {"cards": []}，绝不编造。'
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _resp_field(resp: Any, field: str) -> Any:
@@ -179,7 +178,7 @@ def generate_study_cards(
         for c in chunks
         if c.get("chunk_id")
     }
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请据这本书出知识点卡片。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

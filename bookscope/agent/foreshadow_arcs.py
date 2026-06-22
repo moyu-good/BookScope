@@ -28,6 +28,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -44,7 +45,6 @@ DEFAULT_ARCS_MAX_TOKENS = 8000
 _MAX_ATTEMPTS = 2
 
 _SYSTEM_INSTRUCTION = (
-    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
     "请梳理这本书里的**伏笔与回收**——前文埋下一个悬念/线索/承诺（埋点 setup），"
     "后文把它兑现/呼应/解开（回收点 payoff）。\n"
     "对每条伏笔判断：它在后文有没有被回收？\n"
@@ -63,8 +63,6 @@ _SYSTEM_INSTRUCTION = (
     "按 setup_chapter 从小到大排列，覆盖主要伏笔（最多约 30 条）；"
     "宁可少而准，不必穷尽次要伏笔。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _coerce_arc(item: Any) -> dict[str, Any] | None:
@@ -295,7 +293,7 @@ def generate_foreshadow_arcs(
         埋点核不过的弧已被滤掉；``status="dangling"`` = 断弧（埋了没回收）。
     """
     _ = session_id  # 关缓存：本任务出结构化 JSON，坏响应不该被缓存 poison
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请抽这本书的伏笔与回收弧线。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

@@ -27,6 +27,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -43,7 +44,6 @@ DEFAULT_CURVE_MAX_TOKENS = 8000
 _MAX_ATTEMPTS = 2
 
 _SYSTEM_INSTRUCTION = (
-    "你是严谨的长文本分析助手。下面 === 全书原文 === 之后是一整本书的完整原文。"
     "请逐章梳理这本书的「叙事曲线」——每章判定四个维度：\n"
     "1. tension（张力，0-10 整数）：这章剧情绷得紧不紧。铺垫/过场章低，高潮/冲突章高。\n"
     "2. sentiment（情感方向，-5 到 +5 整数）：这章整体往上走（喜、胜、聚，正数）"
@@ -60,8 +60,6 @@ _SYSTEM_INSTRUCTION = (
     "按章号从小到大排列，覆盖主要章节（最多约 40 章）；evidence 是原文里逐字出现的句子。"
     "宁可少而准，不必穷尽。"
 )
-
-_BOOK_DELIMITER = "\n\n=== 全书原文 ===\n"
 
 
 def _clamp_int(value: Any, lo: int, hi: int, default: int) -> int:
@@ -254,7 +252,7 @@ def generate_narrative_curve(
         ...]`` 按章号排序；任意失败 ``None``。
     """
     _ = session_id  # 关缓存：本任务出结构化 JSON，坏响应不该被缓存 poison
-    system = _SYSTEM_INSTRUCTION + _BOOK_DELIMITER + full_text
+    system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请逐章抽这本书的多维叙事曲线。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
