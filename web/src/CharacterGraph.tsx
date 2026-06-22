@@ -34,9 +34,13 @@ interface CharacterGraphProps {
   baseUrl: string;
 }
 
-const W = 760;
-const H = 560;
 const PAD = 46;
+
+// 画布按节点数自适应——156 人挤在 760×560 会糊成一团，节点多就把画布撑大。
+function canvasSize(nodeCount: number): { w: number; h: number } {
+  const w = Math.max(760, Math.min(1480, Math.round(340 + nodeCount * 6)));
+  return { w, h: Math.round(w * 0.64) };
+}
 
 interface Node {
   x: number;
@@ -50,6 +54,76 @@ interface Node {
 const restLen = (s: number) => 64 + (5 - Math.max(1, Math.min(5, s))) * 26;
 // 关系亲疏 → 连线粗细（紧密更粗）
 const edgeWidth = (s: number) => 1.2 + Math.max(1, Math.min(5, s)) * 0.55;
+
+// 关系类型 → 敌 / 亲 / 中 三类，给边上色（让敌友一眼分明）。
+type RelKind = "foe" | "kin" | "neutral";
+function relationKind(relation: string): RelKind {
+  const r = relation || "";
+  if (/敌|政敌|对手|对立|仇|宿敌|交锋|争|叛|反目/.test(r)) return "foe";
+  if (/盟|结义|亲|族|父|母|子|女|夫|妻|兄|弟|姐|妹|君臣|主仆|师徒|师|徒|友|挚|同袍|姻/.test(r)) return "kin";
+  return "neutral";
+}
+const EDGE_COLOR: Record<RelKind, string> = {
+  foe: "#C0392B", // 敌对 = 红
+  kin: "#2E8B6E", // 同盟/亲族 = 青绿
+  neutral: "#9A948A", // 一般 = 灰
+};
+const EDGE_KIND_LABEL: Record<RelKind, string> = { foe: "敌对", kin: "同盟 / 亲族", neutral: "一般" };
+
+// 阵营配色:社区发现分出的群各给一色(朱砂打头),超出调色板的归中性灰。
+const COMMUNITY_COLORS = [
+  "#B23A26", "#2E6E5E", "#3A5A8C", "#9A6A2E",
+  "#6E3A6E", "#4A7A3A", "#A23A5A", "#3A6E8C",
+];
+const communityColor = (id: number) => COMMUNITY_COLORS[id] ?? "#8A857A";
+
+// 社区发现(label propagation,按 strength 加权):把关系网分成几个群 ≈ 阵营。
+// 纯算法、不调 LLM;群只用来上色 + 布局聚拢,近似(三国大致分出魏蜀吴)。
+function detectCommunities(nodes: string[], edges: GraphEdge[]): Map<string, number> {
+  const adj = new Map<string, [string, number][]>();
+  for (const n of nodes) adj.set(n, []);
+  for (const e of edges) {
+    if (!adj.has(e.source) || !adj.has(e.target)) continue;
+    const w = Math.max(1, Math.min(5, e.strength || 3));
+    adj.get(e.source)!.push([e.target, w]);
+    adj.get(e.target)!.push([e.source, w]);
+  }
+  const label = new Map<string, string>();
+  nodes.forEach((n) => label.set(n, n));
+  for (let iter = 0; iter < 12; iter++) {
+    let changed = false;
+    for (const n of nodes) {
+      const nbrs = adj.get(n)!;
+      if (nbrs.length === 0) continue;
+      const wsum = new Map<string, number>();
+      for (const [nb, s] of nbrs) {
+        const lb = label.get(nb)!;
+        wsum.set(lb, (wsum.get(lb) ?? 0) + s);
+      }
+      let best = label.get(n)!;
+      let bestW = -1;
+      for (const [lb, ww] of wsum) {
+        if (ww > bestW || (ww === bestW && lb < best)) {
+          best = lb;
+          bestW = ww;
+        }
+      }
+      if (best !== label.get(n)) {
+        label.set(n, best);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  // 按群大小降序重映射成 0..k-1(最大的群拿朱砂)
+  const sizes = new Map<string, number>();
+  for (const n of nodes) sizes.set(label.get(n)!, (sizes.get(label.get(n)!) ?? 0) + 1);
+  const order = [...sizes.entries()].sort((a, b) => b[1] - a[1]).map(([lb]) => lb);
+  const labToId = new Map(order.map((lb, i) => [lb, i]));
+  const out = new Map<string, number>();
+  for (const n of nodes) out.set(n, labToId.get(label.get(n)!) ?? 0);
+  return out;
+}
 
 export function CharacterGraph({
   sessionId,
@@ -70,6 +144,13 @@ export function CharacterGraph({
   const coolRef = useRef(0);
   const dragRef = useRef<string | null>(null);
   const [, setFrame] = useState(0);
+
+  // 画布大小随节点数自适应(多就撑大、不糊团);社区发现给每个节点一个阵营 id。
+  const { w: W, h: H } = useMemo(() => canvasSize(data?.nodes.length ?? 0), [data]);
+  const communities = useMemo(
+    () => (data ? detectCommunities(data.nodes, data.edges) : new Map<string, number>()),
+    [data],
+  );
 
   async function load(u: "person" | "concept") {
     setUnit(u);
@@ -115,6 +196,29 @@ export function CharacterGraph({
     return d;
   }, [data]);
 
+  // 每个阵营(前几大社区)选戏份最重的人当代表,给图例打标签("■ 刘备一方")。
+  const campReps = useMemo(() => {
+    if (!data) return [] as { id: number; name: string }[];
+    const ids = [...communities.values()];
+    const numC = ids.length ? Math.max(...ids) + 1 : 0;
+    const ringN = Math.min(numC, 6);
+    const reps: { id: number; name: string }[] = [];
+    for (let id = 0; id < ringN; id++) {
+      let best: string | null = null;
+      let bestDeg = -1;
+      for (const nm of data.nodes) {
+        if ((communities.get(nm) ?? -1) !== id) continue;
+        const dg = degree.get(nm) ?? 0;
+        if (dg > bestDeg) {
+          bestDeg = dg;
+          best = nm;
+        }
+      }
+      if (best) reps.push({ id, name: best });
+    }
+    return reps;
+  }, [data, communities, degree]);
+
   // 初始化节点（圆周）+ 启动动画模拟
   useEffect(() => {
     if (!data) return;
@@ -132,6 +236,7 @@ export function CharacterGraph({
     });
     simRef.current = sim;
     coolRef.current = 0;
+    setFrame((f) => f + 1); // 立刻按初始坐标画一帧——别等 rAF（后台标签页 / 省电模式 rAF 会被掐，否则图空白）
     startSim();
     return stopSim;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,10 +274,20 @@ export function CharacterGraph({
     const names = cur.nodes;
     const fx = new Map<string, number>();
     const fy = new Map<string, number>();
+    // 阵营锚点:前几大社区在画布上沿环分散,各自成员往自己阵营锚拉 → 阵营空间分开、不糊团。
+    const ids = [...communities.values()];
+    const numC = ids.length ? Math.max(...ids) + 1 : 1;
+    const ringN = Math.max(1, Math.min(numC, 6));
+    const anchorAt = (cid: number): { x: number; y: number } => {
+      if (numC <= 1 || cid >= ringN) return { x: W / 2, y: H / 2 };
+      const ang = (2 * Math.PI * cid) / ringN - Math.PI / 2;
+      return { x: W / 2 + Math.cos(ang) * W * 0.3, y: H / 2 + Math.sin(ang) * H * 0.3 };
+    };
     for (const nm of names) {
       const p = sim.get(nm)!;
-      fx.set(nm, (W / 2 - p.x) * 0.008); // 居中
-      fy.set(nm, (H / 2 - p.y) * 0.008);
+      const an = anchorAt(communities.get(nm) ?? 0);
+      fx.set(nm, (an.x - p.x) * 0.011);
+      fy.set(nm, (an.y - p.y) * 0.011);
     }
     // 斥力
     for (let i = 0; i < names.length; i++) {
@@ -187,7 +302,7 @@ export function CharacterGraph({
           dy = Math.random() - 0.5;
           d = 0.01;
         }
-        const rep = 4200 / (d * d);
+        const rep = ((W * H) / 100) / (d * d);
         const ux = dx / d;
         const uy = dy / d;
         fx.set(names[i], fx.get(names[i])! + ux * rep);
@@ -409,9 +524,24 @@ export function CharacterGraph({
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
         {data.nodes.length} 个{noun}、{data.edges.length} 条关系（已核验原文{" "}
-        {data.edges.filter((e) => e.verified).length} 条）。连线越粗越近 = 越亲密；
-        可拖动节点；点边看原文出处。
+        {data.edges.filter((e) => e.verified).length} 条）。节点按阵营自动分群上色，连线按关系类型上色、越粗越亲密；可拖动节点、点边看原文。
       </p>
+      {/* 图例:关系类型 + 阵营 */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
+        {(["foe", "kin", "neutral"] as RelKind[]).map((k) => (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span style={{ display: "inline-block", width: 16, borderTop: `3px solid ${EDGE_COLOR[k]}` }} />
+            {EDGE_KIND_LABEL[k]}
+          </span>
+        ))}
+        {campReps.length > 0 && <span className="opacity-70">阵营：</span>}
+        {campReps.map((c) => (
+          <span key={c.id} className="inline-flex items-center gap-1">
+            <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: communityColor(c.id) }} />
+            {c.name}一方
+          </span>
+        ))}
+      </div>
 
       {!loading && (
         <RunStats trace={data.trace as RunTrace} note={`${data.edges.length} 条关系`} />
@@ -439,17 +569,11 @@ export function CharacterGraph({
                 y1={a.y}
                 x2={b.x}
                 y2={b.y}
-                stroke={
-                  active
-                    ? "var(--color-seal)"
-                    : e.verified
-                      ? "var(--color-ink-muted)"
-                      : "#c9c2b6"
-                }
+                stroke={active ? "var(--color-seal)" : EDGE_COLOR[relationKind(e.relation)]}
                 strokeWidth={active ? edgeWidth(e.strength) + 1.5 : edgeWidth(e.strength)}
                 strokeLinecap="round"
                 strokeDasharray={e.verified ? undefined : "4 3"}
-                opacity={active ? 1 : 0.7}
+                opacity={active ? 1 : e.verified ? 0.72 : 0.4}
               />
               <line
                 x1={a.x}
@@ -464,11 +588,13 @@ export function CharacterGraph({
             </g>
           );
         })}
-        {/* 节点 */}
+        {/* 节点（按阵营上色；人多时只给主要角色标名，免得糊一脸） */}
         {data.nodes.map((name) => {
           const p = sim.get(name);
           if (!p) return null;
-          const r = 6 + Math.min(9, (degree.get(name) ?? 0) * 1.5);
+          const deg = degree.get(name) ?? 0;
+          const r = 6 + Math.min(9, deg * 1.5);
+          const showLabel = data.nodes.length <= 60 || deg >= 4;
           return (
             <g
               key={`n-${name}`}
@@ -479,21 +605,23 @@ export function CharacterGraph({
                 cx={p.x}
                 cy={p.y}
                 r={r}
-                fill="var(--color-seal)"
-                opacity={0.88}
+                fill={communityColor(communities.get(name) ?? 0)}
+                opacity={0.9}
                 stroke="var(--color-paper)"
                 strokeWidth={1.5}
               />
-              <text
-                x={p.x}
-                y={p.y - r - 4}
-                textAnchor="middle"
-                fontSize={12}
-                fill="var(--color-ink)"
-                style={{ fontFamily: "var(--font-display)", pointerEvents: "none" }}
-              >
-                {name}
-              </text>
+              {showLabel && (
+                <text
+                  x={p.x}
+                  y={p.y - r - 4}
+                  textAnchor="middle"
+                  fontSize={12}
+                  fill="var(--color-ink)"
+                  style={{ fontFamily: "var(--font-display)", pointerEvents: "none" }}
+                >
+                  {name}
+                </text>
+              )}
             </g>
           );
         })}
