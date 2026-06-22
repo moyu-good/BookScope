@@ -27,6 +27,8 @@ export interface SessionMetadata {
 export interface BookShelfProps {
   activeSessionId: string | null;
   onSelect: (session: SessionMetadata) => void;
+  /** 点「读」门：进沉浸阅读器 */
+  onRead: (session: SessionMetadata) => void;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -80,6 +82,7 @@ async function deleteSession(sessionId: string): Promise<void> {
 export function BookShelf({
   activeSessionId,
   onSelect,
+  onRead,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -152,14 +155,20 @@ export function BookShelf({
 
   return (
     <section className="border-b border-[var(--color-rule)] pb-5">
-      <h2 className="text-xs uppercase tracking-wider text-[var(--color-ink-muted)] mb-3">
-        书柜
-      </h2>
+      <div className="flex items-baseline gap-3 mb-3 flex-wrap">
+        <h2 className="text-xs uppercase tracking-wider text-[var(--color-ink-muted)]">
+          书柜
+        </h2>
+        <span className="text-xs text-[var(--color-ink-muted)]">
+          点书脊就开读 · 「分析台」只跑分析不读
+        </span>
+      </div>
       <ShelfBody
         state={state}
         activeSessionId={activeSessionId}
         confirmingId={confirmingId}
         onSelect={onSelect}
+        onRead={onRead}
         onAskDelete={(id) => setConfirmingId(id)}
         onCancelDelete={() => setConfirmingId(null)}
         onConfirmDelete={handleConfirmDelete}
@@ -173,6 +182,7 @@ function ShelfBody(props: {
   activeSessionId: string | null;
   confirmingId: string | null;
   onSelect: (session: SessionMetadata) => void;
+  onRead: (session: SessionMetadata) => void;
   onAskDelete: (id: string) => void;
   onCancelDelete: () => void;
   onConfirmDelete: (id: string) => void;
@@ -182,6 +192,7 @@ function ShelfBody(props: {
     activeSessionId,
     confirmingId,
     onSelect,
+    onRead,
     onAskDelete,
     onCancelDelete,
     onConfirmDelete,
@@ -236,6 +247,7 @@ function ShelfBody(props: {
             isActive={isActive}
             isConfirming={isConfirming}
             onSelect={() => onSelect(s)}
+            onRead={() => onRead(s)}
             onAskDelete={() => onAskDelete(s.session_id)}
             onCancelDelete={onCancelDelete}
             onConfirmDelete={() => onConfirmDelete(s.session_id)}
@@ -251,6 +263,7 @@ function BookTab(props: {
   isActive: boolean;
   isConfirming: boolean;
   onSelect: () => void;
+  onRead: () => void;
   onAskDelete: () => void;
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
@@ -260,6 +273,7 @@ function BookTab(props: {
     isActive,
     isConfirming,
     onSelect,
+    onRead,
     onAskDelete,
     onCancelDelete,
     onConfirmDelete,
@@ -283,8 +297,9 @@ function BookTab(props: {
       <span aria-hidden className={stripeClass} />
       <button
         type="button"
-        onClick={onSelect}
+        onClick={onRead}
         aria-pressed={isActive}
+        title={`读《${session.book_title}》`}
         className="flex flex-col items-start text-left pl-3 pr-2 py-2 min-w-[10rem] max-w-[16rem]"
       >
         <span
@@ -302,6 +317,14 @@ function BookTab(props: {
         <span className="text-xs text-[var(--color-ink-muted)] mt-0.5">
           {session.language} · {formatRelativeTime(session.last_accessed_at)}
         </span>
+      </button>
+      <button
+        type="button"
+        onClick={onSelect}
+        className="self-center shrink-0 text-xs px-2.5 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] mr-1"
+        title={`在分析台分析《${session.book_title}》`}
+      >
+        分析台
       </button>
       <div className="flex items-center pr-2">
         {isConfirming ? (

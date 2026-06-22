@@ -4,7 +4,8 @@ import { BookShelf } from "./BookShelf";
 import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
 import type { DrillInfo } from "./AgentOrchestrate";
-import { ReadingView } from "./ReadingView";
+import { Reader } from "./Reader";
+import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
 import { CharacterFlow } from "./CharacterFlow";
@@ -626,12 +627,19 @@ function loadPersistedConfig(): PersistedConfig | null {
     ) {
       return null;
     }
-    return {
-      provider: parsed.provider as Provider,
-      apiKey: parsed.apiKey,
-      model: parsed.model ?? "",
-      baseUrl: parsed.baseUrl ?? "",
-    };
+    let model = parsed.model ?? "";
+    let baseUrl = parsed.baseUrl ?? "";
+    // 旧配置清洗:minimax 已彻底下线(2026-06-11),它的 base_url / 模型名(abab*)若残留在
+    // localStorage 里,会让 DeepSeek 档带着失效端点跑——用户会看到"dk 在用 minimax 设置"。
+    // 命中就清回官方默认(空 = 各后端默认)。
+    if (/minimax/i.test(baseUrl) || /minimax|abab/i.test(model)) {
+      model = "";
+      baseUrl = "";
+    }
+    // provider 只认 deepseek / anthropic;存过别的(如旧 minimax)一律归 deepseek。
+    const provider: Provider =
+      parsed.provider === "anthropic" ? "anthropic" : "deepseek";
+    return { provider, apiKey: parsed.apiKey, model, baseUrl };
   } catch {
     return null;
   }
@@ -640,6 +648,19 @@ function loadPersistedConfig(): PersistedConfig | null {
 function savePersistedConfig(config: PersistedConfig): void {
   if (typeof window === "undefined") return;
   try {
+    // 别用空 key 覆盖已存的 key——防"加载失败/某次渲染 key 暂空 → 存空 → 把保存的 key 抹了"
+    // 的竞态(用户反复反馈"默认保存的 api 又没了")。空 key 时若本地已有 key,直接不写。
+    if (!config.apiKey) {
+      const raw = window.localStorage.getItem(CONFIG_STORAGE_KEY);
+      if (raw) {
+        try {
+          const ex = JSON.parse(raw) as Partial<PersistedConfig>;
+          if (typeof ex.apiKey === "string" && ex.apiKey) return;
+        } catch {
+          /* 解析不了就当没有,照常写 */
+        }
+      }
+    }
     window.localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
   } catch {
     // 隐私模式 / 配额满 / SSR ——失败默默忽略不阻断主流程
@@ -715,6 +736,8 @@ export function App() {
   >("library");
   // 手机端左栏收成抽屉，这个控制开合
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // 读书优先 IA：进沉浸阅读器时为 true，整页渲染 Reader、不挂分析台外壳。
+  const [readerOpen, setReaderOpen] = useState(false);
 
   // 配置变化时同步写 localStorage
   useEffect(() => {
@@ -960,6 +983,13 @@ export function App() {
     setGoalPrefill({ goal: g, token: Date.now() });
   }, []);
 
+  // 读书优先 IA：从书架「读」门进沉浸阅读器（选中该书 + 整页渲染 Reader）。
+  const openReader = useCallback((s: SessionMetadata) => {
+    setCurrentSession(s);
+    setReaderOpen(true);
+    setSidebarOpen(false);
+  }, []);
+
   function effectiveBaseUrl(): string {
     // 仅 deepseek 走 base_url（代理 / 其他 OpenAI 兼容 endpoint）；anthropic 后端会忽略
     if (provider === "anthropic") return "";
@@ -1157,6 +1187,22 @@ export function App() {
     }
   }
 
+  // 读书优先：进了沉浸阅读器就整页渲染 Reader，不挂分析台外壳。
+  // 分析在阅读器内的「鉴」浮层就地跑（AnalysisOverlay），不跳回这里。
+  if (readerOpen && currentSession) {
+    return (
+      <Reader
+        sessionId={currentSession.session_id}
+        bookTitle={currentSession.book_title}
+        provider={provider}
+        apiKey={apiKey}
+        model={model}
+        baseUrl={effectiveBaseUrl()}
+        onExit={() => setReaderOpen(false)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen md:p-3">
       <MobileBar onOpenNav={() => setSidebarOpen(true)} />
@@ -1244,6 +1290,7 @@ export function App() {
               <BookShelf
                 activeSessionId={currentSession?.session_id ?? null}
                 onSelect={handleSelectShelfBook}
+                onRead={openReader}
                 onDeleted={handleDeletedShelfBook}
                 refreshTrigger={shelfRefresh}
                 pendingAutoSelectId={pendingAutoSelectId}
@@ -1395,10 +1442,10 @@ export function App() {
 
               <div className={mode === "annotate" ? "" : "hidden"}>
                 <CanvasHeader
-                  title="精读"
-                  subtitle="像翻一本书那样从头读原文——字号、行距、页边、背景、字体随手调，读到哪记得住。想看脉络时打开「注释」层，行间浮出带原文证据的批注（伏笔、矛盾、母题、人物）。"
+                  title="批注"
+                  subtitle="按选中的层通读全书，行间浮出带原文证据的朱砂批注（伏笔、矛盾、母题、人物），点开看支撑它的原文，跨章批注一键跳到牵连的另一处。想纯读、调排版，去顶部「读」。"
                 />
-                <ReadingView
+                <AnnotatedReader
                   sessionId={currentSession.session_id}
                   provider={provider}
                   apiKey={apiKey}
@@ -2538,7 +2585,7 @@ function ProviderConfig(props: {
           autoComplete="off"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder="仅本地会话保存；刷新页面即失效"
+          placeholder="粘贴你的 key（存在本地浏览器、刷新不丢）"
           className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm"
         />
       </div>
@@ -3525,7 +3572,7 @@ const CAPABILITIES = [
   { t: "时间线", d: "多线、倒叙也理清真实的时间先后" },
   { t: "节奏曲线", d: "逐章看张力——哪几章松、哪几章是高潮" },
   { t: "设定一致性", d: "扫全书前后矛盾，编出来的会被滤掉" },
-  { t: "每书出题", d: "据这本书出该问的诊断题，降低「不会问」的门槛" },
+  { t: "每书出题", d: "替这本书拟几道值得问的题——不知道从哪问起时，照着点就行" },
 ];
 
 function CapabilityShowcase() {
