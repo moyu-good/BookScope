@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -399,6 +401,26 @@ def extract_character_graph(
 # 穷尽化(1.4)分段预算:每段原文的字符上限,控单次 LLM 输入大小。一章范围量级。
 SEGMENT_CHAR_BUDGET = 40000
 
+# 逐段抽取的并发数——三国 ~16 段串行要 8+ 分钟(延迟是产品级问题),必须并发。
+DEFAULT_SEGMENT_WORKERS = 6
+ENV_SEGMENT_WORKERS = "BOOKSCOPE_GRAPH_SEGMENT_WORKERS"
+
+
+def _resolve_segment_workers(explicit: int | None) -> int:
+    """决定逐段抽取并发数：构造参数 > 环境变量 > 默认 6；< 1 兜底成 1（串行）。"""
+    if explicit is not None:
+        return max(1, explicit)
+    raw = os.environ.get(ENV_SEGMENT_WORKERS)
+    if not raw or not raw.strip():
+        return DEFAULT_SEGMENT_WORKERS
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        logger.warning(
+            "Invalid %s=%r; 用默认 %d", ENV_SEGMENT_WORKERS, raw, DEFAULT_SEGMENT_WORKERS
+        )
+        return DEFAULT_SEGMENT_WORKERS
+
 
 def _verify_edges_against_chunks(
     edges: list[dict[str, Any]], chunks: list[dict[str, Any]]
@@ -475,6 +497,8 @@ def extract_character_graph_exhaustive(
     unit: str = "person",
     max_tokens: int = DEFAULT_GRAPH_MAX_TOKENS,
     char_budget: int = SEGMENT_CHAR_BUDGET,
+    cache_enabled: bool = True,
+    max_workers: int | None = None,
 ) -> CharacterGraphResult | None:
     """穷尽化（1.4）：逐段抽边 + 合并，不再单次摘要硬帽 30 条（WP-exhaustive-extraction）。
 
@@ -483,18 +507,21 @@ def extract_character_graph_exhaustive(
     里出现的人物 + 边端点；``known_characters``（上传时 KG 的 canonical 角色清单）喂进每段
     prompt 当锚，减少别名碎裂。任一段失败跳过该段，不让整图全军覆没；全失败返 ``None``。
 
-    缓存：逐段一律关（``cache_enabled=False``）——段 JSON 偶发坏值不该被 L2 缓存住
-    （同整本功能"关缓存防 poison"守卫）。
+    缓存（``cache_enabled``，默认开）：逐段调用走 L2，**同一本书重看关系图直接命中、不重跑
+    N 段**（省钱省延迟——这是作者反复强调的缓存目标）。与单次摘要"关缓存防 poison"守卫不冲突：
+    map-reduce 下某段坏 JSON 只是**跳过该段**（graceful），不像单次那样一坏全挂，所以这里缓存
+    是安全的。每段 system 含该段原文 → L2 key 各异、不会串段。
     """
     start = time.monotonic()
     segments = _segment_chunks(chunks, char_budget)
     if not segments:
         return None
     known = known_characters or []
-    seg_results: list[tuple[list[str], list[dict[str, Any]]]] = []
-    in_tok = 0
-    out_tok = 0
-    for seg in segments:
+
+    def _run_segment(
+        seg: list[dict[str, Any]],
+    ) -> tuple[tuple[list[str], list[dict[str, Any]]] | None, int, int]:
+        """抽一段：返 (parsed|None, in_tok, out_tok)。单段失败 → (None, 0, 0)，不拖垮整图。"""
         seg_text = "".join(str(c.get("text", "")) for c in seg)
         system = _build_segment_system(seg_text, known, unit)
         try:
@@ -505,18 +532,31 @@ def extract_character_graph_exhaustive(
                 tools=[],
                 messages=[{"role": "user", "content": "请抽本段关系。"}],
                 max_tokens=max_tokens,
-                cache_enabled=False,
+                cache_enabled=cache_enabled,
             )
-        except Exception as exc:  # noqa: BLE001 — 单段失败跳过，不拖垮整图
+        except Exception as exc:  # noqa: BLE001 — 单段失败跳过
             logger.warning(
                 "exhaustive graph: 段 LLM 调用抛 %s: %s；跳过该段",
                 type(exc).__name__, exc,
             )
-            continue
+            return None, 0, 0
         it, ot = llm_client.extract_usage_tokens(response)
-        in_tok += it or 0
-        out_tok += ot or 0
-        parsed = _parse_graph(llm_client.extract_final_text(response))
+        return _parse_graph(llm_client.extract_final_text(response)), it or 0, ot or 0
+
+    # 并发逐段抽——串行 N 段在三国是 8+ 分钟，必须并发（延迟是产品级问题）。
+    workers = _resolve_segment_workers(max_workers)
+    if workers <= 1 or len(segments) <= 1:
+        outs = [_run_segment(s) for s in segments]
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            outs = list(ex.map(_run_segment, segments))
+
+    seg_results: list[tuple[list[str], list[dict[str, Any]]]] = []
+    in_tok = 0
+    out_tok = 0
+    for parsed, it, ot in outs:
+        in_tok += it
+        out_tok += ot
         if parsed is not None:
             seg_results.append(parsed)
 

@@ -51,7 +51,9 @@ from bookscope.agent.argument_structure import generate_argument_structure
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.character_arc import generate_character_arc
 from bookscope.agent.character_flow import generate_character_flow
-from bookscope.agent.character_graph import extract_character_graph
+from bookscope.agent.character_graph import (
+    extract_character_graph_exhaustive,
+)
 from bookscope.agent.character_voice import generate_character_voice
 from bookscope.agent.claim_support import check_claim_support
 from bookscope.agent.concept_evolution import generate_concept_evolution
@@ -767,13 +769,20 @@ async def agent_character_graph(
 
     model = request.model or default_model_for(request.provider)
     full_text, chunks = _long_context_inputs(assembler)
-    result = extract_character_graph(
-        full_text=full_text,
+    # 穷尽化(1.4):逐段抽边 + 合并,不再单次摘要硬帽 30 条。人物图把上传时已建好的 KG
+    # canonical 角色清单喂进去当节点锚(减别名碎裂);概念图无此清单、由模型逐段自识别。
+    known_characters = (
+        [c.name for c in assembler._kg.characters]  # noqa: SLF001 — 同既有路由取数惯例
+        if request.unit == "person"
+        else []
+    )
+    result = extract_character_graph_exhaustive(
         chunks=chunks,
         llm_client=client,
         model=model,
+        known_characters=known_characters,
         unit=request.unit,
-        session_id=request.book_session_id,
+        cache_enabled=True,
     )
     if result is None:
         raise HTTPException(

@@ -58,7 +58,9 @@ def test_exhaustive_maps_per_segment_and_merges(monkeypatch) -> None:  # noqa: A
         ),
     ]
     r = cg.extract_character_graph_exhaustive(
-        chunks=_CHUNKS, llm_client=_FakeMulti(texts), model="m", char_budget=8,
+        chunks=_CHUNKS, llm_client=_FakeMulti(texts), model="m",
+        char_budget=8,
+        max_workers=1,
     )
     assert r is not None
     assert len(r.edges) == 2  # 两段各一条、不同对 → 合并后两条
@@ -76,7 +78,9 @@ def test_exhaustive_dedups_same_pair_across_segments(monkeypatch) -> None:  # no
         ensure_ascii=False,
     )
     r = cg.extract_character_graph_exhaustive(
-        chunks=_CHUNKS, llm_client=_FakeMulti([same, same]), model="m", char_budget=8,
+        chunks=_CHUNKS, llm_client=_FakeMulti([same, same]), model="m",
+        char_budget=8,
+        max_workers=1,
     )
     assert r is not None
     assert len(r.edges) == 1  # 两段同一对同关系 → 合并成一条
@@ -85,7 +89,9 @@ def test_exhaustive_dedups_same_pair_across_segments(monkeypatch) -> None:  # no
 def test_exhaustive_all_segments_unparseable_returns_none(monkeypatch) -> None:  # noqa: ANN001
     _seq_patch(monkeypatch)
     r = cg.extract_character_graph_exhaustive(
-        chunks=_CHUNKS, llm_client=_FakeMulti(["不是JSON", "也不是"]), model="m", char_budget=8,
+        chunks=_CHUNKS, llm_client=_FakeMulti(["不是JSON", "也不是"]), model="m",
+        char_budget=8,
+        max_workers=1,
     )
     assert r is None
 
