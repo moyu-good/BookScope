@@ -899,6 +899,46 @@ class RecapResponse(BaseModel):
     )
 
 
+class ChapterAskRequest(BaseModel):
+    """POST /api/agent/chapter-ask 请求体（按章问答 / 本章导读）。BYOK。
+
+    只把第 ``chapter`` 章的原文喂进 context——"贴着我在读这一章"。``question`` 留空 =
+    本章导读（预设问"这章讲了什么 / 谁登场 / 几个要点"）。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    chapter: int = Field(..., ge=1, description="按哪一章问（只喂这一章原文）。")
+    question: str = Field(
+        default="",
+        max_length=2000,
+        description="问题；留空 = 本章导读（预设问）。",
+    )
+    provider: Literal["deepseek", "anthropic"] = Field(default="deepseek")
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class ChapterAskResponse(BaseModel):
+    """POST /api/agent/chapter-ask 响应体。"""
+
+    chapter: int = Field(..., description="回显请求里的 chapter。")
+    answer: str = Field(default="", description="只依据本章原文的作答 / 导读。")
+    citations: list[dict] = Field(
+        default_factory=list,
+        description="本章内的原文引用（{chapter, snippet, verified}）；都在本章 verify 过。",
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否答出。false=失败/该章无可识别原文/书太大。",
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class ConceptEvolutionRequest(BaseModel):
     """POST /api/agent/concept-evolution 请求体（跨章概念演进对照）。BYOK。"""
 
@@ -1275,6 +1315,8 @@ __all__ = [
     "AnnotationsResponse",
     "BookTocResponse",
     "BookUploadResponse",
+    "ChapterAskRequest",
+    "ChapterAskResponse",
     "ChapterTextResponse",
     "CharacterArcRequest",
     "CharacterArcResponse",

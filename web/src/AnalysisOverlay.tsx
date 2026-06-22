@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import { AgentOrchestrate } from "./AgentOrchestrate";
+import { ChapterAsk } from "./ChapterAsk";
 import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
@@ -55,6 +56,7 @@ const GROUPS: { title: string; feats: Feat[] }[] = [
   {
     title: "读着用",
     feats: [
+      { id: "chapter-ask", label: "问这一章", hint: "只问你正读的这一章——答案只从本章原文来，留空给本章导读" },
       { id: "orchestrate", label: "给目标", hint: "说一句你想搞清的事，它编排几个分析、综合带证据回答" },
       { id: "recap", label: "前情回顾", hint: "无剧透地回顾到某一章为止发生了什么" },
       { id: "annotate", label: "行间批注", hint: "原文行间浮出带证据的朱砂批注（伏笔/矛盾/母题/人物）" },
@@ -114,6 +116,8 @@ export function AnalysisOverlay({
 
   function renderActive() {
     switch (active) {
+      case "chapter-ask":
+        return <ChapterAsk {...shared} chapter={currentChapter ?? null} />;
       case "orchestrate":
         return <AgentOrchestrate {...shared} onDrill={() => {}} />;
       case "recap":

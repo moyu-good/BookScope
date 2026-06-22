@@ -93,6 +93,8 @@ from bookscope.api.schemas import (
     AnnotationsResponse,
     ArgumentStructureRequest,
     ArgumentStructureResponse,
+    ChapterAskRequest,
+    ChapterAskResponse,
     CharacterArcRequest,
     CharacterArcResponse,
     CharacterFlowRequest,
@@ -1783,6 +1785,95 @@ async def agent_recap(
         scanned=points is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, partial_text, _t0),
+    )
+
+
+# 本章导读的预设问（question 留空时用）。
+_CHAPTER_DIGEST_Q = (
+    "只看这一章的原文：这一章主要发生了什么？有哪些人物登场？挑出三到五个关键处。"
+    "每条都引本章原文，不用书外知识、不臆测、不剧透后文。"
+)
+
+
+@agent_router.post("/agent/chapter-ask", response_model=ChapterAskResponse)
+async def agent_chapter_ask(
+    request: ChapterAskRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> ChapterAskResponse:
+    """按章问答 / 本章导读：只把第 ``chapter`` 章原文喂进 context，贴着在读这一章作答。
+
+    复用 ``run_long_context``，把输入从整本缩到单章——本章原文就是证据，citation 在本章内
+    verify。``question`` 留空 = 本章导读（预设问）。该章无可识别原文 / 失败 → ``scanned=false``
+    （不报错，前端兜底"这章没取到可分析的原文"）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    ch = request.chapter
+    # 只取本章 chunk 当 context + 证据（其它章物理上不喂 = 按章 scoped 的结构保证）。
+    _full, all_chunks = _long_context_inputs(assembler)
+    chap_chunks = [c for c in all_chunks if int(c.get("chapter", 0)) == ch]
+    if not chap_chunks:
+        return ChapterAskResponse(
+            chapter=ch,
+            answer="",
+            citations=[],
+            scanned=False,
+            book_session_id=request.book_session_id,
+        )
+    chap_text = "".join(c["text"] for c in chap_chunks)
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    question = request.question.strip() or _CHAPTER_DIGEST_Q
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = run_long_context(
+        question,
+        full_text=chap_text,
+        chunks=chap_chunks,
+        llm_client=rec,
+        model=model,
+        session_id=request.book_session_id,
+    )
+    if result is None:
+        return ChapterAskResponse(
+            chapter=ch,
+            answer="",
+            citations=[],
+            scanned=False,
+            book_session_id=request.book_session_id,
+            trace=_run_trace(rec, chap_text, _t0),
+        )
+    return ChapterAskResponse(
+        chapter=ch,
+        answer=result.answer,
+        citations=result.citations,
+        scanned=True,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, chap_text, _t0),
     )
 
 
