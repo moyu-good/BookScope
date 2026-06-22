@@ -26,6 +26,7 @@ import json
 import logging
 from typing import Any
 
+from bookscope.agent._internal.exhaustive import mapreduce_per_chapter
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
@@ -281,4 +282,42 @@ def generate_narrative_curve(
     return None
 
 
-__all__ = ["DEFAULT_CURVE_MAX_TOKENS", "generate_narrative_curve"]
+def generate_narrative_curve_exhaustive(
+    *,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_CURVE_MAX_TOKENS,
+    char_budget: int = 40000,
+    max_workers: int | None = None,
+) -> list[dict[str, Any]] | None:
+    """穷尽化:分段→每段逐章抽→按章拼,覆盖全书每一章(1.4)。
+
+    重型逐章(每章带 evidence/四维)单次会被 max_tokens 截断到几章——三国 cap-lift 后只 8 章。
+    改 map-reduce:每段章数远小于 40 帽,段内用现有 prompt 即可,拼起来覆盖全书。合并后一次性
+    ``_verify_chapters``(逐字核验 + 章号纠偏)。
+
+    Returns: 同 ``generate_narrative_curve``,但覆盖全书所有章;空 → ``None``。
+    """
+    merged = mapreduce_per_chapter(
+        chunks=chunks,
+        instruction=_SYSTEM_INSTRUCTION,
+        user_msg="请逐章抽下面这段原文的多维叙事曲线（只抽本段出现的章）。",
+        parse_fn=_parse_curve,
+        llm_client=llm_client,
+        model=model,
+        max_tokens=max_tokens,
+        char_budget=char_budget,
+        max_workers=max_workers,
+    )
+    if not merged:
+        return None
+    _verify_chapters(merged, chunks)
+    return merged
+
+
+__all__ = [
+    "DEFAULT_CURVE_MAX_TOKENS",
+    "generate_narrative_curve",
+    "generate_narrative_curve_exhaustive",
+]

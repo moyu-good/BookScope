@@ -63,7 +63,7 @@ from bookscope.agent.events import LoopEvent
 from bookscope.agent.foreshadow_arcs import generate_foreshadow_arcs
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.motif_tracking import generate_motif_tracking
-from bookscope.agent.narrative_curve import generate_narrative_curve
+from bookscope.agent.narrative_curve import generate_narrative_curve_exhaustive
 from bookscope.agent.orchestrate import orchestrate
 from bookscope.agent.pacing_curve import generate_pacing_curve
 from bookscope.agent.question_processor import rewrite_followup
@@ -1132,12 +1132,11 @@ async def agent_narrative_curve(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    chapters = generate_narrative_curve(
-        full_text=full_text,
+    # 1.4 穷尽化:分段→每段逐章抽→按章拼,覆盖全书每一章(重型逐章单次会截断到几章)。
+    chapters = generate_narrative_curve_exhaustive(
         chunks=chunks,
         llm_client=rec,
         model=model,
-        session_id=request.book_session_id,
     )
     return NarrativeCurveResponse(
         chapters=chapters or [],
