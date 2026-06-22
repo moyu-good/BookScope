@@ -4,7 +4,7 @@ import { BookShelf } from "./BookShelf";
 import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
 import type { DrillInfo } from "./AgentOrchestrate";
-import { AnnotatedReader } from "./AnnotatedReader";
+import { ReadingView } from "./ReadingView";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
 import { CharacterFlow } from "./CharacterFlow";
@@ -1396,9 +1396,9 @@ export function App() {
               <div className={mode === "annotate" ? "" : "hidden"}>
                 <CanvasHeader
                   title="精读"
-                  subtitle="读原文本身——读到某处行间浮一条带原文证据的批注（这里埋了伏笔、这句和别章矛盾、某母题又一次复现）。选要哪几层，点朱砂记号看批注 + 原文，跨章批注一键跳到它牵连的另一处。"
+                  subtitle="像翻一本书那样从头读原文——字号、行距、页边、背景、字体随手调，读到哪记得住。想看脉络时打开「注释」层，行间浮出带原文证据的批注（伏笔、矛盾、母题、人物）。"
                 />
-                <AnnotatedReader
+                <ReadingView
                   sessionId={currentSession.session_id}
                   provider={provider}
                   apiKey={apiKey}
