@@ -25,9 +25,16 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.api.book_sessions import BookSessionNotFound, BookSessionStore
 from bookscope.api.dependencies import get_book_session_store
-from bookscope.api.schemas import SessionListResponse, SessionMetadata
+from bookscope.api.schemas import (
+    BookTocResponse,
+    ChapterTextResponse,
+    SessionListResponse,
+    SessionMetadata,
+    TocChapter,
+)
 from bookscope.api.session_storage import SessionStorageCorrupted
 
 logger = logging.getLogger(__name__)
@@ -93,6 +100,69 @@ async def get_session(
     return _dict_to_metadata(meta_dict)
 
 
+@sessions_router.get(
+    "/sessions/{session_id}/toc",
+    response_model=BookTocResponse,
+)
+async def get_book_toc(
+    session_id: str,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> BookTocResponse:
+    """精读阅读器的目录：章号 + 标题 + 字数，不带正文（目录要小、要秒回）。
+
+    纯数据、不调 LLM。章节由已修根的 ``detect_chapters`` 现场解析
+    （脏书边界见 WP-robust-chapter-detection）；章号是标准化序号、不保证
+    等于真回数。空书 → ``total_chapters=0`` + 空列表（不是错误）。
+    """
+    assembler = _resolve_assembler(store, session_id)
+    records = assembler._compute_chapter_records()  # noqa: SLF001 — 同 agent 路由既有取数惯例
+    title = str(getattr(assembler._book_text, "title", ""))  # noqa: SLF001
+    chapters = [
+        TocChapter(chapter=r.chapter, title=r.title, word_count=r.word_count)
+        for r in records
+    ]
+    return BookTocResponse(
+        book_title=title,
+        total_chapters=len(chapters),
+        chapters=chapters,
+    )
+
+
+@sessions_router.get(
+    "/sessions/{session_id}/chapters/{chapter}",
+    response_model=ChapterTextResponse,
+)
+async def get_book_chapter(
+    session_id: str,
+    chapter: int,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> ChapterTextResponse:
+    """单章正文，阅读器读到哪取哪。纯数据、不调 LLM。
+
+    章号不存在 / 越界 → 404（ChapterNotFound），FE 兜底"这章取不到"。
+    """
+    assembler = _resolve_assembler(store, session_id)
+    records = assembler._compute_chapter_records()  # noqa: SLF001
+    for r in records:
+        if r.chapter == chapter:
+            return ChapterTextResponse(
+                chapter=r.chapter,
+                title=r.title,
+                text=r.full_text,
+                word_count=r.word_count,
+            )
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={
+            "error_type": "ChapterNotFound",
+            "message": (
+                f"chapter {chapter} not found in book session {session_id!r}."
+            ),
+            "details": {"session_id": session_id, "chapter": chapter},
+        },
+    )
+
+
 @sessions_router.delete(
     "/sessions/{session_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -115,6 +185,17 @@ async def delete_session(
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------
+
+
+def _resolve_assembler(
+    store: BookSessionStore, session_id: str
+) -> R0BookAssembler:
+    """从 store 取 assembler（精读阅读器取章节正文用）；找不到翻译成 404。"""
+    try:
+        return store.get(session_id)
+    except BookSessionNotFound:
+        _raise_not_found(session_id)
+        raise  # _raise_not_found 必抛；这行只为类型收敛（不会执行到）
 
 
 def _raise_not_found(session_id: str) -> None:

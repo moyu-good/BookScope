@@ -1207,6 +1207,40 @@ class SessionListResponse(BaseModel):
     )
 
 
+class TocChapter(BaseModel):
+    """目录里的一章——只给章号 / 标题 / 字数，不带正文（目录要小、要秒回）。"""
+
+    chapter: int = Field(..., ge=1, description="章节号（detect_chapters 标准化后，1 起）。")
+    title: str = Field(default="", description="章节标题；原文无标题时为空串。")
+    word_count: int = Field(..., ge=0, description="该章字数（中文按字符、英文按词）。")
+
+
+class BookTocResponse(BaseModel):
+    """GET /api/books/{session_id}/toc 响应体——精读阅读器的目录。
+
+    纯数据、不调 LLM：章节由已修根的 ``detect_chapters`` 现场解析（脏书边界
+    见 WP-robust-chapter-detection）。章号是序号、不保证等于真回数。
+    """
+
+    book_title: str = Field(..., description="书名。")
+    total_chapters: int = Field(..., ge=0, description="章节总数；空书为 0。")
+    chapters: list[TocChapter] = Field(
+        default_factory=list, description="按章号升序的目录条目。"
+    )
+
+
+class ChapterTextResponse(BaseModel):
+    """GET /api/books/{session_id}/chapters/{chapter} 响应体——单章正文。
+
+    阅读器读到哪取哪；不调 LLM。越界 / 不存在 → 404（ChapterNotFound）。
+    """
+
+    chapter: int = Field(..., ge=1, description="回显章节号。")
+    title: str = Field(default="", description="章节标题；无标题为空串。")
+    text: str = Field(..., description="该章完整原文。")
+    word_count: int = Field(..., ge=0, description="该章字数。")
+
+
 class ErrorResponse(BaseModel):
     """通用错误响应。
 
@@ -1236,7 +1270,9 @@ __all__ = [
     "AgentAskResponse",
     "AnnotationsRequest",
     "AnnotationsResponse",
+    "BookTocResponse",
     "BookUploadResponse",
+    "ChapterTextResponse",
     "CharacterArcRequest",
     "CharacterArcResponse",
     "CharacterFlowRequest",
@@ -1272,4 +1308,5 @@ __all__ = [
     "SuggestQuestionsResponse",
     "TimelineRequest",
     "TimelineResponse",
+    "TocChapter",
 ]

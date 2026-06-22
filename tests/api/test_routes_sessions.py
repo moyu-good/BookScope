@@ -243,3 +243,88 @@ def test_delete_session_missing_returns_404_envelope(
     detail = resp.json()["detail"]
     assert detail["error_type"] == "BookSessionNotFound"
     assert detail["details"]["session_id"] == "never-existed"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/sessions/{id}/toc —— 精读阅读器目录（纯数据、不调 LLM）
+# ---------------------------------------------------------------------------
+
+
+def test_get_toc_returns_chapters_without_text(
+    client_and_store: tuple[TestClient, BookSessionStore],
+) -> None:
+    """目录返回章号 + 标题 + 字数，升序，且不漏正文（无 text 字段）。"""
+    client, store = client_and_store
+    _register_session(store, "read-1", book_title="读测试")
+
+    resp = client.get("/api/sessions/read-1/toc")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["book_title"] == "读测试"
+    assert body["total_chapters"] == len(body["chapters"])
+    assert body["total_chapters"] >= 1
+
+    nums = [c["chapter"] for c in body["chapters"]]
+    assert nums == sorted(nums)  # 升序
+    for c in body["chapters"]:
+        # 目录条目只有这三个键——正文绝不进目录
+        assert set(c.keys()) == {"chapter", "title", "word_count"}
+        assert c["chapter"] >= 1
+        assert c["word_count"] >= 0
+
+
+def test_get_toc_missing_session_returns_404(
+    client_and_store: tuple[TestClient, BookSessionStore],
+) -> None:
+    """不存在的 session 取目录 → 404 + BookSessionNotFound。"""
+    client, _ = client_and_store
+    resp = client.get("/api/sessions/nope/toc")
+    assert resp.status_code == 404
+    assert resp.json()["detail"]["error_type"] == "BookSessionNotFound"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/sessions/{id}/chapters/{chapter} —— 单章正文（纯数据、不调 LLM）
+# ---------------------------------------------------------------------------
+
+
+def test_get_chapter_returns_full_text(
+    client_and_store: tuple[TestClient, BookSessionStore],
+) -> None:
+    """取目录第一章的正文 → 200 + 非空 text（章号从 toc 取，不硬编）。"""
+    client, store = client_and_store
+    _register_session(store, "read-2", book_title="读测试")
+
+    toc = client.get("/api/sessions/read-2/toc").json()
+    first = toc["chapters"][0]["chapter"]
+
+    resp = client.get(f"/api/sessions/read-2/chapters/{first}")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["chapter"] == first
+    assert isinstance(body["text"], str) and len(body["text"]) >= 1
+    assert body["word_count"] >= 0
+
+
+def test_get_chapter_out_of_range_returns_404(
+    client_and_store: tuple[TestClient, BookSessionStore],
+) -> None:
+    """越界章号 → 404 + ChapterNotFound（回显请求的章号）。"""
+    client, store = client_and_store
+    _register_session(store, "read-3", book_title="读测试")
+
+    resp = client.get("/api/sessions/read-3/chapters/9999")
+    assert resp.status_code == 404
+    detail = resp.json()["detail"]
+    assert detail["error_type"] == "ChapterNotFound"
+    assert detail["details"]["chapter"] == 9999
+
+
+def test_get_chapter_missing_session_returns_404(
+    client_and_store: tuple[TestClient, BookSessionStore],
+) -> None:
+    """不存在的 session 取章 → 404 + BookSessionNotFound。"""
+    client, _ = client_and_store
+    resp = client.get("/api/sessions/nope/chapters/1")
+    assert resp.status_code == 404
+    assert resp.json()["detail"]["error_type"] == "BookSessionNotFound"
