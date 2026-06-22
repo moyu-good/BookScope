@@ -723,24 +723,14 @@ async def agent_character_graph(
     request: CharacterGraphRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> CharacterGraphResponse:
-    """抽取一本书的人物关系图（WP-character-graph，exp-013 GO）。
+    """抽取一本书的人物/概念关系图（WP-character-graph / WP-exhaustive-extraction）。
 
-    整本进 context 让模型吐结构化关系图 JSON，每条边的原文出处过 verify_citations。
-    只支持塞得进 context 的书；大书返回明确提示（MVP 不做 RAG 路抽图）。
+    1.4 穷尽化:逐段抽边 + 合并(extract_character_graph_exhaustive),不再整本进一次
+    context。**所以不再卡"书太大"**——map-reduce 按段处理,大书(明朝 1069 chunk /
+    2535 角色那种)照样能抽,只是段多、耗时长些(并发 + 缓存兜底)。旧的
+    ``_book_fits_long_context`` 大书 422 守卫是单次摘要时代的产物,已撤。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "error_type": "BookTooLargeForGraph",
-                "message": (
-                    "这本书太大，暂不支持人物关系图——关系图需要整本书进上下文，"
-                    "超大书（如几百万字）目前走不了。"
-                ),
-                "details": None,
-            },
-        )
 
     try:
         client = build_llm_client_from_params(
