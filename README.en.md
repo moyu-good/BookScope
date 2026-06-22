@@ -1,22 +1,42 @@
-# BookScope · 书鉴
+<p align="center">
+  <img src="docs/images/logo.svg" width="116" alt="BookScope">
+</p>
 
-[![CI](https://github.com/moyu-good/BookScope/actions/workflows/ci.yml/badge.svg)](https://github.com/moyu-good/BookScope/actions)
-[![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<h1 align="center">BookScope · 书鉴</h1>
 
-[中文（full docs）](README.md) · English
+<p align="center">
+  A tool for people who read long books. Every "the book says…" the AI gives you is checked character-by-character against the source; only matches are shown, each stamped with a 「鉴」(verify) seal.
+</p>
 
-> Drop a long book into your browser and ask it anything. Every quote it gives is checked character-by-character against the source, and only the ones that match are shown.
+<p align="center">
+  <a href="https://github.com/moyu-good/BookScope/actions"><img src="https://github.com/moyu-good/BookScope/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.14+-blue.svg" alt="Python 3.14+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
 
-**Live demo**: [moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/). A finished analysis of *Romance of the Three Kingdoms* you can click through, no install and no key. For your own book, clone and run it locally.
+<p align="center">
+  <a href="README.md">中文（full docs）</a> · English · <a href="https://moyu-good.github.io/BookScope/">Live demo</a>
+</p>
 
-![BookScope overview](docs/images/overview.png)
+<p align="center">
+  <img src="docs/images/hero.svg" width="720" alt="Every quote the AI gives is verified against the source before it gets the 鉴 seal">
+</p>
 
-BookScope is a local tool for deep-reading long texts. Upload an epub / txt / pdf and ask it open questions, or run any of 20+ built-in lenses: character graphs and arcs, timelines, pacing and narrative curves, foreshadow tracking, subplot weaves, consistency scans, an evidence-anchored close-reading view, and more.
+---
 
-The difference from "chat with your PDF": every quote the model produces is checked against the source by code. Matches are shown and stamped with a 「鉴」 (verify) seal; mismatches are dropped. The 鉴 in the name is that seal.
+## What it is
 
-Bring your own key, runs locally. The book text goes straight to the LLM provider you pick; there's no server in between, so nothing here ever touches your book or your key.
+Drop a long book (epub / txt / pdf) into your browser and ask it open questions, or run any of 20+ built-in lenses: character graphs and arcs, timelines, pacing and narrative curves, foreshadow tracking, subplot weaves, consistency scans, an evidence-anchored close-reading view, and more.
+
+It runs locally on your own AI account. The book text goes straight to the provider you pick (DeepSeek by default); there's no server in between, so nothing here ever touches your book or your key.
+
+**Live demo**: [moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/) — a finished analysis of *Romance of the Three Kingdoms* you can click through, no install and no key. For your own book, clone and run it locally.
+
+## Why it's different
+
+Today's AIs casually invent "the source says XX" — it sounds real, and you can't go back and check every line.
+
+BookScope's whole job is that check: every quote the model produces is verified against the book by code. Matches are shown and stamped with a 「鉴」seal; mismatches are dropped. Judgement calls (contradictions, foreshadowing, technique) follow the same rule — if the evidence doesn't hold up in the source, it isn't said. 鉴 means *to verify*; it's the point of the project, not a feature on the side.
 
 > The UI is Chinese-first (中文优先 is a project invariant). This is a short English entry point; the full docs are in Chinese.
 
