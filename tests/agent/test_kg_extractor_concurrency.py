@@ -10,7 +10,7 @@ Sprint 6 第一步：把 batch 抽取从串行循环换成 ThreadPoolExecutor �
 - chunk 输出顺序严格跟 batches 同序——这是合并 canonical_name 的硬约束
 - 单个 batch 抽取失败时异常透传，不被吞掉
 - env ``BOOKSCOPE_KG_EXTRACT_MAX_WORKERS`` 能控制并发上限
-- 并发确实并发跑了（用 sleep 验证 wall time 小于串行总和）
+- 并发确实并发跑了（用 barrier 集合点 + 并发计数探针证明，不看墙钟）
 """
 
 from __future__ import annotations
@@ -44,7 +44,13 @@ class _ConcurrencyFakeClient:
     - 用 ``payload_by_first_chunk_index`` 映射首个 chunk 的 index 到响应，
       模拟"不同 batch 抽出不同角色"，便于断言顺序
     - ``call_log`` 记录每次调用的入参用于断言顺序敏感场景
-    - ``simulate_delay_seconds`` 让每次调用阻塞固定时长，用于并发 wall-time 校验
+    - ``simulate_delay_seconds`` 让每次调用阻塞固定时长（顺序 / 失败传播
+      测试用来制造可观测的执行窗口；不再用来卡墙钟阈值）
+    - ``peak_inflight`` 记录并发峰值——进入 +1 / 退出 -1 的 max，证明
+      "同时有几路调用在飞"
+    - ``rendezvous`` 传一个 ``threading.Barrier``，每路调用进来都要在集合点
+      等齐才放行：只有真并发到 N 路才能凑齐瞬间放行，退化成串行会卡死在
+      barrier 的 timeout 上抛 ``BrokenBarrierError``——这是不看墙钟的并发铁证
     - ``raise_on_chunk_index`` 模拟某 batch 失败抛异常
     """
 
@@ -54,10 +60,12 @@ class _ConcurrencyFakeClient:
         payload_by_first_chunk_index: dict[int, dict[str, Any]],
         simulate_delay_seconds: float = 0.0,
         raise_on_first_chunk_index: int | None = None,
+        rendezvous: threading.Barrier | None = None,
     ) -> None:
         self._payloads = dict(payload_by_first_chunk_index)
         self._delay = simulate_delay_seconds
         self._raise_on = raise_on_first_chunk_index
+        self._rendezvous = rendezvous
         self.call_count = 0
         self.call_log: list[int] = []
         self._lock = threading.Lock()
@@ -78,6 +86,12 @@ class _ConcurrencyFakeClient:
                 self.peak_inflight = self._inflight
 
         try:
+            if self._rendezvous is not None:
+                # 集合点：要求所有并发路同时到齐才放行。inflight 已在上面 +1，
+                # 等齐时 peak_inflight 自然摸到 barrier 的 parties 数。若调度退化
+                # 成串行，第一路等不到其它路，barrier 超时抛 BrokenBarrierError，
+                # 透传出去让测试 fail——不依赖任何墙钟阈值。
+                self._rendezvous.wait()
             if self._delay > 0:
                 time.sleep(self._delay)
             if self._raise_on is not None and first_idx == self._raise_on:
@@ -259,26 +273,38 @@ def test_parallel_merge_keeps_first_appearance_name() -> None:
 
 
 def test_parallel_actually_runs_concurrently() -> None:
-    """3 batch 每个 sleep 0.3s，并发 3 路 wall-time 应远小于 3 * 0.3=0.9s。
+    """证明 3 个 batch 真的并发跑了——靠 barrier 集合点，不靠墙钟。
 
-    串行 ≥ 0.9s；3 路并发理论 ~0.3s，留余地断言 < 0.6s。同时 peak_inflight
-    应 == 3。
+    旧版本断言"并发 wall-time < 串行总和"（< 0.6s），在 CI / 高负载下会因为
+    几毫秒抖动误报（实测 0.6017s 越过 0.6s 阈值挂掉）。墙钟阈值跟被测逻辑的
+    正确性根本无关，纯粹是噪音。
+
+    新做法：给 fake client 装一个 ``threading.Barrier(3, timeout=...)``，每路
+    调用进来都要在集合点等齐 3 路才放行。
+
+    - 真并发：ThreadPoolExecutor 把 3 个 batch 同时在飞，3 路瞬间凑齐 barrier、
+      立即放行，测试秒过。
+    - 退化成串行：第一路永远等不到另外两路，barrier 超时抛 ``BrokenBarrierError``
+      透传出来，测试 fail。
+
+    barrier 只看"是否真有 3 路同时到达"，跟机器快慢无关，比墙钟稳得多。timeout
+    给 10s 纯粹是兜底——真并发时根本用不到（微秒级凑齐），只有并发彻底坏了才会
+    触发，那本来就该 fail。``peak_inflight == 3`` 再复核一遍并发峰值确实摸到 3。
     """
-    payloads = {
-        i: {"characters": []} for i in range(3)
-    }
+    n = 3
+    payloads = {i: {"characters": []} for i in range(n)}
+    rendezvous = threading.Barrier(n, timeout=10.0)
     client = _ConcurrencyFakeClient(
         payload_by_first_chunk_index=payloads,
-        simulate_delay_seconds=0.3,
+        rendezvous=rendezvous,
     )
     extractor = MinimalKGExtractor(
-        client=client, max_chunks_per_batch=1, max_workers=3
+        client=client, max_chunks_per_batch=1, max_workers=n
     )
-    start = time.monotonic()
-    extractor.extract(chunks=_chunks(3), book_title="X")
-    elapsed = time.monotonic() - start
-    assert elapsed < 0.6, f"expected concurrent wall-time, got {elapsed:.3f}s"
-    assert client.peak_inflight == 3
+    extractor.extract(chunks=_chunks(n), book_title="X")
+    # barrier 没抛 == 3 路真同时到达；peak_inflight 复核并发峰值确实 == 3
+    assert client.peak_inflight == n
+    assert client.call_count == n
 
 
 def test_max_workers_one_runs_serially() -> None:
