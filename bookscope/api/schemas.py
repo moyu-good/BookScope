@@ -1131,7 +1131,10 @@ class HealthResponse(BaseModel):
         default="ok",
         description="健康状态；当前只有 ok，保留 degraded 以备后续扩展。",
     )
-    version: str = Field(..., description="从 VERSION 文件读取；缺失时 'unknown'。")
+    version: str = Field(
+        ...,
+        description="项目版本号，取 bookscope.__version__（与发版三处版本号同源）。",
+    )
     generation: str = Field(
         default="r1-agent-loop",
         description="代际标识；恒为 r1-agent-loop。",

@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from bookscope import __version__
 from bookscope.api import create_app
 from bookscope.api.book_sessions import get_book_session_store
 
@@ -51,8 +52,7 @@ def test_health_generation_is_r1_agent_loop(client: TestClient) -> None:
     assert body["generation"] == "r1-agent-loop"
 
 
-def test_health_version_is_nonempty_string(client: TestClient) -> None:
-    """version 字段必须是非空字符串（缺 VERSION 时会是 'unknown'）。"""
+def test_health_version_matches_package_version(client: TestClient) -> None:
+    """version 字段必须等于 bookscope.__version__（对外 API 版本不许漂移）。"""
     body = client.get("/api/health").json()
-    assert isinstance(body["version"], str)
-    assert body["version"]
+    assert body["version"] == __version__

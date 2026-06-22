@@ -10,11 +10,11 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from bookscope import __version__
 from bookscope.api.book_sessions import get_book_session_store
 from bookscope.api.routes import (
     agent_router,
@@ -24,17 +24,6 @@ from bookscope.api.routes import (
 )
 
 logger = logging.getLogger("bookscope.api")
-
-_VERSION_FILE = Path(__file__).resolve().parents[2] / "VERSION"
-
-
-def _read_version() -> str:
-    """从仓库根 VERSION 读版本号；缺失时返回 ``"unknown"``。"""
-    try:
-        raw = _VERSION_FILE.read_text(encoding="utf-8").strip()
-    except OSError:
-        return "unknown"
-    return raw or "unknown"
 
 
 @asynccontextmanager
@@ -62,7 +51,7 @@ def create_app() -> FastAPI:
             "只暴露最小必要端点（health + agent/ask）；"
             "不保留 v7 的上传 / 分析 / 导出端点。"
         ),
-        version=_read_version(),
+        version=__version__,
         lifespan=_lifespan,
     )
 
