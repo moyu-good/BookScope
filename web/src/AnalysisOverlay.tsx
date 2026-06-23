@@ -14,19 +14,16 @@ import { AgentOrchestrate } from "./AgentOrchestrate";
 import { ChapterAsk } from "./ChapterAsk";
 import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
-import { CharacterArc } from "./CharacterArc";
+import { ChapterCurves } from "./ChapterCurves";
 import { CharacterFlow } from "./CharacterFlow";
-import { CharacterGraph } from "./CharacterGraph";
 import { CharacterVoice } from "./CharacterVoice";
 import { ConceptEvolution } from "./ConceptEvolution";
 import { ConsistencyScan } from "./ConsistencyScan";
 import { EntityRecall } from "./EntityRecall";
 import { ForeshadowArcs } from "./ForeshadowArcs";
 import { MotifTracking } from "./MotifTracking";
-import { NarrativeCurve } from "./NarrativeCurve";
-import { PacingCurve } from "./PacingCurve";
 import { Recap } from "./Recap";
-import { RelationshipTimeline } from "./RelationshipTimeline";
+import { RelationshipView } from "./RelationshipView";
 import { RevisionList } from "./RevisionList";
 import { StudyCards } from "./StudyCards";
 import { StyleIssues } from "./StyleIssues";
@@ -65,21 +62,18 @@ const GROUPS: { title: string; feats: Feat[] }[] = [
   {
     title: "人物",
     feats: [
-      { id: "graph", label: "关系图", hint: "谁和谁、什么关系，每条边点得到原文" },
-      { id: "reltime", label: "关系演变", hint: "两人关系逐章升降，转折钉原文" },
+      { id: "relationship", label: "关系", hint: "关系网(全书星图) + 关系演变(带时间轴)——一个入口内部切" },
       { id: "flow", label: "叙事流", hint: "谁何时入场、哪几章群戏" },
-      { id: "chararc", label: "人物弧线", hint: "角色逐章的戏份与处境起落" },
       { id: "charvoice", label: "声口一致", hint: "标出「这句不像他说的」" },
     ],
   },
   {
     title: "情节",
     feats: [
+      { id: "chapter-curves", label: "逐章曲线", hint: "叙事曲线(山水)/人物弧线(花鸟)/节奏——逐章看张力情感视角,一个入口内部切" },
       { id: "foreshadow", label: "伏笔回收", hint: "哪个伏笔埋了、收没收" },
       { id: "subplot", label: "支线编织", hint: "每条支线何时活跃、在哪交汇" },
       { id: "timeline", label: "时间线", hint: "多线倒叙也理清真实时序" },
-      { id: "pacing", label: "节奏曲线", hint: "逐章张力起伏" },
-      { id: "narrative", label: "叙事曲线", hint: "逐章张力/情感/视角/主支线" },
     ],
   },
   {
@@ -124,14 +118,10 @@ export function AnalysisOverlay({
         return <Recap {...shared} prefillChapter={currentChapter ?? undefined} />;
       case "annotate":
         return <AnnotatedReader {...shared} />;
-      case "graph":
-        return <CharacterGraph {...shared} />;
-      case "reltime":
-        return <RelationshipTimeline {...shared} />;
+      case "relationship":
+        return <RelationshipView {...shared} />;
       case "flow":
         return <CharacterFlow {...shared} />;
-      case "chararc":
-        return <CharacterArc {...shared} />;
       case "charvoice":
         return <CharacterVoice {...shared} />;
       case "foreshadow":
@@ -140,10 +130,8 @@ export function AnalysisOverlay({
         return <SubplotWeave {...shared} />;
       case "timeline":
         return <Timeline {...shared} />;
-      case "pacing":
-        return <PacingCurve {...shared} />;
-      case "narrative":
-        return <NarrativeCurve {...shared} />;
+      case "chapter-curves":
+        return <ChapterCurves {...shared} />;
       case "entity":
         return <EntityRecall {...shared} />;
       case "motif":
