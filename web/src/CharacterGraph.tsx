@@ -137,6 +137,9 @@ export function CharacterGraph({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+  const [selEv, setSelEv] = useState<{ loading: boolean; text: string; found: boolean } | null>(
+    null,
+  );
   const [unit, setUnit] = useState<"person" | "concept">("person");
 
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -145,6 +148,40 @@ export function CharacterGraph({
   const coolRef = useRef(0);
   const dragRef = useRef<string | null>(null);
   const [, setFrame] = useState(0);
+
+  // 选中某条边 → 若边没带 upfront 证据(章脉转向后的人物图,出路 B),按需调
+  // /agent/spine-evidence 取那一章里支撑这对人的那句原文;边自带证据(概念图/旧路径)则直接用、不取。
+  useEffect(() => {
+    const edge = selected != null ? data?.edges[selected] : null;
+    if (!edge || edge.evidence) {
+      setSelEv(null);
+      return;
+    }
+    let cancelled = false;
+    setSelEv({ loading: true, text: "", found: false });
+    (async () => {
+      try {
+        const resp = await fetch("/api/agent/spine-evidence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_id: sessionId,
+            chapter: edge.chapter,
+            kind: "pair",
+            a: edge.source,
+            b: edge.target,
+          }),
+        });
+        const d = (await resp.json()) as { evidence?: string; found?: boolean };
+        if (!cancelled) setSelEv({ loading: false, text: d.evidence ?? "", found: !!d.found });
+      } catch {
+        if (!cancelled) setSelEv({ loading: false, text: "", found: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, data, sessionId]);
 
   // 画布大小随节点数自适应(多就撑大、不糊团);社区发现给每个节点一个阵营 id。
   const { w: W, h: H } = useMemo(() => canvasSize(data?.nodes.length ?? 0), [data]);
@@ -524,8 +561,7 @@ export function CharacterGraph({
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        {data.nodes.length} 个{noun}、{data.edges.length} 条关系（已核验原文{" "}
-        {data.edges.filter((e) => e.verified).length} 条）。星图：每个{noun}是一颗星、戏份越重越亮，星色按阵营分群；连线=关系（敌红亲绿、越粗越亲密、虚线=没核验上）；可拖动星子、点连线看原文。
+        {data.nodes.length} 个{noun}、{data.edges.length} 条关系。星图：每个{noun}是一颗星、戏份越重越亮，星色按阵营分群；连线=关系（敌红亲绿、越粗越亲密）；可拖动星子、点连线看那一章的原文出处（点开现取）。
       </p>
       {/* 图例:关系类型 + 阵营 */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
@@ -575,8 +611,8 @@ export function CharacterGraph({
                 stroke={active ? "var(--color-seal)" : EDGE_COLOR[relationKind(e.relation)]}
                 strokeWidth={active ? edgeWidth(e.strength) + 1.5 : edgeWidth(e.strength)}
                 strokeLinecap="round"
-                strokeDasharray={e.verified ? undefined : "4 3"}
-                opacity={active ? 1 : e.verified ? 0.72 : 0.4}
+                strokeDasharray={e.evidence && !e.verified ? "4 3" : undefined}
+                opacity={active ? 1 : e.evidence && !e.verified ? 0.4 : 0.72}
               />
               <line
                 x1={a.x}
@@ -636,13 +672,16 @@ export function CharacterGraph({
             </span>
           </p>
           <p className="mt-1 text-sm text-[var(--color-ink)] leading-relaxed">
-            {sel.evidence || "（这条关系没给出原文片段）"}
+            {selEv?.loading
+              ? "正在从这一章原文里找出处…"
+              : (selEv?.found ? selEv.text : sel.evidence) ||
+                "这一章原文里没比对到支撑这条关系的句子。"}
           </p>
-          <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-            {sel.verified
-              ? `原文已核验${sel.chapter > 0 ? ` · 第 ${sel.chapter} 章` : ""}`
-              : "原文未在书中比对命中（仅供参考）"}
-          </p>
+          {(selEv?.found || sel.evidence) && (
+            <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+              原文出处{sel.chapter > 0 ? ` · 第 ${sel.chapter} 章` : ""}（点开现取）
+            </p>
+          )}
         </div>
       )}
     </div>

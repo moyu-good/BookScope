@@ -56,6 +56,7 @@ from bookscope.agent.chapter_spine_views import (
     narrative_curve_from_spine,
     narrative_flow_from_spine,
     pacing_from_spine,
+    relationship_graph_from_spine,
 )
 from bookscope.agent.character_arc import generate_character_arc_exhaustive
 from bookscope.agent.character_graph import (
@@ -768,18 +769,44 @@ async def agent_character_graph(
 
     model = request.model or default_model_for(request.provider)
     full_text, chunks = _long_context_inputs(assembler)
-    # 穷尽化(1.4):逐段抽边 + 合并,不再单次摘要硬帽 30 条。人物图把上传时已建好的 KG
-    # canonical 角色清单喂进去当节点锚(减别名碎裂);概念图无此清单、由模型逐段自识别。
-    known_characters = (
-        [c.name for c in assembler._kg.characters]  # noqa: SLF001 — 同既有路由取数惯例
-        if request.unit == "person"
-        else []
-    )
+
+    # 人物图(1.x 章脉转向 ADR-010 出路 B):从共享章脉的逐章 relations 聚合成边,不再单独跑全书。
+    # 边是章级锚——relation 用章脉给的交互短语、strength 用共现章数(可数事实,比 LLM 糊的亲疏分
+    # 更立得住)、evidence 留空待前端点开调 /agent/spine-evidence 现取。概念图章脉没有(概念维是
+    # claims 不是概念关系),仍走 extract_character_graph_exhaustive 各跑全书。
+    if request.unit == "person":
+        rec = _UsageRecorder(client)
+        _t0 = time.monotonic()
+        spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+        g = relationship_graph_from_spine(spine)
+        edges = [
+            GraphEdge(
+                source=e["source"],
+                target=e["target"],
+                relation="、".join(e.get("notes", [])[:2]) or "同场",
+                strength=max(1, min(5, int(e.get("weight", 1)))),
+                evidence="",
+                verified=False,
+                chapter=(e["chapters"][0] if e.get("chapters") else 0),
+                match_score=0.0,
+            )
+            for e in g["edges"]
+        ]
+        trace = _run_trace(rec, full_text, _t0)
+        trace["total_edges"] = len(edges)
+        return CharacterGraphResponse(
+            nodes=[n["name"] for n in g["nodes"]],
+            edges=edges,
+            book_session_id=request.book_session_id,
+            trace=trace,
+        )
+
+    # 概念图:无 KG canonical 清单,逐段自识别,各跑全书(章脉不覆盖概念关系)。
     result = extract_character_graph_exhaustive(
         chunks=chunks,
         llm_client=client,
         model=model,
-        known_characters=known_characters,
+        known_characters=[],
         unit=request.unit,
         cache_enabled=True,
     )
