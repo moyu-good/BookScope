@@ -27,6 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
+from bookscope.agent._internal.exhaustive import segment_chunks
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
@@ -444,26 +445,6 @@ def _verify_edges_against_chunks(
             edge.setdefault("chapter", 0)
 
 
-def _segment_chunks(
-    chunks: list[dict[str, Any]], char_budget: int = SEGMENT_CHAR_BUDGET
-) -> list[list[dict[str, Any]]]:
-    """按字符预算把全书 chunks 切成若干段（保序，不打散 chunk）。"""
-    segments: list[list[dict[str, Any]]] = []
-    cur: list[dict[str, Any]] = []
-    cur_len = 0
-    for c in chunks:
-        t = str(c.get("text", ""))
-        if cur and cur_len + len(t) > char_budget:
-            segments.append(cur)
-            cur = []
-            cur_len = 0
-        cur.append(c)
-        cur_len += len(t)
-    if cur:
-        segments.append(cur)
-    return segments
-
-
 def _build_segment_system(segment_text: str, known_names: list[str], unit: str) -> str:
     """逐段抽边的 system：已知人物清单 + 本段原文 + "本段内穷尽抽关系"指令。"""
     word = "概念" if unit == "concept" else "人物"
@@ -513,7 +494,7 @@ def extract_character_graph_exhaustive(
     是安全的。每段 system 含该段原文 → L2 key 各异、不会串段。
     """
     start = time.monotonic()
-    segments = _segment_chunks(chunks, char_budget)
+    segments = segment_chunks(chunks, char_budget)
     if not segments:
         return None
     known = known_characters or []

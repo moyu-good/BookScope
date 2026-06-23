@@ -96,7 +96,5 @@ def test_exhaustive_all_segments_unparseable_returns_none(monkeypatch) -> None: 
     assert r is None
 
 
-def test_segment_chunks_splits_by_budget() -> None:
-    chunks = [{"chunk_id": f"c{i}", "text": "一二三四五"} for i in range(5)]  # 每个 5 字
-    assert len(cg._segment_chunks(chunks, char_budget=8)) == 5  # 每段 1 个
-    assert len(cg._segment_chunks(chunks, char_budget=12)) == 3  # [c0c1][c2c3][c4]
+# 分段由共享件 _internal/exhaustive.segment_chunks 提供，分段行为测试见
+# test_exhaustive_helper.py::test_segment_chunks_splits_by_budget（这里不再重复）。
