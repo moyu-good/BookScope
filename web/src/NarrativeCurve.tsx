@@ -139,7 +139,7 @@ export function NarrativeCurve({
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        {n} 章（原文核验 {verifiedN}/{n} 章）。山势=各章张力，越高越紧、平缓处留白成江水；朱砂点=核验过的高潮章。鼠标移过去自动吸附到最近一章、点一下看那章原文。张力只画相对起落，不报精确分数（模型判读，绝对值会浮动）。
+        {n} 章（原文核验 {verifiedN}/{n} 章）。一幅画把四维同收:山势=张力、天色暖冷=情感(暖往上走/冷往下沉)、底部色带=主导视角(换色=换视角、实笔=主线·淡笔=支线)、朱砂点=核验过的高潮章。鼠标移过去吸附最近章、点看那章原文。都是模型判读的相对趋势,不报精确分数。
       </p>
 
       <ShanshuiCurve chapters={chapters} selected={selected} onSelect={setSelected} />

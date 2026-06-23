@@ -39,6 +39,16 @@ const BASE = TOP + RANGE; // 山脚 / 水岸基线
 const WATER = 22;
 const H = BASE + WATER + 26;
 
+// 视角配色(古籍色,循环);"群像"走中性灰
+const POV_PALETTE = ["#8c6b4f", "#5f7a6b", "#9a5b52", "#6b6f8c", "#8a7a4a", "#5b7d8a", "#7a5b6b"];
+
+// 情感方向 → 天色冷暖(暮霭式氛围,只给相对趋势不报精确值):正暖、负冷、平不染
+function sentSky(s: number): { fill: string; opacity: number } | null {
+  if (s > 0) return { fill: "#bd8a52", opacity: Math.min(0.16, (s / 5) * 0.16) };
+  if (s < 0) return { fill: "#5b7d8a", opacity: Math.min(0.16, (-s / 5) * 0.16) };
+  return null;
+}
+
 export function tensionBand(t: number): string {
   if (t >= 8) return "高潮";
   if (t >= 6) return "紧张";
@@ -96,6 +106,20 @@ export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurvePro
     return { n, inner, xAt, ridgeY, near, mid, far, peaks };
   }, [chapters]);
 
+  // 视角 → 固定颜色(按首次出现分配,"群像"中性灰)
+  const povColor = useMemo(() => {
+    const map = new Map<string, string>();
+    let next = 0;
+    for (const c of chapters) {
+      if (map.has(c.pov)) continue;
+      map.set(
+        c.pov,
+        c.pov === "群像" ? "var(--color-ink-muted)" : POV_PALETTE[next++ % POV_PALETTE.length],
+      );
+    }
+    return map;
+  }, [chapters]);
+
   const { n, inner, xAt, ridgeY, near, mid, far, peaks } = layout;
 
   const baseR = `L${W - PAD_R},${BASE} L${PAD_L},${BASE} Z`;
@@ -131,6 +155,15 @@ export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurvePro
 
       {/* 静态山水（随长卷展开） */}
       <g style={{ animation: "ss-sweep .85s ease-out" }}>
+        {/* 情感天色:每章一抹暮霭,暖=往上走(喜/胜)、冷=往下沉(悲/败)。氛围式,只给相对趋势 */}
+        {chapters.map((c, i) => {
+          const sky = sentSky(c.sentiment);
+          if (!sky) return null;
+          const cw = inner / Math.max(1, n);
+          return (
+            <rect key={`sky-${i}`} x={xAt(i) - cw / 2} y={TOP} width={cw} height={BASE - TOP} fill={sky.fill} opacity={sky.opacity} />
+          );
+        })}
         <path d={farPath} fill="var(--color-ink)" opacity={0.08} />
         {/* 烟霭留白带：纸色压一层，把远山推远 */}
         <rect x={PAD_L} y={TOP + 6} width={inner} height={42} fill="var(--color-paper)" opacity={0.42} />
@@ -146,6 +179,21 @@ export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurvePro
         <line x1={PAD_L + 16} y1={BASE + 7} x2={PAD_L + inner * 0.42} y2={BASE + 7} stroke="var(--color-rule)" strokeWidth={0.6} opacity={0.8} />
         <line x1={PAD_L + inner * 0.52} y1={BASE + 13} x2={W - PAD_R - 22} y2={BASE + 13} stroke="var(--color-rule)" strokeWidth={0.6} opacity={0.7} />
         <line x1={PAD_L + inner * 0.2} y1={BASE + 17} x2={PAD_L + inner * 0.62} y2={BASE + 17} stroke="var(--color-rule)" strokeWidth={0.5} opacity={0.55} />
+        {/* 视角色带:每章一格,色=主导视角、实=主线/淡=支线。把原来藏在点击里的两维提到面上 */}
+        {chapters.map((c, i) => {
+          const cw = inner / Math.max(1, n);
+          return (
+            <rect
+              key={`pov-${i}`}
+              x={xAt(i) - cw / 2}
+              y={BASE + WATER + 2}
+              width={Math.max(0.8, cw - 0.4)}
+              height={8}
+              fill={povColor.get(c.pov) ?? "var(--color-ink-muted)"}
+              opacity={c.mainline ? 0.62 : 0.22}
+            />
+          );
+        })}
         {/* 朱砂题点：核验过的高潮章 */}
         {peaks.map((p) => (
           <circle
