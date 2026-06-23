@@ -3,10 +3,11 @@
 章脉是整本一次精读出的带证据逐章结构(``chapter_spine.build_chapter_spine``)。本模块把它
 投影/聚合成各功能要的形态,不再各自重跑全书。
 
-**本文件目前只放"章级标量"视图**(叙事曲线 / 节奏)——它们要的 tension/sentiment/pov 章脉
-直接有,满精度投影、没有开放问题。关系图 / 叙事流 / 时间线要"每条边/事件带逐字证据",而章脉
-当前只到章级证据(给每条关系/事件加证据会让 spine 抽取输出暴涨、章闸要砍半),证据粒度怎么定
-是 ADR-010 的开放问题(牵动立身之本),定了再在这里加。
+两类视图:
+- **章级标量**(叙事曲线 / 节奏):tension/sentiment/pov 章脉直接有,满精度投影。
+- **章级锚**(关系图 / 叙事流 / 时间线,ADR-010 D-2 出路 B,作者 2026-06-23 拍 B):边/对/事件
+  不带 upfront 逐字证据(那要把 spine 抽取输出翻倍),改成钉到章号;前端点开某条时调按需取证
+  端点现取那一句精确原文(贴 NORTH_STAR"查询时证据现场取")。按需取证端点 + 缓存接线是后续步。
 """
 
 from __future__ import annotations
@@ -75,7 +76,109 @@ def pacing_from_spine(spine: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+# ── 章级锚视图(ADR-010 D-2 出路 B:章脉只记"这条在第几章",证据点开现取)─────────
+#
+# 关系图 / 叙事流 / 时间线的边/对/事件不带 upfront 逐字证据(那要把 spine 抽取输出翻倍),
+# 改成钉到章号;前端点开某条边/事件时,调按需取证端点现取那一句精确原文(贴 NORTH_STAR
+# "查询时证据现场取")。所以下面的派生不产 evidence 字段,只产章级锚 + 描述。
+
+
+def _norm_pair(a: str, b: str) -> tuple[str, str]:
+    """无向对归一成 (小, 大),让 甲-乙 和 乙-甲 合到一条边。"""
+    return (a, b) if a <= b else (b, a)
+
+
+def relationship_graph_from_spine(spine: list[dict[str, Any]]) -> dict[str, Any]:
+    """关系图视图:把章脉逐章 relations 聚合成 nodes + edges(章级锚,证据点开现取)。
+
+    edge = 一对人物跨章的并集:``{source, target, chapters:[出现的章], notes:[每章一句], weight}``。
+    weight = 出现章数(画粗细)。节点 = 所有露面人物。不带 upfront evidence(出路 B)。
+    """
+    nodes: dict[str, int] = {}          # name -> 出现次数(节点大小)
+    edges: dict[tuple[str, str], dict[str, Any]] = {}
+    for rec in spine:
+        ch = rec.get("chapter")
+        if not isinstance(ch, int):
+            continue
+        for name in rec.get("present", []) or []:
+            if isinstance(name, str) and name.strip():
+                nodes[name.strip()] = nodes.get(name.strip(), 0) + 1
+        for rel in rec.get("relations", []) or []:
+            if not isinstance(rel, dict):
+                continue
+            pair = rel.get("pair")
+            if not (isinstance(pair, list) and len(pair) == 2):
+                continue
+            a, b = str(pair[0]).strip(), str(pair[1]).strip()
+            if not a or not b or a == b:
+                continue
+            key = _norm_pair(a, b)
+            e = edges.setdefault(key, {"source": key[0], "target": key[1],
+                                       "chapters": [], "notes": [], "weight": 0})
+            if ch not in e["chapters"]:
+                e["chapters"].append(ch)
+                e["weight"] += 1
+            note = str(rel.get("note", "")).strip()
+            if note:
+                e["notes"].append(note)
+    for e in edges.values():
+        e["chapters"].sort()
+    return {
+        "nodes": [{"name": n, "mentions": c} for n, c in sorted(nodes.items())],
+        "edges": sorted(edges.values(), key=lambda e: (-e["weight"], e["source"])),
+    }
+
+
+def narrative_flow_from_spine(spine: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """叙事流视图:逐章 ``{chapter, present:[人名], pairs:[{a,b}]}``(章级锚,证据点开现取)。"""
+    out: list[dict[str, Any]] = []
+    for rec in spine:
+        ch = rec.get("chapter")
+        if not isinstance(ch, int):
+            continue
+        present = [str(n).strip() for n in (rec.get("present") or []) if str(n).strip()]
+        pairs: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for rel in rec.get("relations", []) or []:
+            if not isinstance(rel, dict):
+                continue
+            pair = rel.get("pair")
+            if not (isinstance(pair, list) and len(pair) == 2):
+                continue
+            a, b = str(pair[0]).strip(), str(pair[1]).strip()
+            if not a or not b or a == b:
+                continue
+            key = _norm_pair(a, b)
+            if key in seen:
+                continue
+            seen.add(key)
+            pairs.append({"a": a, "b": b})
+        out.append({"chapter": ch, "present": present, "pairs": pairs})
+    out.sort(key=lambda c: c["chapter"])
+    return out
+
+
+def timeline_from_spine(spine: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """时间线视图:把章脉逐章 events 摊平成按章升序的事件列表(章级锚,证据点开现取)。
+
+    ``[{order, chapter, event}]``——time / evidence 不在这里产(时间靠章序,证据点开现取)。
+    """
+    out: list[dict[str, Any]] = []
+    for rec in sorted(spine, key=lambda r: r.get("chapter", 0)):
+        ch = rec.get("chapter")
+        if not isinstance(ch, int):
+            continue
+        for ev in rec.get("events", []) or []:
+            text = str(ev.get("event", ev) if isinstance(ev, dict) else ev).strip()
+            if text:
+                out.append({"order": len(out) + 1, "chapter": ch, "event": text})
+    return out
+
+
 __all__ = [
     "narrative_curve_from_spine",
     "pacing_from_spine",
+    "relationship_graph_from_spine",
+    "narrative_flow_from_spine",
+    "timeline_from_spine",
 ]
