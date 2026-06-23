@@ -16,10 +16,18 @@ import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 interface FlowPair {
   a: string;
   b: string;
-  evidence: string;
-  verified: boolean;
-  match_score: number;
-  chapter: number;
+  // 章脉转向(出路 B)后同场对只到章级锚,逐字证据点开现取——下面几项不再 upfront 给。
+  evidence?: string;
+  verified?: boolean;
+  match_score?: number;
+  chapter?: number;
+}
+
+// 点开某条同场对时按需取那一句原文(/agent/spine-evidence,纯检索)。
+interface PairEvidence {
+  loading: boolean;
+  text: string;
+  found: boolean;
 }
 
 interface FlowChapter {
@@ -73,7 +81,42 @@ export function CharacterFlow({
   const [error, setError] = useState<string | null>(null);
   const [trace, setTrace] = useState<RunTrace | null>(null);
   const [selected, setSelected] = useState<SelectedPair | null>(null);
+  const [selEv, setSelEv] = useState<PairEvidence | null>(null);
   const [hoverChar, setHoverChar] = useState<string | null>(null);
+
+  // 选中某条同场对 → 按需调 /agent/spine-evidence 取那一章里支撑这对人的那句原文(纯检索,不要 key)。
+  useEffect(() => {
+    if (!selected) {
+      setSelEv(null);
+      return;
+    }
+    let cancelled = false;
+    setSelEv({ loading: true, text: "", found: false });
+    (async () => {
+      try {
+        const resp = await fetch("/api/agent/spine-evidence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_id: sessionId,
+            chapter: selected.chapter,
+            kind: "pair",
+            a: selected.a,
+            b: selected.b,
+          }),
+        });
+        const data = (await resp.json()) as { evidence?: string; found?: boolean };
+        if (!cancelled) {
+          setSelEv({ loading: false, text: data.evidence ?? "", found: !!data.found });
+        }
+      } catch {
+        if (!cancelled) setSelEv({ loading: false, text: "", found: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, sessionId]);
 
   // 松弛动画：每个 (人, 章) 一个 LaneNode；rAF 驱动，冷却 / 硬帧上限停
   const simRef = useRef<Map<string, LaneNode>>(new Map());
@@ -348,21 +391,18 @@ export function CharacterFlow({
   const yOf = (name: string, i: number) =>
     sim.get(`${name}|${i}`)?.y ?? layout.lane.get(name) ?? H / 2;
 
-  const verifiedPairs = view.reduce(
-    (acc, c) => acc + c.pairs.filter((p) => p.verified).length,
-    0,
-  );
   const totalPairs = view.reduce((acc, c) => acc + c.pairs.length, 0);
 
-  const sel = selected
+  // 选中对在数据里若自带 evidence(demo 老形态 / 真后端没有),当现取失败时的回退。
+  const selUpfront = selected
     ? view
         .find((c) => c.chapter === selected.chapter)
         ?.pairs.find(
           (p) =>
             (p.a === selected.a && p.b === selected.b) ||
             (p.a === selected.b && p.b === selected.a),
-        ) ?? null
-    : null;
+        )?.evidence
+    : undefined;
 
   return (
     <div className="pt-4">
@@ -387,7 +427,7 @@ export function CharacterFlow({
         {totalCast > names.length
           ? `图中主要 ${names.length} 人 / 全书共 ${totalCast} 人`
           : `${names.length} 个人物`}
-        、{n} 章（同场判定已核验原文 {verifiedPairs}/{totalPairs} 条）。横线穿全书、线越粗这章戏越多；同场处两线靠拢成束（点束看原文）；虚线灰束 = 原文没核验上。
+        、{n} 章（{totalPairs} 条同场）。横线穿全书、线越粗这章戏越多；同场处两线靠拢成束——点束看那一章的原文出处（点开现取）。
       </p>
 
       <svg
@@ -475,7 +515,6 @@ export function CharacterFlow({
             const yb = yOf(pr.b, i);
             const x = xAt(i);
             const active =
-              sel != null &&
               selected != null &&
               selected.chapter === c.chapter &&
               ((pr.a === selected.a && pr.b === selected.b) ||
@@ -487,16 +526,9 @@ export function CharacterFlow({
                   y1={ya}
                   x2={x}
                   y2={yb}
-                  stroke={
-                    active
-                      ? "var(--color-seal)"
-                      : pr.verified
-                        ? "var(--color-ink-muted)"
-                        : "#c9c2b6"
-                  }
+                  stroke={active ? "var(--color-seal)" : "var(--color-ink-muted)"}
                   strokeWidth={active ? 2.6 : 1.4}
                   strokeLinecap="round"
-                  strokeDasharray={pr.verified ? undefined : "3 3"}
                   opacity={active ? 1 : 0.6}
                 />
                 {/* 透明粗线作点击热区 */}
@@ -518,19 +550,22 @@ export function CharacterFlow({
         )}
       </svg>
 
-      {sel && selected && (
+      {selected && (
         <div className="mt-3 p-3 rounded border border-[var(--color-rule)] bg-white">
           <p className="text-sm font-bold text-[var(--color-ink)]">
-            第 {sel.chapter} 章 · {sel.a} 与 {sel.b} 同场
+            第 {selected.chapter} 章 · {selected.a} 与 {selected.b} 同场
           </p>
           <p className="mt-1 text-sm text-[var(--color-ink)] leading-relaxed">
-            {sel.evidence || "（这条同场没给出原文片段）"}
+            {selEv?.loading
+              ? "正在从这一章原文里找出处…"
+              : (selEv?.found ? selEv.text : selUpfront) ||
+                "这一章原文里没比对到支撑这对同场的句子。"}
           </p>
-          <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-            {sel.verified
-              ? `原文已核验${sel.chapter > 0 ? ` · 第 ${sel.chapter} 章` : ""}`
-              : "原文未在书中比对命中（仅供参考）"}
-          </p>
+          {selEv && !selEv.loading && (selEv.found || selUpfront) && (
+            <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+              原文出处 · 第 {selected.chapter} 章（点开现取）
+            </p>
+          )}
         </div>
       )}
 

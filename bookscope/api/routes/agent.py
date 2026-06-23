@@ -54,10 +54,10 @@ from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.chapter_spine_evidence import evidence_for_event, evidence_for_pair
 from bookscope.agent.chapter_spine_views import (
     narrative_curve_from_spine,
+    narrative_flow_from_spine,
     pacing_from_spine,
 )
 from bookscope.agent.character_arc import generate_character_arc_exhaustive
-from bookscope.agent.character_flow import generate_character_flow_exhaustive
 from bookscope.agent.character_graph import (
     extract_character_graph_exhaustive,
 )
@@ -816,9 +816,10 @@ async def agent_character_flow(
 ) -> CharacterFlowResponse:
     """抽一本书的人物叙事流（逐章同场结构，WP-character-narrative-flow，probe GO）。
 
-    1.4 穷尽化：分段并发逐章抽"同场人物 + 同场对" → 按章拼，覆盖全书每一章；每条同场对的
-    原文出处过 verify_citations（核不过的标灰）。分段处理，明朝那种塞不进 context 的大书也能
-    抽——撤了单次摘要时代的 ``_book_fits_long_context`` 大书返空守卫（同关系图）。
+    1.x 章脉转向(ADR-010 出路 B)：从共享章脉派生(``narrative_flow_from_spine``)——逐章的
+    present + 同场对(relations)章脉直接有,不再单独跑全书。同场对是**章级锚**:不带 upfront 逐字
+    证据,前端点开某条时调 ``/agent/spine-evidence`` 现取那一句(贴 NORTH_STAR 查询时证据现场取)。
+    章脉命中缓存秒出。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
 
@@ -851,14 +852,11 @@ async def agent_character_flow(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    chapters = generate_character_flow_exhaustive(
-        chunks=chunks,
-        llm_client=rec,
-        model=model,
-    )
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    chapters = narrative_flow_from_spine(spine)
     return CharacterFlowResponse(
         chapters=chapters or [],
-        scanned=chapters is not None,
+        scanned=bool(spine),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
