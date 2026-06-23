@@ -14,6 +14,7 @@ import json
 import logging
 from typing import Any
 
+from bookscope.agent._internal.exhaustive import merge_by_key, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
@@ -152,6 +153,34 @@ def _parse_claims(text: str) -> list[dict[str, Any]] | None:
     return salvaged
 
 
+def _verify_claims(claims: list[dict[str, Any]], chunks: list[dict[str, Any]]) -> None:
+    """每条 claim 的 evidence 当一条 citation 过 verify_citations（原地附加）。
+
+    命中 → ``verified=True`` + 用命中 chunk 的真章号纠偏（不信模型自报章号）；没命中 →
+    ``verified=False``，章号留模型自报的（FE 只在 verified 上盖钤印）。
+    """
+    evidence_map = {
+        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
+        for c in chunks
+        if c.get("chunk_id")
+    }
+    for cl in claims:
+        # 带上 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）；
+        # chapter 为 0 = 模型没报，不传，退回确定性首个。
+        self_ch = cl.get("chapter")
+        cit: dict[str, Any] = {"snippet": cl["evidence"]}
+        if isinstance(self_ch, int) and self_ch > 0:
+            cit["chapter"] = self_ch
+        cits = [cit]
+        verify_citations(cits, evidence_map)
+        vc = cits[0]
+        cl["verified"] = bool(vc.get("verified", False))
+        cid = vc.get("chunk_id")
+        true_ch = evidence_map.get(cid, {}).get("chapter") if cid else None
+        if isinstance(true_ch, int) and true_ch > 0:
+            cl["chapter"] = true_ch
+
+
 def generate_argument_structure(
     *,
     full_text: str,
@@ -170,11 +199,6 @@ def generate_argument_structure(
         ``[{order, claim, chapter, evidence, verified}, ...]`` 按 order 排；失败 ``None``。
     """
     _ = session_id
-    evidence_map = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
     system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请梳理这本书的主要论点结构。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
@@ -200,23 +224,51 @@ def generate_argument_structure(
                 "argument_structure parse failed (attempt %d/%d)", attempt, _MAX_ATTEMPTS
             )
             continue
-        for cl in claims:
-            # 带上 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）；
-            # chapter 为 0 = 模型没报，不传，退回确定性首个。
-            self_ch = cl.get("chapter")
-            cit: dict[str, Any] = {"snippet": cl["evidence"]}
-            if isinstance(self_ch, int) and self_ch > 0:
-                cit["chapter"] = self_ch
-            cits = [cit]
-            verify_citations(cits, evidence_map)
-            vc = cits[0]
-            cl["verified"] = bool(vc.get("verified", False))
-            cid = vc.get("chunk_id")
-            true_ch = evidence_map.get(cid, {}).get("chapter") if cid else None
-            if isinstance(true_ch, int) and true_ch > 0:
-                cl["chapter"] = true_ch
+        _verify_claims(claims, chunks)
         return claims
     return None
 
 
-__all__ = ["DEFAULT_ARGUMENT_MAX_TOKENS", "generate_argument_structure"]
+def generate_argument_structure_exhaustive(
+    *,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_ARGUMENT_MAX_TOKENS,
+    char_budget: int = 40000,
+    max_workers: int | None = None,
+) -> list[dict[str, Any]] | None:
+    """穷尽化:分段→每段抽本段论点→按 claim 去重拼,覆盖全书(1.4)。
+
+    单次调用带硬帽（prompt 写"最多约 20 条"），长书论点列不全。改 map-reduce:每段只抽本段
+    论点，跨段按 claim 去重拼起来。论点不像章节那样 disjoint——同一论点可能在相邻段都被抽到，
+    所以按 claim 文本去重。合并后按章号重排再重编 order，最后一次性 ``_verify_claims``。
+
+    Returns: 同 ``generate_argument_structure``,但覆盖全书；空 → ``None``。
+    """
+    outs = run_segments(
+        chunks=chunks,
+        instruction=_SYSTEM_INSTRUCTION,
+        user_msg="请梳理下面这段原文里出现的主要论点（只列本段的）。",
+        parse_fn=_parse_claims,
+        llm_client=llm_client,
+        model=model,
+        max_tokens=max_tokens,
+        char_budget=char_budget,
+        max_workers=max_workers,
+    )
+    merged = merge_by_key(outs, key_fn=lambda c: c.get("claim"))
+    if not merged:
+        return None
+    merged.sort(key=lambda c: c["chapter"])  # 段内 order 跨段会重复，按章号重排
+    for i, c in enumerate(merged, 1):
+        c["order"] = i  # 重排后重新编号 1..N
+    _verify_claims(merged, chunks)
+    return merged
+
+
+__all__ = [
+    "DEFAULT_ARGUMENT_MAX_TOKENS",
+    "generate_argument_structure",
+    "generate_argument_structure_exhaustive",
+]

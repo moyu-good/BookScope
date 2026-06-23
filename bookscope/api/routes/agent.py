@@ -47,10 +47,10 @@ from bookscope.agent import (
     run_fast_path,
 )
 from bookscope.agent.annotations import generate_annotations
-from bookscope.agent.argument_structure import generate_argument_structure
+from bookscope.agent.argument_structure import generate_argument_structure_exhaustive
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
-from bookscope.agent.character_arc import generate_character_arc
-from bookscope.agent.character_flow import generate_character_flow
+from bookscope.agent.character_arc import generate_character_arc_exhaustive
+from bookscope.agent.character_flow import generate_character_flow_exhaustive
 from bookscope.agent.character_graph import (
     extract_character_graph_exhaustive,
 )
@@ -60,7 +60,7 @@ from bookscope.agent.concept_evolution import generate_concept_evolution
 from bookscope.agent.consistency_scan import generate_consistency_scan
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
-from bookscope.agent.foreshadow_arcs import generate_foreshadow_arcs
+from bookscope.agent.foreshadow_arcs import generate_foreshadow_arcs_exhaustive
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.narrative_curve import generate_narrative_curve_exhaustive
@@ -68,12 +68,14 @@ from bookscope.agent.orchestrate import orchestrate
 from bookscope.agent.pacing_curve import generate_pacing_curve
 from bookscope.agent.question_processor import rewrite_followup
 from bookscope.agent.recap import generate_recap
-from bookscope.agent.relationship_timeline import generate_relationship_timeline
+from bookscope.agent.relationship_timeline import (
+    generate_relationship_timeline_exhaustive,
+)
 from bookscope.agent.study_cards import generate_study_cards
 from bookscope.agent.style_issues import generate_style_issues
-from bookscope.agent.subplot_weave import generate_subplot_weave
+from bookscope.agent.subplot_weave import generate_subplot_weave_exhaustive
 from bookscope.agent.suggested_questions import generate_book_questions
-from bookscope.agent.timeline import generate_timeline
+from bookscope.agent.timeline import generate_timeline_exhaustive
 from bookscope.agent.writing_technique import generate_writing_technique
 from bookscope.api.book_sessions import BookSessionNotFound, BookSessionStore
 from bookscope.api.conversation_store import (
@@ -807,15 +809,11 @@ async def agent_character_flow(
 ) -> CharacterFlowResponse:
     """抽一本书的人物叙事流（逐章同场结构，WP-character-narrative-flow，probe GO）。
 
-    整本进 context 让模型逐章吐"同场人物 + 同场对"，每条同场对的原文出处过
-    verify_citations（核不过的标灰）。只支持塞得进 context 的书；大书返空列表
-    （``scanned=false``，前端提示重试）。
+    1.4 穷尽化：分段并发逐章抽"同场人物 + 同场对" → 按章拼，覆盖全书每一章；每条同场对的
+    原文出处过 verify_citations（核不过的标灰）。分段处理，明朝那种塞不进 context 的大书也能
+    抽——撤了单次摘要时代的 ``_book_fits_long_context`` 大书返空守卫（同关系图）。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return CharacterFlowResponse(
-            chapters=[], scanned=False, book_session_id=request.book_session_id
-        )
 
     try:
         client = build_llm_client_from_params(
@@ -846,12 +844,10 @@ async def agent_character_flow(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    chapters = generate_character_flow(
-        full_text=full_text,
+    chapters = generate_character_flow_exhaustive(
         chunks=chunks,
         llm_client=rec,
         model=model,
-        session_id=request.book_session_id,
     )
     return CharacterFlowResponse(
         chapters=chapters or [],
@@ -868,19 +864,12 @@ async def agent_subplot_weave(
 ) -> SubplotWeaveResponse:
     """抽一本书的支线编织结构（支线 + 逐章活跃 + 交汇，WP-subplot-weave，probe GO）。
 
-    整本进 context 让模型抽情节支线、每条逐章活跃段、两条支线同章交汇。支线 evidence 过
-    verify_citations（核不过的整条泳道前端淡化，但仍画——支线是主观构念）；交汇双端证据都
-    过核验，**两端都命中才画交汇节点**（命根子：编的交汇被滤掉）。只支持塞得进 context 的
-    书；大书返空（``scanned=false``，前端提示重试）。
+    1.4 穷尽化：分段并发抽每段支线 + 交汇 → 按支线名并活跃章、按（支线对,章）去重交汇，拼回
+    整本编织图。支线 evidence 过 verify_citations（核不过的整条泳道前端淡化，但仍画——支线是
+    主观构念）；交汇双端证据都过核验，**两端都命中才画交汇节点**（命根子：编的交汇被滤掉）。
+    分段处理，明朝那种塞不进 context 的大书也能抽——撤了 ``_book_fits_long_context`` 守卫。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return SubplotWeaveResponse(
-            subplots=[],
-            intersections=[],
-            scanned=False,
-            book_session_id=request.book_session_id,
-        )
 
     try:
         client = build_llm_client_from_params(
@@ -911,12 +900,10 @@ async def agent_subplot_weave(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    weave = generate_subplot_weave(
-        full_text=full_text,
+    weave = generate_subplot_weave_exhaustive(
         chunks=chunks,
         llm_client=rec,
         model=model,
-        session_id=request.book_session_id,
     )
     return SubplotWeaveResponse(
         subplots=(weave or {}).get("subplots", []),
@@ -1093,15 +1080,11 @@ async def agent_narrative_curve(
 ) -> NarrativeCurveResponse:
     """据整本书逐章抽多维叙事曲线（WP-multidim-narrative-curve，probe GO）。
 
-    整本进 context 让模型逐章判张力 + 情感方向 + 主导 POV + 主/支线，每章判定挂原文
-    片段过 verify_citations（核不过的标低置信）。只支持塞得进 context 的书；大书返空列表
-    （``scanned=false``，前端提示重试）。
+    1.4 穷尽化：分段并发逐章判张力 + 情感方向 + 主导 POV + 主/支线 → 按章拼，覆盖全书每一章；
+    每章判定挂原文片段过 verify_citations（核不过的标低置信）。分段处理，明朝那种塞不进
+    context 的大书也能抽——撤了单次摘要时代的 ``_book_fits_long_context`` 大书返空守卫。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return NarrativeCurveResponse(
-            chapters=[], scanned=False, book_session_id=request.book_session_id
-        )
 
     try:
         client = build_llm_client_from_params(
@@ -1153,16 +1136,13 @@ async def agent_foreshadow_arcs(
 ) -> ForeshadowArcsResponse:
     """据整本书抽伏笔→回收弧线（WP-foreshadow-payoff-arcs，伏笔判定 exp-008 GO）。
 
-    整本进 context 让模型抽每条伏笔的埋点章 + 回收点章 + 两端原文，两端各过
+    1.4 穷尽化：大段 map-reduce 抽每条伏笔的埋点章 + 回收点章 + 两端原文，两端各过
     verify_citations。埋点核不过的整条丢；回收点核不过 / 模型说没回收 = 断弧
-    （``status="dangling"``，埋了没回收，前端画灰虚线悬空）。只支持塞得进 context
-    的书；大书返空列表（``scanned=false``，前端提示重试）。
+    （``status="dangling"``，埋了没回收，前端画灰虚线悬空）。分段处理，明朝那种塞不进
+    context 的大书也能抽——撤了 ``_book_fits_long_context`` 守卫。伏笔天生跨章，故用比逐章
+    功能大得多的段预算（80k 字）把段数压到最少，让绝大多数埋点+回收落同段、仍能配对。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return ForeshadowArcsResponse(
-            arcs=[], scanned=False, book_session_id=request.book_session_id
-        )
 
     try:
         client = build_llm_client_from_params(
@@ -1193,12 +1173,10 @@ async def agent_foreshadow_arcs(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    arcs = generate_foreshadow_arcs(
-        full_text=full_text,
+    arcs = generate_foreshadow_arcs_exhaustive(
         chunks=chunks,
         llm_client=rec,
         model=model,
-        session_id=request.book_session_id,
     )
     return ForeshadowArcsResponse(
         arcs=arcs or [],
@@ -1215,16 +1193,12 @@ async def agent_character_arc(
 ) -> CharacterArcResponse:
     """给主要角色逐章抽戏份/处境弧线曲线（WP-character-arc-curves，probe GO）。
 
-    整本进 context 让模型给主要角色逐章打戏份密度（presence 0-10）+ 处境弧线
-    （fortune -5..+5），每个点挂原文片段过 verify_citations（核不过的标低置信）。
-    把已验的 exp-010 弧线分析画成可核验曲线，不重造判定——平稳角色画平、不编波动。
-    只支持塞得进 context 的书；大书返空列表（``scanned=false``，前端提示重试）。
+    1.4 穷尽化：分段并发给主要角色逐章打戏份密度（presence 0-10）+ 处境弧线（fortune -5..+5）
+    → 按角色名合并、逐章点跨段并集，每个点挂原文片段过 verify_citations（核不过的标低置信）。
+    把已验的 exp-010 弧线分析画成可核验曲线，不重造判定——平稳角色画平、不编波动。分段处理，
+    明朝那种塞不进 context 的大书也能抽——撤了 ``_book_fits_long_context`` 守卫。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return CharacterArcResponse(
-            characters=[], scanned=False, book_session_id=request.book_session_id
-        )
 
     try:
         client = build_llm_client_from_params(
@@ -1255,12 +1229,10 @@ async def agent_character_arc(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    characters = generate_character_arc(
-        full_text=full_text,
+    characters = generate_character_arc_exhaustive(
         chunks=chunks,
         llm_client=rec,
         model=model,
-        session_id=request.book_session_id,
     )
     return CharacterArcResponse(
         characters=characters or [],
@@ -1351,15 +1323,11 @@ async def agent_relationship_timeline(
 ) -> RelationshipTimelineResponse:
     """据整本书逐对主要关系抽演变（WP-relationship-over-time，probe GO）。
 
-    整本进 context 让模型逐对关系吐逐章强度 + 关键转折，每个转折挂原文片段过
-    verify_citations（核不过的标低置信）。只支持塞得进 context 的书；大书返空列表
-    （``scanned=false``，前端提示重试）。
+    1.4 穷尽化：分段并发逐对关系吐逐章强度 + 关键转折 → 按无向人物对合并、强度点 / 转折跨段
+    并集，每个转折挂原文片段过 verify_citations（核不过的标低置信）。分段处理，明朝那种塞不进
+    context 的大书也能抽——撤了 ``_book_fits_long_context`` 守卫。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return RelationshipTimelineResponse(
-            relations=[], scanned=False, book_session_id=request.book_session_id
-        )
 
     try:
         client = build_llm_client_from_params(
@@ -1390,12 +1358,10 @@ async def agent_relationship_timeline(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    relations = generate_relationship_timeline(
-        full_text=full_text,
+    relations = generate_relationship_timeline_exhaustive(
         chunks=chunks,
         llm_client=rec,
         model=model,
-        session_id=request.book_session_id,
     )
     return RelationshipTimelineResponse(
         relations=relations or [],
@@ -1472,13 +1438,10 @@ async def agent_timeline(
 ) -> TimelineResponse:
     """据整本书出按时序的事件时间线（读者发明区）。
 
-    整本进 context 梳理事件，每条 evidence 过原文核验。``scanned=false`` = 失败/书太大。
+    1.4 穷尽化：分段并发梳理事件 → 按事件文字去重、按章重排 + 重编号，每条 evidence 过原文
+    核验。分段处理，大书也能跑——撤了 ``_book_fits_long_context`` 守卫。``scanned=false`` = 失败。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return TimelineResponse(
-            events=[], scanned=False, book_session_id=request.book_session_id
-        )
 
     try:
         client = build_llm_client_from_params(
@@ -1509,12 +1472,10 @@ async def agent_timeline(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    events = generate_timeline(
-        full_text=full_text,
+    events = generate_timeline_exhaustive(
         chunks=chunks,
         llm_client=rec,
         model=model,
-        session_id=request.book_session_id,
     )
     return TimelineResponse(
         events=events or [],
@@ -1596,14 +1557,10 @@ async def agent_argument_structure(
 ) -> ArgumentStructureResponse:
     """梳理一本书的论点结构（学习者发明区）。
 
-    整本进 context、按论证推进列出主要主张 + 原文证据，每条过原文核验。
-    ``scanned=false`` = 失败/书太大。
+    1.4 穷尽化：分段并发列每段主要主张 → 按主张文字去重、按章重排 + 重编号，每条过原文核验。
+    分段处理，大书也能跑——撤了 ``_book_fits_long_context`` 守卫。``scanned=false`` = 失败。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return ArgumentStructureResponse(
-            claims=[], scanned=False, book_session_id=request.book_session_id
-        )
 
     try:
         client = build_llm_client_from_params(
@@ -1634,12 +1591,10 @@ async def agent_argument_structure(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    claims = generate_argument_structure(
-        full_text=full_text,
+    claims = generate_argument_structure_exhaustive(
         chunks=chunks,
         llm_client=rec,
         model=model,
-        session_id=request.book_session_id,
     )
     return ArgumentStructureResponse(
         claims=claims or [],

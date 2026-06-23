@@ -28,6 +28,7 @@ import json
 import logging
 from typing import Any
 
+from bookscope.agent._internal.exhaustive import merge_keyed_points, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
@@ -343,4 +344,49 @@ def generate_relationship_timeline(
     return None
 
 
-__all__ = ["DEFAULT_TIMELINE_MAX_TOKENS", "generate_relationship_timeline"]
+def generate_relationship_timeline_exhaustive(
+    *,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_TIMELINE_MAX_TOKENS,
+    char_budget: int = 40000,
+    max_workers: int | None = None,
+) -> list[dict[str, Any]] | None:
+    """穷尽化：分段→每段抽本段关系→按对拼，覆盖全书每一对关系（1.4）。
+
+    单次整本进 context 抽逐对关系会被 ~12 对的帽和 max_tokens 截断卡住，长书里好多关系
+    都漏了。改 map-reduce：每段只抽这段里出现的关系（强度点、转折），同一对关系跨段的
+    points / turning_points 按章号并集拼起来。合并用 ``merge_keyed_points``——key 是无向
+    人物对（``frozenset({a, b})``），子点字段 points 和 turning_points 各按章并集。合并后
+    一次性 ``_verify_turning_points``（转折逐字核验 + 章号纠偏）。
+
+    Returns: 同 ``generate_relationship_timeline``，但覆盖全书所有关系；空 → ``None``。
+    """
+    outs = run_segments(
+        chunks=chunks,
+        instruction=_SYSTEM_INSTRUCTION,
+        user_msg="请抽下面这段原文里主要人物关系的逐章强度与转折（只抽本段出现的章）。",
+        parse_fn=_parse_timeline,
+        llm_client=llm_client,
+        model=model,
+        max_tokens=max_tokens,
+        char_budget=char_budget,
+        max_workers=max_workers,
+    )
+    merged = merge_keyed_points(
+        outs,
+        key_fn=lambda r: frozenset((r["a"], r["b"])),
+        point_fields=["points", "turning_points"],
+    )
+    if not merged:
+        return None
+    _verify_turning_points(merged, chunks)
+    return merged
+
+
+__all__ = [
+    "DEFAULT_TIMELINE_MAX_TOKENS",
+    "generate_relationship_timeline",
+    "generate_relationship_timeline_exhaustive",
+]

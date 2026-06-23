@@ -14,6 +14,7 @@ import json
 import logging
 from typing import Any
 
+from bookscope.agent._internal.exhaustive import merge_by_key, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
@@ -156,6 +157,35 @@ def _parse_timeline(text: str) -> list[dict[str, Any]] | None:
     return salvaged
 
 
+def _verify_events(events: list[dict[str, Any]], chunks: list[dict[str, Any]]) -> None:
+    """每条事件的 evidence 当一条 citation 过 verify_citations（原地附加）。
+
+    命中 → ``verified=True`` + 用命中 chunk 的真章号纠偏（不信模型自报章号，同
+    long_context / character_flow）；没命中 → ``verified=False``，chapter 退回模型自报。
+    事件自报 chapter 为 0 = 模型没报，不传，让 verify 退回确定性首个命中。
+    """
+    evidence_map = {
+        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
+        for c in chunks
+        if c.get("chunk_id")
+    }
+    for ev in events:
+        # 带上 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）；
+        # chapter 为 0 = 模型没报，不传，退回确定性首个。
+        self_ch = ev.get("chapter")
+        cit: dict[str, Any] = {"snippet": ev["evidence"]}
+        if isinstance(self_ch, int) and self_ch > 0:
+            cit["chapter"] = self_ch
+        cits = [cit]
+        verify_citations(cits, evidence_map)
+        vc = cits[0]
+        ev["verified"] = bool(vc.get("verified", False))
+        cid = vc.get("chunk_id")
+        true_ch = evidence_map.get(cid, {}).get("chapter") if cid else None
+        if isinstance(true_ch, int) and true_ch > 0:
+            ev["chapter"] = true_ch
+
+
 def generate_timeline(
     *,
     full_text: str,
@@ -174,11 +204,6 @@ def generate_timeline(
         ``[{order, time, event, chapter, evidence, verified}, ...]`` 按 order 排；失败 ``None``。
     """
     _ = session_id
-    evidence_map = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
     system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请据这本书按时序梳理主要事件。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
@@ -202,23 +227,53 @@ def generate_timeline(
         if events is None:
             logger.warning("timeline parse failed (attempt %d/%d)", attempt, _MAX_ATTEMPTS)
             continue
-        for ev in events:
-            # 带上 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）；
-            # chapter 为 0 = 模型没报，不传，退回确定性首个。
-            self_ch = ev.get("chapter")
-            cit: dict[str, Any] = {"snippet": ev["evidence"]}
-            if isinstance(self_ch, int) and self_ch > 0:
-                cit["chapter"] = self_ch
-            cits = [cit]
-            verify_citations(cits, evidence_map)
-            vc = cits[0]
-            ev["verified"] = bool(vc.get("verified", False))
-            cid = vc.get("chunk_id")
-            true_ch = evidence_map.get(cid, {}).get("chapter") if cid else None
-            if isinstance(true_ch, int) and true_ch > 0:
-                ev["chapter"] = true_ch
+        _verify_events(events, chunks)
         return events
     return None
 
 
-__all__ = ["DEFAULT_TIMELINE_MAX_TOKENS", "generate_timeline"]
+def generate_timeline_exhaustive(
+    *,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_TIMELINE_MAX_TOKENS,
+    char_budget: int = 40000,
+    max_workers: int | None = None,
+) -> list[dict[str, Any]] | None:
+    """穷尽化：分段→每段梳理本段事件→按事件拼，覆盖全书时序（1.4）。
+
+    单次整本进 context 抽事件会被 ~30 条的帽和 max_tokens 截断卡住，长书后半段的事件
+    都漏了。改 map-reduce：每段只梳理这段发生的事，再按事件文字去重拼起来（跨段重复的
+    事件——相邻段都提到——按身份去重）。``merge_by_key`` 不重排序号，所以合并后按真章号
+    重排再从 1 重编 order（段内 order 跨段会撞）。合并后一次性 ``_verify_events``。
+
+    Returns: 同 ``generate_timeline``，但覆盖全书所有事件；空 → ``None``。
+    """
+    outs = run_segments(
+        chunks=chunks,
+        instruction=_SYSTEM_INSTRUCTION,
+        user_msg="请据下面这段原文按时序梳理其中发生的主要事件（只列本段的）。",
+        parse_fn=_parse_timeline,
+        llm_client=llm_client,
+        model=model,
+        max_tokens=max_tokens,
+        char_budget=char_budget,
+        max_workers=max_workers,
+    )
+    merged = merge_by_key(outs, key_fn=lambda e: e.get("event"))
+    if not merged:
+        return None
+    # 段内 order 跨段会重复，按真章号重排再从 1 重编号
+    merged.sort(key=lambda e: e["chapter"])
+    for i, e in enumerate(merged, 1):
+        e["order"] = i
+    _verify_events(merged, chunks)
+    return merged
+
+
+__all__ = [
+    "DEFAULT_TIMELINE_MAX_TOKENS",
+    "generate_timeline",
+    "generate_timeline_exhaustive",
+]

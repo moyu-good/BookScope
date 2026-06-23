@@ -27,6 +27,7 @@ import json
 import logging
 from typing import Any
 
+from bookscope.agent._internal.exhaustive import merge_by_key, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
@@ -321,4 +322,49 @@ def generate_foreshadow_arcs(
     return None
 
 
-__all__ = ["DEFAULT_ARCS_MAX_TOKENS", "generate_foreshadow_arcs"]
+def generate_foreshadow_arcs_exhaustive(
+    *,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_ARCS_MAX_TOKENS,
+    char_budget: int = 80000,
+    max_workers: int | None = None,
+) -> list[dict[str, Any]] | None:
+    """穷尽化：大段 map-reduce 抽伏笔弧 → 按（描述，埋点章）去重 → 两端核验（1.4）。
+
+    伏笔天生跨章——前文埋、后文收。整本单次塞不进大书的 context（同关系图 422），所以
+    必须分段才跑得起三国 / 明朝这种大书。但分段有个绕不开的代价：埋点和回收点被切到不同
+    段时，只看到埋点的那段会把它误判成断弧。为把这个代价压到最小，这里用**比逐章功能大得多
+    的段预算（默认 80k 字，逐章功能是 40k）**——段越大、段数越少，绝大多数"埋点 + 回收"
+    就落在同一段里，仍能正确配对。**已知限制**：埋点和回收点正好骑在相邻两段边界上的伏笔，
+    会被那个只看到埋点的段标成 ``dangling``。校验在合并后由 ``_verify_endpoints`` 一次性做
+    （埋点核不过的整条丢）。
+
+    Returns: 同 ``generate_foreshadow_arcs``，但覆盖全书、能跑大书；空 → ``None``。
+    """
+    outs = run_segments(
+        chunks=chunks,
+        instruction=_SYSTEM_INSTRUCTION,
+        user_msg="请梳理下面这段原文里埋下或回收的伏笔（只列本段相关的）。",
+        parse_fn=_parse_arcs,
+        llm_client=llm_client,
+        model=model,
+        max_tokens=max_tokens,
+        char_budget=char_budget,
+        max_workers=max_workers,
+    )
+    merged = merge_by_key(
+        outs, key_fn=lambda a: (a.get("description", ""), a.get("setup_chapter"))
+    )
+    if not merged:
+        return None
+    merged.sort(key=lambda a: a["setup_chapter"])
+    return _verify_endpoints(merged, chunks)
+
+
+__all__ = [
+    "DEFAULT_ARCS_MAX_TOKENS",
+    "generate_foreshadow_arcs",
+    "generate_foreshadow_arcs_exhaustive",
+]

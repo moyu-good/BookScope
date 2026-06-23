@@ -29,6 +29,7 @@ import json
 import logging
 from typing import Any
 
+from bookscope.agent._internal.exhaustive import run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
@@ -401,4 +402,102 @@ def generate_subplot_weave(
     return None
 
 
-__all__ = ["DEFAULT_WEAVE_MAX_TOKENS", "generate_subplot_weave"]
+def _parse_weave_as_list(text: str) -> list[dict[str, Any]]:
+    """把单段编织图（dict）包成 0/1 元素的 list，好喂 run_segments（它要 parse_fn→list）。"""
+    weave = _parse_weave(text)
+    return [weave] if weave is not None else []
+
+
+def _merge_weave_segments(
+    outs: list[list[dict[str, Any]]],
+) -> dict[str, Any] | None:
+    """跨段合并编织图：支线按名并 active_chapters，交汇按（支线对，章）去重。
+
+    支线是跨章的（一条线时起时落），分段后同一条线会在多段各露一截——按 name 合并、把各段
+    的 active_chapters 并起来，就拼回整条线的活跃章。交汇是逐章的局部事件，concat 后按
+    ``(sorted 支线对, 章号)`` 去重即可。**已知限制**：同一条支线被不同段起了不同名字会裂成
+    两条（同关系图的别名碎裂），FE 上看是两条相近的泳道——比单次帽住 10 条丢内容好。
+    """
+    sp_order: list[str] = []
+    sp_bucket: dict[str, dict[str, Any]] = {}
+    inter_seen: set[tuple] = set()
+    intersections: list[dict[str, Any]] = []
+    for seg in outs:
+        for weave in seg:
+            for sp in weave.get("subplots", []):
+                name = sp["name"]
+                if name not in sp_bucket:
+                    sp_bucket[name] = {
+                        "name": name,
+                        "active_chapters": list(sp.get("active_chapters", [])),
+                        "evidence": sp.get("evidence", ""),
+                    }
+                    sp_order.append(name)
+                    continue
+                tgt = sp_bucket[name]
+                have = set(tgt["active_chapters"])
+                for ch in sp.get("active_chapters", []):
+                    if ch not in have:
+                        have.add(ch)
+                        tgt["active_chapters"].append(ch)
+                if not tgt["evidence"] and sp.get("evidence"):
+                    tgt["evidence"] = sp["evidence"]  # 先出现段缺证据则后段补上
+            for it in weave.get("intersections", []):
+                key = (tuple(sorted(it["subplots"])), it["chapter"])
+                if key in inter_seen:
+                    continue
+                inter_seen.add(key)
+                intersections.append(it)
+    if not sp_order:
+        return None
+    subplots = [sp_bucket[n] for n in sp_order]
+    for sp in subplots:
+        sp["active_chapters"].sort()
+    return {"subplots": subplots, "intersections": intersections}
+
+
+def generate_subplot_weave_exhaustive(
+    *,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_WEAVE_MAX_TOKENS,
+    char_budget: int = 40000,
+    max_workers: int | None = None,
+) -> dict[str, Any] | None:
+    """穷尽化：分段抽每段支线 + 交汇 → 跨段合并 → 双命根子核验（1.4）。
+
+    单次整本在大书上塞不进 context（同关系图 422），分段才跑得起三国 / 明朝。每段抽出本段
+    的支线（带本段活跃章）和交汇，``_merge_weave_segments`` 按支线名并活跃章、按（对，章）
+    去重交汇，拼回整本编织图。校验在合并后一次性做——支线 evidence 标 verified、交汇走双端
+    守卫（两腿都核过才画）。任意环节空 → ``None``。
+    """
+    outs = run_segments(
+        chunks=chunks,
+        instruction=_SYSTEM_INSTRUCTION,
+        user_msg="请梳理下面这段原文里的情节支线，以及本段内两条支线的交汇。",
+        parse_fn=_parse_weave_as_list,
+        llm_client=llm_client,
+        model=model,
+        max_tokens=max_tokens,
+        char_budget=char_budget,
+        max_workers=max_workers,
+    )
+    weave = _merge_weave_segments(outs)
+    if weave is None:
+        return None
+    evidence = {
+        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
+        for c in chunks
+        if c.get("chunk_id")
+    }
+    _verify_subplots(weave["subplots"], evidence)
+    weave["intersections"] = _verify_intersections(weave["intersections"], evidence)
+    return weave
+
+
+__all__ = [
+    "DEFAULT_WEAVE_MAX_TOKENS",
+    "generate_subplot_weave",
+    "generate_subplot_weave_exhaustive",
+]

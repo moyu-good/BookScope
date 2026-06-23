@@ -80,3 +80,65 @@ def test_mapreduce_skips_unparseable_segment(monkeypatch) -> None:  # noqa: ANN0
         model="m", max_tokens=100, char_budget=1, max_workers=1,
     )
     assert [c["chapter"] for c in out] == [5]  # 坏段跳过,好段保留
+
+
+# ── reduce 合并件（纯函数，直接喂 outs，不过 LLM）─────────────────────────────
+
+
+def test_merge_by_chapter_dedups_and_sorts() -> None:
+    outs = [
+        [{"chapter": 2, "v": "a"}, {"chapter": 1, "v": "a"}],
+        [{"chapter": 3, "v": "b"}, {"chapter": 2, "v": "dup"}],
+    ]
+    out = ex.merge_by_chapter(outs)
+    assert [c["chapter"] for c in out] == [1, 2, 3]
+    assert next(c for c in out if c["chapter"] == 2)["v"] == "a"  # 保先出现
+
+
+def test_merge_by_key_dedups_keeps_first() -> None:
+    outs = [
+        [{"event": "赤壁", "x": 1}, {"event": "官渡", "x": 1}],
+        [{"event": "赤壁", "x": 2}, {"event": "夷陵", "x": 3}],  # 赤壁跨段重复
+    ]
+    out = ex.merge_by_key(outs, key_fn=lambda e: e["event"])
+    assert [e["event"] for e in out] == ["赤壁", "官渡", "夷陵"]
+    assert out[0]["x"] == 1  # 保先出现段的值
+
+
+def test_merge_by_key_drops_none_key() -> None:
+    outs = [[{"event": "赤壁"}, {"noevent": True}]]
+    out = ex.merge_by_key(outs, key_fn=lambda e: e.get("event"))
+    assert [e.get("event") for e in out] == ["赤壁"]  # key=None 丢
+
+
+def test_merge_keyed_points_unions_subpoints_by_chapter() -> None:
+    # 同一角色「刘备」跨两段，各带不同章的 points；标量 name 保先出现
+    outs = [
+        [{"name": "刘备", "points": [{"chapter": 1, "v": 5}, {"chapter": 2, "v": 6}]}],
+        [{"name": "刘备", "points": [{"chapter": 2, "v": 99}, {"chapter": 5, "v": 7}]},
+         {"name": "曹操", "points": [{"chapter": 1, "v": 8}]}],
+    ]
+    out = ex.merge_keyed_points(outs, key_fn=lambda c: c["name"], point_fields=["points"])
+    assert [c["name"] for c in out] == ["刘备", "曹操"]  # 按首见顺序
+    liubei = out[0]
+    assert [p["chapter"] for p in liubei["points"]] == [1, 2, 5]  # 并集 + 升序
+    assert next(p for p in liubei["points"] if p["chapter"] == 2)["v"] == 6  # 章 2 保先出现
+
+
+def test_merge_keyed_points_multiple_point_fields() -> None:
+    outs = [
+        [{"a": "刘备", "b": "曹操", "relation": "政敌",
+          "points": [{"chapter": 1, "strength": 3}],
+          "turning_points": [{"chapter": 1, "change": "初见"}]}],
+        [{"a": "刘备", "b": "曹操", "relation": "ignored",
+          "points": [{"chapter": 9, "strength": 8}],
+          "turning_points": [{"chapter": 9, "change": "决裂"}]}],
+    ]
+    out = ex.merge_keyed_points(
+        outs, key_fn=lambda r: frozenset((r["a"], r["b"])),
+        point_fields=["points", "turning_points"],
+    )
+    assert len(out) == 1
+    assert out[0]["relation"] == "政敌"  # 标量保先出现
+    assert [p["chapter"] for p in out[0]["points"]] == [1, 9]
+    assert [t["chapter"] for t in out[0]["turning_points"]] == [1, 9]

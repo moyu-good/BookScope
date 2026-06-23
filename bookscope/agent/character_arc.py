@@ -32,6 +32,7 @@ import json
 import logging
 from typing import Any
 
+from bookscope.agent._internal.exhaustive import merge_keyed_points, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import verify_citations
@@ -315,4 +316,43 @@ def generate_character_arc(
     return None
 
 
-__all__ = ["DEFAULT_ARC_MAX_TOKENS", "generate_character_arc"]
+def generate_character_arc_exhaustive(
+    *,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_ARC_MAX_TOKENS,
+    char_budget: int = 40000,
+    max_workers: int | None = None,
+) -> list[dict[str, Any]] | None:
+    """穷尽化:分段→每段抽各角色逐章点→按角色名合并、点跨段按章并集(1.4)。
+
+    重型(多角色 × 逐章两维 + evidence)单次会被 max_tokens 截断,大书漏掉后半本的章。
+    改 map-reduce:每段抽本段出场角色的逐章点,再按角色名合并——同一角色跨段的 points 按章并集
+    升序(段是 disjoint 章区间,天然不撞章)。合并后一次性 ``_verify_points``(逐字核验 + 章号纠偏)。
+
+    Returns: 同 ``generate_character_arc``,但覆盖全书所有章;空 → ``None``。
+    """
+    outs = run_segments(
+        chunks=chunks,
+        instruction=_SYSTEM_INSTRUCTION,
+        user_msg="请给下面这段原文里出场的主要角色逐章抽戏份与处境弧线（只抽本段出现的章）。",
+        parse_fn=_parse_arc,
+        llm_client=llm_client,
+        model=model,
+        max_tokens=max_tokens,
+        char_budget=char_budget,
+        max_workers=max_workers,
+    )
+    merged = merge_keyed_points(outs, key_fn=lambda c: c["name"], point_fields=["points"])
+    if not merged:
+        return None
+    _verify_points(merged, chunks)
+    return merged
+
+
+__all__ = [
+    "DEFAULT_ARC_MAX_TOKENS",
+    "generate_character_arc",
+    "generate_character_arc_exhaustive",
+]
