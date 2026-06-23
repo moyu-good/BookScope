@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { NIGHT_SKY, StarNode, StarTwinkleStyle } from "./starSky";
 
 export interface GraphEdge {
   source: string;
@@ -551,13 +552,13 @@ export function CharacterGraph({
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full border border-[var(--color-rule)] rounded touch-none"
-        style={{ maxHeight: 560, background: "#0f1730" }}
+        style={{ maxHeight: 560, background: NIGHT_SKY }}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerLeave={onUp}
       >
         {/* 星图：夜空底 + 人物=星(亮度按戏份)+ 阵营=星色 + 关系=星座连线。闪烁用纯 CSS,不靠 rAF。 */}
-        <style>{`@keyframes cg-twinkle{0%,100%{opacity:.6}50%{opacity:1}}`}</style>
+        <StarTwinkleStyle />
         {/* 边：星座连线 */}
         {data.edges.map((e, i) => {
           const a = sim.get(e.source);
@@ -606,22 +607,7 @@ export function CharacterGraph({
               {(() => {
                 const color = communityColor(communities.get(name) ?? 0);
                 const dur = 2.4 + (deg % 4) * 0.7; // 错开闪烁,别齐刷刷
-                return (
-                  <>
-                    <circle cx={p.x} cy={p.y} r={r * 2.3} fill={color} opacity={0.13} />
-                    <line x1={p.x - r * 1.8} y1={p.y} x2={p.x + r * 1.8} y2={p.y} stroke={color} strokeWidth={0.8} opacity={0.45} />
-                    <line x1={p.x} y1={p.y - r * 1.8} x2={p.x} y2={p.y + r * 1.8} stroke={color} strokeWidth={0.8} opacity={0.45} />
-                    <circle
-                      cx={p.x}
-                      cy={p.y}
-                      r={r}
-                      fill={color}
-                      stroke="#fdf6e3"
-                      strokeWidth={0.9}
-                      style={{ animation: `cg-twinkle ${dur}s ease-in-out infinite` }}
-                    />
-                  </>
-                );
+                return <StarNode cx={p.x} cy={p.y} r={r} color={color} twinkleDur={dur} />;
               })()}
               {showLabel && (
                 <text

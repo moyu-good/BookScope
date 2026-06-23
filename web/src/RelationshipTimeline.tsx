@@ -11,6 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { NIGHT_SKY, StarNode, StarTwinkleStyle } from "./starSky";
 
 interface StrengthPoint {
   chapter: number;
@@ -512,13 +513,13 @@ export function RelationshipTimeline({
             ref={svgRef}
             viewBox={`0 0 ${W} ${H}`}
             className="w-full border border-[var(--color-rule)] rounded touch-none"
-            style={{ maxHeight: 540, background: "#0f1730" }}
+            style={{ maxHeight: 540, background: NIGHT_SKY }}
             onPointerMove={onMove}
             onPointerUp={onUp}
             onPointerLeave={onUp}
           >
             {/* 星图：截至此章的关系网,人物=星、连线=星座(跟人物关系图同族同皮)。闪烁纯 CSS。 */}
-            <style>{`@keyframes rt-twinkle{0%,100%{opacity:.6}50%{opacity:1}}`}</style>
+            <StarTwinkleStyle />
             {/* 活动边：星座连线 */}
             {activeEdges.map((e, i) => {
               const a = sim.get(e.a);
@@ -556,17 +557,12 @@ export function RelationshipTimeline({
                 >
                   {present ? (
                     <>
-                      <circle cx={p.x} cy={p.y} r={r * 2.3} fill="var(--color-seal)" opacity={0.13} />
-                      <line x1={p.x - r * 1.8} y1={p.y} x2={p.x + r * 1.8} y2={p.y} stroke="var(--color-seal)" strokeWidth={0.8} opacity={0.45} />
-                      <line x1={p.x} y1={p.y - r * 1.8} x2={p.x} y2={p.y + r * 1.8} stroke="var(--color-seal)" strokeWidth={0.8} opacity={0.45} />
-                      <circle
+                      <StarNode
                         cx={p.x}
                         cy={p.y}
                         r={r}
-                        fill="var(--color-seal)"
-                        stroke="#fdf6e3"
-                        strokeWidth={0.9}
-                        style={{ animation: `rt-twinkle ${2.4 + (deg % 4) * 0.7}s ease-in-out infinite` }}
+                        color="var(--color-seal)"
+                        twinkleDur={2.4 + (deg % 4) * 0.7}
                       />
                       <text
                         x={p.x}
