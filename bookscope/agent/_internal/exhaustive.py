@@ -23,25 +23,51 @@ from bookscope.agent._internal.longctx_system import build_longctx_system
 logger = logging.getLogger(__name__)
 
 DEFAULT_CHAR_BUDGET = 40000
+# 每段最多多少章（ADR-010 D-7）。穷尽化每段输出 ∝ 段里章数 × 每章带证据的结构,真正撑爆
+# max_tokens 的是输出不是输入。短章书(网文 2-3 千字/章)一个 4 万字段塞十六七章 → 输出顶爆
+# 8000 截断(probe 实测全维 3/4 爆、情节维 17 章已吃到 5759)。所以段大小要同时受"字数"和
+# "章数"两个闸约束,谁先到谁断段。长章书(明朝 ~5.6k 字/章 → 一段才 7 章)字数先到、章闸不咬,
+# 行为不变。chunks 不带 chapter 时章闸不触发(向后兼容)。12 章留足 8000 余量。
+DEFAULT_MAX_CHAPTERS = 12
 DEFAULT_WORKERS = 6
 ENV_WORKERS = "BOOKSCOPE_EXHAUSTIVE_WORKERS"
 
 
 def segment_chunks(
-    chunks: list[dict[str, Any]], char_budget: int = DEFAULT_CHAR_BUDGET
+    chunks: list[dict[str, Any]],
+    char_budget: int = DEFAULT_CHAR_BUDGET,
+    max_chapters: int | None = DEFAULT_MAX_CHAPTERS,
 ) -> list[list[dict[str, Any]]]:
-    """按字符预算把全书 chunks 切成若干段（保序，不打散单个 chunk）。"""
+    """按字符预算 + 章数上限把全书 chunks 切成若干段（保序，不打散单个 chunk）。
+
+    断段条件:当前段非空,且 **要么** 加上这个 chunk 超字符预算,**要么**(ADR-010 D-7)
+    这个 chunk 引入一个新章、而当前段已攒满 ``max_chapters`` 个不同章——谁先到谁断。
+    ``max_chapters=None`` 退回纯字符预算。chunk 不带 ``chapter`` 时章闸不触发(向后兼容)。
+    """
     segments: list[list[dict[str, Any]]] = []
     cur: list[dict[str, Any]] = []
     cur_len = 0
+    cur_chapters: set[Any] = set()
     for c in chunks:
         t = str(c.get("text", ""))
-        if cur and cur_len + len(t) > char_budget:
+        ch = c.get("chapter")
+        over_chars = bool(cur) and cur_len + len(t) > char_budget
+        new_chapter = ch is not None and ch not in cur_chapters
+        over_chapters = (
+            bool(cur)
+            and max_chapters is not None
+            and new_chapter
+            and len(cur_chapters) >= max_chapters
+        )
+        if over_chars or over_chapters:
             segments.append(cur)
             cur = []
             cur_len = 0
+            cur_chapters = set()
         cur.append(c)
         cur_len += len(t)
+        if ch is not None:
+            cur_chapters.add(ch)
     if cur:
         segments.append(cur)
     return segments

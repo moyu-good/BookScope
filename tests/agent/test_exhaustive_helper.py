@@ -18,6 +18,33 @@ def test_segment_chunks_splits_by_budget() -> None:
     assert len(ex.segment_chunks([], 40)) == 0
 
 
+def test_segment_chunks_caps_by_max_chapters() -> None:
+    # ADR-010 D-7 章闸:20 个 chunk 各属不同章、每个很短(字数闸不触发),max_chapters=5 → 按章切
+    chunks = [{"chunk_id": f"c{i}", "chapter": i, "text": "短"} for i in range(20)]
+    segs = ex.segment_chunks(chunks, char_budget=100000, max_chapters=5)
+    assert len(segs) == 4  # 20 章 / 每段至多 5 章
+    assert all(len({c["chapter"] for c in s}) <= 5 for s in segs)
+
+
+def test_segment_chunks_same_chapter_not_counted_twice() -> None:
+    # 同章多 chunk 不算多章:10 个 chunk 都属 chapter 1,max_chapters=2 不该切(字数也不超)
+    chunks = [{"chunk_id": f"c{i}", "chapter": 1, "text": "短"} for i in range(10)]
+    assert len(ex.segment_chunks(chunks, char_budget=100000, max_chapters=2)) == 1
+
+
+def test_segment_chunks_no_chapter_field_ignores_cap() -> None:
+    # 不带 chapter 时章闸不触发,退回纯字符预算(向后兼容)
+    chunks = [{"chunk_id": f"c{i}", "text": "一二三四五"} for i in range(5)]
+    assert len(ex.segment_chunks(chunks, char_budget=12, max_chapters=1)) == 3
+
+
+def test_segment_chunks_char_budget_still_wins_when_tighter() -> None:
+    # 长章场景:每章一个 4 万字 chunk,字数闸先到,章闸(12)咬不到 → 每段 1 章
+    chunks = [{"chunk_id": f"c{i}", "chapter": i, "text": "字" * 39000} for i in range(3)]
+    segs = ex.segment_chunks(chunks, char_budget=40000, max_chapters=12)
+    assert len(segs) == 3  # 字数先到,每段 1 章
+
+
 def test_resolve_workers() -> None:
     assert ex.resolve_workers(3) == 3
     assert ex.resolve_workers(0) == 1  # < 1 兜底 1
