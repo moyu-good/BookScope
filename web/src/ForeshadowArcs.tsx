@@ -93,7 +93,7 @@ export function ForeshadowArcs({
         setError(
           data.scanned
             ? "扫过全书，没找到挂得上原文的伏笔。"
-            : "没抽出伏笔弧（书可能太大，或稍后重试）。",
+            : "没抽出伏笔弧，稍后重试。",
         );
       } else {
         setArcs(

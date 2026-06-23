@@ -480,7 +480,7 @@ export function CharacterGraph({
           </p>
         )}
         <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
-          整本书进上下文现抽，约 1 分钟；超大书暂不支持。
+          整本书分段抽取再合并，大书也能抽，约 1-3 分钟。
         </p>
       </div>
     );

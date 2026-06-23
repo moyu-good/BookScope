@@ -69,7 +69,7 @@ export function Timeline({
       };
       setTrace(data.trace ?? null);
       if (!data.scanned) {
-        setError("这本书太大，暂不支持时间线梳理。");
+        setError("时间线没读出来，稍后重试。");
       } else if (data.events.length === 0) {
         setError("没梳理出明显的事件时间线，稍后可重试。");
       } else {

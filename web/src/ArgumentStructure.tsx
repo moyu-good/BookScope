@@ -101,7 +101,7 @@ export function ArgumentStructure({
 
       {!scanned && claims && (
         <p className="text-sm text-[var(--color-ink-muted)]">
-          这本书太大，暂不支持论点梳理。
+          论点结构没读出来，稍后重试。
         </p>
       )}
 

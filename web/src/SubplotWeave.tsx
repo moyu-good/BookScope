@@ -108,7 +108,7 @@ export function SubplotWeave({
         setError(
           data.scanned
             ? "扫过全书，没切出成形的情节支线。"
-            : "没抽出支线编织图（书可能太大，或稍后重试）。",
+            : "没抽出支线编织图，稍后重试。",
         );
       } else {
         setSubplots(data.subplots);

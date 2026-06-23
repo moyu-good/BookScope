@@ -108,7 +108,7 @@ export function CharacterFlow({
       };
       setTrace(data.trace ?? null);
       if (!data.chapters || data.chapters.length === 0) {
-        setError("没抽出叙事流（书可能太大，或稍后重试）。");
+        setError("没抽出叙事流，稍后重试。");
       } else {
         setChapters([...data.chapters].sort((p, q) => p.chapter - q.chapter));
       }

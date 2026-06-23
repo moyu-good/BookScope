@@ -134,7 +134,7 @@ export function RelationshipTimeline({
       };
       setTrace(data.trace ?? null);
       if (!data.relations || data.relations.length === 0) {
-        setError("没抽出关系演变（书可能太大，或稍后重试）。");
+        setError("没抽出关系演变，稍后重试。");
       } else {
         setRelations(data.relations);
       }

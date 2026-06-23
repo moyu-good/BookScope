@@ -112,7 +112,7 @@ export function CharacterArc({
       };
       setTrace(data.trace ?? null);
       if (!data.characters || data.characters.length === 0) {
-        setError("没抽出人物弧线（书可能太大，或稍后重试）。");
+        setError("没抽出人物弧线，稍后重试。");
       } else {
         setCharacters(
           data.characters.map((c) => ({

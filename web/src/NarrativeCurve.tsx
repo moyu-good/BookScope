@@ -99,7 +99,7 @@ export function NarrativeCurve({
       };
       setTrace(data.trace ?? null);
       if (!data.chapters || data.chapters.length === 0) {
-        setError("没抽出叙事曲线（书可能太大，或稍后重试）。");
+        setError("没抽出叙事曲线，稍后重试。");
       } else {
         setChapters(
           [...data.chapters].sort((p, q) => p.chapter - q.chapter),
