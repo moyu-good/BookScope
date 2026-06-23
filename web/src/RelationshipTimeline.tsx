@@ -511,12 +511,14 @@ export function RelationshipTimeline({
             ref={svgRef}
             viewBox={`0 0 ${W} ${H}`}
             className="w-full border border-[var(--color-rule)] rounded touch-none"
-            style={{ maxHeight: 540, background: "var(--color-paper)" }}
+            style={{ maxHeight: 540, background: "#0f1730" }}
             onPointerMove={onMove}
             onPointerUp={onUp}
             onPointerLeave={onUp}
           >
-            {/* 活动边 */}
+            {/* 星图：截至此章的关系网,人物=星、连线=星座(跟人物关系图同族同皮)。闪烁纯 CSS。 */}
+            <style>{`@keyframes rt-twinkle{0%,100%{opacity:.6}50%{opacity:1}}`}</style>
+            {/* 活动边：星座连线 */}
             {activeEdges.map((e, i) => {
               const a = sim.get(e.a);
               const b = sim.get(e.b);
@@ -528,7 +530,7 @@ export function RelationshipTimeline({
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
-                  stroke="var(--color-ink-muted)"
+                  stroke="#8190b0"
                   strokeWidth={edgeWidth(e.strength)}
                   strokeLinecap="round"
                   opacity={0.32 + (Math.max(0, Math.min(10, e.strength)) / 10) * 0.5}
@@ -551,29 +553,33 @@ export function RelationshipTimeline({
                   onPointerDown={(ev) => onNodeDown(name, ev)}
                   opacity={present ? 1 : 0.18}
                 >
-                  <circle
-                    cx={p.x}
-                    cy={p.y}
-                    r={present ? r : 5}
-                    fill="var(--color-seal)"
-                    opacity={present ? 0.88 : 0.5}
-                    stroke="var(--color-paper)"
-                    strokeWidth={1.5}
-                  />
-                  {present && (
-                    <text
-                      x={p.x}
-                      y={p.y - r - 4}
-                      textAnchor="middle"
-                      fontSize={12}
-                      fill="var(--color-ink)"
-                      style={{
-                        fontFamily: "var(--font-display)",
-                        pointerEvents: "none",
-                      }}
-                    >
-                      {name}
-                    </text>
+                  {present ? (
+                    <>
+                      <circle cx={p.x} cy={p.y} r={r * 2.3} fill="var(--color-seal)" opacity={0.13} />
+                      <line x1={p.x - r * 1.8} y1={p.y} x2={p.x + r * 1.8} y2={p.y} stroke="var(--color-seal)" strokeWidth={0.8} opacity={0.45} />
+                      <line x1={p.x} y1={p.y - r * 1.8} x2={p.x} y2={p.y + r * 1.8} stroke="var(--color-seal)" strokeWidth={0.8} opacity={0.45} />
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r={r}
+                        fill="var(--color-seal)"
+                        stroke="#fdf6e3"
+                        strokeWidth={0.9}
+                        style={{ animation: `rt-twinkle ${2.4 + (deg % 4) * 0.7}s ease-in-out infinite` }}
+                      />
+                      <text
+                        x={p.x}
+                        y={p.y - r - 5}
+                        textAnchor="middle"
+                        fontSize={12}
+                        fill="#e8e0cf"
+                        style={{ fontFamily: "var(--font-display)", pointerEvents: "none" }}
+                      >
+                        {name}
+                      </text>
+                    </>
+                  ) : (
+                    <circle cx={p.x} cy={p.y} r={4} fill="#6b7a99" opacity={0.4} />
                   )}
                 </g>
               );
