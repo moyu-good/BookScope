@@ -524,7 +524,7 @@ export function CharacterGraph({
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
         {data.nodes.length} 个{noun}、{data.edges.length} 条关系（已核验原文{" "}
-        {data.edges.filter((e) => e.verified).length} 条）。节点按阵营自动分群上色，连线按关系类型上色、越粗越亲密；可拖动节点、点边看原文。
+        {data.edges.filter((e) => e.verified).length} 条）。星图：每个{noun}是一颗星、戏份越重越亮，星色按阵营分群；连线=关系（敌红亲绿、越粗越亲密、虚线=没核验上）；可拖动星子、点连线看原文。
       </p>
       {/* 图例:关系类型 + 阵营 */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
@@ -551,12 +551,14 @@ export function CharacterGraph({
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full border border-[var(--color-rule)] rounded touch-none"
-        style={{ maxHeight: 560, background: "var(--color-paper)" }}
+        style={{ maxHeight: 560, background: "#0f1730" }}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerLeave={onUp}
       >
-        {/* 边 */}
+        {/* 星图：夜空底 + 人物=星(亮度按戏份)+ 阵营=星色 + 关系=星座连线。闪烁用纯 CSS,不靠 rAF。 */}
+        <style>{`@keyframes cg-twinkle{0%,100%{opacity:.6}50%{opacity:1}}`}</style>
+        {/* 边：星座连线 */}
         {data.edges.map((e, i) => {
           const a = sim.get(e.source);
           const b = sim.get(e.target);
@@ -601,22 +603,33 @@ export function CharacterGraph({
               style={{ cursor: "grab" }}
               onPointerDown={(ev) => onNodeDown(name, ev)}
             >
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={r}
-                fill={communityColor(communities.get(name) ?? 0)}
-                opacity={0.9}
-                stroke="var(--color-paper)"
-                strokeWidth={1.5}
-              />
+              {(() => {
+                const color = communityColor(communities.get(name) ?? 0);
+                const dur = 2.4 + (deg % 4) * 0.7; // 错开闪烁,别齐刷刷
+                return (
+                  <>
+                    <circle cx={p.x} cy={p.y} r={r * 2.3} fill={color} opacity={0.13} />
+                    <line x1={p.x - r * 1.8} y1={p.y} x2={p.x + r * 1.8} y2={p.y} stroke={color} strokeWidth={0.8} opacity={0.45} />
+                    <line x1={p.x} y1={p.y - r * 1.8} x2={p.x} y2={p.y + r * 1.8} stroke={color} strokeWidth={0.8} opacity={0.45} />
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={r}
+                      fill={color}
+                      stroke="#fdf6e3"
+                      strokeWidth={0.9}
+                      style={{ animation: `cg-twinkle ${dur}s ease-in-out infinite` }}
+                    />
+                  </>
+                );
+              })()}
               {showLabel && (
                 <text
                   x={p.x}
-                  y={p.y - r - 4}
+                  y={p.y - r - 5}
                   textAnchor="middle"
                   fontSize={12}
-                  fill="var(--color-ink)"
+                  fill="#e8e0cf"
                   style={{ fontFamily: "var(--font-display)", pointerEvents: "none" }}
                 >
                   {name}
