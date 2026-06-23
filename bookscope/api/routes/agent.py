@@ -23,6 +23,7 @@ import asyncio
 import json
 import logging
 import os
+import threading
 import time
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -2224,14 +2225,18 @@ class _UsageRecorder:
         self.input_tokens = 0
         self.output_tokens = 0
         self.calls = 0
+        self._lock = threading.Lock()
 
     def messages_create(self, **kwargs: Any) -> Any:
         resp = self._inner.messages_create(**kwargs)
         try:
             it, ot = self._inner.extract_usage_tokens(resp)
-            self.input_tokens += int(it or 0)
-            self.output_tokens += int(ot or 0)
-            self.calls += 1
+            # 穷尽化 map-reduce 下 6 个线程并发调本方法,累加得加锁——否则非原子的
+            # 读-改-写会丢更新,trace 里给前端看的 token 用量少记(同 review 第 1 条)。
+            with self._lock:
+                self.input_tokens += int(it or 0)
+                self.output_tokens += int(ot or 0)
+                self.calls += 1
         except Exception:  # noqa: BLE001 — 记账失败绝不能拖垮主流程
             pass
         return resp

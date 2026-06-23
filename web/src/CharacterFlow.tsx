@@ -219,6 +219,7 @@ export function CharacterFlow({
     });
     simRef.current = sim;
     coolRef.current = 0;
+    setFrame((f) => f + 1); // 立刻按初始坐标画一帧——别等 rAF(后台标签 / 省电模式 rAF 会被掐,否则叙事流空白)
     startSim();
     return stopSim;
     // eslint-disable-next-line react-hooks/exhaustive-deps

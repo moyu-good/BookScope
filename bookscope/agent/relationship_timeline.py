@@ -378,6 +378,8 @@ def generate_relationship_timeline_exhaustive(
         outs,
         key_fn=lambda r: frozenset((r["a"], r["b"])),
         point_fields=["points", "turning_points"],
+        # 转折同一章可多个(prompt 不限每章一个),按整条去重而非按章,免得同章第二个转折被吞
+        multi_per_key_fields=frozenset({"turning_points"}),
     )
     if not merged:
         return None

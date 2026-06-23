@@ -158,21 +158,30 @@ def merge_by_key(
     return merged
 
 
+def _point_sig(p: dict[str, Any]) -> tuple:
+    """子点整条签名(全字段)——给"同 key 可多条"的字段去重用,只去完全相同的重条。"""
+    return tuple(sorted((kk, str(vv)) for kk, vv in p.items()))
+
+
 def merge_keyed_points(
     outs: list[list[dict[str, Any]]],
     *,
     key_fn: Callable[[dict[str, Any]], Any],
     point_fields: list[str],
     point_key: str = "chapter",
+    multi_per_key_fields: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
-    """reduce（带子点型）：按 ``key_fn`` 合并条目，每个条目内的子点列表跨段按章并集。
+    """reduce（带子点型）：按 ``key_fn`` 合并条目，每个条目内的子点列表跨段并集。
 
     用于 character_arc（key=角色名，子点=points）/ relationship_timeline（key=无向对，
     子点=points + turning_points）这类"每个实体一串逐章子点"的功能。合并规则：
 
-    - 标量字段（name / relation / a / b …）：保先出现段的值（段按章序，先=靠前章）。
-    - ``point_fields`` 里每个字段：跨段把子点列表 concat，按 ``point_key``（默认 chapter）
-      去重（保先出现）+ 升序。段是 disjoint 章区间，所以同实体在不同段的子点天然不撞章。
+    - 标量字段（relation 等）：保先出现段的值（段序见 ``run_segments``：``ThreadPoolExecutor.map``
+      按输入序返回，故段序==chunks 列表序；只有当 chunks 本身按章升序时"先=靠前章"才成立）。
+    - ``point_fields`` 里每个字段：跨段 concat 去重 + 按 ``point_key`` 升序。去重方式分两种：
+      默认按 ``point_key``（每章至多一条，如 points 的逐章强度）；列在 ``multi_per_key_fields``
+      里的字段改按**整条签名**去重（同章可多条，如 turning_points 同一章可有多个不同转折，
+      只去完全重复的）。
 
     ``key_fn`` 返回 ``None`` 的条目丢弃。
     """
@@ -197,14 +206,19 @@ def merge_keyed_points(
                 src = item.get(f)
                 if not isinstance(src, list):
                     continue
-                seen_pts = {p.get(point_key) for p in tgt[f] if isinstance(p, dict)}
+                full = f in multi_per_key_fields
+                seen_pts: set[Any] = {
+                    (_point_sig(p) if full else p.get(point_key))
+                    for p in tgt[f]
+                    if isinstance(p, dict)
+                }
                 for p in src:
                     if not isinstance(p, dict):
                         continue
-                    pk = p.get(point_key)
-                    if pk in seen_pts:
+                    dk = _point_sig(p) if full else p.get(point_key)
+                    if dk in seen_pts:
                         continue
-                    seen_pts.add(pk)
+                    seen_pts.add(dk)
                     tgt[f].append(p)
     out: list[dict[str, Any]] = []
     for k in order:

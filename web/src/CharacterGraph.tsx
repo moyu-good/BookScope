@@ -645,7 +645,8 @@ export function CharacterGraph({
           <p className="text-sm font-bold text-[var(--color-ink)]">
             {sel.source} — {sel.relation} — {sel.target}
             <span className="ml-2 text-xs font-normal text-[var(--color-seal)]">
-              亲疏 {sel.strength}/5
+              {sel.strength >= 4 ? "紧密" : sel.strength >= 2 ? "一般" : "疏离"}
+              <span className="text-[var(--color-ink-muted)]">（模型判读）</span>
             </span>
           </p>
           <p className="mt-1 text-sm text-[var(--color-ink)] leading-relaxed">

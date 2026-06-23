@@ -210,6 +210,7 @@ export function RelationshipTimeline({
     });
     simRef.current = sim;
     coolRef.current = 0;
+    setFrame((f) => f + 1); // 立刻按初始坐标画一帧——别等 rAF(后台标签 / 省电模式 rAF 会被掐,否则星图空白)
     if (view === "snapshot") startSim();
     return stopSim;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -615,7 +616,7 @@ export function RelationshipTimeline({
                 viewBox={`0 0 ${curveW} ${curveH}`}
                 className="w-full border border-[var(--color-rule)] rounded bg-white"
               >
-                {/* 强度参考横线 */}
+                {/* 参考横线(不标数字——强度是模型判读,只看相对起落、不看绝对值) */}
                 {[2, 4, 6, 8, 10].map((lvl) => (
                   <line
                     key={`g-${lvl}`}
@@ -627,6 +628,9 @@ export function RelationshipTimeline({
                     strokeWidth={0.5}
                   />
                 ))}
+                {/* 纵向定性标:弱→强,替代精确刻度 */}
+                <text x={cPadL - 5} y={cy(10) + 3} textAnchor="end" fontSize={9} fill="var(--color-ink-muted)">紧</text>
+                <text x={cPadL - 5} y={cy(2) + 3} textAnchor="end" fontSize={9} fill="var(--color-ink-muted)">疏</text>
                 {/* 强度折线 */}
                 {curvePts && (
                   <polyline

@@ -142,3 +142,35 @@ def test_merge_keyed_points_multiple_point_fields() -> None:
     assert out[0]["relation"] == "政敌"  # 标量保先出现
     assert [p["chapter"] for p in out[0]["points"]] == [1, 9]
     assert [t["chapter"] for t in out[0]["turning_points"]] == [1, 9]
+
+
+def test_merge_keyed_points_multi_per_key_keeps_same_chapter() -> None:
+    # 同一章 2 个不同转折:按章去重会吞掉第二个;multi_per_key_fields 改按整条去重 → 都留
+    outs = [
+        [
+            {
+                "a": "刘备",
+                "b": "曹操",
+                "turning_points": [
+                    {"chapter": 5, "change": "初见"},
+                    {"chapter": 5, "change": "决裂"},
+                ],
+            }
+        ],
+    ]
+    out = ex.merge_keyed_points(
+        outs,
+        key_fn=lambda r: frozenset((r["a"], r["b"])),
+        point_fields=["turning_points"],
+        multi_per_key_fields=frozenset({"turning_points"}),
+    )
+    assert [t["change"] for t in out[0]["turning_points"]] == ["初见", "决裂"]
+
+
+def test_merge_keyed_points_default_dedups_same_chapter() -> None:
+    # 默认(不在 multi_per_key_fields):同章按章去重只留首条
+    outs = [[{"name": "刘备", "points": [{"chapter": 5, "v": 1}, {"chapter": 5, "v": 2}]}]]
+    out = ex.merge_keyed_points(
+        outs, key_fn=lambda c: c["name"], point_fields=["points"]
+    )
+    assert [p["v"] for p in out[0]["points"]] == [1]
