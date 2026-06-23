@@ -47,10 +47,15 @@ from bookscope.agent import (
     route_question,
     run_fast_path,
 )
+from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
 from bookscope.agent.annotations import generate_annotations
 from bookscope.agent.argument_structure import generate_argument_structure_exhaustive
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.chapter_spine_evidence import evidence_for_event, evidence_for_pair
+from bookscope.agent.chapter_spine_views import (
+    narrative_curve_from_spine,
+    pacing_from_spine,
+)
 from bookscope.agent.character_arc import generate_character_arc_exhaustive
 from bookscope.agent.character_flow import generate_character_flow_exhaustive
 from bookscope.agent.character_graph import (
@@ -65,9 +70,7 @@ from bookscope.agent.events import LoopEvent
 from bookscope.agent.foreshadow_arcs import generate_foreshadow_arcs_exhaustive
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.motif_tracking import generate_motif_tracking
-from bookscope.agent.narrative_curve import generate_narrative_curve_exhaustive
 from bookscope.agent.orchestrate import orchestrate
-from bookscope.agent.pacing_curve import generate_pacing_curve
 from bookscope.agent.question_processor import rewrite_followup
 from bookscope.agent.recap import generate_recap
 from bookscope.agent.relationship_timeline import (
@@ -1029,11 +1032,10 @@ async def agent_pacing_curve(
 ) -> PacingCurveResponse:
     """据整本书出逐章节奏张力曲线（节奏可视化，exp-012 GO）。
 
-    整本进 context 让模型逐章打张力分。只支持塞得进 context 的书；大书返空列表。
+    1.x 章脉转向(ADR-010):从共享章脉派生(``pacing_from_spine``),不再单独跑全书——所以撤了
+    单次摘要时代的 ``_book_fits_long_context`` 大书返空守卫,几百万字书也能出。章脉命中缓存秒出。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return PacingCurveResponse(points=[], book_session_id=request.book_session_id)
 
     try:
         client = build_llm_client_from_params(
@@ -1061,15 +1063,11 @@ async def agent_pacing_curve(
         ) from exc
 
     model = request.model or default_model_for(request.provider)
-    full_text, _ = _long_context_inputs(assembler)
+    full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    points = generate_pacing_curve(
-        full_text=full_text,
-        llm_client=rec,
-        model=model,
-        session_id=request.book_session_id,
-    )
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    points = pacing_from_spine(spine)
     return PacingCurveResponse(
         points=points or [],
         book_session_id=request.book_session_id,
@@ -1143,15 +1141,13 @@ async def agent_narrative_curve(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    # 1.4 穷尽化:分段→每段逐章抽→按章拼,覆盖全书每一章(重型逐章单次会截断到几章)。
-    chapters = generate_narrative_curve_exhaustive(
-        chunks=chunks,
-        llm_client=rec,
-        model=model,
-    )
+    # 1.x 章脉转向(ADR-010):从共享章脉派生,不再单独跑全书叙事曲线。章脉里逐章已有
+    # tension/sentiment/pov/mainline/evidence/verified,满精度投影;命中缓存秒出。
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    chapters = narrative_curve_from_spine(spine)
     return NarrativeCurveResponse(
         chapters=chapters or [],
-        scanned=chapters is not None,
+        scanned=bool(spine),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
