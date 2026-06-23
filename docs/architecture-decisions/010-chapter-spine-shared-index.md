@@ -194,5 +194,8 @@ NORTH_STAR 措辞：不改（接受 D-6 论证）
 
 - ✅ 第 1 步 D-7 截断修（commit `fea7318`）：segment_chunks 加 12 章上限。
 - ✅ 第 2 步 章脉单一事实源（commit `8c72931`）：`chapter_spine.build_chapter_spine`,分维抽取 + 跨维 union,10 单测 + 三国前 2 段 live 冒烟 9/9 章双维 union、章号全对。
-- 🟡 第 3 步起步（commit `3dc8cea`）：叙事曲线 / 节奏从章脉满精度派生（`chapter_spine_views.py`）。**关系图 / 叙事流 / 时间线挂起在 D-2 证据粒度决定上**（见 D-2 三出路 A/B/C；迁移见效要 A 或 B，归作者裁）。
-- ⬜ 端点接线要等第 5 步章脉缓存（不然每次重建 spine 比现状贵）。
+- ✅ 第 3 步 五视图派生（`chapter_spine_views.py`,commit `3dc8cea` + `13334ab`）：叙事曲线/节奏满精度投影;关系图/叙事流/时间线按作者拍的**出路 B**(章级锚,证据点开现取)派生。
+- ✅ 出路 B 取证原语（`chapter_spine_evidence.py`,commit `14d80c7`）：纯检索取支撑句,关系对/事件各一,0 LLM。
+- ✅ 第 5 步 章脉 book 级缓存（`_internal/chapter_spine_cache.py`,commit `2704824`）：照 kg_book_cache 模式,`get_or_build_spine` facade 一行接入,建一次缓存多次。
+- ⬜ **最后整合（剩这一块）**:把 narrative/pacing/graph/flow/timeline 五个端点接到 `get_or_build_spine` + 对应派生;加 `/agent/spine-evidence` 按需取证端点;前端章级锚视图点开取证。这步动 API 契约 + 前端,要 live 全栈验证。后端地基(spine+派生+取证+缓存)已全部就位、各自单测过。
+- 注:第 4 步"轻 LLM 视图(伏笔/论点)"暂留——伏笔已在章脉 foreshadow 字段,派生方式随最后整合一起定。
