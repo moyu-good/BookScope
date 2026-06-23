@@ -5,6 +5,9 @@ import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
 import type { DrillInfo } from "./AgentOrchestrate";
 import { Reader } from "./Reader";
+import { bookScale } from "./bookScale";
+import type { BookScale } from "./bookScale";
+import { ScaleBanner } from "./ScaleBanner";
 import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
@@ -761,6 +764,34 @@ export function App() {
     null,
   );
 
+  // 当前书的体量估算（全书结构类分析大书会慢/贵/可能截断,提前提醒）。
+  // 拿 TOC（每章 word_count，纯数据不调 LLM）算总字数;取不到就当不知道、不提醒。
+  const [scale, setScale] = useState<BookScale | null>(null);
+  useEffect(() => {
+    if (!currentSession) {
+      setScale(null);
+      return;
+    }
+    let cancelled = false;
+    setScale(null);
+    (async () => {
+      try {
+        const resp = await fetch(`/api/sessions/${currentSession.session_id}/toc`);
+        if (!resp.ok) return;
+        const data = (await resp.json()) as { chapters: { word_count: number }[] };
+        const chapters = data.chapters ?? [];
+        if (cancelled || chapters.length === 0) return;
+        const totalChars = chapters.reduce((s, c) => s + (c.word_count || 0), 0);
+        setScale(bookScale(totalChars, chapters.length));
+      } catch {
+        /* 取不到 TOC 就不提醒，不打断分析 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSession]);
+
   // 书柜刷新触发器：上传成功后 + 删除成功后递增
   const [shelfRefresh, setShelfRefresh] = useState(0);
   // 上传成功后让书柜自动选中新书
@@ -1342,6 +1373,7 @@ export function App() {
 
           {currentSession && (
             <>
+              {scale && WHOLE_BOOK_MODES.has(mode) && <ScaleBanner scale={scale} />}
               <div className={mode === "ask" ? "" : "hidden"}>
                 <CanvasHeader
                   title="问书"
@@ -1791,6 +1823,14 @@ type Mode =
   | "technique"
   | "cards"
   | "revision";
+
+// 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
+// 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
+const WHOLE_BOOK_MODES = new Set<Mode>([
+  "graph", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
+  "timeline", "pacing", "narrative", "consistency", "argument", "style", "technique",
+  "cards", "revision",
+]);
 
 const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "ask", label: "问书" },

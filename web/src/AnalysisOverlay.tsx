@@ -29,6 +29,8 @@ import { StudyCards } from "./StudyCards";
 import { StyleIssues } from "./StyleIssues";
 import { SubplotWeave } from "./SubplotWeave";
 import { Timeline } from "./Timeline";
+import type { BookScale } from "./bookScale";
+import { ScaleBanner } from "./ScaleBanner";
 
 interface AnalysisOverlayProps {
   sessionId: string;
@@ -39,8 +41,16 @@ interface AnalysisOverlayProps {
   baseUrl: string;
   /** 你正读到第几章——带进来让能按章的功能（前情回顾）对准在读处。 */
   currentChapter?: number | null;
+  /** 书的体量估算——大书时提前提醒全书结构类分析会慢/贵/可能截断。 */
+  scale?: BookScale | null;
   onClose: () => void;
 }
+
+// 走 generate_*_exhaustive、读完整本出结构的功能——大书上分很多段、慢且贵、可能截断。
+// 「问这一章」(单章) /「前情回顾」(到某章) /「实体·母题·概念」(query-scoped) 不在此列。
+const WHOLE_BOOK_FEATS = new Set([
+  "relationship", "flow", "chapter-curves", "foreshadow", "subplot", "timeline", "argument",
+]);
 
 type Feat = {
   id: string;
@@ -103,6 +113,7 @@ export function AnalysisOverlay({
   model,
   baseUrl,
   currentChapter,
+  scale,
   onClose,
 }: AnalysisOverlayProps) {
   const [active, setActive] = useState<string | null>(null);
@@ -224,20 +235,24 @@ export function AnalysisOverlay({
           <div className="overflow-y-auto p-4 sm:p-6">
             {active ? (
               <>
+                {scale && WHOLE_BOOK_FEATS.has(active) && <ScaleBanner scale={scale} />}
                 <p className="text-xs text-[var(--color-ink-muted)] mb-3 leading-relaxed">
                   {ALL_FEATS[active]?.hint}
                 </p>
                 {renderActive()}
               </>
             ) : (
-              <div className="h-full flex items-center justify-center text-center">
-                <div className="max-w-sm">
-                  <p className="text-sm text-[var(--color-ink)] mb-2" style={{ fontFamily: "var(--font-display)" }}>
-                    读着读着，挑一项分析
-                  </p>
-                  <p className="text-xs text-[var(--color-ink-muted)] leading-relaxed">
-                    左边挑一项，就在这儿跑、就在这儿看——结论都带原文证据，收起就回到你刚读的地方。
-                  </p>
+              <div className="h-full flex flex-col">
+                {scale && scale.tier !== "ok" && <ScaleBanner scale={scale} />}
+                <div className="flex-1 flex items-center justify-center text-center">
+                  <div className="max-w-sm">
+                    <p className="text-sm text-[var(--color-ink)] mb-2" style={{ fontFamily: "var(--font-display)" }}>
+                      读着读着，挑一项分析
+                    </p>
+                    <p className="text-xs text-[var(--color-ink-muted)] leading-relaxed">
+                      左边挑一项，就在这儿跑、就在这儿看——结论都带原文证据，收起就回到你刚读的地方。
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

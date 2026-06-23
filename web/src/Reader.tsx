@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnalysisOverlay } from "./AnalysisOverlay";
+import { bookScale } from "./bookScale";
 
 interface TocChapter {
   chapter: number;
@@ -287,6 +288,12 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
   }, [sessionId, current]);
 
   const tocNums = useMemo(() => (toc ?? []).map((c) => c.chapter), [toc]);
+  // 全书结构类分析在大书上会 token 爆炸——TOC 一到手就估好体量,传进鉴台提前提醒。
+  const scale = useMemo(() => {
+    if (!toc || toc.length === 0) return null;
+    const totalChars = toc.reduce((s, c) => s + (c.word_count || 0), 0);
+    return bookScale(totalChars, toc.length);
+  }, [toc]);
   const idx = current == null ? -1 : tocNums.indexOf(current);
   const total = tocNums.length;
   const hasPrev = idx > 0;
@@ -423,6 +430,7 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
           model={model}
           baseUrl={baseUrl}
           currentChapter={current}
+          scale={scale}
           onClose={() => setJianOpen(false)}
         />
       )}
