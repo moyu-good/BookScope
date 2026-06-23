@@ -71,6 +71,38 @@ def test_mapreduce_concats_and_dedups_by_chapter(monkeypatch) -> None:  # noqa: 
     assert next(c for c in out if c["chapter"] == 2)["v"] == "a"
 
 
+def test_mapreduce_correct_fn_runs_before_merge(monkeypatch) -> None:  # noqa: ANN001
+    """多卷书 bug 的最小复现 + 修复证明:模型两段都自报小章号 1、2(撞号),靠 evidence 里的
+    真章号纠偏。``correct_fn`` 在合并前逐段跑 → 后段纠成 3、4,四章全留;不跑 → 后段跟前段
+    撞章被 ``merge_by_chapter`` 去重吞掉,只剩 2 章(明朝 158→30 就是这么丢的)。
+    """
+    _seq_patch(monkeypatch)
+    chunks = [{"chunk_id": "c0", "text": "甲"}, {"chunk_id": "c1", "text": "乙"}]
+    texts = [
+        json.dumps({"chapters": [{"chapter": 1, "true": 1}, {"chapter": 2, "true": 2}]}),
+        json.dumps({"chapters": [{"chapter": 1, "true": 3}, {"chapter": 2, "true": 4}]}),
+    ]
+
+    def _correct(seg, _chunks):  # noqa: ANN001, ANN202 — 模拟章号纠偏:把自报章号改成 evidence 真章号
+        for item in seg:
+            item["chapter"] = item["true"]
+
+    out_fixed = ex.mapreduce_per_chapter(
+        chunks=chunks, instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeMulti(texts), model="m", max_tokens=100,
+        char_budget=1, max_workers=1, correct_fn=_correct,
+    )
+    assert [c["chapter"] for c in out_fixed] == [1, 2, 3, 4]  # 合并前纠偏 → 四章全留
+
+    _seq_patch(monkeypatch)  # 重置段计数器
+    out_buggy = ex.mapreduce_per_chapter(
+        chunks=chunks, instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeMulti(texts), model="m", max_tokens=100,
+        char_budget=1, max_workers=1,  # correct_fn=None → 按自报章号先去重
+    )
+    assert [c["chapter"] for c in out_buggy] == [1, 2]  # 后段撞号被吞,正是要修的 bug
+
+
 def test_mapreduce_skips_unparseable_segment(monkeypatch) -> None:  # noqa: ANN001
     _seq_patch(monkeypatch)
     chunks = [{"chunk_id": "c0", "text": "甲"}, {"chunk_id": "c1", "text": "乙"}]

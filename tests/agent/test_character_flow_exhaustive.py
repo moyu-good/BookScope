@@ -52,7 +52,11 @@ def test_exhaustive_covers_all_chapters_and_verifies(monkeypatch) -> None:  # no
     captured: dict[str, object] = {}
 
     def _fake_mapreduce(**kwargs):  # noqa: ANN003, ANN202
+        # 模拟真 mapreduce 的契约:合并前逐段跑 correct_fn(章号纠偏)。这里 merged 当一段喂。
         captured.update(kwargs)
+        correct_fn = kwargs.get("correct_fn")
+        if correct_fn is not None:
+            correct_fn(merged, kwargs["chunks"])
         return merged
 
     monkeypatch.setattr(cf, "mapreduce_per_chapter", _fake_mapreduce)
@@ -68,6 +72,8 @@ def test_exhaustive_covers_all_chapters_and_verifies(monkeypatch) -> None:  # no
     assert captured["instruction"] is cf._SYSTEM_INSTRUCTION
     assert captured["parse_fn"] is cf._parse_flow
     assert "只抽本段出现的章" in captured["user_msg"]
+    # 章号纠偏作为 correct_fn 在合并前跑(不再合并后),所以接的必须是 _correct_flow
+    assert captured["correct_fn"] is cf._correct_flow
     # 每条同场对都过了 verify_citations:evidence 逐字命中对应 chunk → verified
     for chap in out:
         for pr in chap["pairs"]:

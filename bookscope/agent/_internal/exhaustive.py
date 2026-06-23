@@ -245,11 +245,18 @@ def mapreduce_per_chapter(
     char_budget: int = DEFAULT_CHAR_BUDGET,
     max_workers: int | None = None,
     cache_enabled: bool = True,
+    correct_fn: Callable[[list[dict[str, Any]], list[dict[str, Any]]], None] | None = None,
 ) -> list[dict[str, Any]]:
-    """按章 map-reduce 便捷壳：``run_segments`` + ``merge_by_chapter``。
+    """按章 map-reduce 便捷壳：``run_segments`` → (逐段章号纠偏) → ``merge_by_chapter``。
 
-    用于 character_flow / narrative_curve 这类"每章一条"的逐章功能。校验交给调用方
-    （合并后一次性 verify）。子点型 / 列表型功能改用 ``run_segments`` + 对应 merge。
+    用于 character_flow / narrative_curve 这类"每章一条"的逐章功能。
+
+    **``correct_fn`` 必须在合并前逐段跑（不是合并后一次性）**：模型读到的是正文里的章标题，
+    多卷书每卷标题从「第一章」重数（如明朝那些事儿:全局第 86 章正文标题写「第十一章」），模型
+    照标题自报 11 → 跟前段真第 11 章撞号。若按模型自报章号先 merge 去重，后段整章会被当重复
+    丢掉（明朝实测 158 章只剩 30）。所以这里在 merge **之前**逐段把每段结果的章号纠偏成命中
+    chunk 的真章号（``correct_fn(seg, chunks)`` 原地改），再按真章号去重。``correct_fn=None``
+    则不纠偏（调用方自行处理）。
     """
     outs = run_segments(
         chunks=chunks,
@@ -263,6 +270,9 @@ def mapreduce_per_chapter(
         max_workers=max_workers,
         cache_enabled=cache_enabled,
     )
+    if correct_fn is not None:
+        for seg in outs:
+            correct_fn(seg, chunks)
     return merge_by_chapter(outs)
 
 

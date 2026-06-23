@@ -198,6 +198,21 @@ def _verify_pairs(
                 pr["chapter"] = true_chapter  # 命中 chunk 的真章号纠偏
 
 
+def _correct_flow(
+    chapters: list[dict[str, Any]], chunks: list[dict[str, Any]]
+) -> None:
+    """逐段章号纠偏(合并前用):先 ``_verify_pairs`` 把每条同场对纠偏成真章号,再把章条目
+    自己的 ``chapter`` 设成本章某条已核验同场对的真章号——否则 merge 按条目模型自报章号去重,
+    多卷书后段整章会被当重复丢(present-only、无同场对的章没证据可锚,保模型自报,极少见)。
+    """
+    _verify_pairs(chapters, chunks)
+    for chap in chapters:
+        for pr in chap["pairs"]:
+            if pr.get("verified") and isinstance(pr.get("chapter"), int) and pr["chapter"] > 0:
+                chap["chapter"] = pr["chapter"]
+                break
+
+
 def generate_character_flow(
     *,
     full_text: str,
@@ -261,11 +276,14 @@ def generate_character_flow_exhaustive(
     char_budget: int = 40000,
     max_workers: int | None = None,
 ) -> list[dict[str, Any]] | None:
-    """穷尽化:分段→每段逐章抽同场流→按章拼,覆盖全书每一章(1.4)。
+    """穷尽化:分段→每段逐章抽同场流→逐段章号纠偏→按真章号拼,覆盖全书每一章(1.4)。
 
     重型逐章(每章带 present + pairs + evidence)单次会被 max_tokens 截断到几章——大书只够几章。
-    改 map-reduce:每段章数远小于 40 帽,段内沿用现有 prompt,拼起来覆盖全书。合并后一次性
-    ``_verify_pairs``(逐字核验 + 章号纠偏)。
+    改 map-reduce:每段章数远小于 40 帽,段内沿用现有 prompt,拼起来覆盖全书。
+
+    **章号纠偏在合并前逐段做(``correct_fn=_correct_flow``)**:多卷书正文标题每卷重数,模型照标题
+    自报撞号的小章号,若按它先 merge 去重,后段整章被当重复丢(同 narrative,明朝实测大缺)。逐段
+    先纠偏成命中 chunk 的真章号,再按真章号去重。
 
     Returns: 同 ``generate_character_flow``,但覆盖全书所有章;空 → ``None``。
     """
@@ -279,11 +297,9 @@ def generate_character_flow_exhaustive(
         max_tokens=max_tokens,
         char_budget=char_budget,
         max_workers=max_workers,
+        correct_fn=_correct_flow,
     )
-    if not merged:
-        return None
-    _verify_pairs(merged, chunks)
-    return merged
+    return merged or None
 
 
 __all__ = [

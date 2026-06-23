@@ -314,8 +314,13 @@ def generate_relationship_timeline_exhaustive(
     单次整本进 context 抽逐对关系会被 ~12 对的帽和 max_tokens 截断卡住，长书里好多关系
     都漏了。改 map-reduce：每段只抽这段里出现的关系（强度点、转折），同一对关系跨段的
     points / turning_points 按章号并集拼起来。合并用 ``merge_keyed_points``——key 是无向
-    人物对（``frozenset({a, b})``），子点字段 points 和 turning_points 各按章并集。合并后
-    一次性 ``_verify_turning_points``（转折逐字核验 + 章号纠偏）。
+    人物对（``frozenset({a, b})``），子点字段 points 和 turning_points 各按章并集。
+
+    **转折章号纠偏在合并前逐段做**：多卷书正文标题每卷重数，模型照标题给撞号的小章号，若按它
+    先 merge，后段转折会跟前段撞章被吞（同 narrative）。逐段先 ``_verify_turning_points`` 把
+    转折纠偏成命中 chunk 的真章号，转折按整条签名去重（同章可多个），后段转折就不丢。
+    **已知局限**：强度点 ``points`` 没带 evidence，纠不了章号，按模型自报章号去重——多卷书后段
+    强度点若跟前段撞号会被丢，强度曲线在多卷书上可能少几段（转折是核验过的、不受影响）。
 
     Returns: 同 ``generate_relationship_timeline``，但覆盖全书所有关系；空 → ``None``。
     """
@@ -330,6 +335,8 @@ def generate_relationship_timeline_exhaustive(
         char_budget=char_budget,
         max_workers=max_workers,
     )
+    for seg in outs:  # 合并前逐段把转折章号纠偏成真章号,免得跨段撞号被吞
+        _verify_turning_points(seg, chunks)
     merged = merge_keyed_points(
         outs,
         key_fn=lambda r: frozenset((r["a"], r["b"])),
@@ -337,10 +344,7 @@ def generate_relationship_timeline_exhaustive(
         # 转折同一章可多个(prompt 不限每章一个),按整条去重而非按章,免得同章第二个转折被吞
         multi_per_key_fields=frozenset({"turning_points"}),
     )
-    if not merged:
-        return None
-    _verify_turning_points(merged, chunks)
-    return merged
+    return merged or None
 
 
 __all__ = [

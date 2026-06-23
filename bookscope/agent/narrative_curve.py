@@ -247,11 +247,14 @@ def generate_narrative_curve_exhaustive(
     char_budget: int = 40000,
     max_workers: int | None = None,
 ) -> list[dict[str, Any]] | None:
-    """穷尽化:分段→每段逐章抽→按章拼,覆盖全书每一章(1.4)。
+    """穷尽化:分段→每段逐章抽→逐段章号纠偏→按真章号拼,覆盖全书每一章(1.4)。
 
     重型逐章(每章带 evidence/四维)单次会被 max_tokens 截断到几章——三国 cap-lift 后只 8 章。
-    改 map-reduce:每段章数远小于 40 帽,段内用现有 prompt 即可,拼起来覆盖全书。合并后一次性
-    ``_verify_chapters``(逐字核验 + 章号纠偏)。
+    改 map-reduce:每段章数远小于 40 帽,段内用现有 prompt 即可,拼起来覆盖全书。
+
+    **章号纠偏在合并前逐段做(``correct_fn=_verify_chapters``)**:多卷书正文标题每卷重数,模型
+    会照标题自报撞号的小章号,若按它先 merge 去重,后段整章被当重复丢(明朝 158→30)。逐段先把
+    章号纠偏成命中 chunk 的真章号,再按真章号去重,后段才不丢。
 
     Returns: 同 ``generate_narrative_curve``,但覆盖全书所有章;空 → ``None``。
     """
@@ -265,11 +268,9 @@ def generate_narrative_curve_exhaustive(
         max_tokens=max_tokens,
         char_budget=char_budget,
         max_workers=max_workers,
+        correct_fn=_verify_chapters,
     )
-    if not merged:
-        return None
-    _verify_chapters(merged, chunks)
-    return merged
+    return merged or None
 
 
 __all__ = [

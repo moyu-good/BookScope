@@ -281,11 +281,14 @@ def generate_character_arc_exhaustive(
     char_budget: int = 40000,
     max_workers: int | None = None,
 ) -> list[dict[str, Any]] | None:
-    """穷尽化:分段→每段抽各角色逐章点→按角色名合并、点跨段按章并集(1.4)。
+    """穷尽化:分段→每段抽各角色逐章点→逐段章号纠偏→按角色名合并、点按真章号并集(1.4)。
 
     重型(多角色 × 逐章两维 + evidence)单次会被 max_tokens 截断,大书漏掉后半本的章。
-    改 map-reduce:每段抽本段出场角色的逐章点,再按角色名合并——同一角色跨段的 points 按章并集
-    升序(段是 disjoint 章区间,天然不撞章)。合并后一次性 ``_verify_points``(逐字核验 + 章号纠偏)。
+    改 map-reduce:每段抽本段出场角色的逐章点,按角色名合并。
+
+    **章号纠偏在合并前逐段做**:多卷书正文标题每卷重数,模型照标题给点撞号的小章号,若按它先
+    merge,同角色后段的点会跟前段撞章被去重丢(同 narrative 的整章丢,这里丢点)。逐段先把每个点
+    ``_verify_points`` 纠偏成命中 chunk 的真章号,再按真章号并集——后段的点才不丢。
 
     Returns: 同 ``generate_character_arc``,但覆盖全书所有章;空 → ``None``。
     """
@@ -300,11 +303,10 @@ def generate_character_arc_exhaustive(
         char_budget=char_budget,
         max_workers=max_workers,
     )
+    for seg in outs:  # 合并前逐段把点的章号纠偏成真章号,免得跨段撞号被去重
+        _verify_points(seg, chunks)
     merged = merge_keyed_points(outs, key_fn=lambda c: c["name"], point_fields=["points"])
-    if not merged:
-        return None
-    _verify_points(merged, chunks)
-    return merged
+    return merged or None
 
 
 __all__ = [
