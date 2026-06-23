@@ -202,5 +202,6 @@ NORTH_STAR 措辞：不改（接受 D-6 论证）
 - ✅ 出路 B 取证原语（`chapter_spine_evidence.py`,commit `14d80c7`）：纯检索取支撑句,关系对/事件各一,0 LLM。
 - ✅ 第 5 步 章脉 book 级缓存（`_internal/chapter_spine_cache.py`,commit `2704824`）：照 kg_book_cache 模式,`get_or_build_spine` facade 一行接入,建一次缓存多次。
 - ✅ `/agent/spine-evidence` 取证端点（commit `47fb12b`）+ 叙事曲线/节奏端点接章脉（commit `6a2c4f7`,FE 安全,响应形态不变,撤 pacing 大书守卫）。
-- ⬜ **剩最后一块**:关系图 / 叙事流两个端点接 `get_or_build_spine` + 派生(章级锚) + 前端 CharacterGraph/CharacterFlow 改成点开调 `/agent/spine-evidence` 取证 + demo fixture 更新 + live 全栈验证。这步动 2 个复杂 FE 组件(~1200 行)+ 用户可见行为(证据点开现取),专注一轮做、不在长 turn 尾巴硬推。
+- ✅ **整合完成**:叙事流端点接章脉 + FE 点开现取（commit `efad932`,live 验过:刘关张初遇原文）；人物关系图端点接章脉 + FE 点开现取（commit `b03cc87`,live 验过:66 节点/127 边渲染 + 桃园结义誓词）。四个派生视图(叙事曲线/节奏/叙事流/关系图)端点**全部接章脉**,出路 B"证据点开现取"贯通(`/agent/spine-evidence` 纯检索 + FE 取不到回退自带证据)。
 - **时间线 / 伏笔不迁**（见 D-4 更正）：需跨时序/跨章推理,章脉 naive 派生会弄丢核心价值,留各自 exhaustive 路径。所以"全书功能从章脉派生"实际覆盖 4 个(叙事曲线/节奏/叙事流/关系图)+ 论点(轻 LLM),不是原设想的全部。
+- ⬜ 留尾（非阻塞）：第 6 步跨题材跨规模回归（明朝/三国/几百万字网文 各验覆盖+延迟+成本,实测章脉缓存命中后的秒出）；论点结构(轻 LLM 视图)随后。整合本身已通。
