@@ -14,7 +14,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -129,11 +129,7 @@ def generate_recap(
         ``[{order, point, chapter, snippet, verified}, ...]`` 按 order 排；失败 ``None``。
     """
     _ = session_id
-    evidence_map = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence_map = build_evidence_map(chunks)
     system = _system_instruction(up_to_chapter) + _BOOK_DELIMITER + full_text
     messages = [{"role": "user", "content": "请回顾到目前为止的前情。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):

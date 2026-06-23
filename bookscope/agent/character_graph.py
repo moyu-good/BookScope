@@ -30,7 +30,7 @@ from typing import Any
 from bookscope.agent._internal.exhaustive import segment_chunks
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -334,11 +334,7 @@ def extract_character_graph(
     nodes, edges = parsed
 
     # 边粒度证据校验：每条 edge 的 evidence 当一条 citation 过 verify_citations。
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
     edge_citations = [{"snippet": e["evidence"]} for e in edges]
     verify_citations(edge_citations, evidence)
     for edge, vc in zip(edges, edge_citations, strict=True):
@@ -387,11 +383,7 @@ def _verify_edges_against_chunks(
     edges: list[dict[str, Any]], chunks: list[dict[str, Any]]
 ) -> None:
     """对每条边的 evidence 跑 verify_citations（逐字核验）+ 章号纠偏。原地改 edges。"""
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
     edge_citations = [{"snippet": e.get("evidence", "")} for e in edges]
     verify_citations(edge_citations, evidence)
     for edge, vc in zip(edges, edge_citations, strict=True):

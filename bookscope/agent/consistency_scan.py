@@ -22,7 +22,7 @@ from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -144,11 +144,7 @@ def generate_consistency_scan(
         矛盾列表（可空——自洽书）；解析失败返 ``None``（调用方区分"没矛盾"和"扫失败"）。
     """
     _ = session_id
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
     system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请扫描全书的设定一致性，列出真正的前后矛盾。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):

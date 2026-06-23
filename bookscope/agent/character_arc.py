@@ -35,7 +35,7 @@ from typing import Any
 from bookscope.agent._internal.exhaustive import merge_keyed_points, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -199,11 +199,7 @@ def _verify_points(
     long_context / narrative_curve）；没命中 → ``verified=False``（FE 把这个点标低
     置信/淡化），point 退回模型自报的章号。章号纠偏后每个角色的点再排一次序。
     """
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
     for char in characters:
         points = char["points"]
         # 带上每个点 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）。

@@ -33,7 +33,7 @@ from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -202,11 +202,7 @@ def _verify(result: dict[str, Any], chunks: list[dict[str, Any]]) -> dict[str, A
       （核不过的留着、前端标低置信）。无 evidence 的天然 verified=False。
     - **drift_items**：verify-filter——quote 核不过的整条丢（同 study_cards），章号纠偏。
     """
-    evidence_map = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence_map = build_evidence_map(chunks)
 
     for feat in result["features"]:
         cits = [{"snippet": feat["evidence"]}]

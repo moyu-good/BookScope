@@ -30,7 +30,7 @@ from typing import Any
 from bookscope.agent._internal.exhaustive import merge_by_key, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -164,11 +164,7 @@ def _verify_endpoints(
       （已回收实弧）；payoff_chapter 为 null 或回收 evidence 核不过 → ``status="dangling"``
       （断弧，埋了没回收），回收端字段清空——绝不强行画一条挂不上原文的实弧。
     """
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
 
     def _verify_one(snippet: str, self_chapter: object = None) -> dict[str, Any]:
         # 带上 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）；

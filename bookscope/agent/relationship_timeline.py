@@ -31,7 +31,7 @@ from typing import Any
 from bookscope.agent._internal.exhaustive import merge_keyed_points, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -229,11 +229,7 @@ def _verify_turning_points(
     chapter 退回模型自报章号（FE 标灰但仍知道在哪章）。转折的章号纠偏后顺带把它在
     points 上的强度锚回去——但 points 本身不动（强度序列是模型给的，转折只是标注）。
     """
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
     for rel in relations:
         tps = rel["turning_points"]
         # 带上每个转折 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）。

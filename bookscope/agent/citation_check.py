@@ -112,6 +112,19 @@ def _disambiguate_by_chapter(
     return cids[0]
 
 
+def build_evidence_map(chunks: list[dict]) -> dict[str, dict]:
+    """把 chunk 列表收成 :func:`verify_citations` 要的证据登记表 ``{chunk_id: {chapter, text}}``。
+
+    缺 ``chunk_id`` 的 chunk 丢掉（没它当不了登记 id）；``chapter`` 缺退 0、``text`` 缺退空串。
+    各结构化抽取功能（人物图 / 时间线 / 伏笔弧等）核验前都先建这张表，逻辑一份收在这里。
+    """
+    return {
+        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
+        for c in chunks
+        if c.get("chunk_id")
+    }
+
+
 def verify_citations(
     citations: list[dict],
     evidence: dict[str, dict],
@@ -189,6 +202,7 @@ def verify_citations(
 
 __all__ = [
     "CONTAINMENT_THRESHOLD",
+    "build_evidence_map",
     "char_ngram_containment",
     "normalize_text",
     "verify_citations",

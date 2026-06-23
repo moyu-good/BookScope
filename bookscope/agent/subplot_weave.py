@@ -32,7 +32,7 @@ from typing import Any
 from bookscope.agent._internal.exhaustive import run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -319,11 +319,7 @@ def generate_subplot_weave(
         （挂不上原文的不画）；任意失败返 ``None``。
     """
     _ = session_id  # 关缓存：本任务出结构化 JSON，坏响应不该被缓存 poison
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
     system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请抽这本书的情节支线编织结构。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
@@ -440,11 +436,7 @@ def generate_subplot_weave_exhaustive(
     weave = _merge_weave_segments(outs)
     if weave is None:
         return None
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
     _verify_subplots(weave["subplots"], evidence)
     weave["intersections"] = _verify_intersections(weave["intersections"], evidence)
     return weave

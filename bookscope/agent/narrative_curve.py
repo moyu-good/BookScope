@@ -29,7 +29,7 @@ from typing import Any
 from bookscope.agent._internal.exhaustive import mapreduce_per_chapter
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -169,11 +169,7 @@ def _verify_chapters(
     long_context / character_flow）；没命中 → ``verified=False``（FE 把这章的维度
     标低置信/不画），chapter 退回模型自报的章号。
     """
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
     # 带上每章 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）。
     citations = [{"snippet": c["evidence"], "chapter": c["chapter"]} for c in chapters]
     verify_citations(citations, evidence)

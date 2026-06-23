@@ -17,7 +17,7 @@ from typing import Any
 from bookscope.agent._internal.exhaustive import merge_by_key, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -124,11 +124,7 @@ def _verify_events(events: list[dict[str, Any]], chunks: list[dict[str, Any]]) -
     long_context / character_flow）；没命中 → ``verified=False``，chapter 退回模型自报。
     事件自报 chapter 为 0 = 模型没报，不传，让 verify 退回确定性首个命中。
     """
-    evidence_map = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence_map = build_evidence_map(chunks)
     for ev in events:
         # 带上 LLM 自报章号当多命中消歧弱先验（真章号在 verify 后用 chunk_id 覆盖）；
         # chapter 为 0 = 模型没报，不传，退回确定性首个。

@@ -24,7 +24,7 @@ from typing import Any
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent._internal.loop_shared import elapsed_ms as _elapsed_ms
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.events import FinalAnswerEvent, IterationStartEvent, LoopCallback
 from bookscope.agent.models import AgentQueryResult, LoopTrace
 from bookscope.agent.utils.json_parsing import parse_final_answer
@@ -163,11 +163,7 @@ def run_long_context(
         return None
 
     # evidence-first：全书 chunks 当证据，snippet 匹配即 verified（章号漂移鲁棒）。
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunks)
     citations = verify_citations(citations, evidence)
 
     # 章号纠偏（exp-009/010 caveat）：长上下文模型自报章号会漂，但 snippet verify

@@ -31,7 +31,7 @@ from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_
 from bookscope.agent._internal.loop_shared import TOOL_NAME_SEARCH
 from bookscope.agent._internal.loop_shared import elapsed_ms as _elapsed_ms
 from bookscope.agent._internal.search_cache import search_chunks_cached
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.events import (
     FinalAnswerEvent,
     IterationStartEvent,
@@ -632,11 +632,7 @@ def run_fast_path(
     # WP1：fast path 的候选证据就是这一次 search 的结果——按 chunk_id
     # 登记后给每条 citation 附加 verified / chunk_id / match_score。
     # auto_filled 的那条文本本来取自 chunk，verified 自然为 true。
-    evidence = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunk_dicts
-        if c.get("chunk_id")
-    }
+    evidence = build_evidence_map(chunk_dicts)
     citations = verify_citations(citations, evidence)
 
     trace.iterations = 1

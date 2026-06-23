@@ -19,7 +19,7 @@ from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.citation_check import verify_citations
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -137,11 +137,7 @@ def generate_concept_evolution(
     concept = (concept or "").strip()
     if not concept:
         return None
-    evidence_map = {
-        str(c["chunk_id"]): {"chapter": c.get("chapter", 0), "text": c.get("text", "")}
-        for c in chunks
-        if c.get("chunk_id")
-    }
+    evidence_map = build_evidence_map(chunks)
     system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": f"请回溯概念「{concept}」在全书的演进。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
