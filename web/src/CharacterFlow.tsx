@@ -43,6 +43,10 @@ const PAD_RIGHT = 24;
 const PAD_TOP = 28;
 const PAD_BOTTOM = 28;
 
+// storyline 只画主要角色——穷尽化后整本会浮出上百号人，全画成泳道纵向就糊成一团、
+// 力学松弛也卡。按出场频次取前 N 人，长尾次要人物不入图（同关系图按重要度限规模）。
+const TOP_CHARS = 18;
+
 // 选中的同场束：唯一标识 = 章号 + 两人名
 interface SelectedPair {
   chapter: number;
@@ -119,14 +123,42 @@ export function CharacterFlow({
     }
   }
 
+  // 全书出场总人数（给说明用——穷尽化后可能上百，图里只画前 TOP_CHARS 个）
+  const totalCast = useMemo(() => {
+    if (!chapters) return 0;
+    const all = new Set<string>();
+    for (const c of chapters) for (const name of c.present) all.add(name);
+    return all.size;
+  }, [chapters]);
+
+  // 画图用的视图：只留出场最频繁的前 TOP_CHARS 个角色，pairs 两端都在内才保留。
+  // 长尾次要人物（一两章露个脸）不进 storyline——否则泳道糊成一团、力学松弛也卡。
+  const view = useMemo(() => {
+    if (!chapters) return null;
+    const freq = new Map<string, number>();
+    for (const c of chapters)
+      for (const name of c.present) freq.set(name, (freq.get(name) ?? 0) + 1);
+    const kept = new Set(
+      [...freq.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, TOP_CHARS)
+        .map(([name]) => name),
+    );
+    return chapters.map((c) => ({
+      chapter: c.chapter,
+      present: c.present.filter((n) => kept.has(n)),
+      pairs: c.pairs.filter((p) => kept.has(p.a) && kept.has(p.b)),
+    }));
+  }, [chapters]);
+
   // ----- 布局派生量：人物 lane 基线、各章 x、每人出现区间、每章戏份 -----
   const layout = useMemo(() => {
-    if (!chapters) return null;
+    if (!view) return null;
 
     // 每人首/末出现章 index（登场线起、退场线止）
     const firstIdx = new Map<string, number>();
     const lastIdx = new Map<string, number>();
-    chapters.forEach((c, i) => {
+    view.forEach((c, i) => {
       for (const name of c.present) {
         if (!firstIdx.has(name)) firstIdx.set(name, i);
         lastIdx.set(name, i);
@@ -135,7 +167,7 @@ export function CharacterFlow({
 
     // 人物按总出场次数排序定 lane 顺序（戏多的靠中间更稳，这里简单按登场顺序+频次）
     const freq = new Map<string, number>();
-    for (const c of chapters)
+    for (const c of view)
       for (const name of c.present) freq.set(name, (freq.get(name) ?? 0) + 1);
     const names = [...firstIdx.keys()].sort((a, b) => {
       const fa = firstIdx.get(a)!;
@@ -155,13 +187,13 @@ export function CharacterFlow({
     });
 
     // 各章 x
-    const n = chapters.length;
+    const n = view.length;
     const colW = (W - PAD_LEFT - PAD_RIGHT) / Math.max(1, n - 1 || 1);
     const xAt = (i: number) => PAD_LEFT + (n === 1 ? 0 : i * colW);
 
     // 每人每章戏份（出场=1 + 同场对数）→ 线粗
     const screen = new Map<string, number>(); // key = name|idx
-    chapters.forEach((c, i) => {
+    view.forEach((c, i) => {
       const pairCount = new Map<string, number>();
       for (const pr of c.pairs) {
         pairCount.set(pr.a, (pairCount.get(pr.a) ?? 0) + 1);
@@ -173,13 +205,13 @@ export function CharacterFlow({
     });
 
     return { names, lane, firstIdx, lastIdx, xAt, n, screen };
-  }, [chapters]);
+  }, [view]);
 
   // 初始化 LaneNode + 启动松弛动画
   useEffect(() => {
-    if (!chapters || !layout) return;
+    if (!view || !layout) return;
     const sim = new Map<string, LaneNode>();
-    chapters.forEach((c, i) => {
+    view.forEach((c, i) => {
       for (const name of c.present) {
         const base = layout.lane.get(name)!;
         sim.set(`${name}|${i}`, { y: base, vy: 0, base });
@@ -190,7 +222,7 @@ export function CharacterFlow({
     startSim();
     return stopSim;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapters, layout]);
+  }, [view, layout]);
 
   function stopSim() {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
@@ -219,7 +251,7 @@ export function CharacterFlow({
   // 一帧纵向松弛：同章同场对相吸（聚束）+ 同章内防重叠 + 锚回基线 + 阻尼
   function step(): number {
     const sim = simRef.current;
-    const cur = chapters;
+    const cur = view;
     if (!sim || !cur || !layout) return 0;
     const fy = new Map<string, number>();
     for (const k of sim.keys()) fy.set(k, 0);
@@ -270,7 +302,7 @@ export function CharacterFlow({
     return maxv;
   }
 
-  if (!chapters || !layout) {
+  if (!view || !layout) {
     return (
       <div className="pt-4">
         <h3
@@ -315,14 +347,14 @@ export function CharacterFlow({
   const yOf = (name: string, i: number) =>
     sim.get(`${name}|${i}`)?.y ?? layout.lane.get(name) ?? H / 2;
 
-  const verifiedPairs = chapters.reduce(
+  const verifiedPairs = view.reduce(
     (acc, c) => acc + c.pairs.filter((p) => p.verified).length,
     0,
   );
-  const totalPairs = chapters.reduce((acc, c) => acc + c.pairs.length, 0);
+  const totalPairs = view.reduce((acc, c) => acc + c.pairs.length, 0);
 
   const sel = selected
-    ? chapters
+    ? view
         .find((c) => c.chapter === selected.chapter)
         ?.pairs.find(
           (p) =>
@@ -351,8 +383,10 @@ export function CharacterFlow({
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        {names.length} 个人物、{n} 章（同场判定已核验原文 {verifiedPairs}/
-        {totalPairs} 条）。横线穿全书、线越粗这章戏越多；同场处两线靠拢成束（点束看原文）；虚线灰束 = 原文没核验上。
+        {totalCast > names.length
+          ? `图中主要 ${names.length} 人 / 全书共 ${totalCast} 人`
+          : `${names.length} 个人物`}
+        、{n} 章（同场判定已核验原文 {verifiedPairs}/{totalPairs} 条）。横线穿全书、线越粗这章戏越多；同场处两线靠拢成束（点束看原文）；虚线灰束 = 原文没核验上。
       </p>
 
       <svg
@@ -361,7 +395,7 @@ export function CharacterFlow({
         style={{ maxHeight: 520, background: "var(--color-paper)" }}
       >
         {/* 章号刻度（每隔几章标一个，避免拥挤） */}
-        {chapters.map((c, i) =>
+        {view.map((c, i) =>
           n <= 24 || i % 4 === 0 ? (
             <text
               key={`x-${c.chapter}`}
@@ -434,7 +468,7 @@ export function CharacterFlow({
         })}
 
         {/* 同场束：每章每条 pair，在该章 x 处画一段连接两人 lane 的竖向束线 */}
-        {chapters.map((c, i) =>
+        {view.map((c, i) =>
           c.pairs.map((pr, j) => {
             const ya = yOf(pr.a, i);
             const yb = yOf(pr.b, i);
