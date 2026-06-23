@@ -98,8 +98,12 @@ CLAUDE.md 硬约束在设计阶段就要 lock：原文证据是立身之本（�
 ### D-4：各功能视图怎么从章脉派生
 
 分两类：
-- **纯计算视图（0 次 LLM）**：叙事曲线（tension/sentiment/pov 已在章脉）、节奏、叙事流（present[]）、关系图（relations[] 聚合）、时间线（events[]）。章脉建好后这些**免费**、秒出。
-- **轻 LLM 视图（章脉很小，1 次小调用）**：伏笔回收（跨章把埋点配对收点——要推理，但喂的是小章脉不是全本原文）、论点结构。
+- **纯计算视图（0 次 LLM）**：叙事曲线（tension/sentiment/pov 已在章脉）、节奏、叙事流（present[] + relations）、关系图（relations[] 聚合）。章脉建好后这些**免费**、秒出。
+- **轻 LLM 视图（章脉很小，1 次小调用）**：论点结构。
+- **不迁、留各自路径（2026-06-23 实现中更正）**：
+  - **时间线**:命根子是把倒叙/多线**还原成真实时间先后**(temporal reasoning),章脉的逐章 events 是**阅读顺序**——naive 派生会把"还原倒叙"这个核心价值弄丢。需章脉之外的时序推理,留 `generate_timeline_exhaustive`。
+  - **伏笔回收**:跨章把埋点配对收点要 setup→payoff 推理,章脉的 foreshadow 候选只是逐章标记、没配对。留各自路径(也呼应 D-2 里伏笔本就特殊)。
+  - 教训:不是所有"全书结构"功能都能从逐章章脉 naive 派生——**只有"逐章独立可填"的维度(张力/在场/关系)能;需要跨章/跨时序推理的(时序还原/伏笔配对)不能**。章脉省的是"重复读全书"那部分,省不掉"专门的跨章推理"。
 
 ### D-5：章脉的缓存与持久化（接 ADR-008 L3）
 
@@ -197,5 +201,6 @@ NORTH_STAR 措辞：不改（接受 D-6 论证）
 - ✅ 第 3 步 五视图派生（`chapter_spine_views.py`,commit `3dc8cea` + `13334ab`）：叙事曲线/节奏满精度投影;关系图/叙事流/时间线按作者拍的**出路 B**(章级锚,证据点开现取)派生。
 - ✅ 出路 B 取证原语（`chapter_spine_evidence.py`,commit `14d80c7`）：纯检索取支撑句,关系对/事件各一,0 LLM。
 - ✅ 第 5 步 章脉 book 级缓存（`_internal/chapter_spine_cache.py`,commit `2704824`）：照 kg_book_cache 模式,`get_or_build_spine` facade 一行接入,建一次缓存多次。
-- ⬜ **最后整合（剩这一块）**:把 narrative/pacing/graph/flow/timeline 五个端点接到 `get_or_build_spine` + 对应派生;加 `/agent/spine-evidence` 按需取证端点;前端章级锚视图点开取证。这步动 API 契约 + 前端,要 live 全栈验证。后端地基(spine+派生+取证+缓存)已全部就位、各自单测过。
-- 注:第 4 步"轻 LLM 视图(伏笔/论点)"暂留——伏笔已在章脉 foreshadow 字段,派生方式随最后整合一起定。
+- ✅ `/agent/spine-evidence` 取证端点（commit `47fb12b`）+ 叙事曲线/节奏端点接章脉（commit `6a2c4f7`,FE 安全,响应形态不变,撤 pacing 大书守卫）。
+- ⬜ **剩最后一块**:关系图 / 叙事流两个端点接 `get_or_build_spine` + 派生(章级锚) + 前端 CharacterGraph/CharacterFlow 改成点开调 `/agent/spine-evidence` 取证 + demo fixture 更新 + live 全栈验证。这步动 2 个复杂 FE 组件(~1200 行)+ 用户可见行为(证据点开现取),专注一轮做、不在长 turn 尾巴硬推。
+- **时间线 / 伏笔不迁**（见 D-4 更正）：需跨时序/跨章推理,章脉 naive 派生会弄丢核心价值,留各自 exhaustive 路径。所以"全书功能从章脉派生"实际覆盖 4 个(叙事曲线/节奏/叙事流/关系图)+ 论点(轻 LLM),不是原设想的全部。
