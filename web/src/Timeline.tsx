@@ -117,12 +117,25 @@ export function Timeline({
       {loading && <RunningProcess label="按时序梳理时间线" />}
 
       {events && (
-        <ol className="relative border-l border-[var(--color-rule)] ml-2">
+        <div
+          className="rounded-md overflow-hidden"
+          style={{
+            background: "var(--color-paper-raised)",
+            border: "1px solid var(--color-folio-edge)",
+          }}
+        >
+          {/* 手卷上轴杆 */}
+          <div style={{ height: 7, background: "var(--color-ink)", opacity: 0.5 }} aria-hidden />
+          <ol
+            className="relative border-l-2 ml-6 mr-4 py-4"
+            style={{ borderColor: "color-mix(in srgb, var(--color-seal) 30%, transparent)", animation: "tl-unroll .6s ease-out" }}
+          >
+            <style>{`@keyframes tl-unroll{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
           {events.map((ev, i) => (
             <li key={i} className="mb-4 ml-4">
               <span
-                className="absolute -left-[5px] w-2.5 h-2.5 rounded-full"
-                style={{ background: "var(--color-seal)" }}
+                className="absolute -left-[7px] w-3 h-3 rounded-full"
+                style={{ background: "var(--color-seal)", boxShadow: "0 0 0 2px var(--color-paper-raised)" }}
                 aria-hidden="true"
               />
               <button
@@ -159,7 +172,10 @@ export function Timeline({
               )}
             </li>
           ))}
-        </ol>
+          </ol>
+          {/* 手卷下轴杆 */}
+          <div style={{ height: 7, background: "var(--color-ink)", opacity: 0.5 }} aria-hidden />
+        </div>
       )}
 
       {events && !loading && <RunStats trace={trace} note={`${events.length} 个事件`} />}

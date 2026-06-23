@@ -112,24 +112,29 @@ export function ArgumentStructure({
       )}
 
       {claims && claims.length > 0 && (
-        <ol className="space-y-4">
+        <ol
+          className="relative space-y-4 ml-3 pl-7 border-l-2"
+          style={{ borderColor: "color-mix(in srgb, var(--color-seal) 25%, transparent)" }}
+        >
+          <style>{`@keyframes arg-flow{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}`}</style>
           {claims.map((c, i) => (
             <li
               key={i}
-              className="rounded-md border pl-4 pr-3 py-3"
+              className="relative rounded-md border pl-4 pr-3 py-3"
               style={{
                 borderColor: "var(--color-folio-edge)",
                 background: "var(--color-paper-raised)",
+                animation: "arg-flow .5s ease-out",
               }}
             >
-              <div className="flex items-baseline gap-2 mb-1.5">
-                <span
-                  className="text-xs shrink-0"
-                  style={{ color: "var(--color-seal)" }}
-                >
-                  论点 {c.order}
-                </span>
-              </div>
+              {/* 脉络节点：朱砂序号圈坐在脊线上,论证一脉相承 */}
+              <span
+                className="absolute top-3 w-6 h-6 rounded-full flex items-center justify-center text-[11px]"
+                style={{ left: "-2.45rem", background: "var(--color-seal)", color: "var(--color-paper)" }}
+                aria-hidden
+              >
+                {c.order}
+              </span>
               <div
                 className="text-[15px] leading-relaxed text-[var(--color-ink)] mb-2"
                 style={{ fontFamily: "var(--font-display)" }}
