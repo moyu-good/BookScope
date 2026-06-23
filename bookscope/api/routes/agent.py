@@ -50,6 +50,7 @@ from bookscope.agent import (
 from bookscope.agent.annotations import generate_annotations
 from bookscope.agent.argument_structure import generate_argument_structure_exhaustive
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
+from bookscope.agent.chapter_spine_evidence import evidence_for_event, evidence_for_pair
 from bookscope.agent.character_arc import generate_character_arc_exhaustive
 from bookscope.agent.character_flow import generate_character_flow_exhaustive
 from bookscope.agent.character_graph import (
@@ -133,6 +134,8 @@ from bookscope.api.schemas import (
     RelationshipTimelineResponse,
     Review,
     ReviewDimensionScore,
+    SpineEvidenceRequest,
+    SpineEvidenceResponse,
     StudyCardsRequest,
     StudyCardsResponse,
     StyleIssuesRequest,
@@ -1072,6 +1075,30 @@ async def agent_pacing_curve(
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
+
+
+@agent_router.post("/agent/spine-evidence", response_model=SpineEvidenceResponse)
+async def agent_spine_evidence(
+    request: SpineEvidenceRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> SpineEvidenceResponse:
+    """章脉章级锚视图"点开现取"那一句（ADR-010 出路 B）。纯检索、不调 LLM。
+
+    关系图边 / 时间线事件只钉到章号,用户点开时调本端点从那一章原文现找支撑句。找不到返
+    ``found=False`` + 空串（evidence-first：没原文不编）。章号不存在也返空、不报错。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    records = assembler._compute_chapter_records()  # noqa: SLF001 — 同既有取数惯例
+    chapter_text = next(
+        (r.full_text for r in records if r.chapter == request.chapter), ""
+    )
+    if not chapter_text:
+        return SpineEvidenceResponse(chapter=request.chapter, evidence="", found=False)
+    if request.kind == "pair":
+        ev = evidence_for_pair(chapter_text, request.a or "", request.b or "")
+    else:
+        ev = evidence_for_event(chapter_text, request.event or "")
+    return SpineEvidenceResponse(chapter=request.chapter, evidence=ev, found=bool(ev))
 
 
 @agent_router.post("/agent/narrative-curve", response_model=NarrativeCurveResponse)

@@ -504,6 +504,33 @@ class NarrativeCurveResponse(BaseModel):
     )
 
 
+class SpineEvidenceRequest(BaseModel):
+    """POST /api/agent/spine-evidence 请求体（章脉章级锚视图"点开现取"那一句，ADR-010 出路 B）。
+
+    关系图边 / 时间线事件这类章级锚视图不带 upfront 逐字证据，用户点开某条时调本端点，从那一章
+    原文里现找支撑句。纯检索、不调 LLM、不要 api_key——是数据端点不是分析端点。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    chapter: int = Field(..., ge=1, description="这条边/事件锚定的真章号。")
+    kind: Literal["pair", "event"] = Field(
+        ..., description="pair=关系边(传 a/b)；event=事件(传 event)。"
+    )
+    a: str | None = Field(default=None, description="kind=pair 时人物 A。")
+    b: str | None = Field(default=None, description="kind=pair 时人物 B。")
+    event: str | None = Field(default=None, description="kind=event 时事件描述。")
+
+
+class SpineEvidenceResponse(BaseModel):
+    """POST /api/agent/spine-evidence 响应体。"""
+
+    chapter: int = Field(..., description="回显章号。")
+    evidence: str = Field(default="", description="从该章原文找到的支撑句；没找到返空串。")
+    found: bool = Field(
+        default=False, description="是否在该章找到支撑原文（evidence-first：没找到不编）。"
+    )
+
+
 class ForeshadowArcsRequest(BaseModel):
     """POST /api/agent/foreshadow-arcs 请求体（伏笔→回收弧线图，WP-foreshadow-payoff-arcs）。
 
@@ -1347,6 +1374,8 @@ __all__ = [
     "ReviewDimensionScore",
     "SessionListResponse",
     "SessionMetadata",
+    "SpineEvidenceRequest",
+    "SpineEvidenceResponse",
     "SubplotWeaveRequest",
     "SubplotWeaveResponse",
     "SuggestQuestionsRequest",
