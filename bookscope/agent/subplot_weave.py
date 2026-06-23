@@ -37,6 +37,9 @@ from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
 from bookscope.agent.utils.json_parsing import (
+    salvage_closed_objects,
+)
+from bookscope.agent.utils.json_parsing import (
     strip_code_fence as _strip_code_fence,
 )
 
@@ -186,60 +189,11 @@ def _salvage_truncated(text: str) -> dict[str, Any] | None:
     丢的是后半段交汇——优先抠出已闭合的 ``subplots`` 对象，至少把泳道画出来（同关系图/
     叙事流截断抢救思路）。交汇若也截断就当空，不强抢半截交汇。
     """
-    subplots = _salvage_array(text, '"subplots"')
+    subplots = salvage_closed_objects(text, '"subplots"')
     if not subplots:
         return None
-    intersections = _salvage_array(text, '"intersections"') or []
+    intersections = salvage_closed_objects(text, '"intersections"') or []
     return _build_weave({"subplots": subplots, "intersections": intersections})
-
-
-def _salvage_array(text: str, key: str) -> list[Any] | None:
-    """从 ``text`` 里抠出 ``key`` 对应数组里已经闭合的 ``{...}`` 对象（截断抢救通用件）。"""
-    idx = text.find(key)
-    if idx == -1:
-        return None
-    start = text.find("[", idx)
-    if start == -1:
-        return None
-    raw_items: list[Any] = []
-    i = start + 1
-    n = len(text)
-    while i < n:
-        while i < n and text[i] not in "{]":  # 跳到下一个对象起点；遇 ] 收工
-            i += 1
-        if i >= n or text[i] == "]":
-            break
-        depth = 0
-        in_str = False
-        esc = False
-        closed = False
-        j = i
-        while j < n:  # 括号匹配抠一个完整 {...}，跳过字符串内的括号
-            ch = text[j]
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = not in_str
-            elif not in_str:
-                if ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        j += 1
-                        closed = True
-                        break
-            j += 1
-        if not closed:
-            break  # 最后一个对象被截断 → 停
-        try:
-            raw_items.append(json.loads(text[i:j]))
-        except json.JSONDecodeError:
-            pass
-        i = j
-    return raw_items or None
 
 
 def _parse_weave(text: str) -> dict[str, Any] | None:

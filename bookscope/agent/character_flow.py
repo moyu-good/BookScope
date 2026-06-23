@@ -33,6 +33,9 @@ from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
 from bookscope.agent.utils.json_parsing import (
+    salvage_closed_objects,
+)
+from bookscope.agent.utils.json_parsing import (
     strip_code_fence as _strip_code_fence,
 )
 
@@ -136,50 +139,7 @@ def _salvage_truncated_chapters(text: str) -> list[dict[str, Any]] | None:
     整段 ``json.loads`` 必败。与其整张图丢掉返 None，不如把 ``"chapters"`` 数组里已经
     闭合的 ``{...}`` 逐个抠出来——用户至少看到大部分章节（同关系图截断抢救思路）。
     """
-    idx = text.find('"chapters"')
-    if idx == -1:
-        return None
-    start = text.find("[", idx)
-    if start == -1:
-        return None
-    raw_chapters: list[Any] = []
-    i = start + 1
-    n = len(text)
-    while i < n:
-        while i < n and text[i] not in "{]":  # 跳到下一个对象起点；遇 ] 收工
-            i += 1
-        if i >= n or text[i] == "]":
-            break
-        depth = 0
-        in_str = False
-        esc = False
-        closed = False
-        j = i
-        while j < n:  # 括号匹配抠一个完整 {...}，跳过字符串内的括号
-            ch = text[j]
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = not in_str
-            elif not in_str:
-                if ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        j += 1
-                        closed = True
-                        break
-            j += 1
-        if not closed:
-            break  # 最后一个对象被截断 → 停
-        try:
-            raw_chapters.append(json.loads(text[i:j]))
-        except json.JSONDecodeError:
-            pass
-        i = j
+    raw_chapters = salvage_closed_objects(text, '"chapters"') or []
     chapters = _coerce_chapters(raw_chapters)
     return chapters or None
 

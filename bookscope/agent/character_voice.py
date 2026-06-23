@@ -38,6 +38,9 @@ from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
 from bookscope.agent.utils.json_parsing import (
+    salvage_closed_objects,
+)
+from bookscope.agent.utils.json_parsing import (
     strip_code_fence as _strip_code_fence,
 )
 
@@ -148,8 +151,8 @@ def _salvage_truncated(text: str) -> dict[str, Any] | None:
     max_tokens），整段 json.loads 必败。括号匹配逐个抠完整 {...}，拼部分结果比整张丢掉好
     （同 entity_recall / study_cards 抢救）。两个数组任一抢到东西就算有效。
     """
-    features = _salvage_array(text, '"features"')
-    drift = _salvage_array(text, '"drift_items"')
+    features = salvage_closed_objects(text, '"features"')
+    drift = salvage_closed_objects(text, '"drift_items"')
     if features is None and drift is None:
         return None
     return _coerce(
@@ -159,55 +162,6 @@ def _salvage_truncated(text: str) -> dict[str, Any] | None:
             "drift_items": drift or [],
         }
     )
-
-
-def _salvage_array(text: str, key: str) -> list[Any] | None:
-    """从 ``text`` 里 ``key`` 指向的 JSON 数组里抠出已闭合的完整对象列表（截断抢救通用）。"""
-    idx = text.find(key)
-    if idx == -1:
-        return None
-    start = text.find("[", idx)
-    if start == -1:
-        return None
-    raw_items: list[Any] = []
-    i = start + 1
-    n = len(text)
-    while i < n:
-        while i < n and text[i] not in "{]":  # 跳到下一个对象起点；遇 ] 收工
-            i += 1
-        if i >= n or text[i] == "]":
-            break
-        depth = 0
-        in_str = False
-        esc = False
-        closed = False
-        j = i
-        while j < n:  # 括号匹配抠一个完整 {...}，跳过字符串内的括号
-            ch = text[j]
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = not in_str
-            elif not in_str:
-                if ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        j += 1
-                        closed = True
-                        break
-            j += 1
-        if not closed:
-            break  # 最后一个对象被截断 → 停
-        try:
-            raw_items.append(json.loads(text[i:j]))
-        except json.JSONDecodeError:
-            pass
-        i = j
-    return raw_items or None
 
 
 def _parse_voice(text: str) -> dict[str, Any] | None:

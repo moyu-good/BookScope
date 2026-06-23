@@ -22,6 +22,9 @@ from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
 from bookscope.agent.utils.json_parsing import (
+    salvage_closed_objects,
+)
+from bookscope.agent.utils.json_parsing import (
     strip_code_fence as _strip_code_fence,
 )
 
@@ -85,50 +88,7 @@ def _salvage_truncated(text: str) -> list[dict[str, Any]] | None:
     时间线是长输出，reasoning + 内容可能撑爆 max_tokens 截断成半截 JSON，整段 loads 必败。
     括号匹配逐个抠完整 {...}，拼部分时间线，比整张丢掉返空好。
     """
-    idx = text.find('"events"')
-    if idx == -1:
-        return None
-    start = text.find("[", idx)
-    if start == -1:
-        return None
-    raw_events: list[Any] = []
-    i = start + 1
-    n = len(text)
-    while i < n:
-        while i < n and text[i] not in "{]":
-            i += 1
-        if i >= n or text[i] == "]":
-            break
-        depth = 0
-        in_str = False
-        esc = False
-        closed = False
-        j = i
-        while j < n:
-            ch = text[j]
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = not in_str
-            elif not in_str:
-                if ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        j += 1
-                        closed = True
-                        break
-            j += 1
-        if not closed:
-            break
-        try:
-            raw_events.append(json.loads(text[i:j]))
-        except json.JSONDecodeError:
-            pass
-        i = j
+    raw_events = salvage_closed_objects(text, '"events"') or []
     return _coerce({"events": raw_events}) if raw_events else None
 
 

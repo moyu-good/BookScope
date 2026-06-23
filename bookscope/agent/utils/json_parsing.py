@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import re
+from typing import Any
 
 from bookscope.agent.errors import LLMFormatError
 
@@ -35,6 +36,7 @@ __all__ = [
     "autofix_unescaped_quotes_in_all_string_values",
     "extract_first_json_object",
     "parse_final_answer",
+    "salvage_closed_objects",
     "strip_code_fence",
 ]
 
@@ -106,6 +108,69 @@ def strip_code_fence(text: str) -> str:
     if m:
         return m.group(1).strip()
     return text
+
+
+def salvage_closed_objects(text: str, key: str) -> list[Any] | None:
+    """从 ``text`` 里 ``key`` 指向的数组中抠出已闭合的完整 ``{...}`` 对象（截断抢救通用件）。
+
+    flash 把 reasoning_content 算进 max_tokens，结构化输出一大就可能被截断成半截 JSON，
+    整段 ``json.loads`` 必败。这里定位 ``key`` 后的 ``[``，括号匹配逐个抠完整对象（跳过
+    字符串内的括号、按 ``\\`` 处理转义），最后那个没闭合的对象丢掉。拼出的部分结果比整段
+    丢掉好——人物图 / 时间线 / 伏笔弧等十余处结构化抽取共用这一份抢救逻辑。
+
+    Args:
+        text: 可能被截断的 LLM JSON 输出。
+        key: 数组字段名，**含引号**，如 ``'"edges"'`` / ``'"chapters"'``。
+
+    Returns:
+        已闭合对象的原始 ``list``（未 coerce）；``key`` 找不到 / 没有 ``[`` / 一个完整对象
+        都没抠到时返 ``None``。
+    """
+    idx = text.find(key)
+    if idx == -1:
+        return None
+    start = text.find("[", idx)
+    if start == -1:
+        return None
+    raw_items: list[Any] = []
+    i = start + 1
+    n = len(text)
+    while i < n:
+        while i < n and text[i] not in "{]":  # 跳到下一个对象起点；遇 ] 收工
+            i += 1
+        if i >= n or text[i] == "]":
+            break
+        depth = 0
+        in_str = False
+        esc = False
+        closed = False
+        j = i
+        while j < n:  # 括号匹配抠一个完整 {...}，跳过字符串内的括号
+            ch = text[j]
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = not in_str
+            elif not in_str:
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        j += 1
+                        closed = True
+                        break
+            j += 1
+        if not closed:
+            break  # 最后一个对象被截断 → 停
+        try:
+            raw_items.append(json.loads(text[i:j]))
+        except json.JSONDecodeError:
+            pass
+        i = j
+    return raw_items or None
 
 
 def autofix_unescaped_quotes_in_all_string_values(json_text: str) -> str | None:
