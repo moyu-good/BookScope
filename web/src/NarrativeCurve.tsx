@@ -42,6 +42,13 @@ const POV_H = 26; // POV 泳道高
 const GAP = 10;
 const H = PAD_TOP + TENSION_H + GAP + POV_H + 20;
 
+// 山水长卷视图：山势=各章张力，平缓处=江水留白。同一份数据、换种画法。
+const ART_TOP = 16;
+const ART_RANGE = 118; // 张力 0-10 映射到的山高
+const ART_BASE = ART_TOP + ART_RANGE; // 山脚 / 水岸基线
+const ART_WATER_H = 20;
+const ART_H = ART_BASE + ART_WATER_H + 22;
+
 // POV 色带取一组克制的古籍色（不刺眼、可区分），循环用；"群像"固定中性灰
 const POV_PALETTE = [
   "#8c6b4f",
@@ -68,6 +75,8 @@ export function NarrativeCurve({
   // 维度开关——四线糊一起时可单独看
   const [showTension, setShowTension] = useState(true);
   const [showSentiment, setShowSentiment] = useState(true);
+  // 视图：山水长卷（品读，默认）/ 朴素图（分析，看四维数值）
+  const [artMode, setArtMode] = useState(true);
 
   async function load() {
     setLoading(true);
@@ -129,7 +138,33 @@ export function NarrativeCurve({
     return map;
   }, [chapters]);
 
-  if (!chapters) {
+  // 山水长卷派生量：山脊（近山=张力）、远山（张力平滑后压低，作烟霭层）、朱砂题点（核验
+  // 过的高张力章，取前 6 个当"题在画上的名场面"）。山脚连成江岸，低张力处留白成水。
+  const art = useMemo(() => {
+    if (!chapters) return null;
+    const m = chapters.length;
+    const inner = W - PAD_LEFT - PAD_RIGHT;
+    const xAt = (i: number) =>
+      PAD_LEFT + (m <= 1 ? inner / 2 : (i / (m - 1)) * inner);
+    const ridgeY = (t: number) =>
+      ART_BASE - (Math.max(0, Math.min(10, t)) / 10) * ART_RANGE;
+    const ridge = chapters.map((c, i) => `${xAt(i)},${ridgeY(c.tension)}`);
+    // 远山：张力做 3 点滑动平均再压到 0.5 高、整体抬高一点，淡墨烟霭层
+    const far = chapters.map((c, i) => {
+      const a = chapters[Math.max(0, i - 1)].tension;
+      const b = chapters[Math.min(m - 1, i + 1)].tension;
+      const sm = (a + c.tension + b) / 3;
+      return `${xAt(i)},${ART_BASE - (sm / 10) * ART_RANGE * 0.5 - 14}`;
+    });
+    const peaks = chapters
+      .map((c, i) => ({ c, x: xAt(i), y: ridgeY(c.tension) }))
+      .filter((p) => p.c.verified && p.c.tension >= 6)
+      .sort((a, b) => b.c.tension - a.c.tension)
+      .slice(0, 6);
+    return { m, xAt, ridgeY, ridge, far, peaks };
+  }, [chapters]);
+
+  if (!chapters || !art) {
     return (
       <div className="pt-4">
         <h3
@@ -216,30 +251,180 @@ export function NarrativeCurve({
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        {n} 章（原文核验 {verifiedN}/{n} 章）。柱=张力（越高越紧）、线=情感（零轴上方往上走、下方往下沉）、
-        下方色带=主导视角（同色同视角、换色=切视角，实心主线/斜纹支线）。淡化的章=原文没核验上。点任一章看依据。
+        {artMode ? (
+          <>
+            {n} 章（原文核验 {verifiedN}/{n} 章）。山势=各章张力，越高越紧、平缓处留白成江水；朱砂点=核验过的高潮章。点山看那章原文。要看情感/视角/主支线，切「朴素图」。
+          </>
+        ) : (
+          <>
+            {n} 章（原文核验 {verifiedN}/{n} 章）。柱=张力（越高越紧）、线=情感（零轴上方往上走、下方往下沉）、
+            下方色带=主导视角（同色同视角、换色=切视角，实心主线/斜纹支线）。淡化的章=原文没核验上。点任一章看依据。
+          </>
+        )}
       </p>
 
-      {/* 维度开关 */}
-      <div className="flex items-center gap-3 mb-2 text-xs">
-        <label className="flex items-center gap-1 cursor-pointer text-[var(--color-ink)]">
-          <input
-            type="checkbox"
-            checked={showTension}
-            onChange={(e) => setShowTension(e.target.checked)}
-          />
-          张力
-        </label>
-        <label className="flex items-center gap-1 cursor-pointer text-[var(--color-ink)]">
-          <input
-            type="checkbox"
-            checked={showSentiment}
-            onChange={(e) => setShowSentiment(e.target.checked)}
-          />
-          情感
-        </label>
+      {/* 视图切换：山水（品读）/ 朴素（分析） */}
+      <div className="flex items-center gap-2 mb-2 text-xs">
+        {(["art", "plain"] as const).map((mode) => {
+          const on = artMode === (mode === "art");
+          return (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setArtMode(mode === "art")}
+              className={[
+                "px-2.5 py-1 rounded border transition-colors",
+                on
+                  ? "border-[var(--color-seal)] text-[var(--color-seal)]"
+                  : "border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)]",
+              ].join(" ")}
+            >
+              {mode === "art" ? "山水长卷" : "朴素图"}
+            </button>
+          );
+        })}
       </div>
 
+      {/* 维度开关（只在朴素图下需要） */}
+      {!artMode && (
+        <div className="flex items-center gap-3 mb-2 text-xs">
+          <label className="flex items-center gap-1 cursor-pointer text-[var(--color-ink)]">
+            <input
+              type="checkbox"
+              checked={showTension}
+              onChange={(e) => setShowTension(e.target.checked)}
+            />
+            张力
+          </label>
+          <label className="flex items-center gap-1 cursor-pointer text-[var(--color-ink)]">
+            <input
+              type="checkbox"
+              checked={showSentiment}
+              onChange={(e) => setShowSentiment(e.target.checked)}
+            />
+            情感
+          </label>
+        </div>
+      )}
+
+      {/* 山水长卷视图：山势=张力，留白成江水，朱砂=核验过的高潮章 */}
+      {artMode && (
+        <svg
+          viewBox={`0 0 ${W} ${ART_H}`}
+          className="w-full border border-[var(--color-rule)] rounded"
+          style={{ background: "var(--color-paper)" }}
+        >
+          {/* 远山·烟霭层（张力平滑压低） */}
+          <polygon
+            points={`${art.far.join(" ")} ${W - PAD_RIGHT},${ART_BASE} ${PAD_LEFT},${ART_BASE}`}
+            fill="var(--color-ink)"
+            opacity={0.1}
+          />
+          {/* 近山·张力山脊（墨色填充 + 脊线） */}
+          <polygon
+            points={`${art.ridge.join(" ")} ${W - PAD_RIGHT},${ART_BASE} ${PAD_LEFT},${ART_BASE}`}
+            fill="var(--color-ink)"
+            opacity={0.32}
+          />
+          <polyline
+            points={art.ridge.join(" ")}
+            fill="none"
+            stroke="var(--color-ink)"
+            strokeWidth={1}
+            strokeLinejoin="round"
+            opacity={0.55}
+          />
+          {/* 江水·留白 + 涟漪 */}
+          <rect
+            x={PAD_LEFT}
+            y={ART_BASE}
+            width={W - PAD_LEFT - PAD_RIGHT}
+            height={ART_WATER_H}
+            fill="var(--color-paper-raised)"
+            opacity={0.7}
+          />
+          <line
+            x1={PAD_LEFT + 18}
+            y1={ART_BASE + 7}
+            x2={W * 0.4}
+            y2={ART_BASE + 7}
+            stroke="var(--color-rule)"
+            strokeWidth={0.6}
+          />
+          <line
+            x1={W * 0.5}
+            y1={ART_BASE + 13}
+            x2={W - PAD_RIGHT - 28}
+            y2={ART_BASE + 13}
+            stroke="var(--color-rule)"
+            strokeWidth={0.6}
+          />
+          {/* 选中章：竖向朱砂线 + 山脊大点 */}
+          {sel && (
+            <g>
+              <line
+                x1={art.xAt(chapters.indexOf(sel))}
+                y1={ART_TOP}
+                x2={art.xAt(chapters.indexOf(sel))}
+                y2={ART_BASE + ART_WATER_H}
+                stroke="var(--color-seal)"
+                strokeWidth={1}
+                opacity={0.5}
+              />
+              <circle
+                cx={art.xAt(chapters.indexOf(sel))}
+                cy={art.ridgeY(sel.tension)}
+                r={5}
+                fill="var(--color-seal)"
+              />
+            </g>
+          )}
+          {/* 朱砂题点：核验过的高潮章 */}
+          {art.peaks.map((p) => (
+            <circle
+              key={`pk-${p.c.chapter}`}
+              cx={p.x}
+              cy={p.y}
+              r={selected === p.c.chapter ? 5 : 3.2}
+              fill="var(--color-seal)"
+              opacity={0.9}
+            />
+          ))}
+          {/* 章号刻度 */}
+          {chapters.map((c, i) =>
+            n <= 20 || i % 5 === 0 ? (
+              <text
+                key={`ax-${c.chapter}`}
+                x={art.xAt(i)}
+                y={ART_H - 6}
+                textAnchor="middle"
+                fontSize={9}
+                fill="var(--color-ink-muted)"
+              >
+                {c.chapter}
+              </text>
+            ) : null,
+          )}
+          {/* 每章透明热区——点选 */}
+          {chapters.map((c, i) => {
+            const hw = (W - PAD_LEFT - PAD_RIGHT) / n;
+            return (
+              <rect
+                key={`ah-${c.chapter}`}
+                x={art.xAt(i) - hw / 2}
+                y={ART_TOP}
+                width={hw}
+                height={ART_BASE + ART_WATER_H - ART_TOP}
+                fill="transparent"
+                style={{ cursor: "pointer" }}
+                onClick={() => setSelected(c.chapter)}
+              />
+            );
+          })}
+        </svg>
+      )}
+
+      {!artMode && (
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full border border-[var(--color-rule)] rounded bg-white"
@@ -411,9 +596,10 @@ export function NarrativeCurve({
           />
         )}
       </svg>
+      )}
 
-      {/* POV 图例 */}
-      {povsInOrder.length > 0 && (
+      {/* POV 图例（只在朴素图下） */}
+      {!artMode && povsInOrder.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-ink-muted)]">
           {povsInOrder.slice(0, 7).map((p) => (
             <span key={p} className="flex items-center gap-1">
