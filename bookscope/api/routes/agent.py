@@ -54,6 +54,7 @@ from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.chapter_spine_canon import build_spine_name_map
 from bookscope.agent.chapter_spine_concept import concept_evolution_from_spine
 from bookscope.agent.chapter_spine_consistency import consistency_scan_from_spine
+from bookscope.agent.chapter_spine_dropped_thread import dropped_threads_from_spine
 from bookscope.agent.chapter_spine_evidence import evidence_for_event, evidence_for_pair
 from bookscope.agent.chapter_spine_foreshadow import foreshadow_from_spine
 from bookscope.agent.chapter_spine_relationship import relationship_timeline_from_spine
@@ -1695,6 +1696,7 @@ async def agent_style_issues(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
+    # 用词重复 / 视角越界两类局部毛病:整本一次扫。
     issues = generate_style_issues(
         full_text=full_text,
         chunks=chunks,
@@ -1702,8 +1704,12 @@ async def agent_style_issues(
         model=model,
         session_id=request.book_session_id,
     )
+    # 支线失踪是跨章判断,拆出来章脉派生(算术筛候选 + 一次复核分"忘收尾"vs"正常完结"),
+    # 大书不漏报。两类条目同形(type/what/chapter/snippet/verified),合并一起返。
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    dropped = dropped_threads_from_spine(spine=spine, llm_client=rec, model=model)
     return StyleIssuesResponse(
-        issues=issues or [],
+        issues=(issues or []) + (dropped or []),
         scanned=issues is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),

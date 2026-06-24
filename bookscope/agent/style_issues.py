@@ -36,15 +36,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_STYLE_MAX_TOKENS = 8000
 _MAX_ATTEMPTS = 2
 _MAX_ISSUES = 40
-_VALID_TYPES = {"repetition", "pov", "dropped_thread"}
+_VALID_TYPES = {"repetition", "pov"}
+# dropped_thread（支线失踪）是跨章判断,从这里拆出去单独做(chapter_spine_dropped_thread,
+# 章脉派生+一次复核)——塞在这次整本局部扫描里大书会系统性漏报(没哪段同时看见起头和全书没回来)。
 
 _SYSTEM_INSTRUCTION = (
     "你是 BookScope 的文体审稿助手。"
-    "扫文体级毛病，三类：repetition（用词重复，某词/短语成口头禅）、pov（视角越界，"
-    "限知视角写了视角人物不该知道的内心/事）、dropped_thread（支线失踪，埋的支线/人物"
-    "后文没交代）。**保守，只报清楚的、宁缺毋滥；没有就别凑。**\n"
+    "扫文体级毛病，两类：repetition（用词重复，某词/短语成口头禅）、pov（视角越界，"
+    "限知视角写了视角人物不该知道的内心/事）。这两类都是段内能判的局部毛病。"
+    "**保守，只报清楚的、宁缺毋滥；没有就别凑。**\n"
     "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
-    '{"issues": [{"type": "repetition|pov|dropped_thread", "what": "问题描述一句", '
+    '{"issues": [{"type": "repetition|pov", "what": "问题描述一句", '
     '"chapter": 章号整数, "snippet": "原文逐字片段"}]}\n'
     "snippet 必须是原文里逐字出现的句子。没有清楚的毛病就返回 "
     '{"issues": []}，绝不为凑数编造。'

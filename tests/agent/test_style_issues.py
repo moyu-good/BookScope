@@ -112,12 +112,12 @@ def test_parse_failure_returns_none(monkeypatch):
 def test_retry_recovers(monkeypatch):
     good = json.dumps(
         {"issues": [
-            {"type": "dropped_thread", "what": "信使没交代", "chapter": 7,
-             "snippet": "这条支线提到的神秘信使，此后再无交代"},
+            {"type": "repetition", "what": "笑了笑重复", "chapter": 1,
+             "snippet": "他笑了笑，他笑了笑，他又笑了笑"},
         ]},
         ensure_ascii=False,
     )
     _patch(monkeypatch)
     issues = _gen(_FakeClient(["坏 JSON", good]))
     assert issues is not None and len(issues) == 1
-    assert issues[0]["type"] == "dropped_thread"
+    assert issues[0]["type"] == "repetition"
