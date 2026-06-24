@@ -48,14 +48,16 @@ def main() -> None:
     seg_text = "".join(str(c["text"]) for c in seg)
     print(f"[book] {path} · 段0 {len(seg_text)} 字")
 
-    client = build_llm_client_from_params(provider="deepseek", api_key=os.environ["DEEPSEEK_API_KEY"])
+    client = build_llm_client_from_params(
+        provider="deepseek", api_key=os.environ["DEEPSEEK_API_KEY"]
+    )
     model = default_model_for("deepseek")
 
     p1, h1, m1 = _call(client, model, seg_text, _INSTR_CHAR)
     print(f"[人物维·冷] prompt={p1} 命中={h1} 未命中={m1}  命中率 {h1/max(1,p1):.0%}")
     p2, h2, m2 = _call(client, model, seg_text, _INSTR_PLOT)
     print(f"[情节维·同段重读] prompt={p2} 命中={h2} 未命中={m2}  命中率 {h2/max(1,p2):.0%}")
-    print("\n结论:人物维(第一次读)未命中高=把书读一遍的固有成本;情节维同段命中高=book-first 前缀复用生效。")
+    print("\n结论:第一次读未命中高=读一遍书的固有成本;同段重读命中高=book-first 前缀复用生效。")
 
 
 if __name__ == "__main__":
