@@ -66,13 +66,26 @@ def _rel_spine() -> list[dict]:
 def test_relationship_graph_aggregates_edges_undirected() -> None:
     g = relationship_graph_from_spine(_rel_spine())
     names = {n["name"] for n in g["nodes"]}
-    assert names == {"刘备", "关羽", "张飞", "曹操"}
+    # 关系图只画有关系的人:张飞 present 但没进任何 relation → 去孤立点丢掉(不是 bug,是关系图本义)
+    assert names == {"刘备", "关羽", "曹操"}
+    assert "张飞" not in names
     # 刘备-关羽:章1 两条(含 乙-甲)合成一条边,只记章1 → weight 1
     lk = next(e for e in g["edges"] if {e["source"], e["target"]} == {"刘备", "关羽"})
     assert lk["chapters"] == [1] and lk["weight"] == 1
     assert "结义" in lk["notes"] and "再提" in lk["notes"]
     # 边不带 upfront evidence(出路 B)
     assert "evidence" not in lk
+
+
+def test_relationship_graph_no_default_cap() -> None:
+    # 一百多回的书有几百号人有关系,默认不砍——50 个互相有关系的人应全画出来(不再默认砍到 40)
+    spine = [
+        {"chapter": i, "present": [f"甲{i}", f"乙{i}"],
+         "relations": [{"pair": [f"甲{i}", f"乙{i}"], "note": "x"}]}
+        for i in range(50)
+    ]
+    g = relationship_graph_from_spine(spine)
+    assert len({n["name"] for n in g["nodes"]}) == 100   # 50 对 = 100 个人,全在,没被砍到 40
 
 
 def test_narrative_flow_present_and_pairs() -> None:

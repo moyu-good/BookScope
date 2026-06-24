@@ -110,9 +110,12 @@ def relationship_graph_from_spine(
     weight = 出现章数(画粗细)。节点 = 所有露面人物。不带 upfront evidence(出路 B)。
     ``name_map``(别名→canonical,来自 KG)合并 玄德/刘备/先主 这类碎裂别名。
 
-    ``top_n``:章脉人物维把每章每个露面的人(连小角色/称呼变体)都抽进来,大书几百个节点画成一团
-    乱麻、也截不出干净图。设了就**按连接度(总边权重)取前 top_n 个主要人物 + 他们之间的边**显示
-    ——全量数据在章脉里留着,这里只收显示主干(同叙事流 TOP 18 的做法)。
+    **默认展示整本书的完整关系网**:只去掉"没抽到任何关系的孤立点"(关系图本就该画有关系的人;
+    present 里露过面但没进任何 relation 的人留在章脉、不画进图)。一百多回的书有几百号人有关系,
+    就画几百个——不设人数帽(密不密是前端显示/缩放的事,不在这里丢数据)。
+
+    ``top_n`` 可选,**默认 None=不砍**;只在调用方明确要"只看主干"时按连接度取前 top_n。曾经默认
+    砍到 40 是错的(一百多回的书哪可能只有 40 个人),已去掉。
     """
     nodes: dict[str, int] = {}          # name -> 出现次数(节点大小)
     edges: dict[tuple[str, str], dict[str, Any]] = {}
@@ -145,8 +148,12 @@ def relationship_graph_from_spine(
     for e in edges.values():
         e["chapters"].sort()
 
+    # 只画有关系的人(关系图本义):去掉没进任何边的孤立点。不设人数帽,几百号人有关系就画几百个。
+    connected = {e["source"] for e in edges.values()} | {e["target"] for e in edges.values()}
+    nodes = {n: c for n, c in nodes.items() if n in connected}
+
     if top_n is not None and len(nodes) > top_n:
-        # 按连接度(节点上所有边的 weight 之和)取前 top_n,同分用 mentions 兜底
+        # 调用方明确要主干时才砍:按连接度(节点上所有边的 weight 之和)取前 top_n,同分用 mentions 兜底
         degree: dict[str, int] = {}
         for e in edges.values():
             degree[e["source"]] = degree.get(e["source"], 0) + e["weight"]

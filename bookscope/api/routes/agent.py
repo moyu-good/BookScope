@@ -782,8 +782,9 @@ async def agent_character_graph(
         # 章脉逐章用原文当下的称呼(玄德/刘备/先主),没合并;先一次 LLM 判同人出别名表,
         # 把碎裂别名收成一个节点(刘备/刘玄德、孔明/诸葛亮)。只发人名清单走缓存、失败返空表不合并。
         name_map = build_spine_name_map(spine=spine, llm_client=rec, model=model)
-        # top_n=40:大书章脉会抽出几百个露面的人,关系图按连接度收到主要 ~40 个画,免得糊成一团。
-        g = relationship_graph_from_spine(spine, name_map=name_map, top_n=40)
+        # 不设人数帽:一百多回的书几百号人有关系就画几百个(曾错砍到 40,把"太少"造回来了)。
+        # relationship_graph_from_spine 已只画有关系的人(去孤立点);密不密是前端缩放的事。
+        g = relationship_graph_from_spine(spine, name_map=name_map)
         edges = [
             GraphEdge(
                 source=e["source"],
