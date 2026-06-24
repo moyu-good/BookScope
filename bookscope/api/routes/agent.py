@@ -51,6 +51,7 @@ from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
 from bookscope.agent.annotations import generate_annotations
 from bookscope.agent.argument_structure import generate_argument_structure_exhaustive
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
+from bookscope.agent.chapter_spine_canon import build_spine_name_map
 from bookscope.agent.chapter_spine_evidence import evidence_for_event, evidence_for_pair
 from bookscope.agent.chapter_spine_views import (
     narrative_curve_from_spine,
@@ -778,10 +779,11 @@ async def agent_character_graph(
         rec = _UsageRecorder(client)
         _t0 = time.monotonic()
         spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+        # 章脉逐章用原文当下的称呼(玄德/刘备/先主),没合并;先一次 LLM 判同人出别名表,
+        # 把碎裂别名收成一个节点(刘备/刘玄德、孔明/诸葛亮)。只发人名清单走缓存、失败返空表不合并。
+        name_map = build_spine_name_map(spine=spine, llm_client=rec, model=model)
         # top_n=40:大书章脉会抽出几百个露面的人,关系图按连接度收到主要 ~40 个画,免得糊成一团。
-        g = relationship_graph_from_spine(
-            spine, name_map=_kg_name_map(assembler), top_n=40
-        )
+        g = relationship_graph_from_spine(spine, name_map=name_map, top_n=40)
         edges = [
             GraphEdge(
                 source=e["source"],
@@ -883,7 +885,9 @@ async def agent_character_flow(
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-    chapters = narrative_flow_from_spine(spine, name_map=_kg_name_map(assembler))
+    # 同人物图:章脉逐章称呼不一,先一次 LLM 判同人合别名(玄德/刘备),再派生叙事流。
+    name_map = build_spine_name_map(spine=spine, llm_client=rec, model=model)
+    chapters = narrative_flow_from_spine(spine, name_map=name_map)
     return CharacterFlowResponse(
         chapters=chapters or [],
         scanned=bool(spine),
@@ -2305,25 +2309,6 @@ def _run_trace(rec: _UsageRecorder, full_text: str, started: float) -> dict[str,
         "chars": len(full_text),
         "duration_ms": int((time.monotonic() - started) * 1000),
     }
-
-
-def _kg_name_map(assembler: R0BookAssembler) -> dict[str, str]:
-    """从上传时建好的 KG 建 别名→canonical 人名表,给章脉派生的人物图/叙事流合并别名。
-
-    KG 的 MinimalKGExtractor 已做过 canonical 合并,每个 CharacterProfile 带 name + aliases。
-    玄德/先主 → 刘备。章脉是逐章抽的、每章称呼可能不一,不合并会碎成多节点(ADR-010 整合隐患)。
-    """
-    name_map: dict[str, str] = {}
-    for c in assembler._kg.characters:  # noqa: SLF001 — 同既有路由取数惯例
-        canonical = str(getattr(c, "name", "")).strip()
-        if not canonical:
-            continue
-        name_map[canonical] = canonical
-        for alias in getattr(c, "aliases", []) or []:
-            a = str(alias).strip()
-            if a:
-                name_map[a] = canonical
-    return name_map
 
 
 def _resolve_assembler(
