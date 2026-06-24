@@ -84,6 +84,15 @@ async function main() {
   await sleep(4000);
   await shoot(page, "arc.png");
 
+  // ── 叙事流(验动态高:泳道多不挤)─────────────────────────────
+  console.log("叙事流…");
+  await openJian(page);
+  await clickText(page, "叙事流");
+  await sleep(500);
+  if (!(await clickText(page, "重新生成"))) await clickText(page, "生成", { exact: false });
+  await sleep(6000);
+  await shoot(page, "flow.png");
+
   await browser.close();
   console.log("完成。");
 }

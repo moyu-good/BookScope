@@ -45,7 +45,8 @@ interface CharacterFlowProps {
 }
 
 const W = 880;
-const H = 520;
+const H_MIN = 520;
+const LANE_H = 18; // 单条泳道纵向占高:泳道多就把画布撑高(不挤成发丝),同花鸟高度自适应
 const PAD_LEFT = 96; // 左边给人名留位
 const PAD_RIGHT = 24;
 const PAD_TOP = 28;
@@ -221,6 +222,9 @@ export function CharacterFlow({
       return (freq.get(b) ?? 0) - (freq.get(a) ?? 0);
     });
 
+    // 画布高随泳道数长:泳道少用 H_MIN,多了每条留 LANE_H,免得几十条挤成发丝(viewBox 按容器缩放)
+    const H = Math.max(H_MIN, names.length * LANE_H + PAD_TOP + PAD_BOTTOM);
+
     // lane 基线 y：纵向均分
     const lane = new Map<string, number>();
     const plotTop = PAD_TOP;
@@ -249,8 +253,11 @@ export function CharacterFlow({
       }
     });
 
-    return { names, lane, firstIdx, lastIdx, xAt, n, screen };
+    return { names, lane, firstIdx, lastIdx, xAt, n, screen, H };
   }, [view]);
+
+  // 动态画布高(泳道多就高);layout 未就绪时退 H_MIN。step / 渲染 / viewBox 都用这个。
+  const H = layout?.H ?? H_MIN;
 
   // 初始化 LaneNode + 启动松弛动画
   useEffect(() => {
