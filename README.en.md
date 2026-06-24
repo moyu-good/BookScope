@@ -5,7 +5,7 @@
 <h1 align="center">BookScope · 书鉴</h1>
 
 <p align="center">
-  A tool for people who read long books. Every "the book says…" the AI gives you is checked character-by-character against the source; only matches are shown, each stamped with a 「鉴」(verify) seal.
+  A tool for people who read long books. Every "the book says…" the AI gives you is checked word-by-word against the source; only matches are shown, each stamped with a 「鉴」(verify) seal. It also draws the whole book — through a reader's eye, not a dashboard.
 </p>
 
 <p align="center">
@@ -19,24 +19,39 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/hero.svg" width="720" alt="Every quote the AI gives is verified against the source before it gets the 鉴 seal">
+  <img src="docs/images/graph.png" width="760" alt="Star-map of characters: each person a star, each line a relationship, click to see the source">
+  <br>
+  <sub>All 348 connected characters of <i>Romance of the Three Kingdoms</i> — each a star, brighter with more screen time, red for rivals and green for allies. Click a line to read the source from that chapter. A 120-chapter book should be this dense.</sub>
 </p>
 
 ---
 
 ## What it is
 
-Drop a long book (epub / txt / pdf) into your browser and ask it open questions, or run any of 20+ built-in lenses: character graphs and arcs, timelines, pacing and narrative curves, foreshadow tracking, subplot weaves, consistency scans, an evidence-anchored close-reading view, and more.
+Drop a long book (epub / txt / pdf) into your browser and ask it open questions. It also maps the whole book: who relates to whom, the rise and fall of tension chapter by chapter, the timeline, foreshadowing, where subplots cross, and whether the book contradicts itself.
 
 It runs locally on your own AI account. The book text goes straight to the provider you pick (DeepSeek by default); there's no server in between, so nothing here ever touches your book or your key.
 
-**Live demo**: [moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/) — a finished analysis of *Romance of the Three Kingdoms* you can click through, no install and no key. For your own book, clone and run it locally.
+**Live demo**: [moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/) — a finished analysis of *Romance of the Three Kingdoms* you can click through, no install and no key.
 
 ## Why it's different
 
-Today's AIs casually invent "the source says XX" — it sounds real, and you can't go back and check every line.
+**One: the check.** Today's AIs casually invent "the source says XX" — it sounds real, and you can't go back and verify every line. BookScope verifies every quote against the book by code: matches are shown and stamped with a 「鉴」seal, mismatches are dropped. Judgement calls (contradictions, foreshadowing, technique) follow the same rule — if it doesn't hold up in the source, it isn't said. This is the point of the project, not a feature on the side.
 
-BookScope's whole job is that check: every quote the model produces is verified against the book by code. Matches are shown and stamped with a 「鉴」seal; mismatches are dropped. Judgement calls (contradictions, foreshadowing, technique) follow the same rule — if the evidence doesn't hold up in the source, it isn't said. 鉴 means *to verify*; it's the point of the project, not a feature on the side.
+**Two: it draws the book through a reader's eye.** The tension curve is painted as an ink-wash mountain range; relationships as a night-sky star map; character arcs as flowering branches. Every stroke is anchored to the source — click a relationship line or a timeline event and it fetches the supporting sentence from that chapter, live.
+
+<p align="center">
+  <img src="docs/images/narrative.png" width="48%" alt="Narrative tension as an ink-wash mountain range">
+  <img src="docs/images/arc.png" width="48%" alt="Character arcs as flowering branches">
+  <br>
+  <sub>Left: the narrative curve as an ink-wash scroll — each peak and valley a chapter's tension, red dots the climaxes. Right: character arcs as bird-and-flower painting — one branch per character, its rise and fall their fortunes, blossom density their screen time.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/qa-citation.png" width="60%" alt="Answers carry their source; verified quotes get the 鉴 seal">
+  <br>
+  <sub>Ask the book: answers carry their source, quotes checked word-for-word get the 「鉴」seal; anything that fails the check never shows up.</sub>
+</p>
 
 > The UI is Chinese-first (中文优先 is a project invariant). This is a short English entry point; the full docs are in Chinese.
 
@@ -63,10 +78,9 @@ No vendor key is bundled. Eight providers are preset: DeepSeek (default), GLM, Q
 
 ## How it works
 
-A light index is built on upload. At query time the agent reads the source live and verifies every citation:
+A light index is built on upload. At query time the agent reads the source live and verifies every citation against it before showing anything.
 
-- fits the context window → the whole book goes into the prompt, behind a stable prefix cache that saves tokens on repeat questions
-- too large → BM25 + vector hybrid retrieval
+For the whole-book maps (relationships, curves, foreshadowing), there's a second path: the book is read closely once into an evidence-anchored per-chapter structure, and every map is derived from that one read — no re-reading the whole book per view. So multi-million-word web novels work too; you're told up front how big the book is and that the first run reads it once, then it's cached and instant.
 
 ## Docs
 
