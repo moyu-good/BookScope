@@ -24,10 +24,16 @@ _CHUNKS = [
 
 
 def _no_llm(monkeypatch):
-    """把四个数据源默认 patch 成返空，单测各自再覆盖需要的那一个。"""
-    monkeypatch.setattr(ann, "generate_foreshadow_arcs", lambda **_: None)
+    """把数据源默认 patch 成返空,单测各自再覆盖需要的那一个。
+
+    伏笔/矛盾已改章脉派生(``foreshadow_from_spine``/``consistency_scan_from_spine``);
+    编排器会先建 spine,这里把 ``get_or_build_spine`` patch 成返个非空 spine,from_spine
+    的 mock 用 ``**_`` 收掉 spine 参数。
+    """
+    monkeypatch.setattr(ann, "get_or_build_spine", lambda **_: [{"chapter": 1}])
+    monkeypatch.setattr(ann, "foreshadow_from_spine", lambda **_: None)
     monkeypatch.setattr(ann, "generate_motif_tracking", lambda **_: [])
-    monkeypatch.setattr(ann, "generate_consistency_scan", lambda **_: [])
+    monkeypatch.setattr(ann, "consistency_scan_from_spine", lambda **_: [])
     monkeypatch.setattr(ann, "generate_entity_recall", lambda **_: [])
 
 
@@ -45,7 +51,7 @@ def _run(layers, **kw):
 def test_foreshadow_resolved_arc_maps_with_target(monkeypatch):
     """已回收实弧 → 埋点处一条注释 + target_* 指向回收处。"""
     _no_llm(monkeypatch)
-    monkeypatch.setattr(ann, "generate_foreshadow_arcs", lambda **_: [
+    monkeypatch.setattr(ann, "foreshadow_from_spine", lambda **_: [
         {
             "description": "断剑认主",
             "setup_chapter": 2, "payoff_chapter": 9,
@@ -74,7 +80,7 @@ def test_foreshadow_resolved_arc_maps_with_target(monkeypatch):
 def test_foreshadow_dangling_arc_no_target(monkeypatch):
     """断弧（埋了没回收）→ 一条注释、无 target。"""
     _no_llm(monkeypatch)
-    monkeypatch.setattr(ann, "generate_foreshadow_arcs", lambda **_: [
+    monkeypatch.setattr(ann, "foreshadow_from_spine", lambda **_: [
         {
             "description": "白衣郎中", "setup_chapter": 4, "payoff_chapter": None,
             "setup_evidence": "白衣郎中看了手相便走", "payoff_evidence": "",
@@ -97,7 +103,7 @@ def test_foreshadow_dangling_arc_no_target(monkeypatch):
 def test_anchor_approx_when_snippet_not_verbatim_in_chapter(monkeypatch):
     """snippet 不是所属章原文的逐字子串（转述）→ anchor=approx，不冒充精确位置。"""
     _no_llm(monkeypatch)
-    monkeypatch.setattr(ann, "generate_foreshadow_arcs", lambda **_: [
+    monkeypatch.setattr(ann, "foreshadow_from_spine", lambda **_: [
         {
             # setup_evidence 是转述、不是第二章原文逐字（原文是"墙角断剑落满灰尘"）
             "description": "断剑转述", "setup_chapter": 2, "payoff_chapter": None,
@@ -137,7 +143,7 @@ def test_foreshadow_failure_returns_no_annotations(monkeypatch):
 def test_contradiction_maps_both_sides(monkeypatch):
     """设定矛盾 → a 侧一条注释 + target_* 指向 b 侧。"""
     _no_llm(monkeypatch)
-    monkeypatch.setattr(ann, "generate_consistency_scan", lambda **_: [
+    monkeypatch.setattr(ann, "consistency_scan_from_spine", lambda **_: [
         {
             "topic": "断剑归属", "conflict": "第2章说断剑无主、第9章说认主",
             "a": {"snippet": "墙角断剑落满灰尘", "chapter": 2, "verified": True},
@@ -160,7 +166,7 @@ def test_contradiction_maps_both_sides(monkeypatch):
 def test_target_anchor_approx_when_target_not_verbatim(monkeypatch):
     """跨章 target_snippet 不是 target 章原文逐字 → target_anchor=approx（独立于 anchor）。"""
     _no_llm(monkeypatch)
-    monkeypatch.setattr(ann, "generate_consistency_scan", lambda **_: [
+    monkeypatch.setattr(ann, "consistency_scan_from_spine", lambda **_: [
         {
             "topic": "x", "conflict": "y",
             # a 侧逐字命中第二章，b 侧是第九章原文的转述（原文"少年拔起断剑认主"）
@@ -177,7 +183,7 @@ def test_target_anchor_approx_when_target_not_verbatim(monkeypatch):
 def test_contradiction_drops_unverified_side(monkeypatch):
     """一侧未核验 → evidence-first 整条丢。"""
     _no_llm(monkeypatch)
-    monkeypatch.setattr(ann, "generate_consistency_scan", lambda **_: [
+    monkeypatch.setattr(ann, "consistency_scan_from_spine", lambda **_: [
         {
             "topic": "x", "conflict": "y",
             "a": {"snippet": "墙角断剑落满灰尘", "chapter": 2, "verified": True},
@@ -245,7 +251,7 @@ def test_layer_exception_skipped(monkeypatch):
 
     def _boom(**_):
         raise RuntimeError("source blew up")
-    monkeypatch.setattr(ann, "generate_consistency_scan", _boom)
+    monkeypatch.setattr(ann, "consistency_scan_from_spine", _boom)
     monkeypatch.setattr(ann, "generate_motif_tracking", lambda **_: [
         {"order": 1, "chapter": 2, "manifestation": "x",
          "snippet": "墙角断剑落满灰尘", "verified": True},
@@ -259,7 +265,7 @@ def test_layer_exception_skipped(monkeypatch):
 def test_annotations_sorted_by_chapter_then_layer(monkeypatch):
     """多层多条 → 按 (chapter, layer) 排序。"""
     _no_llm(monkeypatch)
-    monkeypatch.setattr(ann, "generate_foreshadow_arcs", lambda **_: [
+    monkeypatch.setattr(ann, "foreshadow_from_spine", lambda **_: [
         {
             "description": "晚埋", "setup_chapter": 9, "payoff_chapter": None,
             "setup_evidence": "少年拔起断剑认主", "payoff_evidence": "",

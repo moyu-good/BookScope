@@ -26,10 +26,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
+from bookscope.agent.chapter_spine_consistency import consistency_scan_from_spine
+from bookscope.agent.chapter_spine_foreshadow import foreshadow_from_spine
 from bookscope.agent.citation_check import normalize_text
-from bookscope.agent.consistency_scan import generate_consistency_scan
 from bookscope.agent.entity_recall import generate_entity_recall
-from bookscope.agent.foreshadow_arcs import generate_foreshadow_arcs
 from bookscope.agent.motif_tracking import generate_motif_tracking
 
 logger = logging.getLogger(__name__)
@@ -41,37 +42,31 @@ DEFAULT_LAYERS: tuple[str, ...] = ("foreshadow", "contradiction")
 
 def _foreshadow_annotations(
     *,
-    full_text: str,
-    chunks: list[dict[str, Any]],
+    spine: list[dict[str, Any]],
     llm_client: Any,
     model: str,
-    session_id: str | None,
 ) -> list[dict[str, Any]]:
-    """伏笔弧 → 注释。埋点处一条注释；resolved 实弧带 target_* 指向回收处。"""
-    arcs = generate_foreshadow_arcs(
-        full_text=full_text,
-        chunks=chunks,
-        llm_client=llm_client,
-        model=model,
-        session_id=session_id,
-    )
+    """伏笔弧 → 注释。埋点处一条注释；resolved 实弧带 target_* 指向回收处。
+
+    数据源改章脉派生（``foreshadow_from_spine``，跨章配对,不再 map-reduce 逐段盲)。章脉弧的
+    两端 evidence 是建 spine 时已核验的章级证据,这里全收;snippet 是否逐字命中由下游 anchor
+    逻辑判 exact/approx(approx 退批注栏不进行间),所以不在这里按 verified 滤。
+    """
+    arcs = foreshadow_from_spine(spine=spine, llm_client=llm_client, model=model)
     if not arcs:  # None（失败）或 []（没挂得上原文的伏笔）——都没注释
         return []
     out: list[dict[str, Any]] = []
     for arc in arcs:
-        # 埋点核不过的整条弧 BE 已滤掉，到这里 setup 必 verified；保险再判一次。
-        if not arc.get("setup_verified"):
-            continue
-        resolved = arc.get("status") == "resolved" and arc.get("payoff_verified")
+        resolved = arc.get("status") == "resolved"
         out.append({
             "layer": "foreshadow",
             "type": "伏笔回收" if resolved else "断弧",
             "chapter": arc["setup_chapter"],
-            "snippet": arc["setup_evidence"],
+            "snippet": arc.get("setup_evidence", ""),
             "summary": arc.get("description", ""),
             # 跨章：已回收实弧指向回收处；断弧没回收，target 留空
-            "target_chapter": arc["payoff_chapter"] if resolved else None,
-            "target_snippet": arc["payoff_evidence"] if resolved else None,
+            "target_chapter": arc.get("payoff_chapter") if resolved else None,
+            "target_snippet": arc.get("payoff_evidence", "") if resolved else None,
         })
     return out
 
@@ -117,19 +112,17 @@ def _motif_annotations(
 
 def _contradiction_annotations(
     *,
-    full_text: str,
-    chunks: list[dict[str, Any]],
+    spine: list[dict[str, Any]],
     llm_client: Any,
     model: str,
-    session_id: str | None,
 ) -> list[dict[str, Any]]:
-    """设定矛盾 → 注释。a 侧一条注释，target_* 指向 b 侧（两侧都已 verified）。"""
-    contradictions = generate_consistency_scan(
-        full_text=full_text,
-        chunks=chunks,
-        llm_client=llm_client,
-        model=model,
-        session_id=session_id,
+    """设定矛盾 → 注释。a 侧一条注释，target_* 指向 b 侧（两侧都已 verified）。
+
+    数据源改章脉派生（``consistency_scan_from_spine``)——整本单次大书截断,章脉一次全局扫得到
+    全书。矛盾形态不变(a/b 各带 chapter/snippet/verified),下面映射照旧。
+    """
+    contradictions = consistency_scan_from_spine(
+        spine=spine, llm_client=llm_client, model=model
     )
     if not contradictions:
         return []
@@ -302,12 +295,16 @@ def generate_annotations(
     annotations: list[dict[str, Any]] = []
     scanned: list[str] = []
 
+    # 伏笔 / 矛盾两层走章脉派生,循环前建一次共享 spine(多半已为别功能缓存);其它层不需要。
+    spine: list[dict[str, Any]] = []
+    if {"foreshadow", "contradiction"} & set(wanted):
+        spine = get_or_build_spine(chunks=chunks, llm_client=llm_client, model=model) or []
+
     for layer in wanted:
         try:
             if layer == "foreshadow":
                 part = _foreshadow_annotations(
-                    full_text=full_text, chunks=chunks,
-                    llm_client=llm_client, model=model, session_id=session_id,
+                    spine=spine, llm_client=llm_client, model=model,
                 )
             elif layer == "motif":
                 part = _motif_annotations(
@@ -316,8 +313,7 @@ def generate_annotations(
                 )
             elif layer == "contradiction":
                 part = _contradiction_annotations(
-                    full_text=full_text, chunks=chunks,
-                    llm_client=llm_client, model=model, session_id=session_id,
+                    spine=spine, llm_client=llm_client, model=model,
                 )
             else:  # entity
                 part = _entity_annotations(
