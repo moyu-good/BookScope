@@ -778,7 +778,10 @@ async def agent_character_graph(
         rec = _UsageRecorder(client)
         _t0 = time.monotonic()
         spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-        g = relationship_graph_from_spine(spine, name_map=_kg_name_map(assembler))
+        # top_n=40:大书章脉会抽出几百个露面的人,关系图按连接度收到主要 ~40 个画,免得糊成一团。
+        g = relationship_graph_from_spine(
+            spine, name_map=_kg_name_map(assembler), top_n=40
+        )
         edges = [
             GraphEdge(
                 source=e["source"],

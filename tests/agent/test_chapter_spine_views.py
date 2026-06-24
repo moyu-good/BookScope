@@ -102,6 +102,32 @@ def test_relationship_graph_canonicalizes_aliases() -> None:
     assert {"刘备", "关羽"} in edge_pairs and {"刘备", "曹操"} in edge_pairs
 
 
+def test_relationship_graph_top_n_keeps_most_connected() -> None:
+    # 甲是中心(跟乙丙丁都有边),戊只跟己有一条弱边。top_n=3 应保住甲乙丙丁里连接度高的、砍掉边角
+    spine = [
+        {"chapter": 1, "present": ["甲", "乙", "丙", "丁"],
+         "relations": [{"pair": ["甲", "乙"], "note": "x"}, {"pair": ["甲", "丙"], "note": "x"},
+                       {"pair": ["甲", "丁"], "note": "x"}]},
+        {"chapter": 2, "present": ["甲", "乙"], "relations": [{"pair": ["甲", "乙"], "note": "y"}]},
+        {"chapter": 9, "present": ["戊", "己"], "relations": [{"pair": ["戊", "己"], "note": "z"}]},
+    ]
+    g = relationship_graph_from_spine(spine, top_n=3)
+    names = {n["name"] for n in g["nodes"]}
+    assert len(names) == 3
+    assert "甲" in names                         # 连接度最高,必留
+    assert "戊" not in names and "己" not in names  # 边角弱边,砍掉
+    # 留下的边都在保留节点之间
+    for e in g["edges"]:
+        assert e["source"] in names and e["target"] in names
+
+
+def test_relationship_graph_top_n_noop_when_under_limit() -> None:
+    spine = [{"chapter": 1, "present": ["甲", "乙"],
+              "relations": [{"pair": ["甲", "乙"], "note": "x"}]}]
+    g = relationship_graph_from_spine(spine, top_n=40)
+    assert {n["name"] for n in g["nodes"]} == {"甲", "乙"}   # 没超限,全留
+
+
 def test_narrative_flow_canonicalizes_aliases() -> None:
     spine = [{"chapter": 1, "present": ["玄德", "刘备", "关羽"],
               "relations": [{"pair": ["玄德", "关羽"], "note": "x"}]}]

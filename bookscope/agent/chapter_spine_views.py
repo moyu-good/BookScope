@@ -100,13 +100,19 @@ def _canon(name: str, name_map: dict[str, str] | None) -> str:
 
 
 def relationship_graph_from_spine(
-    spine: list[dict[str, Any]], name_map: dict[str, str] | None = None
+    spine: list[dict[str, Any]],
+    name_map: dict[str, str] | None = None,
+    top_n: int | None = None,
 ) -> dict[str, Any]:
     """关系图视图:把章脉逐章 relations 聚合成 nodes + edges(章级锚,证据点开现取)。
 
     edge = 一对人物跨章的并集:``{source, target, chapters:[出现的章], notes:[每章一句], weight}``。
     weight = 出现章数(画粗细)。节点 = 所有露面人物。不带 upfront evidence(出路 B)。
     ``name_map``(别名→canonical,来自 KG)合并 玄德/刘备/先主 这类碎裂别名。
+
+    ``top_n``:章脉人物维把每章每个露面的人(连小角色/称呼变体)都抽进来,大书几百个节点画成一团
+    乱麻、也截不出干净图。设了就**按连接度(总边权重)取前 top_n 个主要人物 + 他们之间的边**显示
+    ——全量数据在章脉里留着,这里只收显示主干(同叙事流 TOP 18 的做法)。
     """
     nodes: dict[str, int] = {}          # name -> 出现次数(节点大小)
     edges: dict[tuple[str, str], dict[str, Any]] = {}
@@ -138,6 +144,19 @@ def relationship_graph_from_spine(
                 e["notes"].append(note)
     for e in edges.values():
         e["chapters"].sort()
+
+    if top_n is not None and len(nodes) > top_n:
+        # 按连接度(节点上所有边的 weight 之和)取前 top_n,同分用 mentions 兜底
+        degree: dict[str, int] = {}
+        for e in edges.values():
+            degree[e["source"]] = degree.get(e["source"], 0) + e["weight"]
+            degree[e["target"]] = degree.get(e["target"], 0) + e["weight"]
+        kept = set(
+            sorted(nodes, key=lambda n: (degree.get(n, 0), nodes[n]), reverse=True)[:top_n]
+        )
+        nodes = {n: c for n, c in nodes.items() if n in kept}
+        edges = {k: e for k, e in edges.items() if e["source"] in kept and e["target"] in kept}
+
     return {
         "nodes": [{"name": n, "mentions": c} for n, c in sorted(nodes.items())],
         "edges": sorted(edges.values(), key=lambda e: (-e["weight"], e["source"])),
