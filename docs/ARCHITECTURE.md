@@ -93,28 +93,35 @@ KG 抽取是上传链路上唯一的重 LLM 步骤，也是首次上传耗时的
 
 ---
 
-## 主链路三：整本书结构化功能（12 个深读功能）
+## 主链路三：整本书结构化功能（关系图 / 曲线 / 伏笔…）
 
-「问书」之外的 12 个功能（关系图 / 时间线 / 节奏 / 一致性 / 实体回溯 / 前情回顾 / 母题追踪 / 论点结构 / 概念演进 / 写作手法 / 知识卡片 / 文体体检）走另一套机制，**不进 agent 循环**：
+「问书」之外的全书功能走另一套机制，**不进 agent 循环**。1.x 起（ADR-010 章脉转向）分两条路：
+
+### A. 从「章脉」派生（叙事曲线 / 节奏 / 叙事流 / 关系图）
+
+整本只精读一次，出一份带原文证据的逐章结构「章脉」，各视图从它派生——不再每个功能各跑一遍全书（旧法十个功能把整本 input 重发十遍）。
 
 ```
-请求（book_session_id + 可选一个词，如实体名 / 读到第几章）
- │
- ├─ 取整本书 cleaned 原文 + 全书 chunks（当证据 + 章号 ground truth）
- ├─ 整本进 system 固定段（长上下文、缓存友好）→ 一次 LLM 调用
- ├─ 要结构化 JSON（图 / 列表 / 曲线点）→ 省下游 parse 散文
- ├─ verify_citations：每条结论的 evidence 逐条核验 + 章号纠偏
- │     └─ 判断类功能（矛盾 / 伏笔 / 手法…）核验不过的直接丢（命根子守卫）
- └─ 返回结构化结果 + trace（input/output tokens + chars + duration_ms）
+传书后首次：build_chapter_spine ── 分维 map-reduce(人物维 + 情节维)逐段抽 → 按真章号合并 → 章脉
+              （D-7 按字数+章数双闸切段防输出截断;book-first 书在前指令在后,DeepSeek 前缀缓存复用）
+缓存(book 级,接 L3)：同书重开秒出,不重抽
+派生视图：relationship_graph_from_spine / narrative_curve_from_spine / …(纯计算,0 次 LLM)
+点开现取：章级锚视图(关系图边 / 叙事流同场对)不带 upfront 证据,前端点开调 /agent/spine-evidence
+          现取那一章的支撑句(纯检索,出路 B,贴「查询时证据现场取」)
 ```
+
+**几百万字的书也跑得动**（map-reduce 分段，不需整本塞进窗口）；首次精读一遍是固有成本（前端大书提醒条会提前告诉用户），读完缓存住、之后各视图秒出。
+
+### B. 各跑全书（时间线 / 伏笔 / 支线 / 实体 / 母题 / 概念 / 一致性 / 论点 / 文体 / 知识卡 / 改稿 / 前情 / 声口）
+
+需要跨章 / 跨时序推理或 query-scoped 的功能**不能**从逐章章脉 naive 派生（时间线要把倒叙还原成真实时序、伏笔要 setup→payoff 跨章配对），仍走「分段 map-reduce + 结构化 JSON + 条粒度证据核验」。
 
 | 关注点 | 说明 |
 |--------|------|
-| 端点 | `bookscope/api/routes/agent.py` 下的 `/agent/*` 端点：character-graph / timeline / pacing-curve / consistency-scan / entity-recall / recap / motif-tracking / argument-structure / concept-evolution / writing-technique / study-cards / style-issues（+ suggest-questions 出诊断题） |
-| 模块 | 每个功能一个模块（`character_graph.py` / `timeline.py` / `pacing_curve.py` / …），共用「整本进 context + 结构化 JSON + 条粒度证据核验」骨架 |
-| 三道可靠性守卫 | ① max_tokens 给够（结构化输出长，截断了抢救已闭合的条目）② 关缓存防坏响应 poison ③ 失败重试 |
-| 运行用量 | `_UsageRecorder` 把 LLM client 包一层，旁路记每次调用的 token，组装进响应 `trace`，前端「运行过程可视化」据此显示读了多少字 / 花了多少 token |
-| 适用范围 | 需要整本进上下文，只支持塞得进所选模型上下文窗口的书；超大书返回明确提示，不硬上 |
+| 端点 | `bookscope/api/routes/agent.py` 下的 `/agent/*`：character-graph / character-flow / narrative-curve / pacing-curve（走 A 章脉）· timeline / foreshadow-arcs / subplot-weave / entity-recall / recap / motif-tracking / argument-structure / concept-evolution / writing-technique / study-cards / style-issues / character-voice（走 B）· spine-evidence（A 的点开取证，纯检索不调 LLM） |
+| 章脉模块 | `chapter_spine.py`(建)/ `_internal/chapter_spine_cache.py`(缓存)/ `chapter_spine_views.py`(派生)/ `chapter_spine_canon.py`(别名合并)/ `chapter_spine_evidence.py`(取证) |
+| 三道可靠性守卫 | ① max_tokens 给够 + D-7 章闸（结构化输出长，截断了抢救已闭合的条目）② 关缓存防坏响应 poison ③ 失败重试 |
+| 运行用量 | `_UsageRecorder` 把 LLM client 包一层，旁路记每次调用的 token，组装进响应 `trace`，前端据此显示读了多少字 / 花了多少 token |
 
 ---
 
@@ -126,8 +133,9 @@ KG 抽取是上传链路上唯一的重 LLM 步骤，也是首次上传耗时的
 | L2 | `_internal/llm_cache.py` | LLM 调用结果 | model+system+messages 的 hash (SQLite 持久化) | 每次调 LLM 前 |
 | L2.5 | 同上 | — | prompt_version | prompt 升级时按版本失效 |
 | L3 | `_internal/book_cache.py` | 整本书装配体(WarmedBook) | session_id (LRU+磁盘pickle) | 读 session 时(非上传) |
+| 章脉 | `_internal/chapter_spine_cache.py` | 整本精读出的逐章章脉(list[dict]) | chunks文本+model+genre 的 hash (SQLite,同 kg_cache.db 不同表) | 派生视图建图前；同书一次后命中 |
 
-DeepSeek 前缀缓存：system 固定段不变以保命中，多轮对话前情提要接 system 末尾可变段（保前缀稳定）。
+DeepSeek 前缀缓存：长上下文的 system 固定段、章脉抽取的 book-first 前缀都保持 byte 一致以保命中（实测同段重读 ~100% 命中）；多轮对话前情提要接 system 末尾可变段（保前缀稳定）。
 
 ---
 
@@ -143,8 +151,8 @@ DeepSeek 前缀缓存：system 固定段不变以保命中，多轮对话前情�
 
 ## 已知限制与演进方向
 
-- **整本书结构化功能需要整本进上下文**——只支持塞得进所选模型上下文窗口的书；超大书部分功能不可用，会返回明确提示。
-- **首次上传偏慢**——主要耗在 KG 抽取这一步的重 LLM 调用；重开同一本书走 L3 缓存即快。
+- **几百万字大书的全书功能首次跑慢且费**——章脉转向(ADR-010)后改 map-reduce 分段,大书不再"不可用",但首次要把整本精读一遍(读一遍书的固有成本,DeepSeek 前缀缓存救不了第一次读);读完章脉缓存住、之后各视图秒出。前端大书提醒条提前告诉用户这一次性成本。
+- **首次上传偏慢**——主要耗在 KG 抽取这一步的重 LLM 调用;重开同一本书走 L3 缓存即快。
 - **深度诊断题延迟偏高**——现场读原文 + 多轮推理，不是查缓存；问题更具体能更快。
 - **session 是内存态**——后端进程重启后已上传的书要重新上传（持久化是后续方向）。
 - **引用核验目前做存在性（recall 侧）**——拿引文比对原文判「是否真有」；论断支撑度（precision 侧）由 `/agent/check-citations` 在答完后补判。
