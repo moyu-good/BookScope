@@ -53,6 +53,7 @@ from bookscope.agent.argument_structure import generate_argument_structure_exhau
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.chapter_spine_canon import build_spine_name_map
 from bookscope.agent.chapter_spine_concept import concept_evolution_from_spine
+from bookscope.agent.chapter_spine_concept_graph import concept_graph_from_spine
 from bookscope.agent.chapter_spine_consistency import consistency_scan_from_spine
 from bookscope.agent.chapter_spine_dropped_thread import dropped_threads_from_spine
 from bookscope.agent.chapter_spine_evidence import evidence_for_event, evidence_for_pair
@@ -806,7 +807,24 @@ async def agent_character_graph(
             trace=trace,
         )
 
-    # 概念图:无 KG canonical 清单,逐段自识别,各跑全书(章脉不覆盖概念关系)。
+    # 概念图:章脉概念维(claims)派生,一次全局推理出跨章概念关系(逐段抽看不见跨段勾连)。
+    # claims 只在 genre="theory" 章脉里有 → 这条 theory-spine 和人物图等默认 fiction-spine 分裂
+    # 缓存(同书两条),是已知取舍:理论书概念图天然要 theory 维、小说功能在理论书上本就不用。
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model, genre="theory")
+    g = concept_graph_from_spine(spine=spine, llm_client=rec, model=model)
+    if g is not None:
+        trace = _run_trace(rec, full_text, _t0)
+        trace["total_edges"] = len(g["edges"])
+        return CharacterGraphResponse(
+            nodes=g["nodes"],
+            edges=[GraphEdge(**e) for e in g["edges"]],
+            book_session_id=request.book_session_id,
+            trace=trace,
+        )
+
+    # 降级:章脉没 claims(不是理论书 / theory 维没抽出)→ 回老的逐段抽全书。
     result = extract_character_graph_exhaustive(
         chunks=chunks,
         llm_client=client,
