@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 
 from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
-from bookscope.agent.backends.minimal_kg_extractor import MinimalKGExtractor
+from bookscope.agent.chapter_spine_canon import build_spine_name_map
 from bookscope.agent.chapter_spine_evidence import evidence_for_pair
 from bookscope.agent.chapter_spine_views import relationship_graph_from_spine
 from bookscope.api.dependencies import build_llm_client_from_params, default_model_for
@@ -41,17 +41,10 @@ def main() -> None:
     )
     model = default_model_for("deepseek")
     spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model)  # 缓存命中
-    kg = MinimalKGExtractor(client=client, model=model).extract(chunk_res, "三国演义")
-    name_map: dict[str, str] = {}
-    for c in kg.characters:
-        canon = str(c.name).strip()
-        if canon:
-            name_map[canon] = canon
-            for a in c.aliases or []:
-                if str(a).strip():
-                    name_map[str(a).strip()] = canon
+    # 跟产品端点一致:build_spine_name_map 判同人合别名,不设人数帽(去孤立点后画全部有关系的人)。
+    name_map = build_spine_name_map(spine=spine, llm_client=client, model=model)
 
-    g = relationship_graph_from_spine(spine, name_map=name_map, top_n=40)
+    g = relationship_graph_from_spine(spine, name_map=name_map)
 
     edges = []
     for e in g["edges"]:
