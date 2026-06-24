@@ -778,7 +778,7 @@ async def agent_character_graph(
         rec = _UsageRecorder(client)
         _t0 = time.monotonic()
         spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-        g = relationship_graph_from_spine(spine)
+        g = relationship_graph_from_spine(spine, name_map=_kg_name_map(assembler))
         edges = [
             GraphEdge(
                 source=e["source"],
@@ -880,7 +880,7 @@ async def agent_character_flow(
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-    chapters = narrative_flow_from_spine(spine)
+    chapters = narrative_flow_from_spine(spine, name_map=_kg_name_map(assembler))
     return CharacterFlowResponse(
         chapters=chapters or [],
         scanned=bool(spine),
@@ -2302,6 +2302,25 @@ def _run_trace(rec: _UsageRecorder, full_text: str, started: float) -> dict[str,
         "chars": len(full_text),
         "duration_ms": int((time.monotonic() - started) * 1000),
     }
+
+
+def _kg_name_map(assembler: R0BookAssembler) -> dict[str, str]:
+    """从上传时建好的 KG 建 别名→canonical 人名表,给章脉派生的人物图/叙事流合并别名。
+
+    KG 的 MinimalKGExtractor 已做过 canonical 合并,每个 CharacterProfile 带 name + aliases。
+    玄德/先主 → 刘备。章脉是逐章抽的、每章称呼可能不一,不合并会碎成多节点(ADR-010 整合隐患)。
+    """
+    name_map: dict[str, str] = {}
+    for c in assembler._kg.characters:  # noqa: SLF001 — 同既有路由取数惯例
+        canonical = str(getattr(c, "name", "")).strip()
+        if not canonical:
+            continue
+        name_map[canonical] = canonical
+        for alias in getattr(c, "aliases", []) or []:
+            a = str(alias).strip()
+            if a:
+                name_map[a] = canonical
+    return name_map
 
 
 def _resolve_assembler(

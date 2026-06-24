@@ -88,11 +88,25 @@ def _norm_pair(a: str, b: str) -> tuple[str, str]:
     return (a, b) if a <= b else (b, a)
 
 
-def relationship_graph_from_spine(spine: list[dict[str, Any]]) -> dict[str, Any]:
+def _canon(name: str, name_map: dict[str, str] | None) -> str:
+    """别名合并:玄德/先主 → 刘备(用 KG 的 别名→canonical 表)。没表或没命中就原样。
+
+    章脉的 relations/present 是逐章抽的,模型每章可能给不同称呼(玄德/刘备/先主),不合并就
+    碎成好几个节点(三国实测 702 节点,其中大量别名碎裂)。老的专门抽边路径喂 KG canonical 表
+    合并过,迁章脉时丢了这步——这里补回来(ADR-010 整合发现的隐患)。
+    """
+    n = name.strip()
+    return name_map.get(n, n) if name_map else n
+
+
+def relationship_graph_from_spine(
+    spine: list[dict[str, Any]], name_map: dict[str, str] | None = None
+) -> dict[str, Any]:
     """关系图视图:把章脉逐章 relations 聚合成 nodes + edges(章级锚,证据点开现取)。
 
     edge = 一对人物跨章的并集:``{source, target, chapters:[出现的章], notes:[每章一句], weight}``。
     weight = 出现章数(画粗细)。节点 = 所有露面人物。不带 upfront evidence(出路 B)。
+    ``name_map``(别名→canonical,来自 KG)合并 玄德/刘备/先主 这类碎裂别名。
     """
     nodes: dict[str, int] = {}          # name -> 出现次数(节点大小)
     edges: dict[tuple[str, str], dict[str, Any]] = {}
@@ -102,14 +116,15 @@ def relationship_graph_from_spine(spine: list[dict[str, Any]]) -> dict[str, Any]
             continue
         for name in rec.get("present", []) or []:
             if isinstance(name, str) and name.strip():
-                nodes[name.strip()] = nodes.get(name.strip(), 0) + 1
+                cn = _canon(name, name_map)
+                nodes[cn] = nodes.get(cn, 0) + 1
         for rel in rec.get("relations", []) or []:
             if not isinstance(rel, dict):
                 continue
             pair = rel.get("pair")
             if not (isinstance(pair, list) and len(pair) == 2):
                 continue
-            a, b = str(pair[0]).strip(), str(pair[1]).strip()
+            a, b = _canon(str(pair[0]), name_map), _canon(str(pair[1]), name_map)
             if not a or not b or a == b:
                 continue
             key = _norm_pair(a, b)
@@ -129,14 +144,24 @@ def relationship_graph_from_spine(spine: list[dict[str, Any]]) -> dict[str, Any]
     }
 
 
-def narrative_flow_from_spine(spine: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """叙事流视图:逐章 ``{chapter, present:[人名], pairs:[{a,b}]}``(章级锚,证据点开现取)。"""
+def narrative_flow_from_spine(
+    spine: list[dict[str, Any]], name_map: dict[str, str] | None = None
+) -> list[dict[str, Any]]:
+    """叙事流视图:逐章 ``{chapter, present:[人名], pairs:[{a,b}]}``(章级锚,证据点开现取)。
+
+    ``name_map``(别名→canonical,来自 KG)合并 玄德/刘备 这类碎裂别名(同关系图)。
+    """
     out: list[dict[str, Any]] = []
     for rec in spine:
         ch = rec.get("chapter")
         if not isinstance(ch, int):
             continue
-        present = [str(n).strip() for n in (rec.get("present") or []) if str(n).strip()]
+        present_seen: dict[str, None] = {}
+        for n in rec.get("present") or []:
+            cn = _canon(str(n), name_map)
+            if cn:
+                present_seen.setdefault(cn, None)
+        present = list(present_seen)
         pairs: list[dict[str, str]] = []
         seen: set[tuple[str, str]] = set()
         for rel in rec.get("relations", []) or []:
@@ -145,7 +170,7 @@ def narrative_flow_from_spine(spine: list[dict[str, Any]]) -> list[dict[str, Any
             pair = rel.get("pair")
             if not (isinstance(pair, list) and len(pair) == 2):
                 continue
-            a, b = str(pair[0]).strip(), str(pair[1]).strip()
+            a, b = _canon(str(pair[0]), name_map), _canon(str(pair[1]), name_map)
             if not a or not b or a == b:
                 continue
             key = _norm_pair(a, b)

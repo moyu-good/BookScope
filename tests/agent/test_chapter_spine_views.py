@@ -84,6 +84,33 @@ def test_narrative_flow_present_and_pairs() -> None:
     assert {c1["pairs"][0]["a"], c1["pairs"][0]["b"]} == {"刘备", "关羽"}
 
 
+def test_relationship_graph_canonicalizes_aliases() -> None:
+    # 玄德/先主 应并到 刘备(name_map 来自 KG),别名碎裂收掉
+    spine = [
+        {"chapter": 1, "present": ["玄德", "关羽"],
+         "relations": [{"pair": ["玄德", "关羽"], "note": "结义"}]},
+        {"chapter": 2, "present": ["先主", "曹操"],
+         "relations": [{"pair": ["先主", "曹操"], "note": "对峙"}]},
+    ]
+    nm = {"玄德": "刘备", "先主": "刘备", "刘备": "刘备"}
+    g = relationship_graph_from_spine(spine, name_map=nm)
+    names = {n["name"] for n in g["nodes"]}
+    assert "玄德" not in names and "先主" not in names      # 别名没漏
+    assert "刘备" in names
+    # 刘备-关羽、刘备-曹操 两条边(玄德/先主 都归到刘备)
+    edge_pairs = {frozenset((e["source"], e["target"])) for e in g["edges"]}
+    assert {"刘备", "关羽"} in edge_pairs and {"刘备", "曹操"} in edge_pairs
+
+
+def test_narrative_flow_canonicalizes_aliases() -> None:
+    spine = [{"chapter": 1, "present": ["玄德", "刘备", "关羽"],
+              "relations": [{"pair": ["玄德", "关羽"], "note": "x"}]}]
+    nm = {"玄德": "刘备"}
+    out = narrative_flow_from_spine(spine, name_map=nm)
+    assert out[0]["present"] == ["刘备", "关羽"]            # 玄德+刘备 去重成刘备
+    assert {out[0]["pairs"][0]["a"], out[0]["pairs"][0]["b"]} == {"刘备", "关羽"}
+
+
 def test_timeline_flattens_events_by_chapter() -> None:
     spine = [
         {"chapter": 2, "events": [{"event": "对峙", "evidence": "x"}]},
