@@ -52,8 +52,13 @@ from bookscope.agent.annotations import generate_annotations
 from bookscope.agent.argument_structure import generate_argument_structure_exhaustive
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.chapter_spine_canon import build_spine_name_map
+from bookscope.agent.chapter_spine_concept import concept_evolution_from_spine
+from bookscope.agent.chapter_spine_consistency import consistency_scan_from_spine
 from bookscope.agent.chapter_spine_evidence import evidence_for_event, evidence_for_pair
 from bookscope.agent.chapter_spine_foreshadow import foreshadow_from_spine
+from bookscope.agent.chapter_spine_relationship import relationship_timeline_from_spine
+from bookscope.agent.chapter_spine_subplot import subplot_weave_from_spine
+from bookscope.agent.chapter_spine_timeline import timeline_from_spine
 from bookscope.agent.chapter_spine_views import (
     narrative_curve_from_spine,
     narrative_flow_from_spine,
@@ -66,8 +71,6 @@ from bookscope.agent.character_graph import (
 )
 from bookscope.agent.character_voice import generate_character_voice
 from bookscope.agent.claim_support import check_claim_support
-from bookscope.agent.concept_evolution import generate_concept_evolution
-from bookscope.agent.consistency_scan import generate_consistency_scan
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
 from bookscope.agent.long_context import run_long_context
@@ -75,14 +78,9 @@ from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.orchestrate import orchestrate
 from bookscope.agent.question_processor import rewrite_followup
 from bookscope.agent.recap import generate_recap
-from bookscope.agent.relationship_timeline import (
-    generate_relationship_timeline_exhaustive,
-)
 from bookscope.agent.study_cards import generate_study_cards
 from bookscope.agent.style_issues import generate_style_issues
-from bookscope.agent.subplot_weave import generate_subplot_weave_exhaustive
 from bookscope.agent.suggested_questions import generate_book_questions
-from bookscope.agent.timeline import generate_timeline_exhaustive
 from bookscope.agent.writing_technique import generate_writing_technique
 from bookscope.api.book_sessions import BookSessionNotFound, BookSessionStore
 from bookscope.api.conversation_store import (
@@ -940,11 +938,9 @@ async def agent_subplot_weave(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    weave = generate_subplot_weave_exhaustive(
-        chunks=chunks,
-        llm_client=rec,
-        model=model,
-    )
+    # 支线交汇天生跨段——从章脉全书梗概一次全局找(map-reduce 逐段看不见远段交汇)。
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    weave = subplot_weave_from_spine(spine=spine, llm_client=rec, model=model)
     return SubplotWeaveResponse(
         subplots=(weave or {}).get("subplots", []),
         intersections=(weave or {}).get("intersections", []),
@@ -1414,14 +1410,14 @@ async def agent_relationship_timeline(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    relations = generate_relationship_timeline_exhaustive(
-        chunks=chunks,
-        llm_client=rec,
-        model=model,
+    # 关系强度是累积量(截至此章),map-reduce 逐段算不对(段间看不见)——章脉逐对全局推理。
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    result = relationship_timeline_from_spine(
+        spine=spine, chunks=chunks, llm_client=rec, model=model
     )
     return RelationshipTimelineResponse(
-        relations=relations or [],
-        scanned=relations is not None,
+        relations=(result or {}).get("relations", []),
+        scanned=result is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
@@ -1472,13 +1468,9 @@ async def agent_consistency_scan(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    result = generate_consistency_scan(
-        full_text=full_text,
-        chunks=chunks,
-        llm_client=rec,
-        model=model,
-        session_id=request.book_session_id,
-    )
+    # 矛盾要跨章对比,整本单次大书截断——章脉(紧凑全书结构)一次全局找,扫得到全书。
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    result = consistency_scan_from_spine(spine=spine, llm_client=rec, model=model)
     return ConsistencyScanResponse(
         contradictions=result or [],
         scanned=result is not None,
@@ -1528,11 +1520,10 @@ async def agent_timeline(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    events = generate_timeline_exhaustive(
-        chunks=chunks,
-        llm_client=rec,
-        model=model,
-    )
+    # 时间线命根子=倒叙还原真实故事时序。map-reduce 逐段抽 + 按叙述章号排做不到——章脉
+    # 全书事件流一次全局推理判故事时序(timeline_from_spine 按 story_order 排,非章号)。
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    events = timeline_from_spine(spine=spine, llm_client=rec, model=model)
     return TimelineResponse(
         events=events or [],
         scanned=events is not None,
@@ -1934,13 +1925,11 @@ async def agent_concept_evolution(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    stages = generate_concept_evolution(
-        concept=request.concept,
-        full_text=full_text,
-        chunks=chunks,
-        llm_client=rec,
-        model=model,
-        session_id=request.book_session_id,
+    # 概念演进要按章序串全书,整本单次大书截断——章脉一次全局排阶段(共享那份 spine,
+    # 不另建 theory-genre 以免分裂缓存;小说走 events 兜底,理论书 genre 是另一个议题)。
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    stages = concept_evolution_from_spine(
+        concept=request.concept, spine=spine, llm_client=rec, model=model
     )
     return ConceptEvolutionResponse(
         concept=request.concept,
