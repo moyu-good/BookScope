@@ -59,7 +59,7 @@ async function main() {
   await clickText(page, "关系网");
   await sleep(500);
   await clickText(page, "人物关系图", { exact: false });
-  await sleep(9000); // 等 fixture 加载 + 力导向稳定(348 节点重,多给点时间)
+  await sleep(15000); // 等 fixture 加载 + 力导向稳定(348 节点 + 防重叠铺开,settle 慢,多给时间)
   await shoot(page, "graph.png");
 
   // ── 山水叙事曲线 ─────────────────────────────────────────────

@@ -37,11 +37,15 @@ interface CharacterGraphProps {
 
 const PAD = 46;
 
-// 画布按节点数自适应——156 人挤在 760×560 会糊成一团，节点多就把画布撑大。
+// 画布按节点数自适应——几百号人挤在小画布会糊成一团，节点多就把画布撑大（给力学更多铺开空间）。
+// 上限放到 2400:三国 348 人也铺得开;SVG 按容器宽缩放,逻辑空间大=结构(阵营/主次)散得开。
 function canvasSize(nodeCount: number): { w: number; h: number } {
-  const w = Math.max(760, Math.min(1480, Math.round(340 + nodeCount * 6)));
-  return { w, h: Math.round(w * 0.64) };
+  const w = Math.max(760, Math.min(2400, Math.round(360 + nodeCount * 7)));
+  return { w, h: Math.round(w * 0.66) };
 }
+
+// 防重叠最小间距:任何两个节点近于此就强分开,免得堆成一坨(节点半径 6~15,留够间隙)。
+const MIN_SEP = 30;
 
 interface Node {
   x: number;
@@ -295,7 +299,7 @@ export function CharacterGraph({
       ticks += 1;
       if (dragRef.current == null && maxv < 0.4) coolRef.current += 1;
       else coolRef.current = 0;
-      if (coolRef.current > 40 || ticks > 600) {
+      if (coolRef.current > 40 || ticks > 1000) {
         rafRef.current = null; // 冷却（静止）或到硬上限 ~600 帧：停 rAF 省 CPU
         return;
       }
@@ -340,7 +344,9 @@ export function CharacterGraph({
           dy = Math.random() - 0.5;
           d = 0.01;
         }
-        const rep = ((W * H) / 100) / (d * d);
+        let rep = ((W * H) / 100) / (d * d);
+        // 防重叠:近于 MIN_SEP 的两点额外强分,保证不堆成一坨(线性硬推,比 1/d² 在近距更可靠)。
+        if (d < MIN_SEP) rep += (MIN_SEP - d) * 0.45;
         const ux = dx / d;
         const uy = dy / d;
         fx.set(names[i], fx.get(names[i])! + ux * rep);
