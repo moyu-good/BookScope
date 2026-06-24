@@ -48,6 +48,13 @@
 </p>
 
 <p align="center">
+  <img src="docs/images/relationship.png" width="48%" alt="关系演变小多图时间线">
+  <img src="docs/images/foreshadow.png" width="48%" alt="伏笔回收弧线">
+  <br>
+  <sub>左：关系演变。挑戏份最重的几十对，每对一行，线往上是越来越紧、往下是渐疏，一眼看完谁和谁怎么一章章走到这一步。这和上面的星图分工：星图看“谁连着谁”，这里看“关系怎么变”。右：伏笔回收。埋的坑收没收，朱红实线从埋点拱到回收点（魏延脑后反骨，第 53 回埋、第 105 回应验，拱过大半本书），灰虚线是埋了没填的。</sub>
+</p>
+
+<p align="center">
   <img src="docs/images/qa-citation.png" width="60%" alt="带核验的问答：答案挂原文出处，盖「鉴」印">
   <br>
   <sub>问书：答案挂着原文出处，逐字核对过的盖了「鉴」印；核不上的不会冒出来。</sub>

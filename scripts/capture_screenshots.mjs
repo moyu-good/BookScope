@@ -93,6 +93,26 @@ async function main() {
   await sleep(6000);
   await shoot(page, "flow.png");
 
+  // ── 关系演变(小多图时间线,重做后跟关系图分工)──────────────────
+  console.log("关系演变(小多图)…");
+  await openJian(page);
+  await clickText(page, "关系");
+  await sleep(500);
+  await clickText(page, "关系演变");
+  await sleep(500);
+  if (!(await clickText(page, "重新生成"))) await clickText(page, "生成", { exact: false });
+  await sleep(3000); // 小多图无动画,渲染即稳
+  await shoot(page, "relationship.png");
+
+  // ── 伏笔回收(章脉事件流配对,真长跨度弧)──────────────────────
+  console.log("伏笔回收…");
+  await openJian(page);
+  await clickText(page, "伏笔回收");
+  await sleep(500);
+  if (!(await clickText(page, "重新生成"))) await clickText(page, "生成", { exact: false });
+  await sleep(4000);
+  await shoot(page, "foreshadow.png");
+
   await browser.close();
   console.log("完成。");
 }

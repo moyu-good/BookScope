@@ -48,6 +48,13 @@ It runs locally on your own AI account. The book text goes straight to the provi
 </p>
 
 <p align="center">
+  <img src="docs/images/relationship.png" width="48%" alt="Relationship evolution as small-multiple timelines">
+  <img src="docs/images/foreshadow.png" width="48%" alt="Foreshadowing arcs from setup to payoff">
+  <br>
+  <sub>Left: relationship evolution — the heaviest few dozen pairs, one row each; the line rising means growing closer, falling means drifting apart. This splits work with the star map above: the map shows who connects to whom, this shows how a bond changed over the book. Right: foreshadowing — solid vermilion arcs span from a setup to its payoff (Wei Yan's "bone of rebellion," planted in ch. 53 and fulfilled in ch. 105, arcing across half the book); dashed grey arcs are setups left dangling.</sub>
+</p>
+
+<p align="center">
   <img src="docs/images/qa-citation.png" width="60%" alt="Answers carry their source; verified quotes get the 鉴 seal">
   <br>
   <sub>Ask the book: answers carry their source, quotes checked word-for-word get the 「鉴」seal; anything that fails the check never shows up.</sub>
