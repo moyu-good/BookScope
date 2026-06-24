@@ -53,6 +53,7 @@ from bookscope.agent.argument_structure import generate_argument_structure_exhau
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.chapter_spine_canon import build_spine_name_map
 from bookscope.agent.chapter_spine_evidence import evidence_for_event, evidence_for_pair
+from bookscope.agent.chapter_spine_foreshadow import foreshadow_from_spine
 from bookscope.agent.chapter_spine_views import (
     narrative_curve_from_spine,
     narrative_flow_from_spine,
@@ -69,7 +70,6 @@ from bookscope.agent.concept_evolution import generate_concept_evolution
 from bookscope.agent.consistency_scan import generate_consistency_scan
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
-from bookscope.agent.foreshadow_arcs import generate_foreshadow_arcs_exhaustive
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.orchestrate import orchestrate
@@ -1230,11 +1230,10 @@ async def agent_foreshadow_arcs(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    arcs = generate_foreshadow_arcs_exhaustive(
-        chunks=chunks,
-        llm_client=rec,
-        model=model,
-    )
+    # 伏笔天生跨章（早埋晚收）——从章脉全书「埋/收」清单一次全局配对，不再 map-reduce
+    # 逐段盲（逐段看不见别段→只能凑同章 span-0 假伏笔）。spine 多半已为别的功能建过、L2 命中。
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    arcs = foreshadow_from_spine(spine=spine, llm_client=rec, model=model)
     return ForeshadowArcsResponse(
         arcs=arcs or [],
         scanned=arcs is not None,
