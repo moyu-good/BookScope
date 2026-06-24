@@ -1308,15 +1308,8 @@ async def agent_character_voice(
     只支持塞得进 context 的书；大书返空（``scanned=false``，前端提示重试）。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
-    if not _book_fits_long_context(assembler):
-        return CharacterVoiceResponse(
-            character=request.character,
-            sample_too_small=False,
-            features=[],
-            drift_items=[],
-            scanned=False,
-            book_session_id=request.book_session_id,
-        )
+    # 大书不再返空:声口改跨章采样(下面 spine + present 定位角色出场章、只喂那些章原文),
+    # 大书也跑得起,不必再被 _book_fits_long_context 闸挡在门外。
 
     try:
         client = build_llm_client_from_params(
@@ -1347,12 +1340,18 @@ async def agent_character_voice(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
+    # 声口要对白文本、章脉派生不了——改跨章采样:章脉 present 定位角色出场章,只喂那几章原文
+    # (大书也不截断);name_map 合并别名(玄德/刘备)定位更准。spine 多半已为别功能缓存。
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    name_map = build_spine_name_map(spine=spine, llm_client=rec, model=model)
     result = generate_character_voice(
         character=request.character,
         full_text=full_text,
         chunks=chunks,
         llm_client=rec,
         model=model,
+        spine=spine,
+        name_map=name_map,
         session_id=request.book_session_id,
     )
     return CharacterVoiceResponse(
