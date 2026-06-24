@@ -42,9 +42,8 @@ interface RelationshipTimelineProps {
   baseUrl: string;
 }
 
-const W = 760;
-const H = 540;
 const PAD = 46;
+const MIN_SEP = 34; // 节点最小间距，太近就额外推开——免得几十个节点挤成一团（同星图）
 
 interface Node {
   x: number;
@@ -177,6 +176,12 @@ export function RelationshipTimeline({
     return [...set];
   }, [relations]);
 
+  // 画布随节点数放大——三国能有 100+ 个人，固定 760×540 必挤团（同星图自适应）
+  const { W, H } = useMemo(() => {
+    const w = Math.max(760, Math.min(1800, Math.round(420 + nodes.length * 9)));
+    return { W: w, H: Math.round(w * 0.66) };
+  }, [nodes.length]);
+
   // 拉到全书末尾，让初始快照展示完整关系网
   useEffect(() => {
     if (relations) setCursor(maxCh);
@@ -241,7 +246,7 @@ export function RelationshipTimeline({
       ticks += 1;
       if (dragRef.current == null && maxv < 0.4) coolRef.current += 1;
       else coolRef.current = 0;
-      if (coolRef.current > 40 || ticks > 600) {
+      if (coolRef.current > 40 || ticks > 1000) {
         rafRef.current = null; // 冷却（静止）或到硬上限 ~600 帧：停 rAF 省 CPU
         return;
       }
@@ -258,8 +263,8 @@ export function RelationshipTimeline({
     const fy = new Map<string, number>();
     for (const nm of nodes) {
       const p = sim.get(nm)!;
-      fx.set(nm, (W / 2 - p.x) * 0.008); // 居中
-      fy.set(nm, (H / 2 - p.y) * 0.008);
+      fx.set(nm, (W / 2 - p.x) * 0.003); // 弱居中：只防整团跑偏，让斥力把节点撑开填满画布（否则全缩成中心一坨）
+      fy.set(nm, (H / 2 - p.y) * 0.003);
     }
     // 斥力
     for (let i = 0; i < nodes.length; i++) {
@@ -274,7 +279,8 @@ export function RelationshipTimeline({
           dy = Math.random() - 0.5;
           d = 0.01;
         }
-        const rep = 4200 / (d * d);
+        let rep = ((W * H) / 110) / (d * d); // 斥力随画布面积缩放——画布放大了斥力也要跟上，否则填不满（同星图）
+        if (d < MIN_SEP) rep += (MIN_SEP - d) * 0.6; // 近场硬推开，防重叠
         const ux = dx / d;
         const uy = dy / d;
         fx.set(nodes[i], fx.get(nodes[i])! + ux * rep);
