@@ -47,9 +47,20 @@ async function main() {
   await clickText(page, "关系演变");
   await sleep(400);
   if (!(await clickText(page, "重新生成"))) await clickText(page, "生成", { exact: false });
-  await sleep(16000); // 等 103 节点力导向收敛
+  await sleep(2500); // 小多图无动画，渲染即稳
   await page.screenshot({ path: join(OUT, "_verify_rel.png"), animations: "disabled" });
   console.log("  存 _verify_rel.png");
+  // 下钻:点第一对关系行 → 单对曲线
+  await page.evaluate(() => {
+    const sm = [...document.querySelectorAll("svg")].find((s) => (s.textContent || "").includes("—"));
+    // 行 <g> 才含 polyline(sparkline);轴刻度 <g> 没有。点行内透明热区 rect。
+    const row = [...(sm?.querySelectorAll("g") || [])].find((g) => g.querySelector("polyline"));
+    const hit = row?.querySelector("rect") || row;
+    if (hit) hit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await sleep(1200);
+  await page.screenshot({ path: join(OUT, "_verify_rel_detail.png"), animations: "disabled" });
+  console.log("  存 _verify_rel_detail.png");
 
   console.log("伏笔回收…");
   await openJian(page);
