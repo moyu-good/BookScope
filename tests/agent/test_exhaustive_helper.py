@@ -360,8 +360,8 @@ def test_run_segment_truncated_without_continue_keeps_partial(monkeypatch) -> No
     assert [c["chapter"] for c in outs[0]] == [1]
 
 
-def test_run_segment_truncated_empty_does_not_continue(monkeypatch) -> None:  # noqa: ANN001
-    # 截断且一条都没抢救到 → 不续抽（无 partial 可接着），返空。
+def test_run_segment_truncated_empty_single_chapter_gives_up(monkeypatch) -> None:  # noqa: ANN001
+    # 截断且一条都没抢救到、且段只剩单章 → 拆不动（单章是下限）→ 放弃返空。不续抽。
     called = {"continue": False}
 
     def _continue(_seg, _partial):  # noqa: ANN001, ANN202
@@ -379,4 +379,137 @@ def test_run_segment_truncated_empty_does_not_continue(monkeypatch) -> None:  # 
         continue_fn=_continue,
     )
     assert called["continue"] is False
-    assert outs[0] == []
+    assert outs[0] == []  # 单章拆不动,放弃
+
+
+# ── 1.5.2 丢章修复：截断且抢救为 0 → 按章拆小重抽，不跳过整段 ──────────────────
+
+
+def test_split_segment_by_chapter_halves() -> None:
+    seg = [{"chunk_id": f"c{i}", "chapter": i, "text": "x"} for i in range(1, 7)]  # 6 章
+    subs = ex._split_segment_by_chapter(seg)
+    assert subs is not None
+    assert [c["chapter"] for c in subs[0]] == [1, 2, 3]  # 前一半章
+    assert [c["chapter"] for c in subs[1]] == [4, 5, 6]  # 后一半章
+
+
+def test_split_segment_keeps_same_chapter_chunks_together() -> None:
+    # 同章多 chunk 不拆散:章 1 两个 chunk + 章 2 两个 chunk → 拆成 [章1] / [章2]
+    seg = [
+        {"chunk_id": "a", "chapter": 1, "text": "x"},
+        {"chunk_id": "b", "chapter": 1, "text": "y"},
+        {"chunk_id": "c", "chapter": 2, "text": "z"},
+        {"chunk_id": "d", "chapter": 2, "text": "w"},
+    ]
+    subs = ex._split_segment_by_chapter(seg)
+    assert subs is not None
+    assert {c["chunk_id"] for c in subs[0]} == {"a", "b"}
+    assert {c["chunk_id"] for c in subs[1]} == {"c", "d"}
+
+
+def test_split_segment_single_chapter_returns_none() -> None:
+    seg = [{"chunk_id": f"c{i}", "chapter": 1, "text": "x"} for i in range(3)]  # 都是单章
+    assert ex._split_segment_by_chapter(seg) is None
+
+
+def test_split_segment_no_chapter_returns_none() -> None:
+    seg = [{"chunk_id": f"c{i}", "text": "x"} for i in range(3)]  # 不带 chapter
+    assert ex._split_segment_by_chapter(seg) is None
+
+
+def test_run_segment_truncated_empty_splits_and_covers_all_chapters(monkeypatch) -> None:  # noqa: ANN001
+    # 核心修复路径:一段 6 章,整段抽时**总被截断且抢救为 0**(旧逻辑会丢掉全部 6 章);
+    # 拆小后单章能抽出 → 断言拆到每章都被覆盖、零丢。
+    # 桩:段含 >1 章(即"还没拆到单章")时返截断空响应,逼它继续拆;拆到单章时正常返该章。
+    def _fake_invoke(*_a, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        # build_longctx_system 把段原文塞进 system;从 system 数出现了几个章标记判断段大小。
+        system = kwargs.get("system", "")
+        marks = [n for n in range(1, 7) if f"〔章{n}〕" in system]
+        if len(marks) > 1:
+            return _resp("截断半截没法解析", "length")  # 多章段:截断且抢救为 0
+        # 单章段:正常返该章一条
+        ch = marks[0]
+        return _resp(json.dumps({"chapters": [{"chapter": ch}]}), "stop")
+
+    monkeypatch.setattr(ex, "invoke_client_cached", _fake_invoke)
+    chunks = [
+        {"chunk_id": f"c{i}", "chapter": i, "text": f"〔章{i}〕正文"} for i in range(1, 7)
+    ]
+    outs = ex.run_segments(
+        chunks=chunks, instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100,
+        char_budget=100000, max_chapters=12, max_workers=1,  # 一段含全 6 章
+    )
+    got = sorted(c["chapter"] for seg_out in outs for c in seg_out)
+    assert got == [1, 2, 3, 4, 5, 6]  # 拆小后每章都覆盖,零丢
+
+
+def test_run_segment_split_respects_depth_limit(monkeypatch) -> None:  # noqa: ANN001
+    # 每段(含单章)永远返截断且抢救为 0 → 递归靠 _SPLIT_MAX_DEPTH + 单章拆不动双重收敛,
+    # 不无限递归;最终覆盖为空(谁也抽不出),但不挂死。
+    calls = {"n": 0}
+
+    def _fake_invoke(*_a, **_k):  # noqa: ANN002, ANN003, ANN202
+        calls["n"] += 1
+        return _resp("永远截断", "length")
+
+    monkeypatch.setattr(ex, "invoke_client_cached", _fake_invoke)
+    chunks = [{"chunk_id": f"c{i}", "chapter": i, "text": "x"} for i in range(1, 9)]  # 8 章
+    outs = ex.run_segments(
+        chunks=chunks, instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100,
+        char_budget=100000, max_chapters=12, max_workers=1,
+    )
+    assert [c for seg_out in outs for c in seg_out] == []  # 谁也抽不出
+    assert calls["n"] < 100  # 收敛,不爆炸(8 章拆树调用数有限)
+
+
+# ── 1.5.2 兜底不变量：合并后缺章 → 单章重抽补齐 ────────────────────────────────
+
+
+def _sweep_invoke(*_a, **kwargs):  # noqa: ANN002, ANN003, ANN202
+    # 多章段:漏掉章 3(没截断、模型就是漏了);单章段(兜底重抽):正常返该章。
+    system = kwargs.get("system", "")
+    marks = [n for n in range(1, 4) if f"〔章{n}〕" in system]
+    if len(marks) > 1:
+        return _resp(json.dumps({"chapters": [{"chapter": 1}, {"chapter": 2}]}))
+    return _resp(json.dumps({"chapters": [{"chapter": marks[0]}]}))
+
+
+def test_mapreduce_sweep_recovers_missing_chapter(monkeypatch) -> None:  # noqa: ANN001
+    # 第一遍整段漏掉章 3 → 兜底按"每个喂入章都得出现"单章重抽,把章 3 救回。
+    monkeypatch.setattr(ex, "invoke_client_cached", _sweep_invoke)
+    chunks = [{"chunk_id": f"c{i}", "chapter": i, "text": f"〔章{i}〕正文"} for i in range(1, 4)]
+    out = ex.mapreduce_per_chapter(
+        chunks=chunks, instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100,
+        char_budget=100000, max_chapters=12, max_workers=1,
+        correct_fn=lambda _seg, _c: None, sweep_missing_chapters=True,
+    )
+    assert [c["chapter"] for c in out] == [1, 2, 3]  # 漏的章 3 被兜底救回
+
+
+def test_mapreduce_sweep_off_keeps_missing(monkeypatch) -> None:  # noqa: ANN001
+    # 不开 sweep(默认)→ 漏的章不补,别的穷尽化功能行为不变。
+    monkeypatch.setattr(ex, "invoke_client_cached", _sweep_invoke)
+    chunks = [{"chunk_id": f"c{i}", "chapter": i, "text": f"〔章{i}〕正文"} for i in range(1, 4)]
+    out = ex.mapreduce_per_chapter(
+        chunks=chunks, instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100,
+        char_budget=100000, max_chapters=12, max_workers=1,
+        correct_fn=lambda _seg, _c: None,  # sweep_missing_chapters 默认 False
+    )
+    assert [c["chapter"] for c in out] == [1, 2]  # 漏的章 3 不补
+
+
+def test_mapreduce_sweep_needs_correct_fn(monkeypatch) -> None:  # noqa: ANN001
+    # 兜底只在有 correct_fn(章号可信)时生效——无 correct_fn 时不扫,免得拿自报章号瞎补。
+    monkeypatch.setattr(ex, "invoke_client_cached", _sweep_invoke)
+    chunks = [{"chunk_id": f"c{i}", "chapter": i, "text": f"〔章{i}〕正文"} for i in range(1, 4)]
+    out = ex.mapreduce_per_chapter(
+        chunks=chunks, instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100,
+        char_budget=100000, max_chapters=12, max_workers=1,
+        sweep_missing_chapters=True,  # 但没 correct_fn → 不扫
+    )
+    assert [c["chapter"] for c in out] == [1, 2]  # 没补

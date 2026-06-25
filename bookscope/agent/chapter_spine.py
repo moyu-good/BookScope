@@ -361,6 +361,7 @@ def build_chapter_spine(
             max_workers=max_workers,
             correct_fn=_correct_by_evidence,
             continue_fn=continue_fn,
+            sweep_missing_chapters=True,  # 1.5.2 兜底:缺章单章重抽,堵住所有截断丢章
         )
         dim_lists.append(recs)
 

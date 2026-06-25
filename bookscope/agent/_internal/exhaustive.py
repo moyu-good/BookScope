@@ -33,6 +33,12 @@ DEFAULT_MAX_CHAPTERS = 12
 DEFAULT_WORKERS = 6
 ENV_WORKERS = "BOOKSCOPE_EXHAUSTIVE_WORKERS"
 
+# 截断兜底拆段递归深度上限（1.5.2 丢章修复）。某段截断、连一条都没抢救到时，把这段按章
+# 对半拆小重抽——6 章塞不下就拆 3、再塞不下拆 1（单章总塞得下，是下限）。每拆一层章数至少
+# 减半，6→3→2→1 四层足够；这个硬上限只是防御性兜底，防极端 chunk 把递归拖深。降到单章仍
+# 截断 = 这一章本身塞不下（极罕见），保留抢救到的（可能空）不再拆。
+_SPLIT_MAX_DEPTH = 4
+
 
 def segment_chunks(
     chunks: list[dict[str, Any]],
@@ -72,6 +78,34 @@ def segment_chunks(
     if cur:
         segments.append(cur)
     return segments
+
+
+def _split_segment_by_chapter(
+    seg: list[dict[str, Any]],
+) -> list[list[dict[str, Any]]] | None:
+    """把一段按 ``chapter`` 对半拆成两个更小子段（截断兜底用，1.5.2 丢章修复）。
+
+    按 chunk 的真 ``chapter`` 把段切两半：前一半章一个子段、后一半章一个子段（同章的多个
+    chunk 不拆散，整章跟着走）。返回两个子段；**拆不动时返 ``None``**——段不带 chapter（向后
+    兼容路，没法按章拆）或整段只剩一个章（单章已是下限，再拆没意义）。每拆一层章数至少减半，
+    保证递归收敛。
+    """
+    chapters: list[Any] = []
+    for c in seg:
+        ch = c.get("chapter")
+        if ch is not None and ch not in chapters:
+            chapters.append(ch)
+    if len(chapters) < 2:  # 不带章号 或 只有单章 → 拆不动
+        return None
+    mid = len(chapters) // 2
+    first_half = set(chapters[:mid])
+    first: list[dict[str, Any]] = []
+    second: list[dict[str, Any]] = []
+    for c in seg:
+        (first if c.get("chapter") in first_half else second).append(c)
+    if not first or not second:  # 兜底：万一全落一边，当拆不动
+        return None
+    return [first, second]
 
 
 def resolve_workers(explicit: int | None, default: int = DEFAULT_WORKERS) -> int:
@@ -120,13 +154,19 @@ def run_segments(
     该段结果——把"截断悄悄丢章"变"截断补抽回来"。``None`` 则不补抽（截断时记 warning 后照旧返
     抢救到的部分）。截断判定靠 ``finish_reason``（1.5.2 方案 A），不再盲抢救。
 
+    **截断且一条都没抢救到**（1.5.2 丢章修复）：旧逻辑直接跳过整段、约 6 章全丢。改成把这段
+    按章对半拆小递归重抽（``_split_segment_by_chapter`` → ``run_segment(sub, depth+1)``），段太
+    大塞不下就拆成更小窗口分别抽，逐章是兜底下限——保证每章都被覆盖、不丢。拆有 ``_SPLIT_MAX_DEPTH``
+    深度上限防无限递归；不带 chapter 字段的段拆不动，仍按旧行为放弃（返空）。这只在"截断且抢救
+    为 0"分支触发，不动 ``max_chapters`` 的默认值。
+
     缓存默认开：同段同书重看直接命中（map-reduce 下坏段只跳过、不一坏全挂，开缓存安全）。
     """
     segments = segment_chunks(chunks, char_budget, max_chapters)
     if not segments:
         return []
 
-    def run_segment(seg: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def run_segment(seg: list[dict[str, Any]], depth: int = 0) -> list[dict[str, Any]]:
         seg_text = "".join(str(c.get("text", "")) for c in seg)
         system = build_longctx_system(seg_text, instruction)
         try:
@@ -153,8 +193,10 @@ def run_segments(
             return parsed
         # finish_reason=length：这段被输出长度截断了（不是"模型真没抽到"）。
         if not parsed:
-            logger.warning("exhaustive 段被 max_tokens 截断且一条都没抢救到；跳过该段")
-            return parsed
+            # 截断且一条都没抢救到——旧逻辑直接跳过整段（约 6 章全丢，正是 1.5.2 的丢章
+            # bug）。改成把这段按章对半拆小重抽：段太大塞不下就拆成更小窗口分别抽，逐章
+            # 是兜底下限（单章总塞得下）。密集段多花几次调用，换"每章都被覆盖、不丢"。
+            return _split_and_retry(seg, depth)
         logger.warning(
             "exhaustive 段被 max_tokens 截断，抢救到 %d 条%s",
             len(parsed),
@@ -172,6 +214,36 @@ def run_segments(
         if extra:
             parsed = [*parsed, *extra]
         return parsed
+
+    def _split_and_retry(
+        seg: list[dict[str, Any]], depth: int
+    ) -> list[dict[str, Any]]:
+        """截断且抢救为 0 的兜底：按章把这段对半拆小，对每个子段递归重抽，再拼起来。
+
+        拆分按 chunk 的 ``chapter`` 走（不在章内切），保证每个子段都是完整的章——逐章抽
+        不会把一章劈两半。子段章数严格递减（取前一半章），降到单章是下限（单章总塞得下）。
+        ``depth`` 防御性硬上限 ``_SPLIT_MAX_DEPTH``；段不带 chapter（向后兼容路）或只剩
+        单章却仍截断 → 没法再拆，记 warning 后放弃该段（返空）。
+        """
+        sub_segments = _split_segment_by_chapter(seg)
+        if depth >= _SPLIT_MAX_DEPTH or sub_segments is None or len(sub_segments) < 2:
+            logger.warning(
+                "exhaustive 段被 max_tokens 截断且抢救为 0，已无法再拆小（深度 %d / 子段 %d）；"
+                "放弃该段",
+                depth,
+                0 if sub_segments is None else len(sub_segments),
+            )
+            return []
+        logger.warning(
+            "exhaustive 段被 max_tokens 截断且抢救为 0，按章拆成 %d 个更小子段重抽（深度 %d→%d）",
+            len(sub_segments),
+            depth,
+            depth + 1,
+        )
+        out: list[dict[str, Any]] = []
+        for sub in sub_segments:
+            out.extend(run_segment(sub, depth + 1))
+        return out
 
     workers = resolve_workers(max_workers)
     if workers <= 1 or len(segments) <= 1:
@@ -316,6 +388,7 @@ def mapreduce_per_chapter(
         [list[dict[str, Any]], list[dict[str, Any]]], list[dict[str, Any]]
     ]
     | None = None,
+    sweep_missing_chapters: bool = False,
 ) -> list[dict[str, Any]]:
     """按章 map-reduce 便捷壳：``run_segments`` → (逐段章号纠偏) → ``merge_by_chapter``。
 
@@ -330,6 +403,12 @@ def mapreduce_per_chapter(
 
     ``max_chapters`` / ``continue_fn`` 透传给 ``run_segments``（1.5.2 方案 B/C）：默认沿用全局
     章闸 12、不续抽，调用方（章脉）按需传更小章闸 + 续抽回调。
+
+    ``sweep_missing_chapters``（1.5.2 兜底不变量）：合并完后拿"喂进来的章"和"抽出来的章"一比，
+    缺哪章就**单章重抽哪章**（``max_chapters=1``，单章总塞得下）。截断的恢复路有好几条（抢救为 0
+    拆小、抢救部分续抽……）任一条没补全都会悄悄漏章；这条兜底不管漏在哪条路，最后统一按"每个
+    喂入章都必须出现"这个不变量补齐，是最稳的那道闸。只在调用方显式开启 + 有 ``correct_fn``（章号
+    可信）时生效；单章重抽后仍缺（极罕见，单章自身仍爆 token）记 warning、不再静默。
     """
     outs = run_segments(
         chunks=chunks,
@@ -348,7 +427,52 @@ def mapreduce_per_chapter(
     if correct_fn is not None:
         for seg in outs:
             correct_fn(seg, chunks)
-    return merge_by_chapter(outs)
+    merged = merge_by_chapter(outs)
+    if not (sweep_missing_chapters and correct_fn is not None):
+        return merged
+    # 兜底不变量:喂进来的章必须都在输出里。缺的单章重抽——堵住所有截断丢章模式。
+    expected = sorted(
+        {c["chapter"] for c in chunks if isinstance(c.get("chapter"), int) and c["chapter"] >= 1}
+    )
+    have = {m["chapter"] for m in merged if isinstance(m.get("chapter"), int)}
+    missing = [ch for ch in expected if ch not in have]
+    if not missing:
+        return merged
+    logger.warning(
+        "exhaustive 兜底不变量:合并后仍缺 %d 章,单章重抽 %s",
+        len(missing),
+        missing[:20],
+    )
+    miss_set = set(missing)
+    miss_chunks = [c for c in chunks if c.get("chapter") in miss_set]
+    sweep_outs = run_segments(
+        chunks=miss_chunks,
+        instruction=instruction,
+        user_msg=user_msg,
+        parse_fn=parse_fn,
+        llm_client=llm_client,
+        model=model,
+        max_tokens=max_tokens,
+        char_budget=char_budget,
+        max_chapters=1,  # 每章单独成段,单章总塞得下
+        max_workers=max_workers,
+        cache_enabled=cache_enabled,
+        continue_fn=continue_fn,
+    )
+    for seg in sweep_outs:
+        correct_fn(seg, chunks)
+    for m in merge_by_chapter(sweep_outs):
+        ch = m.get("chapter")
+        if ch not in have:
+            merged.append(m)
+            have.add(ch)
+    merged.sort(key=lambda c: c["chapter"])
+    still = [ch for ch in missing if ch not in have]
+    if still:
+        logger.warning(
+            "exhaustive 兜底后仍缺 %d 章(单章仍爆 token/抽空):%s", len(still), still[:20]
+        )
+    return merged
 
 
 __all__ = [
