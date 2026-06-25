@@ -705,26 +705,44 @@ class RelationshipTimelineRequest(BaseModel):
     api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
     model: str | None = Field(default=None)
     base_url: str | None = Field(default=None)
+    pair_a: str | None = Field(
+        default=None,
+        description="下钻：这对人的一方（canonical 名）。与 pair_b 同给才算这对编年。",
+    )
+    pair_b: str | None = Field(
+        default=None,
+        description="下钻：另一方。都不给则返全员对清单（总览，不算编年）。",
+    )
 
 
 class RelationshipTimelineResponse(BaseModel):
-    """POST /api/agent/relationship-timeline 响应体。
+    """POST /api/agent/relationship-timeline 响应体（1.5.1 关系编年）。
 
-    ``relations`` 是每对主要关系的逐章强度 + 关键转折，给前端在关系图上加时间维：
-    每条 ``{a, b, relation, points, turning_points}``——``points`` 是逐章强度
-    ``[{chapter, strength(0-10)}]``（连成强度曲线 / 拖时间轴时定连线粗细），
-    ``turning_points`` 是关键转折 ``[{chapter, change, evidence, verified, match_score}]``，
-    每个转折的 ``evidence`` 过原文核验，``verified=false`` 的前端标低置信/不画
-    （evidence-first：挂不上原文的转折不当确定结论画）。
+    两种返法（与关系图协同：关系图=全员索引，这里=任一对按需下钻）：
+    - 给了 ``pair_a``/``pair_b`` → ``relations`` 是这一对的**关系编年**（一条）：
+      ``{a, b, verdict, beats}``。``verdict`` 是整体判断
+      ``{essence, arc, asymmetric, view_a_on_b, view_b_on_a, sharp_point, pivot_chapter}``；
+      ``beats`` 是逐幕编年 ``[{chapter, scene, state, valence(-5友..5敌), change,
+      evidence, verified, match_score}]``，每幕 evidence 按这对人 + 这件事在原文里捞、过核验，
+      ``verified=false`` 的前端标低置信/标待核（evidence-first：挂不上原文的不当确定结论画）。
+    - 没给 pair → ``relations`` 空、``pairs`` 是便宜的全员对清单（不调 LLM）：
+      ``[{a, b, chapters, first, last, count}]``，给概览/选择器，点一对再来取编年。
     """
 
     relations: list[dict] = Field(
         default_factory=list,
         description=(
-            "逐对关系的演变。每条 {a:str, b:str, relation:str, "
-            "points:[{chapter:int, strength:0-10}], "
-            "turning_points:[{chapter:int, change:str, evidence:str, verified:bool, "
-            "match_score:float}]}；转折的 evidence 过原文核验，verified=false 的标低置信。"
+            "下钻时这对人的关系编年（一条）：{a, b, verdict:{essence, arc, asymmetric, "
+            "view_a_on_b, view_b_on_a, sharp_point, pivot_chapter}, "
+            "beats:[{chapter, scene, state, valence, change, evidence, verified, match_score}]}。"
+            "没下钻时为空。"
+        ),
+    )
+    pairs: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "全员对清单（总览，没下钻时返）：[{a, b, chapters:[int], first, last, count}]，"
+            "按互动章数降序。给前端做选择器/概览，覆盖全书所有有关系的对，点一对再取编年。"
         ),
     )
     scanned: bool = Field(

@@ -58,7 +58,10 @@ from bookscope.agent.chapter_spine_consistency import consistency_scan_from_spin
 from bookscope.agent.chapter_spine_dropped_thread import dropped_threads_from_spine
 from bookscope.agent.chapter_spine_evidence import evidence_for_event, evidence_for_pair
 from bookscope.agent.chapter_spine_foreshadow import foreshadow_from_spine
-from bookscope.agent.chapter_spine_relationship import relationship_timeline_from_spine
+from bookscope.agent.chapter_spine_relationship import (
+    relationship_chronicle_for_pair,
+    relationship_pairs_index,
+)
 from bookscope.agent.chapter_spine_subplot import subplot_weave_from_spine
 from bookscope.agent.chapter_spine_timeline import timeline_from_spine
 from bookscope.agent.chapter_spine_views import (
@@ -813,7 +816,7 @@ async def agent_character_graph(
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model, genre="theory")
-    g = concept_graph_from_spine(spine=spine, llm_client=rec, model=model)
+    g = concept_graph_from_spine(spine=spine, llm_client=rec, model=model, chunks=chunks)
     if g is not None:
         trace = _run_trace(rec, full_text, _t0)
         trace["total_edges"] = len(g["edges"])
@@ -959,7 +962,7 @@ async def agent_subplot_weave(
     _t0 = time.monotonic()
     # 支线交汇天生跨段——从章脉全书梗概一次全局找(map-reduce 逐段看不见远段交汇)。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-    weave = subplot_weave_from_spine(spine=spine, llm_client=rec, model=model)
+    weave = subplot_weave_from_spine(spine=spine, llm_client=rec, model=model, chunks=chunks)
     return SubplotWeaveResponse(
         subplots=(weave or {}).get("subplots", []),
         intersections=(weave or {}).get("intersections", []),
@@ -1115,7 +1118,7 @@ async def agent_pacing_curve(
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-    points = pacing_from_spine(spine)
+    points = pacing_from_spine(spine, chunks=chunks)
     return PacingCurveResponse(
         points=points or [],
         book_session_id=request.book_session_id,
@@ -1192,7 +1195,7 @@ async def agent_narrative_curve(
     # 1.x 章脉转向(ADR-010):从共享章脉派生,不再单独跑全书叙事曲线。章脉里逐章已有
     # tension/sentiment/pov/mainline/evidence/verified,满精度投影;命中缓存秒出。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-    chapters = narrative_curve_from_spine(spine)
+    chapters = narrative_curve_from_spine(spine, chunks=chunks)
     return NarrativeCurveResponse(
         chapters=chapters or [],
         scanned=bool(spine),
@@ -1248,7 +1251,7 @@ async def agent_foreshadow_arcs(
     # 伏笔天生跨章（早埋晚收）——从章脉全书「埋/收」清单一次全局配对，不再 map-reduce
     # 逐段盲（逐段看不见别段→只能凑同章 span-0 假伏笔）。spine 多半已为别的功能建过、L2 命中。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-    arcs = foreshadow_from_spine(spine=spine, llm_client=rec, model=model)
+    arcs = foreshadow_from_spine(spine=spine, llm_client=rec, model=model, chunks=chunks)
     return ForeshadowArcsResponse(
         arcs=arcs or [],
         scanned=arcs is not None,
@@ -1428,14 +1431,32 @@ async def agent_relationship_timeline(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    # 关系强度是累积量(截至此章),map-reduce 逐段算不对(段间看不见)——章脉逐对全局推理。
+    # 1.5.1 关系编年(章脉派生):关系图=全员索引,这里=任一对按需下钻。给了 pair 只算那对(L2 缓存),
+    # 没给返便宜的全员对清单(总览,不调 LLM)。别名表跟关系图共享同一张(同输入命中同缓存),两边
+    # "谁是谁"对齐——否则"关系图里点的刘备"和"这里查的刘备"对不上、就找不到人。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-    result = relationship_timeline_from_spine(
-        spine=spine, chunks=chunks, llm_client=rec, model=model
-    )
+    name_map = build_spine_name_map(spine=spine, llm_client=rec, model=model)
+    if request.pair_a and request.pair_b:
+        rel = relationship_chronicle_for_pair(
+            a=request.pair_a,
+            b=request.pair_b,
+            spine=spine,
+            chunks=chunks,
+            llm_client=rec,
+            model=model,
+            name_map=name_map,
+        )
+        relations: list[dict] = [rel] if rel else []
+        pairs: list[dict] = []
+        scanned = rel is not None
+    else:
+        relations = []
+        pairs = relationship_pairs_index(spine, name_map)
+        scanned = bool(pairs)
     return RelationshipTimelineResponse(
-        relations=(result or {}).get("relations", []),
-        scanned=result is not None,
+        relations=relations,
+        pairs=pairs,
+        scanned=scanned,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
@@ -1488,7 +1509,7 @@ async def agent_consistency_scan(
     _t0 = time.monotonic()
     # 矛盾要跨章对比,整本单次大书截断——章脉(紧凑全书结构)一次全局找,扫得到全书。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-    result = consistency_scan_from_spine(spine=spine, llm_client=rec, model=model)
+    result = consistency_scan_from_spine(spine=spine, llm_client=rec, model=model, chunks=chunks)
     return ConsistencyScanResponse(
         contradictions=result or [],
         scanned=result is not None,
@@ -1725,7 +1746,7 @@ async def agent_style_issues(
     # 支线失踪是跨章判断,拆出来章脉派生(算术筛候选 + 一次复核分"忘收尾"vs"正常完结"),
     # 大书不漏报。两类条目同形(type/what/chapter/snippet/verified),合并一起返。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
-    dropped = dropped_threads_from_spine(spine=spine, llm_client=rec, model=model)
+    dropped = dropped_threads_from_spine(spine=spine, llm_client=rec, model=model, chunks=chunks)
     return StyleIssuesResponse(
         issues=(issues or []) + (dropped or []),
         scanned=issues is not None,
@@ -1952,7 +1973,7 @@ async def agent_concept_evolution(
     # 不另建 theory-genre 以免分裂缓存;小说走 events 兜底,理论书 genre 是另一个议题)。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
     stages = concept_evolution_from_spine(
-        concept=request.concept, spine=spine, llm_client=rec, model=model
+        concept=request.concept, spine=spine, llm_client=rec, model=model, chunks=chunks
     )
     return ConceptEvolutionResponse(
         concept=request.concept,
