@@ -14,6 +14,12 @@
 // evidence-first（全站一个规矩）：核不过的原文老实标"待核·仅供参考"，绝不假装有原文。
 // 勾选只是本地阅读态（看到哪了 / 哪条要做），不回写后端、不持久化。
 // scanned=false 或没 clauses → 优雅退场（可能是报告 / 批复类，没有可执行指令）。
+//
+// 数字善本水准的艺术化（1.6·只动视觉不动数据）：借红头公文气质——
+//   标题前一道朱砂红头短脊；汇总卡做成"案卷签条"，硬要求那张顶上点一道朱砂脊（最有约束力、
+//     先看它）；可勾清单每条像"案牍待办"：左侧朱砂批注线 + 宋体事项 + 钤印原文。
+// 克制——朱砂只落在红头脊、案卷签条顶脊、批注线、钤印这几个语义位；instruction_type 彩标
+// 颜色一律不动（数据色）。
 // ---------------------------------------------------------------------------
 
 import { useMemo, useState } from "react";
@@ -174,9 +180,14 @@ export function RedheadActionList({
     return (
       <div className="pt-4">
         <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1"
+          className="text-base font-bold text-[var(--color-ink)] mb-1 flex items-center gap-2"
           style={{ fontFamily: "var(--font-display)" }}
         >
+          {/* 红头点缀：标题前一道朱砂短脊，预告这是红头公文视图 */}
+          <span
+            className="h-4 w-[3px] rounded-full bg-[var(--color-seal)]"
+            aria-hidden="true"
+          />
           办事清单
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
@@ -307,8 +318,17 @@ export function RedheadActionList({
             return (
               <div
                 key={idx}
-                className="rounded border border-[var(--color-rule)] bg-white p-3"
+                className="relative rounded border border-[var(--color-rule)] bg-white p-3 pl-4"
               >
+                {/* 案牍批注线：左侧朱砂细脊（批注领格），核过的深一点、勾掉的淡下去 */}
+                <span
+                  className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full"
+                  style={{
+                    background: "var(--color-seal)",
+                    opacity: isDone ? 0.12 : showOrigin ? 0.45 : 0.18,
+                  }}
+                  aria-hidden="true"
+                />
                 <div className="flex items-start gap-3">
                   {/* 勾选框（本地阅读态） */}
                   <label className="flex items-center pt-0.5 cursor-pointer shrink-0">
@@ -413,7 +433,8 @@ export function RedheadActionList({
   );
 }
 
-// 顶部汇总数字卡——一个数 + 一行标签，accent 给数字描个色（硬要求朱砂等）。
+// 顶部汇总数字卡——做成"案卷签条"：顶上一道极细色脊（accent 那类的标识色）+ 大宋体数字
+// + 一行标签。accent 给数字和顶脊同一个色（硬要求朱砂等），没 accent 的总数卡走素墨脊。
 function SummaryCard({
   label,
   value,
@@ -423,8 +444,15 @@ function SummaryCard({
   value: number;
   accent?: string;
 }) {
+  const tint = accent ?? "var(--color-ink-muted)";
   return (
-    <div className="rounded border border-[var(--color-rule)] bg-white px-3 py-2">
+    <div className="relative rounded border border-[var(--color-rule)] bg-white px-3 pt-2.5 pb-2 overflow-hidden">
+      {/* 案卷签条顶脊：一道细色脊标识这张卡是哪类（朱砂=硬要求等） */}
+      <span
+        className="absolute left-0 right-0 top-0 h-[2.5px]"
+        style={{ background: tint, opacity: accent ? 0.85 : 0.3 }}
+        aria-hidden="true"
+      />
       <div
         className="text-xl font-bold tabular-nums leading-none"
         style={{

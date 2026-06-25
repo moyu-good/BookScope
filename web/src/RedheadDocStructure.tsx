@@ -13,6 +13,14 @@
 // instruction_type 是封闭集四标签（硬要求 / 软倡导 / 信息告知 / 依据陈述），渲染成
 // 带色小标签——它是分类不是打分，所以不画进度条、不报分数。
 // scanned=false 或没真东西 → 优雅退场，不画空壳。
+//
+// 数字善本水准的艺术化（1.6·只动视觉不动数据）：借红头公文自己的气质——
+//   头要素区做成"红头公文版头"：顶上一道朱红粗线（红头）、标题事由居中大宋体、
+//     发文字号 / 成文日期分列版头两侧（公文版头的真实站位）、其余要素列在朱红细线下；
+//   逐条款像"案牍批注"：朱砂序号墨钉 + 宋体事项 + 版心朱砂短线起承，原文引文走宋体留白；
+//   钤印「鉴」核验过的角上盖（用现成 SealMark）。
+// 克制是高级——朱砂只落在版头红线、序号墨钉、钤印、版心短线这几个语义位，绝不当大色块
+// 分隔；instruction_type 彩标颜色一律不动（数据色）。
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
@@ -140,9 +148,14 @@ export function RedheadDocStructure({
     return (
       <div className="pt-4">
         <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1"
+          className="text-base font-bold text-[var(--color-ink)] mb-1 flex items-center gap-2"
           style={{ fontFamily: "var(--font-display)" }}
         >
+          {/* 红头点缀：标题前一道朱砂短脊，预告这是红头公文视图 */}
+          <span
+            className="h-4 w-[3px] rounded-full bg-[var(--color-seal)]"
+            aria-hidden="true"
+          />
           公文结构解读
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
@@ -212,6 +225,10 @@ export function RedheadDocStructure({
   const headFilled = head.filter((h) => hasValue(h.value)).length;
   const clauseVerified = clauses.filter((c) => c.verified && c.evidence).length;
 
+  // 版头意象：标题事由抽出来当版头大标题（公文版头正中那行），其余八项照常列在红线下。
+  // 抽不到标题就不提，版头退成一道素净的红线 + 标签，绝不造假。
+  const titleEl = head.find((h) => h.field === "标题事由" && hasValue(h.value));
+
   // ---- 已抽到：头要素清单 + 逐条款 ----
   return (
     <div className="pt-4">
@@ -232,24 +249,52 @@ export function RedheadDocStructure({
         </button>
       </div>
 
-      {/* ── 头要素：八项骨架清单 ── */}
-      <div className="mb-2 flex items-center gap-2">
-        <span
-          className="inline-block text-xs px-2 py-0.5 rounded-full"
-          style={{
-            color: "var(--color-seal)",
-            border: "0.5px solid var(--color-seal)",
-          }}
-        >
-          头要素 · 八项
-        </span>
-        <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
-          抽到 {headFilled}/{head.length || 8}
-        </span>
+      {/* ── 头要素：八项骨架，做成"红头公文版头"意象 ── */}
+      {/* 红头：版头顶上那道标志性的朱红粗线（公文之所以叫"红头"）。克制——只此一道。 */}
+      <div
+        className="h-[3px] rounded-full"
+        style={{
+          background:
+            "linear-gradient(90deg, var(--color-seal), color-mix(in oklch, var(--color-seal) 72%, transparent))",
+        }}
+      />
+      {/* 版头标题区：标题事由抽到了就居中提为大宋体版头标题（公文正中那行） */}
+      <div className="mt-3 mb-2.5 text-center">
+        {titleEl ? (
+          <div className="flex items-start justify-center gap-1.5 px-2">
+            <h4
+              className="text-[15px] font-bold text-[var(--color-ink)] leading-snug"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {titleEl.value}
+            </h4>
+            {/* 标题事由核验过 → 版头角上盖一枚「鉴」印（版头求净，只盖印不展开原文） */}
+            {titleEl.verified && (
+              <SealMark size={16} title="标题已核验" className="mt-0.5" />
+            )}
+          </div>
+        ) : (
+          <p
+            className="text-sm text-[var(--color-ink-muted)]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            头要素 · 八项骨架
+          </p>
+        )}
+        {/* 版心短线：版头标题下一道朱砂细线收束，仿公文版头分隔线（红线在心不在面） */}
+        <div className="mt-2 flex items-center justify-center gap-2">
+          <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
+          <span className="text-[11px] text-[var(--color-ink-muted)] tabular-nums">
+            头要素 抽到 {headFilled}/{head.length || 8}
+          </span>
+          <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
+        </div>
       </div>
 
       <div className="rounded border border-[var(--color-rule)] bg-white overflow-hidden">
         {head.map((h, i) => {
+          // 标题事由已提为版头大标题，清单里就不重复列了（提到版头的那条跳过）
+          if (titleEl && h.field === "标题事由") return null;
           const filled = hasValue(h.value);
           const canOpen = filled && !!h.evidence;
           const isOpen = openHead === h.field;
@@ -259,11 +304,19 @@ export function RedheadDocStructure({
               className="border-b border-[var(--color-rule)] last:border-b-0"
             >
               <div className="flex items-start gap-3 px-3 py-2">
-                {/* 左：要素名 */}
+                {/* 左：要素名——版心朱砂短钉起头，仿公文版头各项前的领格 */}
                 <span
-                  className="text-sm text-[var(--color-ink-muted)] shrink-0 w-20"
+                  className="text-sm text-[var(--color-ink-muted)] shrink-0 w-20 relative pl-2.5"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
+                  <span
+                    className="absolute left-0 top-1.5 h-3 w-[2px] rounded-full"
+                    style={{
+                      background: "var(--color-seal)",
+                      opacity: filled ? 0.55 : 0.2,
+                    }}
+                    aria-hidden="true"
+                  />
                   {h.field}
                 </span>
                 {/* 右：值 + 核验状态 */}
@@ -318,19 +371,21 @@ export function RedheadDocStructure({
         })}
       </div>
 
-      {/* ── 逐条款 ── */}
-      <div className="mt-5 mb-2 flex items-center gap-2">
+      {/* ── 逐条款：案牍批注意象 ── */}
+      <div className="mt-6 mb-3 flex items-center gap-2.5">
+        {/* 版心朱砂短线起头，仿案牍页眉的领格 */}
+        <span className="h-3.5 w-[3px] rounded-full bg-[var(--color-seal)] opacity-70" />
         <span
-          className="inline-block text-xs px-2 py-0.5 rounded-full"
-          style={{
-            color: "var(--color-seal)",
-            border: "0.5px solid var(--color-seal)",
-          }}
+          className="text-sm font-bold text-[var(--color-ink)]"
+          style={{ fontFamily: "var(--font-display)" }}
         >
-          逐条款 · {clauses.length} 条
+          逐条款
+        </span>
+        <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
+          {clauses.length} 条
         </span>
         {clauses.length > 0 && (
-          <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
+          <span className="ml-auto text-xs text-[var(--color-ink-muted)] tabular-nums">
             原文核验 {clauseVerified}/{clauses.length}
           </span>
         )}
@@ -348,13 +403,36 @@ export function RedheadDocStructure({
             return (
               <div
                 key={i}
-                className="rounded border border-[var(--color-rule)] bg-white p-3"
+                className="relative rounded border border-[var(--color-rule)] bg-white p-3 pl-4"
               >
-                {/* 标题行：序号 + 指令类型标签 */}
+                {/* 案牍批注线：卡左侧一道朱砂细脊（批注的领格），核过的深一点 */}
+                <span
+                  className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full"
+                  style={{
+                    background: "var(--color-seal)",
+                    opacity: showOrigin ? 0.45 : 0.18,
+                  }}
+                  aria-hidden="true"
+                />
+                {/* 标题行：朱砂墨钉序号 + 事项 + 指令类型标签 */}
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-bold text-[var(--color-ink)] leading-snug">
-                    <span className="text-[var(--color-ink-muted)] tabular-nums mr-1.5">
-                      {i + 1}.
+                  <p className="text-sm font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
+                    {/* 朱砂墨钉：圆印里白序号，仿案牍逐条的朱批编号 */}
+                    <span
+                      className="inline-flex items-center justify-center align-middle mr-2 tabular-nums shrink-0"
+                      style={{
+                        width: "18px",
+                        height: "18px",
+                        borderRadius: "3px",
+                        background: "var(--color-seal)",
+                        color: "var(--color-paper)",
+                        fontSize: "11px",
+                        lineHeight: 1,
+                        fontFamily: "var(--font-display)",
+                        transform: "rotate(-3deg)",
+                      }}
+                    >
+                      {i + 1}
                     </span>
                     {c.matter || "（这条没给主体事项）"}
                   </p>
