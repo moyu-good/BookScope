@@ -788,6 +788,153 @@ class ConsistencyScanResponse(BaseModel):
     )
 
 
+# ── 1.6 红头文件垂直(Phase 1)：单文件解读 + 三个跨文件视图 ──────────────────
+
+
+class RedheadDocStructureRequest(BaseModel):
+    """POST /api/agent/redhead/doc-structure 请求体（单份公文文脉解读）。
+
+    一份公文 = 一个已有的 book session（用户照现有 /books/upload 各传一份公文）；
+    这里收单个 book_session_id，建这份的文脉。BYOK，同其它整本结构化功能。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识（一份公文）。")
+    provider: Literal["deepseek", "anthropic"] = Field(default="deepseek")
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class RedheadDocStructureResponse(BaseModel):
+    """POST /api/agent/redhead/doc-structure 响应体（一份公文的文脉）。"""
+
+    head: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "文件头要素，固定 8 条（发文字号/文种/发文机关/主送机关/抄送机关/标题事由/"
+            "成文日期/签发人）。每条 {field, value, evidence, verified, match_score}；"
+            "抽不到的留空 value + verified=false（待核，绝不编）。"
+        ),
+    )
+    clauses: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "逐条款结构，按条款序号排。每条 {chapter, matter, instruction_type, actor, "
+            "deadline, basis_ref, evidence, verified, match_score}；instruction_type 是"
+            "带原文撑的四标签之一（硬要求/软倡导/信息告知/依据陈述），不是打分。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否成功精读。false=失败，前端提示重试；true+空 clauses=读过但没抽到条款。",
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
+class RedheadCrossDocRequest(BaseModel):
+    """跨文件视图（依据链网 / 政策演变 / 上下级一致性）共用的请求体。
+
+    「卷宗」= 客户端传一组 book_session_ids（每个是一份已上传的公文）。端点逐个 resolve
+    assembler、建文脉，凑成一摞文脉再跑视图。政策演变可另带 topic，见子类。BYOK。
+    """
+
+    book_session_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        description="一组 book session 标识（一卷宗的多份公文）。",
+    )
+    provider: Literal["deepseek", "anthropic"] = Field(default="deepseek")
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class RedheadDependencyGraphResponse(BaseModel):
+    """POST /api/agent/redhead/dependency-graph 响应体（依据链关联网）。"""
+
+    nodes: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "节点：文件（字号）+ 机关。每条 {id, kind:'文件'|'机关', label, 文种, 机关, "
+            "成文日期}，前端按 kind 分色。"
+        ),
+    )
+    edges: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "有向边：{source, target, kind, chapter_anchor, note}。kind 是关系类型"
+            "（依据/落实/废止/修改/上下级/发文）；chapter_anchor 是来源条款序号（可空，"
+            "点开按需取证据）。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否成功推出关系网。false=失败/不足两份相关文件/没推出任何关系（空态）。",
+    )
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
+class RedheadPolicyEvolutionRequest(RedheadCrossDocRequest):
+    """POST /api/agent/redhead/policy-evolution 请求体。可另带政策主题。"""
+
+    topic: str | None = Field(
+        default=None,
+        description="政策主题（可选）。空时按这摞文件整体的政策线排演变。",
+    )
+
+
+class RedheadPolicyEvolutionResponse(BaseModel):
+    """POST /api/agent/redhead/policy-evolution 响应体（政策演变时间线）。"""
+
+    stages: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "按成文日期排的演变阶段，每条 {order, doc, change, snippet, verified}。"
+            "doc 是真实发文字号；snippet 取那份文脉某条款已核 evidence（锚不到原文的阶段被丢）。"
+            "空 + scanned=true = 主题不在这摞文件。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description="是否成功排演变。false=失败/没有可锚的真实文件；true+空=主题不在这摞文件。",
+    )
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
+class RedheadLevelConsistencyResponse(BaseModel):
+    """POST /api/agent/redhead/level-consistency 响应体（上下级一致性核查）。"""
+
+    conflicts: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "上下级对不上的地方，每条 {topic, detail, deviation, upper:{doc, clause, snippet, "
+            "verified}, lower:{...}}。deviation 是 走样/加码/漏落实 之一；两侧 snippet 都取"
+            "各自文脉已核 evidence（任一侧坐实不了的整条丢，不 cry wolf）。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description=(
+            "是否成功核查。false=失败/这摞文件全平级或单文件（没上下级落差，题材自适应该掉）；"
+            "true+空=都一致没扫出走样。"
+        ),
+    )
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class TimelineRequest(BaseModel):
     """POST /api/agent/timeline 请求体（时间线/事件梳理）。BYOK。"""
 
@@ -1386,6 +1533,13 @@ __all__ = [
     "PacingCurveRequest",
     "PacingCurveResponse",
     "PreviousReviewHint",
+    "RedheadCrossDocRequest",
+    "RedheadDependencyGraphResponse",
+    "RedheadDocStructureRequest",
+    "RedheadDocStructureResponse",
+    "RedheadLevelConsistencyResponse",
+    "RedheadPolicyEvolutionRequest",
+    "RedheadPolicyEvolutionResponse",
     "RelationshipTimelineRequest",
     "RelationshipTimelineResponse",
     "Review",

@@ -48,6 +48,7 @@ from bookscope.agent import (
     run_fast_path,
 )
 from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
+from bookscope.agent._internal.doc_spine_cache import get_or_build_doc_spine
 from bookscope.agent.annotations import generate_annotations
 from bookscope.agent.argument_structure import generate_argument_structure_exhaustive
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
@@ -76,6 +77,12 @@ from bookscope.agent.character_graph import (
 )
 from bookscope.agent.character_voice import generate_character_voice
 from bookscope.agent.claim_support import check_claim_support
+from bookscope.agent.cross_doc import cross_doc_relations_from_spines
+from bookscope.agent.cross_doc_views import (
+    dependency_graph_from_cross_doc,
+    level_consistency_from_spines,
+    policy_evolution_from_spines,
+)
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
 from bookscope.agent.long_context import run_long_context
@@ -138,6 +145,13 @@ from bookscope.api.schemas import (
     PreviousReviewHint,
     RecapRequest,
     RecapResponse,
+    RedheadCrossDocRequest,
+    RedheadDependencyGraphResponse,
+    RedheadDocStructureRequest,
+    RedheadDocStructureResponse,
+    RedheadLevelConsistencyResponse,
+    RedheadPolicyEvolutionRequest,
+    RedheadPolicyEvolutionResponse,
     RelationshipTimelineRequest,
     RelationshipTimelineResponse,
     Review,
@@ -2901,6 +2915,197 @@ def _serialize_trace(trace: Any) -> dict:
     if isinstance(trace, dict):
         return trace
     return {}
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 1.6 红头文件垂直(Phase 1):单文件解读 + 三个跨文件视图
+# ════════════════════════════════════════════════════════════════════════════
+#
+# 摄入最简、复用现状(不新建 session 模型):一份公文 = 一个已有的 book session
+# (用户照现有 /books/upload 各传一份)。「卷宗」= 客户端传一组 book_session_ids,
+# 跨文件端点逐个 resolve assembler → 拿 chunks → 建文脉(get_or_build_doc_spine,
+# 同份秒出),凑成文脉栈再跑视图。错误分层 / trace / BYOK client 构建照其它端点抄。
+
+
+def _build_params_client_or_raise(request: Any) -> Any:
+    """按 BYOK 参数构造 LLM client;SDK 未装 / 参数非法翻译为 HTTP 400。
+
+    口径同各整本结构化功能端点内联的那段 try/except(ProviderSdkMissing /
+    ClientBuildFailed)。``request`` 只要带 ``provider`` / ``api_key`` / ``base_url``。
+    """
+    try:
+        return build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+
+def _collect_doc_spines(
+    store: BookSessionStore,
+    session_ids: list[str],
+    *,
+    llm_client: Any,
+    model: str,
+) -> list[dict]:
+    """逐个 resolve assembler → 拿 chunks → 建文脉(命中缓存秒出),凑成文脉栈。
+
+    每个 session_id 都过 ``_resolve_assembler``(找不到照样翻 404,不静默跳过——卷宗里
+    点名的文件必须都在)。同份公文 ``get_or_build_doc_spine`` 命中缓存,跨文件视图逐份建
+    文脉时同份只精读一次。``llm_client`` 已被 ``_UsageRecorder`` 包过,token 用量累加进 trace。
+    """
+    spines: list[dict] = []
+    for sid in session_ids:
+        assembler = _resolve_assembler(store, sid)
+        _full, chunks = _long_context_inputs(assembler)
+        spine = get_or_build_doc_spine(chunks=chunks, llm_client=llm_client, model=model)
+        spines.append(spine)
+    return spines
+
+
+@agent_router.post(
+    "/agent/redhead/doc-structure",
+    response_model=RedheadDocStructureResponse,
+)
+async def agent_redhead_doc_structure(
+    request: RedheadDocStructureRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadDocStructureResponse:
+    """单份公文解读:精读一份红头文件出带证据的文脉(头要素 + 逐条款)。
+
+    一份公文 = 一个已有的 book session。从这份的 chunks 建文脉(``get_or_build_doc_spine``,
+    同份秒出)。头要素抽不到的留空待核、绝不编;指令类型是带原文撑的四标签、不是打分。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    spine = get_or_build_doc_spine(chunks=chunks, llm_client=rec, model=model)
+    head = spine.get("head") or []
+    clauses = spine.get("clauses") or []
+    return RedheadDocStructureResponse(
+        head=head,
+        clauses=clauses,
+        # 头要素永远出 8 条骨架,所以 scanned 看「有没有抽到真东西」:任一头要素有值 或 有条款。
+        scanned=bool(clauses) or any(str(el.get("value", "")).strip() for el in head),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/redhead/dependency-graph",
+    response_model=RedheadDependencyGraphResponse,
+)
+async def agent_redhead_dependency_graph(
+    request: RedheadCrossDocRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadDependencyGraphResponse:
+    """依据链关联网:一卷宗逐份建文脉 → 一次全局推文件间关系 → 整成星图(谁连谁)。
+
+    ``cross_doc_relations_from_spines`` 推关系(锚回真实字号,编不出来的丢),
+    ``dependency_graph_from_cross_doc`` 纯聚合成 nodes/edges。不足两份相关文件 / 推不出
+    任何关系 → 空态(scanned=false),不硬画。
+    """
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    spines = _collect_doc_spines(
+        store, request.book_session_ids, llm_client=rec, model=model
+    )
+    cross = cross_doc_relations_from_spines(
+        doc_spines=spines, llm_client=rec, model=model
+    )
+    graph = dependency_graph_from_cross_doc(cross)
+    return RedheadDependencyGraphResponse(
+        nodes=(graph or {}).get("nodes", []),
+        edges=(graph or {}).get("edges", []),
+        scanned=graph is not None,
+        trace=_run_trace(rec, "", _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/redhead/policy-evolution",
+    response_model=RedheadPolicyEvolutionResponse,
+)
+async def agent_redhead_policy_evolution(
+    request: RedheadPolicyEvolutionRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadPolicyEvolutionResponse:
+    """政策演变:一卷宗逐份建文脉 → 一次 LLM 按成文日期序排演变(每阶段标改了什么)。
+
+    ``policy_evolution_from_spines`` 锚回真实字号、每阶段 snippet 取那份文脉已核 evidence
+    (锚不到原文的阶段丢)。主题(topic)可选;主题不在这摞文件返空 + scanned=true,
+    一次推理失败 / 没可锚文件返 scanned=false。
+    """
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    spines = _collect_doc_spines(
+        store, request.book_session_ids, llm_client=rec, model=model
+    )
+    stages = policy_evolution_from_spines(
+        doc_spines=spines, llm_client=rec, model=model, topic=request.topic
+    )
+    return RedheadPolicyEvolutionResponse(
+        stages=stages or [],
+        scanned=stages is not None,
+        trace=_run_trace(rec, "", _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/redhead/level-consistency",
+    response_model=RedheadLevelConsistencyResponse,
+)
+async def agent_redhead_level_consistency(
+    request: RedheadCrossDocRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadLevelConsistencyResponse:
+    """上下级一致性核查:一卷宗逐份建文脉 → 一次 LLM 找上下级要求对不上的地方。
+
+    ``level_consistency_from_spines`` 按机关层级判上下级、双向守卫(两侧 snippet 都取已核
+    evidence,任一坐实不了的整条丢,不 cry wolf)。题材自适应:全平级 / 单文件 / 层级全未知
+    (没上下级落差)返 scanned=false,这个视图本就该掉;都一致返空 + scanned=true。
+    """
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    spines = _collect_doc_spines(
+        store, request.book_session_ids, llm_client=rec, model=model
+    )
+    conflicts = level_consistency_from_spines(
+        doc_spines=spines, llm_client=rec, model=model
+    )
+    return RedheadLevelConsistencyResponse(
+        conflicts=conflicts or [],
+        scanned=conflicts is not None,
+        trace=_run_trace(rec, "", _t0),
+    )
 
 
 __all__ = ["agent_router"]
