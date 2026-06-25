@@ -323,19 +323,20 @@ def test_strips_code_fence(monkeypatch):
     assert len(r["relations"]) == 1
 
 
-# ── 没字号的文件靠标题进网络(地方法规场景) ─────────────────────────────────────
-def test_doc_without_number_anchors_by_title(monkeypatch):
-    """没发文字号的地方法规(广东 / 广州条例)用标题当 anchor,照样进网络、能被引到。
+# ── 没字号的文件靠「机关·标题」进网络(地方法规场景) ───────────────────────────
+def test_doc_without_number_anchors_by_org_and_title(monkeypatch):
+    """没发文字号的地方法规(广东 / 广州条例)用「发文机关·标题」当 anchor,照样进网络、能被引到。
 
-    营商环境链的真实形态:722 条例有字号;广东条例没字号,只有标题《广东省优化营商环境条例》,
-    正文「根据《优化营商环境条例》制定本条例」按标题引 722。
+    营商环境链的真实形态:722 条例有字号;广东条例没字号,只有机关 + 标题《广东省优化营商环境
+    条例》,正文「根据《优化营商环境条例》制定本条例」按标题引 722。anchor 带机关前缀(广东 /
+    广州 / 国务院三份同名时才分得开)。
     """
     spines = [
         # 722:有字号
         {"head": _head(num="国务院令第722号", doc_type="条例", org="国务院",
                        title="优化营商环境条例", date="2019年10月22日"),
          "clauses": [_clause(1, "总则")]},
-        # 广东条例:没字号,靠标题进网络;正文按标题引 722
+        # 广东条例:没字号,靠「机关·标题」进网络;正文按标题引 722
         {"head": _head(num="", doc_type="条例", org="广东省人民代表大会常务委员会",
                        title="广东省优化营商环境条例", date="2020年7月1日"),
          "clauses": [_clause(1, "据上位条例制定", basis="《优化营商环境条例》")]},
@@ -344,17 +345,54 @@ def test_doc_without_number_anchors_by_title(monkeypatch):
     _patch(monkeypatch, json.dumps({"relations": []}))
     r = _run(spines=spines)
     assert r is not None
-    # 广东条例靠标题当 anchor 进了 docs(没字号也在)
+    gd_anchor = "广东省人民代表大会常务委员会·广东省优化营商环境条例"
+    # 广东条例靠「机关·标题」当 anchor 进了 docs(没字号也在)
     anchors = {d["字号"] for d in r["docs"]}
-    assert "广东省优化营商环境条例" in anchors
+    assert gd_anchor in anchors
     # 本地兜底捞出"广东条例 依据 722"(按标题引解析回 722 的字号 anchor)
     rels = r["relations"]
     assert any(
-        x["from_doc"] == "广东省优化营商环境条例"
+        x["from_doc"] == gd_anchor
         and x["to_doc"] == "国务院令第722号"
         and x["kind"] == "依据"
         for x in rels
     )
+
+
+def test_same_title_basis_resolves_up_level_not_self(monkeypatch):
+    """三份同名《优化营商环境条例》(国务院 / 广东 / 广州):下位「根据《优化营商环境条例》」
+    本地兜底解析到**层级更高**那份(往上指),不指回自己 / 平级。
+
+    这是依据链网从 None 复活的核心:光用标题三份撞一个节点 → 没边;改「机关·标题」分开节点 +
+    同名引用按层级解析,广东依据国务院、广州依据国务院,链就出来了。
+    """
+    spines = [
+        # 国务院 722:有字号,层级 1(中央)
+        {"head": _head(num="国务院令第722号", doc_type="条例", org="国务院",
+                       title="优化营商环境条例", date="2019年10月22日"),
+         "clauses": [_clause(1, "总则")]},
+        # 广东:没字号,层级 2(省);正文据《优化营商环境条例》→ 应解析到 722,不指自己
+        {"head": _head(num="", doc_type="条例", org="广东省人民代表大会常务委员会",
+                       title="广东省优化营商环境条例", date="2022年7月1日"),
+         "clauses": [_clause(1, "据上位条例制定", basis="优化营商环境条例")]},
+        # 广州:没字号,层级 3(市);正文据《优化营商环境条例》→ 应解析到 722(不指广东 / 自己)
+        {"head": _head(num="", doc_type="条例", org="广州市人民代表大会常务委员会",
+                       title="广州市优化营商环境条例", date="2020年11月27日"),
+         "clauses": [_clause(1, "据上位条例制定", basis="优化营商环境条例")]},
+    ]
+    _patch(monkeypatch, json.dumps({"relations": []}))  # 全靠本地兜底,LLM 不推
+    r = _run(spines=spines)
+    assert r is not None
+    rels = r["relations"]
+    gd = "广东省人民代表大会常务委员会·广东省优化营商环境条例"
+    gz = "广州市人民代表大会常务委员会·广州市优化营商环境条例"
+    by_from = {x["from_doc"]: x for x in rels if x["kind"] == "依据"}
+    # 广东依据国务院 722(不依据自己)
+    assert by_from[gd]["to_doc"] == "国务院令第722号"
+    # 广州依据国务院 722(往上指到中央,不指平级广东、不指自己)
+    assert by_from[gz]["to_doc"] == "国务院令第722号"
+    # 没有任何一条 from == to(没自指)
+    assert all(x["from_doc"] != x["to_doc"] for x in rels)
 
 
 # ── 本地 basis_ref 兜底:LLM 漏了,正文引用照样坐实依据 ──────────────────────────
