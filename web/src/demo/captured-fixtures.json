@@ -20851,1264 +20851,5389 @@
       }
     },
     "POST /api/agent/relationship-timeline": {
-      "relations": [
+      "relations": [],
+      "pairs": [
         {
           "a": "刘备",
           "b": "诸葛亮",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 42,
-              "strength": 7
-            },
-            {
-              "chapter": 54,
-              "strength": 8
-            },
-            {
-              "chapter": 74,
-              "strength": 9
-            },
-            {
-              "chapter": 86,
-              "strength": 10
-            }
+          "chapters": [
+            42,
+            50,
+            52,
+            53,
+            54,
+            55,
+            67,
+            71,
+            74,
+            86
           ],
-          "turning_points": [
-            {
-              "chapter": 54,
-              "change": "孔明劝刘备应允婚事并予锦囊，刘备完全信任其谋略",
-              "evidence": "国太大怒，骂周瑜曰：‘汝做六郡八十一州大都督，直恁无条计策去取荆州，却将我女儿为名，使美人计！杀了刘备，我女便是望门寡，明日再怎的说亲？须误了我女儿一世！你们好做作！’",
-              "verified": true,
-              "match_score": 0.9
-            },
-            {
-              "chapter": 74,
-              "change": "孔明劝刘备进位汉中王，刘备依允，君臣关系达到新高度",
-              "evidence": "云长大悟，乃再拜曰：‘某之不明，非足下见教，几误大事。’即拜受印绶。",
-              "verified": true,
-              "match_score": 0.81
-            },
-            {
-              "chapter": 86,
-              "change": "刘备托孤并言马谡不可大用，体现绝对信任",
-              "evidence": "先主泣曰：‘君才十倍曹丕，必能安邦定国，终定大事。若嗣子可辅则辅之，如其不才，君可自为成都之主。’",
-              "verified": true,
-              "match_score": 0.91
-            }
-          ]
+          "first": 42,
+          "last": 86,
+          "count": 10
         },
         {
           "a": "刘禅",
           "b": "诸葛亮",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 86,
-              "strength": 10
-            }
+          "chapters": [
+            86,
+            87,
+            88,
+            92,
+            97,
+            98,
+            100,
+            103
           ],
-          "turning_points": []
+          "first": 86,
+          "last": 103,
+          "count": 8
         },
         {
           "a": "司马懿",
           "b": "诸葛亮",
-          "relation": "政敌",
-          "points": [
-            {
-              "chapter": 96,
-              "strength": 9
-            },
-            {
-              "chapter": 105,
-              "strength": 9
-            }
+          "chapters": [
+            96,
+            97,
+            98,
+            100,
+            101,
+            103,
+            104,
+            105
           ],
-          "turning_points": []
+          "first": 96,
+          "last": 105,
+          "count": 8
         },
         {
           "a": "诸葛亮",
           "b": "鲁肃",
-          "relation": "同盟",
-          "points": [
-            {
-              "chapter": 42,
-              "strength": 5
-            },
-            {
-              "chapter": 43,
-              "strength": 6
-            },
-            {
-              "chapter": 45,
-              "strength": 7
-            },
-            {
-              "chapter": 46,
-              "strength": 8
-            },
-            {
-              "chapter": 49,
-              "strength": 9
-            },
-            {
-              "chapter": 52,
-              "strength": 7
-            },
-            {
-              "chapter": 54,
-              "strength": 6
-            },
-            {
-              "chapter": 56,
-              "strength": 5
-            }
+          "chapters": [
+            42,
+            43,
+            45,
+            46,
+            49,
+            52,
+            54,
+            56
           ],
-          "turning_points": [
-            {
-              "chapter": 42,
-              "change": "鲁肃邀孔明同见孙权，二人初次合作，关系建立",
-              "evidence": "张飞睁目又喝曰：“燕人张翼德在此！谁敢来决死战？”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 45,
-              "change": "孔明点破周瑜计谋，鲁肃惊服，信任显著加深",
-              "evidence": "瑜大惊，汗流满背，便斟酒与云长把盏。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 49,
-              "change": "鲁肃助孔明筑坛借东风，合作达到顶峰",
-              "evidence": "孔明索纸笔，屏退左右，密书十六字曰：欲破曹公，宜用火攻；万事俱备，只欠东风。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 52,
-              "change": "鲁肃首次讨荆州，孔明以刘琦在为由推托并立暂借文书，关系出现裂痕",
-              "evidence": "孔明曰：‘子敬乃高明之士，何故亦出此言？常言道：“物必归主。”荆襄九郡，非东吴之地，乃刘景升之基业。吾主固景升之弟也，景升虽亡，其子尚在。以叔辅侄，而取荆襄，有何不可？’",
-              "verified": true,
-              "match_score": 0.9
-            }
-          ]
+          "first": 42,
+          "last": 56,
+          "count": 8
         },
         {
           "a": "刘备",
           "b": "曹操",
-          "relation": "政敌",
-          "points": [
-            {
-              "chapter": 16,
-              "strength": 8
-            },
-            {
-              "chapter": 17,
-              "strength": 9
-            },
-            {
-              "chapter": 18,
-              "strength": 10
-            },
-            {
-              "chapter": 21,
-              "strength": 7
-            },
-            {
-              "chapter": 24,
-              "strength": 1
-            },
-            {
-              "chapter": 31,
-              "strength": 0
-            },
-            {
-              "chapter": 73,
-              "strength": 0
-            }
+          "chapters": [
+            16,
+            17,
+            18,
+            21,
+            24,
+            31,
+            73
           ],
-          "turning_points": [
-            {
-              "chapter": 16,
-              "change": "刘备投靠曹操，曹操表荐刘备为豫州牧，两人初识并建立合作关系",
-              "evidence": "吕布提画戟在手，纪灵、玄德尽皆失色。布曰：‘我劝你两家不要厮杀，尽在天命。’",
-              "verified": true,
-              "match_score": 0.86
-            },
-            {
-              "chapter": 18,
-              "change": "曹操约刘备共图吕布，同盟关系达到顶峰",
-              "evidence": "夏侯惇大叫一声，急用手拔箭，不想连眼珠拔出，乃大呼曰：‘父精母血，不可弃也！’遂纳于口内啖之。",
-              "verified": true,
-              "match_score": 0.82
-            },
-            {
-              "chapter": 21,
-              "change": "曹操煮酒论英雄试探刘备，刘备巧借雷声掩饰，双方出现猜疑，关系开始降温",
-              "evidence": "操曰：‘今天下英雄，惟使君与操耳！’玄德闻言，吃了一惊，手中所执匙箸，不觉落于地下。",
-              "verified": true,
-              "match_score": 0.88
-            },
-            {
-              "chapter": 24,
-              "change": "曹操东征徐州，与刘备正式开战，关系彻底破裂",
-              "evidence": "田丰以杖击地曰：“遭此难遇之时，乃以婴儿之病，失此机会！大事去矣，可痛惜哉！”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 31,
-              "change": "刘备欲袭许昌被曹操击败，投奔刘表，敌对状态确立",
-              "evidence": "袁绍大怒曰：‘竖儒怎敢笑我！我必杀之！’遂命使者赍宝剑先往冀州狱中杀田丰。",
-              "verified": true,
-              "match_score": 0.8
-            }
-          ]
+          "first": 16,
+          "last": 73,
+          "count": 7
         },
         {
           "a": "诸葛亮",
           "b": "赵云",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 52,
-              "strength": 7
-            },
-            {
-              "chapter": 73,
-              "strength": 8
-            },
-            {
-              "chapter": 90,
-              "strength": 9
-            },
-            {
-              "chapter": 97,
-              "strength": 10
-            }
+          "chapters": [
+            52,
+            73,
+            87,
+            90,
+            97,
+            98
           ],
-          "turning_points": [
-            {
-              "chapter": 52,
-              "change": "诸葛亮赞赏赵云以大局为重，初次记录二人互动，信任基础建立",
-              "evidence": "孔明曰：‘子敬乃高明之士，何故亦出此言？常言道：“物必归主。”荆襄九郡，非东吴之地，乃刘景升之基业。吾主固景升之弟也，景升虽亡，其子尚在。以叔辅侄，而取荆襄，有何不可？’",
-              "verified": true,
-              "match_score": 0.9
-            },
-            {
-              "chapter": 97,
-              "change": "诸葛亮高度赞赏赵云不折一人一骑并赏赐，赵云辞谢，关系达到最融洽",
-              "evidence": "孔明挥泪曰：“吾与汝义同兄弟，汝之子即吾之子也，不必多嘱。”左右推出马谡于辕门之外，将斩。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 98,
-              "change": "赵云去世，诸葛亮闻讯跌足痛哭，君臣情谊以悲痛终结",
-              "evidence": "孔明大惊，跌足而哭曰：“子龙身故，国家损一栋梁，吾去一臂也！”",
-              "verified": true,
-              "match_score": 0.93
-            }
-          ]
+          "first": 52,
+          "last": 98,
+          "count": 6
         },
         {
           "a": "关羽",
           "b": "曹操",
-          "relation": "恩义之交",
-          "points": [
-            {
-              "chapter": 25,
-              "strength": 6
-            },
-            {
-              "chapter": 27,
-              "strength": 7
-            },
-            {
-              "chapter": 42,
-              "strength": 2
-            },
-            {
-              "chapter": 50,
-              "strength": 9
-            }
+          "chapters": [
+            25,
+            26,
+            27,
+            42,
+            50
           ],
-          "turning_points": [
-            {
-              "chapter": 25,
-              "change": "关羽约三事降曹，曹操允诺，建立关系",
-              "evidence": "关公曰：“吾观颜良，如插标卖首耳！”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 27,
-              "change": "曹操亲送关羽并赠袍，加深恩情",
-              "evidence": "关公曰：“吾非欲沿途杀人，奈事不得已也。曹公知之，必以我为负恩之人矣。”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 42,
-              "change": "关羽截住曹操，曹操惊呼中计，关系转为敌对",
-              "evidence": "张飞睁目又喝曰：“燕人张翼德在此！谁敢来决死战？”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 50,
-              "change": "曹操在华容道以昔日恩情说动关羽放行，关系缓和并加深",
-              "evidence": "云长是个义重如山之人，想起当日曹操许多恩义，与后来五关斩将之事，如何不动心？又见曹军惶惶，皆欲垂泪，一发心中不忍。于是把马头勒回，谓众军曰：‘四散摆开。’",
-              "verified": true,
-              "match_score": 0.95
-            }
-          ]
+          "first": 25,
+          "last": 50,
+          "count": 5
         },
         {
           "a": "刘备",
           "b": "吕布",
-          "relation": "政敌",
-          "points": [
-            {
-              "chapter": 5,
-              "strength": 1
-            },
-            {
-              "chapter": 14,
-              "strength": 3
-            },
-            {
-              "chapter": 15,
-              "strength": 5
-            },
-            {
-              "chapter": 16,
-              "strength": 7
-            },
-            {
-              "chapter": 19,
-              "strength": 0
-            }
+          "chapters": [
+            5,
+            14,
+            15,
+            16,
+            19
           ],
-          "turning_points": [
-            {
-              "chapter": 5,
-              "change": "刘备参与三英战吕布，初次交战，关系敌对",
-              "evidence": "关公曰：“酒且斟下，某去便来。”出帐提刀，飞身上马。众诸侯听得关外鼓声大振...云长提华雄之头，掷于地上，其酒尚温。",
-              "verified": true,
-              "match_score": 0.93
-            },
-            {
-              "chapter": 14,
-              "change": "吕布送还刘备家眷，关系缓和",
-              "evidence": "玄德叹曰：‘得何足喜，失何足忧！’",
-              "verified": true,
-              "match_score": 0.73
-            },
-            {
-              "chapter": 15,
-              "change": "吕布再次送还家眷，二人和好",
-              "evidence": "古人云：‘兄弟如手足，妻子如衣服。衣服破，尚可缝；手足断，安可续？’",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 16,
-              "change": "吕布辕门射戟为刘备解困，关系升温至短期同盟",
-              "evidence": "吕布提画戟在手，纪灵、玄德尽皆失色。布曰：‘我劝你两家不要厮杀，尽在天命。’",
-              "verified": true,
-              "match_score": 0.86
-            },
-            {
-              "chapter": 19,
-              "change": "吕布攻小沛，刘备弃城并暗示曹操杀吕，关系彻底决裂",
-              "evidence": "操令将吕布缢死，然后枭首。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 5,
+          "last": 19,
+          "count": 5
         },
         {
           "a": "周瑜",
           "b": "诸葛亮",
-          "relation": "政敌",
-          "points": [
-            {
-              "chapter": 44,
-              "strength": 3
-            },
-            {
-              "chapter": 45,
-              "strength": 2
-            },
-            {
-              "chapter": 46,
-              "strength": 1
-            },
-            {
-              "chapter": 49,
-              "strength": 3
-            },
-            {
-              "chapter": 58,
-              "strength": 0
-            }
+          "chapters": [
+            44,
+            45,
+            46,
+            49,
+            58
           ],
-          "turning_points": [
-            {
-              "chapter": 44,
-              "change": "孔明以铜雀台赋激怒周瑜，两人首次正面交锋，关系以冲突开场",
-              "evidence": "周瑜听罢，勃然大怒，离座指北而骂曰：“老贼欺吾太甚！”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 45,
-              "change": "周瑜令孔明劫粮欲借刀杀人，孔明化解，关系进一步恶化",
-              "evidence": "瑜大惊，汗流满背，便斟酒与云长把盏。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 46,
-              "change": "周瑜令孔明造箭，孔明草船借箭十万，周瑜妒忌加深，关系持续紧张",
-              "evidence": "孔明笑曰：“吾料曹操于重雾中必不敢出。吾等只顾酌酒取乐，待雾散便回。”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 49,
-              "change": "周瑜因缺东风请孔明祭风，两人暂时合作，关系短暂缓和",
-              "evidence": "孔明索纸笔，屏退左右，密书十六字曰：欲破曹公，宜用火攻；万事俱备，只欠东风。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 58,
-              "change": "周瑜被孔明书信气死，临终慨叹'既生瑜，何生亮'，孔明吊丧痛哭，关系彻底终结",
-              "evidence": "周瑜览毕，长叹一声，唤左右取纸笔作书上吴侯。乃聚众将曰：“吾非不欲尽忠报国，奈天命已绝矣。汝等善事吴侯，共成大业。”言讫昏绝。徐徐又醒，仰天长叹曰：“既生瑜，何生亮！”连叫数声而亡，寿三十六岁。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 44,
+          "last": 58,
+          "count": 5
         },
         {
           "a": "周瑜",
           "b": "鲁肃",
-          "relation": "盟友",
-          "points": [
-            {
-              "chapter": 29,
-              "strength": 3
-            },
-            {
-              "chapter": 44,
-              "strength": 6
-            },
-            {
-              "chapter": 52,
-              "strength": 8
-            }
+          "chapters": [
+            29,
+            44,
+            51,
+            52,
+            54
           ],
-          "turning_points": [
-            {
-              "chapter": 29,
-              "change": "周瑜聘用鲁肃，鲁肃献鼎足江东之策，二人开始合作",
-              "evidence": "言讫瞑目而逝，年止二十六岁。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 44,
-              "change": "鲁肃劝阻周瑜杀害诸葛亮，周瑜听从，关系进一步紧密",
-              "evidence": "周瑜听罢，勃然大怒，离座指北而骂曰：“老贼欺吾太甚！”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 52,
-              "change": "鲁肃再次成功劝阻周瑜进攻刘备并自荐说理，信任加深",
-              "evidence": "孔明曰：‘子敬乃高明之士，何故亦出此言？常言道：“物必归主。”荆襄九郡，非东吴之地，乃刘景升之基业。吾主固景升之弟也，景升虽亡，其子尚在。以叔辅侄，而取荆襄，有何不可？’",
-              "verified": true,
-              "match_score": 0.9
-            }
-          ]
+          "first": 29,
+          "last": 54,
+          "count": 5
         },
         {
           "a": "姜维",
           "b": "诸葛亮",
-          "relation": "师徒",
-          "points": [
-            {
-              "chapter": 94,
-              "strength": 5
-            },
-            {
-              "chapter": 97,
-              "strength": 7
-            },
-            {
-              "chapter": 100,
-              "strength": 8
-            },
-            {
-              "chapter": 105,
-              "strength": 10
-            }
+          "chapters": [
+            94,
+            97,
+            98,
+            100,
+            105
           ],
-          "turning_points": [
-            {
-              "chapter": 94,
-              "change": "诸葛亮用计收服姜维，执手叹得之，建立师徒关系",
-              "evidence": "孔明慌忙下车而迎，执维手曰：“吾自出茅庐以来，遍求贤者，欲传授平生之学，恨未得其人。今遇伯约，吾愿足矣。”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 105,
-              "change": "诸葛亮授予姜维兵书连弩，传授核心技艺，关系达到顶峰",
-              "evidence": "懿叹曰：‘吾能料其生，不能料其死也！’",
-              "verified": true,
-              "match_score": 0.75
-            }
-          ]
+          "first": 94,
+          "last": 105,
+          "count": 5
         },
         {
           "a": "曹操",
           "b": "荀彧",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 10,
-              "strength": 8
-            }
+          "chapters": [
+            10,
+            12,
+            14,
+            24,
+            30
           ],
-          "turning_points": [
-            {
-              "chapter": 10,
-              "change": "曹操收荀彧为谋士，称其为‘吾之子房’，建立紧密的君臣信任关系",
-              "evidence": "操闻之，哭倒于地。众人救起，操切齿曰：‘陶谦纵兵杀吾父，此仇不共戴天！吾今悉起大军，洗荡徐州，方雪吾恨！’",
-              "verified": true,
-              "match_score": 0.92
-            }
-          ]
+          "first": 10,
+          "last": 30,
+          "count": 5
         },
         {
           "a": "李儒",
           "b": "董卓",
-          "relation": "谋士与主公",
-          "points": [
-            {
-              "chapter": 3,
-              "strength": 8
-            },
-            {
-              "chapter": 8,
-              "strength": 6
-            },
-            {
-              "chapter": 9,
-              "strength": 2
-            }
+          "chapters": [
+            3,
+            4,
+            6,
+            8,
+            9
           ],
-          "turning_points": [
-            {
-              "chapter": 3,
-              "change": "李儒首次献策被董卓采纳，建立信任关系",
-              "evidence": "何进昂然直入，至嘉德殿门，张让、段珪迎出，左右围住，进大惊。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 8,
-              "change": "李儒劝董卓将貂蝉赐吕布，董卓不从，关系出现分歧",
-              "evidence": "允跪而言曰：“百姓有倒悬之危...今欲用‘连环计’，先将汝许嫁吕布，后献与董卓。”",
-              "verified": true,
-              "match_score": 0.85
-            },
-            {
-              "chapter": 9,
-              "change": "李儒再次劝谏，董卓怒斥，关系严重恶化",
-              "evidence": "吕布从车后厉声出曰：“有诏讨贼！”一戟直透咽喉，李肃早割头在手。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 3,
+          "last": 9,
+          "count": 5
         },
         {
           "a": "典韦",
           "b": "曹操",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 10,
-              "strength": 5
-            },
-            {
-              "chapter": 12,
-              "strength": 7
-            },
-            {
-              "chapter": 16,
-              "strength": 10
-            }
+          "chapters": [
+            10,
+            12,
+            16,
+            18
           ],
-          "turning_points": [
-            {
-              "chapter": 10,
-              "change": "典韦投奔曹操，曹操赞赏其勇猛，关系初建",
-              "evidence": "操闻之，哭倒于地。众人救起，操切齿曰：‘陶谦纵兵杀吾父，此仇不共戴天！吾今悉起大军，洗荡徐州，方雪吾恨！’",
-              "verified": true,
-              "match_score": 0.92
-            },
-            {
-              "chapter": 12,
-              "change": "典韦助曹操设计收服许褚，关系进一步深化",
-              "evidence": "操仰面笑曰：‘误中匹夫之计，吾必当报之！’",
-              "verified": true,
-              "match_score": 0.79
-            },
-            {
-              "chapter": 16,
-              "change": "典韦为保护曹操战死，关系达到忠诚的顶峰",
-              "evidence": "吕布提画戟在手，纪灵、玄德尽皆失色。布曰：‘我劝你两家不要厮杀，尽在天命。’",
-              "verified": true,
-              "match_score": 0.86
-            }
-          ]
+          "first": 10,
+          "last": 18,
+          "count": 4
         },
         {
           "a": "刘备",
           "b": "庞统",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 58,
-              "strength": 8
-            },
-            {
-              "chapter": 61,
-              "strength": 9
-            },
-            {
-              "chapter": 63,
-              "strength": 9
-            },
-            {
-              "chapter": 64,
-              "strength": 0
-            }
+          "chapters": [
+            58,
+            61,
+            63,
+            64
           ],
-          "turning_points": [
-            {
-              "chapter": 58,
-              "change": "刘备拜庞统为副军师，与孔明共赞方略，君臣关系正式建立",
-              "evidence": "周瑜览毕，长叹一声，唤左右取纸笔作书上吴侯。乃聚众将曰：“吾非不欲尽忠报国，奈天命已绝矣。汝等善事吴侯，共成大业。”言讫昏绝。徐徐又醒，仰天长叹曰：“既生瑜，何生亮！”连叫数声而亡，寿三十六岁。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 64,
-              "change": "庞统在落凤坡被张任射死，君臣关系因死亡终结",
-              "evidence": "只听山坡前一声炮响，箭如飞蝗，只望骑白马者射来。可怜庞统竟死于乱箭之下。时年止三十六岁。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 58,
+          "last": 64,
+          "count": 4
         },
         {
           "a": "刘备",
           "b": "张飞",
-          "relation": "兄弟",
-          "points": [
-            {
-              "chapter": 1,
-              "strength": 10
-            }
+          "chapters": [
+            1,
+            24,
+            42,
+            74
           ],
-          "turning_points": [
-            {
-              "chapter": 1,
-              "change": "在涿郡相遇，张飞提议结义，二人结为兄弟",
-              "evidence": "次日，于桃园中，备下乌牛白马祭礼等项，三人焚香再拜而说誓曰：‘念刘备、关羽、张飞，虽然异姓，既结为兄弟，则同心协力，救困扶危，上报国家，下安黎庶，不求同年同月同日生，只愿同年同月同日死。’",
-              "verified": true,
-              "match_score": 0.93
-            }
-          ]
+          "first": 1,
+          "last": 74,
+          "count": 4
         },
         {
           "a": "刘备",
           "b": "赵云",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 11,
-              "strength": 5
-            },
-            {
-              "chapter": 42,
-              "strength": 9
-            }
+          "chapters": [
+            11,
+            42,
+            54,
+            55
           ],
-          "turning_points": [
-            {
-              "chapter": 11,
-              "change": "赵云随刘备往徐州，开始追随",
-              "evidence": "玄德曰：‘备已许人，不敢失信。’",
-              "verified": true,
-              "match_score": 0.71
-            },
-            {
-              "chapter": 42,
-              "change": "刘备掷阿斗以慰赵云，君臣信任达到顶峰",
-              "evidence": "张飞睁目又喝曰：“燕人张翼德在此！谁敢来决死战？”",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 11,
+          "last": 55,
+          "count": 4
         },
         {
           "a": "吕布",
           "b": "曹操",
-          "relation": "政敌",
-          "points": [
-            {
-              "chapter": 11,
-              "strength": 1
-            },
-            {
-              "chapter": 17,
-              "strength": 7
-            },
-            {
-              "chapter": 19,
-              "strength": 0
-            }
+          "chapters": [
+            11,
+            12,
+            17,
+            19
           ],
-          "turning_points": [
-            {
-              "chapter": 11,
-              "change": "曹操与吕布首次交战，典韦救曹操，两人确立敌对关系",
-              "evidence": "玄德曰：‘备已许人，不敢失信。’",
-              "verified": true,
-              "match_score": 0.71
-            },
-            {
-              "chapter": 17,
-              "change": "曹操会合吕布征袁术，暂时结盟，关系升温",
-              "evidence": "操曰：‘吾自有策。’乃密召王垕入曰：‘吾欲问汝借一物，以压众心，汝必勿吝。’",
-              "verified": true,
-              "match_score": 0.79
-            },
-            {
-              "chapter": 19,
-              "change": "曹操擒杀吕布，关系彻底决裂",
-              "evidence": "操令将吕布缢死，然后枭首。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 11,
+          "last": 19,
+          "count": 4
         },
         {
           "a": "吕布",
           "b": "陈宫",
-          "relation": "谋士与主公",
-          "points": [
-            {
-              "chapter": 11,
-              "strength": 6
-            },
-            {
-              "chapter": 14,
-              "strength": 6
-            },
-            {
-              "chapter": 18,
-              "strength": 4
-            },
-            {
-              "chapter": 19,
-              "strength": 2
-            }
+          "chapters": [
+            11,
+            14,
+            18,
+            19
           ],
-          "turning_points": [
-            {
-              "chapter": 18,
-              "change": "陈宫谏言提防陈珪，吕布不听，首次出现重大分歧",
-              "evidence": "夏侯惇大叫一声，急用手拔箭，不想连眼珠拔出，乃大呼曰：‘父精母血，不可弃也！’遂纳于口内啖之。",
-              "verified": true,
-              "match_score": 0.82
-            },
-            {
-              "chapter": 19,
-              "change": "陈宫献掎角之计，吕布因妻言拒绝采纳，进一步削弱信任",
-              "evidence": "操令将吕布缢死，然后枭首。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 11,
+          "last": 19,
+          "count": 4
         },
         {
           "a": "孟获",
           "b": "诸葛亮",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 88,
-              "strength": 1
-            },
-            {
-              "chapter": 89,
-              "strength": 3
-            },
-            {
-              "chapter": 91,
-              "strength": 9
-            },
-            {
-              "chapter": 92,
-              "strength": 10
-            }
+          "chapters": [
+            88,
+            89,
+            91,
+            92
           ],
-          "turning_points": [
-            {
-              "chapter": 88,
-              "change": "诸葛亮初擒孟获，孟获不服，孔明释放，建立初次接触。",
-              "evidence": "孔明曰：‘吾今擒汝，汝心服否？’获曰：‘山僻路狭，误遭汝手，如何肯服！’",
-              "verified": true,
-              "match_score": 0.73
-            },
-            {
-              "chapter": 91,
-              "change": "诸葛亮第七次擒获孟获，孟获终于心服归顺。",
-              "evidence": "孟获垂泪言曰：“七擒七纵，自古未尝有也。吾虽化外之人，颇知礼义，直如此无羞耻乎？”遂同兄弟妻子宗党人等，皆匍匐跪于帐下，肉袒谢罪曰：“丞相天威，南人不复反矣！”",
-              "verified": true,
-              "match_score": 0.97
-            },
-            {
-              "chapter": 92,
-              "change": "孟获为诸葛亮送行并告知泸水祭奠习俗，诸葛亮以馒头代替人头祭祀，关系转为互助合作。",
-              "evidence": "孔明受诏归府，唤诸将听令。前督部：镇北将军、领丞相司马、凉州刺史、都亭侯魏延；前军都督：领扶风太守张翼，牙门将：裨将军王平……",
-              "verified": true,
-              "match_score": 0.97
-            }
-          ]
+          "first": 88,
+          "last": 92,
+          "count": 4
         },
         {
           "a": "曹操",
           "b": "陈宫",
-          "relation": "叛臣与主公",
-          "points": [
-            {
-              "chapter": 4,
-              "strength": 8
-            },
-            {
-              "chapter": 5,
-              "strength": 2
-            },
-            {
-              "chapter": 19,
-              "strength": 0
-            }
+          "chapters": [
+            4,
+            5,
+            10,
+            19
           ],
-          "turning_points": [
-            {
-              "chapter": 4,
-              "change": "陈宫释曹操，弃官同逃，两人开始逃亡同伴关系",
-              "evidence": "宁教我负天下人，休教天下人负我。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 5,
-              "change": "陈宫因曹操言论弃之而去，关系决裂",
-              "evidence": "关公曰：“酒且斟下，某去便来。”出帐提刀，飞身上马。众诸侯听得关外鼓声大振...云长提华雄之头，掷于地上，其酒尚温。",
-              "verified": true,
-              "match_score": 0.93
-            },
-            {
-              "chapter": 19,
-              "change": "曹操劝降陈宫，陈宫从容就死，关系终结",
-              "evidence": "操令将吕布缢死，然后枭首。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 4,
+          "last": 19,
+          "count": 4
         },
         {
           "a": "诸葛亮",
           "b": "马谡",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 88,
-              "strength": 7
-            },
-            {
-              "chapter": 92,
-              "strength": 9
-            },
-            {
-              "chapter": 96,
-              "strength": 5
-            },
-            {
-              "chapter": 97,
-              "strength": 0
-            }
+          "chapters": [
+            88,
+            92,
+            96,
+            97
           ],
-          "turning_points": [
-            {
-              "chapter": 88,
-              "change": "马谡献攻心策，诸葛亮采纳，建立信任",
-              "evidence": "孔明曰：‘吾今擒汝，汝心服否？’获曰：‘山僻路狭，误遭汝手，如何肯服！’",
-              "verified": true,
-              "match_score": 0.73
-            },
-            {
-              "chapter": 92,
-              "change": "马谡献反间计使司马懿被贬，关系进一步紧密",
-              "evidence": "孔明受诏归府，唤诸将听令。前督部：镇北将军、领丞相司马、凉州刺史、都亭侯魏延；前军都督：领扶风太守张翼，牙门将：裨将军王平……",
-              "verified": true,
-              "match_score": 0.97
-            },
-            {
-              "chapter": 96,
-              "change": "马谡失街亭，诸葛亮叹息责备，关系恶化",
-              "evidence": "孔明跌足长叹曰：“大事去矣！此吾之过也！”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 97,
-              "change": "诸葛亮挥泪斩马谡，关系彻底决裂",
-              "evidence": "孔明挥泪曰：“吾与汝义同兄弟，汝之子即吾之子也，不必多嘱。”左右推出马谡于辕门之外，将斩。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 88,
+          "last": 97,
+          "count": 4
         },
         {
           "a": "诸葛亮",
           "b": "魏延",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 53,
-              "strength": 1
-            },
-            {
-              "chapter": 97,
-              "strength": 4
-            },
-            {
-              "chapter": 100,
-              "strength": 6
-            },
-            {
-              "chapter": 104,
-              "strength": 8
-            }
+          "chapters": [
+            53,
+            97,
+            100,
+            104
           ],
-          "turning_points": [
-            {
-              "chapter": 53,
-              "change": "孔明欲斩魏延，刘备劝阻后仅警告，关系起始于警惕与压制",
-              "evidence": "云长引魏延来见，孔明喝令刀斧手推下斩之。玄德惊问孔明曰：‘魏延乃有功无罪之人，军师何故欲杀之？’孔明曰：‘食其禄而杀其主，是不忠也；居其土而献其地，是不义也。吾观魏延脑后有反骨，久后必反，故先斩之，以绝祸根。’",
-              "verified": true,
-              "match_score": 0.91
-            },
-            {
-              "chapter": 97,
-              "change": "诸葛亮开始委派魏延断后诈败任务，关系由排斥转为利用与试探",
-              "evidence": "孔明挥泪曰：“吾与汝义同兄弟，汝之子即吾之子也，不必多嘱。”左右推出马谡于辕门之外，将斩。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 100,
-              "change": "孔明授予魏延密计斩杀王双，信任明显增强",
-              "evidence": "孔明大笑曰：“郭淮、孙礼休走！司马懿之计，安能瞒得过吾？",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 104,
-              "change": "魏延踏灭主灯，孔明未责罚，宽容默许使关系达到顶点",
-              "evidence": "孔明叹曰：‘谋事在人，成事在天。’不可强也！",
-              "verified": true,
-              "match_score": 0.95
-            }
-          ]
+          "first": 53,
+          "last": 104,
+          "count": 4
         },
         {
           "a": "关羽",
           "b": "夏侯惇",
-          "relation": "敌对",
-          "points": [
-            {
-              "chapter": 25,
-              "strength": 2
-            },
-            {
-              "chapter": 28,
-              "strength": 1
-            }
+          "chapters": [
+            25,
+            27,
+            28
           ],
-          "turning_points": [
-            {
-              "chapter": 25,
-              "change": "夏侯惇诱关羽出城并困于土山，两人首次直接冲突",
-              "evidence": "关公曰：“吾观颜良，如插标卖首耳！”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 28,
-              "change": "张辽持曹操公文解围，夏侯惇停止追击，冲突缓和",
-              "evidence": "张飞把手指曰：“兀的不是军马来也！”",
-              "verified": true,
-              "match_score": 0.81
-            }
-          ]
+          "first": 25,
+          "last": 28,
+          "count": 3
         },
         {
           "a": "刘备",
           "b": "刘璋",
-          "relation": "政敌",
-          "points": [
-            {
-              "chapter": 61,
-              "strength": 9
-            },
-            {
-              "chapter": 63,
-              "strength": 1
-            },
-            {
-              "chapter": 66,
-              "strength": 3
-            }
+          "chapters": [
+            61,
+            63,
+            66
           ],
-          "turning_points": [
-            {
-              "chapter": 61,
-              "change": "刘璋迎刘备入川，二人会于涪城，建立同盟关系",
-              "evidence": "松于袖中取出一图，递与玄德曰：“松感明公盛德，敢献此图。但看此图，便知蜀中道路矣。”玄德略展视之，上面尽写着地理行程，远近阔狭，山川险要，府库钱粮，一一俱载明白。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 63,
-              "change": "刘备与刘璋反目，攻取涪关，关系破裂成为敌人",
-              "evidence": "庞统曰：“某有三条计策，请主公自择而行。”玄德问：“那三条计？”统曰：“只今便选精兵，昼夜兼道径袭成都：此为上计。杨怀、高沛乃蜀中名将，各仗强兵拒守关隘，今主公佯以回荆州为名，二将闻知，必来相送，就送行处，擒而杀之，夺了关隘，先取涪城，然后却向成都：此中计也。退还白帝，连夜回荆州，徐图进取：此为下计。若沉吟不去，将至大困，不可救矣。”",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 66,
-              "change": "刘璋投降，刘备入成都，关系变为从属",
-              "evidence": "马超大喜，即唤杨柏入，一剑斩之，将首级共恢一同上关来降玄德。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 61,
+          "last": 66,
+          "count": 3
         },
         {
           "a": "刘备",
           "b": "袁绍",
-          "relation": "主从关系",
-          "points": [
-            {
-              "chapter": 24,
-              "strength": 3
-            },
-            {
-              "chapter": 25,
-              "strength": 1
-            },
-            {
-              "chapter": 26,
-              "strength": 2
-            }
+          "chapters": [
+            24,
+            25,
+            26
           ],
-          "turning_points": [
-            {
-              "chapter": 25,
-              "change": "袁绍因颜良之死欲斩刘备，关系急剧恶化",
-              "evidence": "关公曰：“吾观颜良，如插标卖首耳！”",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 24,
+          "last": 26,
+          "count": 3
         },
         {
           "a": "刘备",
           "b": "马良",
-          "relation": "君臣",
-          "points": [
-            {
-              "chapter": 84,
-              "strength": 3
-            },
-            {
-              "chapter": 86,
-              "strength": 6
-            }
+          "chapters": [
+            84,
+            85,
+            86
           ],
-          "turning_points": [
-            {
-              "chapter": 84,
-              "change": "马良劝和，刘备怒斥不允，关系紧张",
-              "evidence": "陆逊听毕，掣剑在手，厉声曰：‘仆虽一介书生，今蒙主上托以重任者，以吾有尺寸可取，能忍辱负重故也。汝等只各守隘口，牢把险要，不许妄动。如违令者皆斩！’",
-              "verified": true,
-              "match_score": 0.92
-            },
-            {
-              "chapter": 86,
-              "change": "马良转述孔明之言，刘备悔恨，关系缓和回升",
-              "evidence": "先主泣曰：‘君才十倍曹丕，必能安邦定国，终定大事。若嗣子可辅则辅之，如其不才，君可自为成都之主。’",
-              "verified": true,
-              "match_score": 0.91
-            }
-          ]
+          "first": 84,
+          "last": 86,
+          "count": 3
         },
         {
           "a": "吕布",
           "b": "张飞",
-          "relation": "宿敌",
-          "points": [
-            {
-              "chapter": 5,
-              "strength": 3
-            },
-            {
-              "chapter": 14,
-              "strength": 2
-            },
-            {
-              "chapter": 16,
-              "strength": 1
-            }
+          "chapters": [
+            5,
+            14,
+            16
           ],
-          "turning_points": [
-            {
-              "chapter": 5,
-              "change": "张飞与吕布大战五十余合，初次交锋，建立敌对关系",
-              "evidence": "关公曰：“酒且斟下，某去便来。”出帐提刀，飞身上马。众诸侯听得关外鼓声大振...云长提华雄之头，掷于地上，其酒尚温。",
-              "verified": true,
-              "match_score": 0.93
-            },
-            {
-              "chapter": 14,
-              "change": "吕布趁醉攻入徐州，张飞败走，关系恶化",
-              "evidence": "玄德叹曰：‘得何足喜，失何足忧！’",
-              "verified": true,
-              "match_score": 0.73
-            },
-            {
-              "chapter": 16,
-              "change": "张飞夺吕布马匹，二人再次交战，关系进一步恶化",
-              "evidence": "吕布提画戟在手，纪灵、玄德尽皆失色。布曰：‘我劝你两家不要厮杀，尽在天命。’",
-              "verified": true,
-              "match_score": 0.86
-            }
-          ]
+          "first": 5,
+          "last": 16,
+          "count": 3
         },
         {
           "a": "吕布",
           "b": "董卓",
-          "relation": "父子",
-          "points": [
-            {
-              "chapter": 3,
-              "strength": 8
-            },
-            {
-              "chapter": 8,
-              "strength": 4
-            },
-            {
-              "chapter": 9,
-              "strength": 0
-            }
+          "chapters": [
+            3,
+            8,
+            9
           ],
-          "turning_points": [
-            {
-              "chapter": 3,
-              "change": "吕布拜董卓为义父，结为父子关系",
-              "evidence": "何进昂然直入，至嘉德殿门，张让、段珪迎出，左右围住，进大惊。",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 8,
-              "change": "董卓因吕布与貂蝉共语而掷戟刺布，关系出现裂痕",
-              "evidence": "允跪而言曰：“百姓有倒悬之危...今欲用‘连环计’，先将汝许嫁吕布，后献与董卓。”",
-              "verified": true,
-              "match_score": 0.85
-            },
-            {
-              "chapter": 9,
-              "change": "吕布持戟刺杀董卓，关系彻底决裂",
-              "evidence": "吕布从车后厉声出曰：“有诏讨贼！”一戟直透咽喉，李肃早割头在手。",
-              "verified": true,
-              "match_score": 1.0
-            }
-          ]
+          "first": 3,
+          "last": 9,
+          "count": 3
         },
         {
           "a": "吕布",
           "b": "袁术",
-          "relation": "政敌",
-          "points": [
-            {
-              "chapter": 15,
-              "strength": 3
-            },
-            {
-              "chapter": 16,
-              "strength": 2
-            },
-            {
-              "chapter": 17,
-              "strength": 1
-            }
+          "chapters": [
+            15,
+            16,
+            17
           ],
-          "turning_points": [
-            {
-              "chapter": 15,
-              "change": "袁术失信于吕布，吕布怒而请回刘备，关系恶化",
-              "evidence": "古人云：‘兄弟如手足，妻子如衣服。衣服破，尚可缝；手足断，安可续？’",
-              "verified": true,
-              "match_score": 1.0
-            },
-            {
-              "chapter": 16,
-              "change": "袁术求亲，吕布先允后拒，关系进一步恶化",
-              "evidence": "吕布提画戟在手，纪灵、玄德尽皆失色。布曰：‘我劝你两家不要厮杀，尽在天命。’",
-              "verified": true,
-              "match_score": 0.86
-            },
-            {
-              "chapter": 17,
-              "change": "袁术七路征吕布，吕布用陈珪计破之，双方彻底开战",
-              "evidence": "操曰：‘吾自有策。’乃密召王垕入曰：‘吾欲问汝借一物，以压众心，汝必勿吝。’",
-              "verified": true,
-              "match_score": 0.79
-            }
-          ]
+          "first": 15,
+          "last": 17,
+          "count": 3
+        },
+        {
+          "a": "周瑜",
+          "b": "孙权",
+          "chapters": [
+            29,
+            44,
+            56
+          ],
+          "first": 29,
+          "last": 56,
+          "count": 3
+        },
+        {
+          "a": "周瑜",
+          "b": "曹操",
+          "chapters": [
+            48,
+            49,
+            50
+          ],
+          "first": 48,
+          "last": 50,
+          "count": 3
+        },
+        {
+          "a": "周瑜",
+          "b": "黄盖",
+          "chapters": [
+            46,
+            49,
+            55
+          ],
+          "first": 46,
+          "last": 55,
+          "count": 3
+        },
+        {
+          "a": "姜维",
+          "b": "邓艾",
+          "chapters": [
+            112,
+            114,
+            116
+          ],
+          "first": 112,
+          "last": 116,
+          "count": 3
+        },
+        {
+          "a": "孙坚",
+          "b": "袁术",
+          "chapters": [
+            5,
+            6,
+            7
+          ],
+          "first": 5,
+          "last": 7,
+          "count": 3
+        },
+        {
+          "a": "孙权",
+          "b": "张昭",
+          "chapters": [
+            43,
+            62,
+            100
+          ],
+          "first": 43,
+          "last": 100,
+          "count": 3
+        },
+        {
+          "a": "张绣",
+          "b": "曹操",
+          "chapters": [
+            16,
+            17,
+            18
+          ],
+          "first": 16,
+          "last": 18,
+          "count": 3
+        },
+        {
+          "a": "张辽",
+          "b": "曹操",
+          "chapters": [
+            19,
+            20,
+            24
+          ],
+          "first": 19,
+          "last": 24,
+          "count": 3
+        },
+        {
+          "a": "徐晃",
+          "b": "曹操",
+          "chapters": [
+            14,
+            56,
+            76
+          ],
+          "first": 14,
+          "last": 76,
+          "count": 3
+        },
+        {
+          "a": "曹操",
+          "b": "程昱",
+          "chapters": [
+            24,
+            25,
+            56
+          ],
+          "first": 24,
+          "last": 56,
+          "count": 3
+        },
+        {
+          "a": "曹操",
+          "b": "许攸",
+          "chapters": [
+            30,
+            32,
+            33
+          ],
+          "first": 30,
+          "last": 33,
+          "count": 3
+        },
+        {
+          "a": "曹操",
+          "b": "郭嘉",
+          "chapters": [
+            18,
+            21,
+            33
+          ],
+          "first": 18,
+          "last": 33,
+          "count": 3
+        },
+        {
+          "a": "诸葛亮",
+          "b": "郝昭",
+          "chapters": [
+            97,
+            98,
+            100
+          ],
+          "first": 97,
+          "last": 100,
+          "count": 3
+        },
+        {
+          "a": "诸葛亮",
+          "b": "马岱",
+          "chapters": [
+            89,
+            90,
+            105
+          ],
+          "first": 89,
+          "last": 105,
+          "count": 3
+        },
+        {
+          "a": "严颜",
+          "b": "张飞",
+          "chapters": [
+            64,
+            65
+          ],
+          "first": 64,
+          "last": 65,
+          "count": 2
+        },
+        {
+          "a": "何进",
+          "b": "曹操",
+          "chapters": [
+            2,
+            3
+          ],
+          "first": 2,
+          "last": 3,
+          "count": 2
+        },
+        {
+          "a": "何进",
+          "b": "袁绍",
+          "chapters": [
+            2,
+            3
+          ],
+          "first": 2,
+          "last": 3,
+          "count": 2
+        },
+        {
+          "a": "公孙瓒",
+          "b": "刘备",
+          "chapters": [
+            7,
+            11
+          ],
+          "first": 7,
+          "last": 11,
+          "count": 2
+        },
+        {
+          "a": "公孙瓒",
+          "b": "袁绍",
+          "chapters": [
+            7,
+            21
+          ],
+          "first": 7,
+          "last": 21,
+          "count": 2
+        },
+        {
+          "a": "关平",
+          "b": "关羽",
+          "chapters": [
+            75,
+            76
+          ],
+          "first": 75,
+          "last": 76,
+          "count": 2
+        },
+        {
+          "a": "关羽",
+          "b": "刘备",
+          "chapters": [
+            1,
+            26
+          ],
+          "first": 1,
+          "last": 26,
+          "count": 2
+        },
+        {
+          "a": "关羽",
+          "b": "张辽",
+          "chapters": [
+            25,
+            50
+          ],
+          "first": 25,
+          "last": 50,
+          "count": 2
+        },
+        {
+          "a": "关羽",
+          "b": "诸葛亮",
+          "chapters": [
+            51,
+            64
+          ],
+          "first": 51,
+          "last": 64,
+          "count": 2
+        },
+        {
+          "a": "关羽",
+          "b": "诸葛瑾",
+          "chapters": [
+            67,
+            74
+          ],
+          "first": 67,
+          "last": 74,
+          "count": 2
+        },
+        {
+          "a": "凌统",
+          "b": "甘宁",
+          "chapters": [
+            68,
+            69
+          ],
+          "first": 68,
+          "last": 69,
+          "count": 2
+        },
+        {
+          "a": "刘备",
+          "b": "刘表",
+          "chapters": [
+            31,
+            34
+          ],
+          "first": 31,
+          "last": 34,
+          "count": 2
+        },
+        {
+          "a": "刘备",
+          "b": "陶谦",
+          "chapters": [
+            11,
+            12
+          ],
+          "first": 11,
+          "last": 12,
+          "count": 2
+        },
+        {
+          "a": "刘备",
+          "b": "黄权",
+          "chapters": [
+            85,
+            86
+          ],
+          "first": 85,
+          "last": 86,
+          "count": 2
+        },
+        {
+          "a": "刘璋",
+          "b": "张松",
+          "chapters": [
+            61,
+            63
+          ],
+          "first": 61,
+          "last": 63,
+          "count": 2
+        },
+        {
+          "a": "司马师",
+          "b": "司马昭",
+          "chapters": [
+            109,
+            111
+          ],
+          "first": 109,
+          "last": 111,
+          "count": 2
+        },
+        {
+          "a": "司马懿",
+          "b": "张郃",
+          "chapters": [
+            97,
+            101
+          ],
+          "first": 97,
+          "last": 101,
+          "count": 2
+        },
+        {
+          "a": "司马懿",
+          "b": "曹操",
+          "chapters": [
+            74,
+            76
+          ],
+          "first": 74,
+          "last": 76,
+          "count": 2
+        },
+        {
+          "a": "司马懿",
+          "b": "曹爽",
+          "chapters": [
+            107,
+            108
+          ],
+          "first": 107,
+          "last": 108,
+          "count": 2
+        },
+        {
+          "a": "司马懿",
+          "b": "曹睿",
+          "chapters": [
+            95,
+            107
+          ],
+          "first": 95,
+          "last": 107,
+          "count": 2
+        },
+        {
+          "a": "吕凯",
+          "b": "诸葛亮",
+          "chapters": [
+            88,
+            90
+          ],
+          "first": 88,
+          "last": 90,
+          "count": 2
+        },
+        {
+          "a": "吕布",
+          "b": "李肃",
+          "chapters": [
+            3,
+            9
+          ],
+          "first": 3,
+          "last": 9,
+          "count": 2
+        },
+        {
+          "a": "吕布",
+          "b": "王允",
+          "chapters": [
+            8,
+            9
+          ],
+          "first": 8,
+          "last": 9,
+          "count": 2
+        },
+        {
+          "a": "周瑜",
+          "b": "程普",
+          "chapters": [
+            44,
+            51
+          ],
+          "first": 44,
+          "last": 51,
+          "count": 2
+        },
+        {
+          "a": "周瑜",
+          "b": "蒋干",
+          "chapters": [
+            45,
+            47
+          ],
+          "first": 45,
+          "last": 47,
+          "count": 2
+        },
+        {
+          "a": "夏侯尚",
+          "b": "黄忠",
+          "chapters": [
+            71,
+            72
+          ],
+          "first": 71,
+          "last": 72,
+          "count": 2
+        },
+        {
+          "a": "夏侯惇",
+          "b": "曹操",
+          "chapters": [
+            5,
+            70
+          ],
+          "first": 5,
+          "last": 70,
+          "count": 2
+        },
+        {
+          "a": "姜维",
+          "b": "郭淮",
+          "chapters": [
+            108,
+            110
+          ],
+          "first": 108,
+          "last": 110,
+          "count": 2
+        },
+        {
+          "a": "姜维",
+          "b": "钟会",
+          "chapters": [
+            119,
+            120
+          ],
+          "first": 119,
+          "last": 120,
+          "count": 2
+        },
+        {
+          "a": "孙权",
+          "b": "孙策",
+          "chapters": [
+            29,
+            68
+          ],
+          "first": 29,
+          "last": 68,
+          "count": 2
+        },
+        {
+          "a": "孙权",
+          "b": "张辽",
+          "chapters": [
+            53,
+            68
+          ],
+          "first": 53,
+          "last": 68,
+          "count": 2
+        },
+        {
+          "a": "孙权",
+          "b": "诸葛瑾",
+          "chapters": [
+            67,
+            74
+          ],
+          "first": 67,
+          "last": 74,
+          "count": 2
+        },
+        {
+          "a": "庞德",
+          "b": "曹操",
+          "chapters": [
+            68,
+            75
+          ],
+          "first": 68,
+          "last": 75,
+          "count": 2
+        },
+        {
+          "a": "张绣",
+          "b": "贾诩",
+          "chapters": [
+            18,
+            23
+          ],
+          "first": 18,
+          "last": 23,
+          "count": 2
+        },
+        {
+          "a": "张飞",
+          "b": "曹操",
+          "chapters": [
+            42,
+            50
+          ],
+          "first": 42,
+          "last": 50,
+          "count": 2
+        },
+        {
+          "a": "张飞",
+          "b": "董卓",
+          "chapters": [
+            2,
+            6
+          ],
+          "first": 2,
+          "last": 6,
+          "count": 2
+        },
+        {
+          "a": "张飞",
+          "b": "赵云",
+          "chapters": [
+            42,
+            65
+          ],
+          "first": 42,
+          "last": 65,
+          "count": 2
+        },
+        {
+          "a": "徐晃",
+          "b": "王平",
+          "chapters": [
+            72,
+            73
+          ],
+          "first": 72,
+          "last": 73,
+          "count": 2
+        },
+        {
+          "a": "曹丕",
+          "b": "群臣",
+          "chapters": [
+            85,
+            87
+          ],
+          "first": 85,
+          "last": 87,
+          "count": 2
+        },
+        {
+          "a": "曹操",
+          "b": "董卓",
+          "chapters": [
+            4,
+            6
+          ],
+          "first": 4,
+          "last": 6,
+          "count": 2
+        },
+        {
+          "a": "曹操",
+          "b": "董承",
+          "chapters": [
+            20,
+            23
+          ],
+          "first": 20,
+          "last": 23,
+          "count": 2
+        },
+        {
+          "a": "曹操",
+          "b": "袁绍",
+          "chapters": [
+            5,
+            31
+          ],
+          "first": 5,
+          "last": 31,
+          "count": 2
+        },
+        {
+          "a": "曹操",
+          "b": "韩遂",
+          "chapters": [
+            59,
+            60
+          ],
+          "first": 59,
+          "last": 60,
+          "count": 2
+        },
+        {
+          "a": "曹真",
+          "b": "郭淮",
+          "chapters": [
+            94,
+            95
+          ],
+          "first": 94,
+          "last": 95,
+          "count": 2
+        },
+        {
+          "a": "王双",
+          "b": "诸葛亮",
+          "chapters": [
+            97,
+            98
+          ],
+          "first": 97,
+          "last": 98,
+          "count": 2
+        },
+        {
+          "a": "王平",
+          "b": "马谡",
+          "chapters": [
+            96,
+            97
+          ],
+          "first": 96,
+          "last": 97,
+          "count": 2
+        },
+        {
+          "a": "田丰",
+          "b": "袁绍",
+          "chapters": [
+            30,
+            31
+          ],
+          "first": 30,
+          "last": 31,
+          "count": 2
+        },
+        {
+          "a": "苟安",
+          "b": "诸葛亮",
+          "chapters": [
+            97,
+            101
+          ],
+          "first": 97,
+          "last": 101,
+          "count": 2
+        },
+        {
+          "a": "董承",
+          "b": "马腾",
+          "chapters": [
+            20,
+            21
+          ],
+          "first": 20,
+          "last": 21,
+          "count": 2
+        },
+        {
+          "a": "袁术",
+          "b": "袁绍",
+          "chapters": [
+            3,
+            5
+          ],
+          "first": 3,
+          "last": 5,
+          "count": 2
+        },
+        {
+          "a": "许褚",
+          "b": "马超",
+          "chapters": [
+            59,
+            60
+          ],
+          "first": 59,
+          "last": 60,
+          "count": 2
+        },
+        {
+          "a": "赵云",
+          "b": "黄忠",
+          "chapters": [
+            72,
+            73
+          ],
+          "first": 72,
+          "last": 73,
+          "count": 2
+        },
+        {
+          "a": "陆逊",
+          "b": "韩当",
+          "chapters": [
+            84,
+            85
+          ],
+          "first": 84,
+          "last": 85,
+          "count": 2
+        },
+        {
+          "a": "丁原",
+          "b": "吕布",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "丁原",
+          "b": "董卓",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "丁奉",
+          "b": "孙",
+          "chapters": [
+            114
+          ],
+          "first": 114,
+          "last": 114,
+          "count": 1
+        },
+        {
+          "a": "丁奉",
+          "b": "胡遵",
+          "chapters": [
+            109
+          ],
+          "first": 109,
+          "last": 109,
+          "count": 1
+        },
+        {
+          "a": "丁奉",
+          "b": "诸葛恪",
+          "chapters": [
+            109
+          ],
+          "first": 109,
+          "last": 109,
+          "count": 1
+        },
+        {
+          "a": "丁管",
+          "b": "董卓",
+          "chapters": [
+            4
+          ],
+          "first": 4,
+          "last": 4,
+          "count": 1
+        },
+        {
+          "a": "严畯",
+          "b": "诸葛亮",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "严纲",
+          "b": "麹义",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "严颜",
+          "b": "夏侯德",
+          "chapters": [
+            71
+          ],
+          "first": 71,
+          "last": 71,
+          "count": 1
+        },
+        {
+          "a": "严颜",
+          "b": "黄忠",
+          "chapters": [
+            71
+          ],
+          "first": 71,
+          "last": 71,
+          "count": 1
+        },
+        {
+          "a": "乐",
+          "b": "张虎",
+          "chapters": [
+            100
+          ],
+          "first": 100,
+          "last": 100,
+          "count": 1
+        },
+        {
+          "a": "乐进",
+          "b": "张辽",
+          "chapters": [
+            53
+          ],
+          "first": 53,
+          "last": 53,
+          "count": 1
+        },
+        {
+          "a": "于吉",
+          "b": "孙策",
+          "chapters": [
+            29
+          ],
+          "first": 29,
+          "last": 29,
+          "count": 1
+        },
+        {
+          "a": "于禁",
+          "b": "关羽",
+          "chapters": [
+            75
+          ],
+          "first": 75,
+          "last": 75,
+          "count": 1
+        },
+        {
+          "a": "于禁",
+          "b": "庞德",
+          "chapters": [
+            75
+          ],
+          "first": 75,
+          "last": 75,
+          "count": 1
+        },
+        {
+          "a": "于禁",
+          "b": "曹操",
+          "chapters": [
+            75
+          ],
+          "first": 75,
+          "last": 75,
+          "count": 1
+        },
+        {
+          "a": "于诠",
+          "b": "王基",
+          "chapters": [
+            113
+          ],
+          "first": 113,
+          "last": 113,
+          "count": 1
+        },
+        {
+          "a": "伊籍",
+          "b": "刘备",
+          "chapters": [
+            34
+          ],
+          "first": 34,
+          "last": 34,
+          "count": 1
+        },
+        {
+          "a": "伍孚",
+          "b": "董卓",
+          "chapters": [
+            4
+          ],
+          "first": 4,
+          "last": 4,
+          "count": 1
+        },
+        {
+          "a": "伏后",
+          "b": "曹操",
+          "chapters": [
+            67
+          ],
+          "first": 67,
+          "last": 67,
+          "count": 1
+        },
+        {
+          "a": "众将",
+          "b": "诸葛亮",
+          "chapters": [
+            89
+          ],
+          "first": 89,
+          "last": 89,
+          "count": 1
+        },
+        {
+          "a": "何太后",
+          "b": "董太后",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "何晏",
+          "b": "管辂",
+          "chapters": [
+            107
+          ],
+          "first": 107,
+          "last": 107,
+          "count": 1
+        },
+        {
+          "a": "何苗",
+          "b": "吴匡",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "何进",
+          "b": "张让",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "何进",
+          "b": "蹇硕",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "使者",
+          "b": "刘备",
+          "chapters": [
+            14
+          ],
+          "first": 14,
+          "last": 14,
+          "count": 1
+        },
+        {
+          "a": "俞涉",
+          "b": "华雄",
+          "chapters": [
+            5
+          ],
+          "first": 5,
+          "last": 5,
+          "count": 1
+        },
+        {
+          "a": "傅士仁",
+          "b": "关羽",
+          "chapters": [
+            74
+          ],
+          "first": 74,
+          "last": 74,
+          "count": 1
+        },
+        {
+          "a": "傅士仁",
+          "b": "吕蒙",
+          "chapters": [
+            76
+          ],
+          "first": 76,
+          "last": 76,
+          "count": 1
+        },
+        {
+          "a": "傅士仁",
+          "b": "糜芳",
+          "chapters": [
+            76
+          ],
+          "first": 76,
+          "last": 76,
+          "count": 1
+        },
+        {
+          "a": "傅士仁",
+          "b": "虞翻",
+          "chapters": [
+            76
+          ],
+          "first": 76,
+          "last": 76,
+          "count": 1
+        },
+        {
+          "a": "兀突骨",
+          "b": "诸葛亮",
+          "chapters": [
+            91
+          ],
+          "first": 91,
+          "last": 91,
+          "count": 1
+        },
+        {
+          "a": "公孙康",
+          "b": "曹操",
+          "chapters": [
+            33
+          ],
+          "first": 33,
+          "last": 33,
+          "count": 1
+        },
+        {
+          "a": "公孙渊",
+          "b": "司马懿",
+          "chapters": [
+            107
+          ],
+          "first": 107,
+          "last": 107,
+          "count": 1
+        },
+        {
+          "a": "公孙瓒",
+          "b": "吕布",
+          "chapters": [
+            5
+          ],
+          "first": 5,
+          "last": 5,
+          "count": 1
+        },
+        {
+          "a": "公孙瓒",
+          "b": "文丑",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "公孙瓒",
+          "b": "赵云",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "关公",
+          "b": "张辽",
+          "chapters": [
+            18
+          ],
+          "first": 18,
+          "last": 18,
+          "count": 1
+        },
+        {
+          "a": "关兴",
+          "b": "越吉",
+          "chapters": [
+            95
+          ],
+          "first": 95,
+          "last": 95,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "华佗",
+          "chapters": [
+            76
+          ],
+          "first": 76,
+          "last": 76,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "华雄",
+          "chapters": [
+            5
+          ],
+          "first": 5,
+          "last": 5,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "卞喜",
+          "chapters": [
+            27
+          ],
+          "first": 27,
+          "last": 27,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "吕布",
+          "chapters": [
+            5
+          ],
+          "first": 5,
+          "last": 5,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "周仓",
+          "chapters": [
+            28
+          ],
+          "first": 28,
+          "last": 28,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "周瑜",
+          "chapters": [
+            55
+          ],
+          "first": 55,
+          "last": 55,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "孔秀",
+          "chapters": [
+            27
+          ],
+          "first": 27,
+          "last": 27,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "庞德",
+          "chapters": [
+            75
+          ],
+          "first": 75,
+          "last": 75,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "廖化",
+          "chapters": [
+            27
+          ],
+          "first": 27,
+          "last": 27,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "张飞",
+          "chapters": [
+            28
+          ],
+          "first": 28,
+          "last": 28,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "文丑",
+          "chapters": [
+            26
+          ],
+          "first": 26,
+          "last": 26,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "曹仁",
+          "chapters": [
+            74
+          ],
+          "first": 74,
+          "last": 74,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "王忠",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "王植",
+          "chapters": [
+            27
+          ],
+          "first": 27,
+          "last": 27,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "王甫",
+          "chapters": [
+            74
+          ],
+          "first": 74,
+          "last": 74,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "秦琪",
+          "chapters": [
+            27
+          ],
+          "first": 27,
+          "last": 27,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "程远志",
+          "chapters": [
+            1
+          ],
+          "first": 1,
+          "last": 1,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "糜芳",
+          "chapters": [
+            74
+          ],
+          "first": 74,
+          "last": 74,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "袁术",
+          "chapters": [
+            17
+          ],
+          "first": 17,
+          "last": 17,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "裴元绍",
+          "chapters": [
+            28
+          ],
+          "first": 28,
+          "last": 28,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "费诗",
+          "chapters": [
+            74
+          ],
+          "first": 74,
+          "last": 74,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "郭常",
+          "chapters": [
+            28
+          ],
+          "first": 28,
+          "last": 28,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "陆逊",
+          "chapters": [
+            76
+          ],
+          "first": 76,
+          "last": 76,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "陈震",
+          "chapters": [
+            26
+          ],
+          "first": 26,
+          "last": 26,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "韩福",
+          "chapters": [
+            27
+          ],
+          "first": 27,
+          "last": 27,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "颜良",
+          "chapters": [
+            25
+          ],
+          "first": 25,
+          "last": 25,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "鲁肃",
+          "chapters": [
+            67
+          ],
+          "first": 67,
+          "last": 67,
+          "count": 1
+        },
+        {
+          "a": "关羽",
+          "b": "黄忠",
+          "chapters": [
+            53
+          ],
+          "first": 53,
+          "last": 53,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "刘焉",
+          "chapters": [
+            1
+          ],
+          "first": 1,
+          "last": 1,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "刘琦",
+          "chapters": [
+            42
+          ],
+          "first": 42,
+          "last": 42,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "卢植",
+          "chapters": [
+            1
+          ],
+          "first": 1,
+          "last": 1,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "吴国太",
+          "chapters": [
+            54
+          ],
+          "first": 54,
+          "last": 54,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "周瑜",
+          "chapters": [
+            45
+          ],
+          "first": 45,
+          "last": 45,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "太史慈",
+          "chapters": [
+            11
+          ],
+          "first": 11,
+          "last": 11,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "孙仲",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "孙夫人",
+          "chapters": [
+            55
+          ],
+          "first": 55,
+          "last": 55,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "张宝",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "张松",
+          "chapters": [
+            61
+          ],
+          "first": 61,
+          "last": 61,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "张苞",
+          "chapters": [
+            84
+          ],
+          "first": 84,
+          "last": 84,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "彭羕",
+          "chapters": [
+            64
+          ],
+          "first": 64,
+          "last": 64,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "朱儁",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "杨怀",
+          "chapters": [
+            63
+          ],
+          "first": 63,
+          "last": 63,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "献帝",
+          "chapters": [
+            20
+          ],
+          "first": 20,
+          "last": 20,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "的卢马",
+          "chapters": [
+            34
+          ],
+          "first": 34,
+          "last": 34,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "督邮",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "程秉",
+          "chapters": [
+            84
+          ],
+          "first": 84,
+          "last": 84,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "董卓",
+          "chapters": [
+            1
+          ],
+          "first": 1,
+          "last": 1,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "董承",
+          "chapters": [
+            21
+          ],
+          "first": 21,
+          "last": 21,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "蔡瑁",
+          "chapters": [
+            34
+          ],
+          "first": 34,
+          "last": 34,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "陆逊",
+          "chapters": [
+            85
+          ],
+          "first": 85,
+          "last": 85,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "韩忠",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "刘备",
+          "b": "鲁肃",
+          "chapters": [
+            42
+          ],
+          "first": 42,
+          "last": 42,
+          "count": 1
+        },
+        {
+          "a": "刘岱",
+          "b": "张飞",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "刘岱",
+          "b": "玄德",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "刘岱",
+          "b": "王忠",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "刘晔",
+          "b": "张绣",
+          "chapters": [
+            23
+          ],
+          "first": 23,
+          "last": 23,
+          "count": 1
+        },
+        {
+          "a": "刘璋",
+          "b": "王累",
+          "chapters": [
+            61
+          ],
+          "first": 61,
+          "last": 61,
+          "count": 1
+        },
+        {
+          "a": "刘璋",
+          "b": "马超",
+          "chapters": [
+            66
+          ],
+          "first": 66,
+          "last": 66,
+          "count": 1
+        },
+        {
+          "a": "刘璋",
+          "b": "黄权",
+          "chapters": [
+            61
+          ],
+          "first": 61,
+          "last": 61,
+          "count": 1
+        },
+        {
+          "a": "刘璝",
+          "b": "紫虚上人",
+          "chapters": [
+            63
+          ],
+          "first": 63,
+          "last": 63,
+          "count": 1
+        },
+        {
+          "a": "刘禅",
+          "b": "司马昭",
+          "chapters": [
+            120
+          ],
+          "first": 120,
+          "last": 120,
+          "count": 1
+        },
+        {
+          "a": "刘禅",
+          "b": "蒋琬",
+          "chapters": [
+            106
+          ],
+          "first": 106,
+          "last": 106,
+          "count": 1
+        },
+        {
+          "a": "刘禅",
+          "b": "谯周",
+          "chapters": [
+            119
+          ],
+          "first": 119,
+          "last": 119,
+          "count": 1
+        },
+        {
+          "a": "刘禅",
+          "b": "邓艾",
+          "chapters": [
+            119
+          ],
+          "first": 119,
+          "last": 119,
+          "count": 1
+        },
+        {
+          "a": "刘表",
+          "b": "孙坚",
+          "chapters": [
+            6
+          ],
+          "first": 6,
+          "last": 6,
+          "count": 1
+        },
+        {
+          "a": "刘表",
+          "b": "蒯良",
+          "chapters": [
+            8
+          ],
+          "first": 8,
+          "last": 8,
+          "count": 1
+        },
+        {
+          "a": "刘谌",
+          "b": "崔夫人",
+          "chapters": [
+            119
+          ],
+          "first": 119,
+          "last": 119,
+          "count": 1
+        },
+        {
+          "a": "刘馥",
+          "b": "曹操",
+          "chapters": [
+            48
+          ],
+          "first": 48,
+          "last": 48,
+          "count": 1
+        },
+        {
+          "a": "北斗",
+          "b": "赵颜",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "华佗徒弟",
+          "b": "孙策",
+          "chapters": [
+            29
+          ],
+          "first": 29,
+          "last": 29,
+          "count": 1
+        },
+        {
+          "a": "华歆",
+          "b": "曹操",
+          "chapters": [
+            56
+          ],
+          "first": 56,
+          "last": 56,
+          "count": 1
+        },
+        {
+          "a": "华雄",
+          "b": "孙坚",
+          "chapters": [
+            5
+          ],
+          "first": 5,
+          "last": 5,
+          "count": 1
+        },
+        {
+          "a": "华雄",
+          "b": "潘凤",
+          "chapters": [
+            5
+          ],
+          "first": 5,
+          "last": 5,
+          "count": 1
+        },
+        {
+          "a": "南斗",
+          "b": "赵颜",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "卢植",
+          "b": "段珪",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "卫弘",
+          "b": "曹操",
+          "chapters": [
+            5
+          ],
+          "first": 5,
+          "last": 5,
+          "count": 1
+        },
+        {
+          "a": "卫瓘",
+          "b": "钟会",
+          "chapters": [
+            120
+          ],
+          "first": 120,
+          "last": 120,
+          "count": 1
+        },
+        {
+          "a": "司马师",
+          "b": "司马懿",
+          "chapters": [
+            109
+          ],
+          "first": 109,
+          "last": 109,
+          "count": 1
+        },
+        {
+          "a": "司马师",
+          "b": "姜维",
+          "chapters": [
+            109
+          ],
+          "first": 109,
+          "last": 109,
+          "count": 1
+        },
+        {
+          "a": "司马师",
+          "b": "文鸯",
+          "chapters": [
+            111
+          ],
+          "first": 111,
+          "last": 111,
+          "count": 1
+        },
+        {
+          "a": "司马师",
+          "b": "曹芳",
+          "chapters": [
+            110
+          ],
+          "first": 110,
+          "last": 110,
+          "count": 1
+        },
+        {
+          "a": "司马懿",
+          "b": "孟达",
+          "chapters": [
+            95
+          ],
+          "first": 95,
+          "last": 95,
+          "count": 1
+        },
+        {
+          "a": "司马懿",
+          "b": "曹丕",
+          "chapters": [
+            86
+          ],
+          "first": 86,
+          "last": 86,
+          "count": 1
+        },
+        {
+          "a": "司马懿",
+          "b": "曹真",
+          "chapters": [
+            97
+          ],
+          "first": 97,
+          "last": 97,
+          "count": 1
+        },
+        {
+          "a": "司马懿",
+          "b": "桓范",
+          "chapters": [
+            107
+          ],
+          "first": 107,
+          "last": 107,
+          "count": 1
+        },
+        {
+          "a": "司马懿",
+          "b": "辛毗",
+          "chapters": [
+            104
+          ],
+          "first": 104,
+          "last": 104,
+          "count": 1
+        },
+        {
+          "a": "司马懿",
+          "b": "郭淮",
+          "chapters": [
+            103
+          ],
+          "first": 103,
+          "last": 103,
+          "count": 1
+        },
+        {
+          "a": "司马懿",
+          "b": "马谡",
+          "chapters": [
+            96
+          ],
+          "first": 96,
+          "last": 96,
+          "count": 1
+        },
+        {
+          "a": "司马昭",
+          "b": "司马炎",
+          "chapters": [
+            120
+          ],
+          "first": 120,
+          "last": 120,
+          "count": 1
+        },
+        {
+          "a": "司马昭",
+          "b": "曹髦",
+          "chapters": [
+            115
+          ],
+          "first": 115,
+          "last": 115,
+          "count": 1
+        },
+        {
+          "a": "司马昭",
+          "b": "诸葛诞",
+          "chapters": [
+            113
+          ],
+          "first": 113,
+          "last": 113,
+          "count": 1
+        },
+        {
+          "a": "司马昭",
+          "b": "邓艾",
+          "chapters": [
+            119
+          ],
+          "first": 119,
+          "last": 119,
+          "count": 1
+        },
+        {
+          "a": "司马望",
+          "b": "姜维",
+          "chapters": [
+            113
+          ],
+          "first": 113,
+          "last": 113,
+          "count": 1
+        },
+        {
+          "a": "司马炎",
+          "b": "孙皓",
+          "chapters": [
+            121
+          ],
+          "first": 121,
+          "last": 121,
+          "count": 1
+        },
+        {
+          "a": "吉平",
+          "b": "曹操",
+          "chapters": [
+            23
+          ],
+          "first": 23,
+          "last": 23,
+          "count": 1
+        },
+        {
+          "a": "吉平",
+          "b": "董承",
+          "chapters": [
+            23
+          ],
+          "first": 23,
+          "last": 23,
+          "count": 1
+        },
+        {
+          "a": "吉穆",
+          "b": "金祎",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "吉邈",
+          "b": "金祎",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "后主刘禅",
+          "b": "师婆",
+          "chapters": [
+            117
+          ],
+          "first": 117,
+          "last": 117,
+          "count": 1
+        },
+        {
+          "a": "后主刘禅",
+          "b": "黄皓",
+          "chapters": [
+            116
+          ],
+          "first": 116,
+          "last": 116,
+          "count": 1
+        },
+        {
+          "a": "吕伯奢",
+          "b": "曹操",
+          "chapters": [
+            4
+          ],
+          "first": 4,
+          "last": 4,
+          "count": 1
+        },
+        {
+          "a": "吕公",
+          "b": "孙坚",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "吕布",
+          "b": "宋宪",
+          "chapters": [
+            19
+          ],
+          "first": 19,
+          "last": 19,
+          "count": 1
+        },
+        {
+          "a": "吕布",
+          "b": "曹豹",
+          "chapters": [
+            14
+          ],
+          "first": 14,
+          "last": 14,
+          "count": 1
+        },
+        {
+          "a": "吕布",
+          "b": "杨奉",
+          "chapters": [
+            17
+          ],
+          "first": 17,
+          "last": 17,
+          "count": 1
+        },
+        {
+          "a": "吕布",
+          "b": "貂蝉",
+          "chapters": [
+            8
+          ],
+          "first": 8,
+          "last": 8,
+          "count": 1
+        },
+        {
+          "a": "吕布",
+          "b": "陈珪",
+          "chapters": [
+            16
+          ],
+          "first": 16,
+          "last": 16,
+          "count": 1
+        },
+        {
+          "a": "吕布",
+          "b": "韩暹",
+          "chapters": [
+            17
+          ],
+          "first": 17,
+          "last": 17,
+          "count": 1
+        },
+        {
+          "a": "吕范",
+          "b": "孙权",
+          "chapters": [
+            54
+          ],
+          "first": 54,
+          "last": 54,
+          "count": 1
+        },
+        {
+          "a": "吕蒙",
+          "b": "周瑜",
+          "chapters": [
+            51
+          ],
+          "first": 51,
+          "last": 51,
+          "count": 1
+        },
+        {
+          "a": "吕蒙",
+          "b": "孙权",
+          "chapters": [
+            76
+          ],
+          "first": 76,
+          "last": 76,
+          "count": 1
+        },
+        {
+          "a": "吕蒙",
+          "b": "陆逊",
+          "chapters": [
+            76
+          ],
+          "first": 76,
+          "last": 76,
+          "count": 1
+        },
+        {
+          "a": "吴主孙亮",
+          "b": "孙",
+          "chapters": [
+            114
+          ],
+          "first": 114,
+          "last": 114,
+          "count": 1
+        },
+        {
+          "a": "吴兰",
+          "b": "曹彰",
+          "chapters": [
+            73
+          ],
+          "first": 73,
+          "last": 73,
+          "count": 1
+        },
+        {
+          "a": "吴国太",
+          "b": "孙夫人",
+          "chapters": [
+            55
+          ],
+          "first": 55,
+          "last": 55,
+          "count": 1
+        },
+        {
+          "a": "吴国太",
+          "b": "孙权",
+          "chapters": [
+            54
+          ],
+          "first": 54,
+          "last": 54,
+          "count": 1
+        },
+        {
+          "a": "周仓",
+          "b": "庞德",
+          "chapters": [
+            75
+          ],
+          "first": 75,
+          "last": 75,
+          "count": 1
+        },
+        {
+          "a": "周善",
+          "b": "孙夫人",
+          "chapters": [
+            62
+          ],
+          "first": 62,
+          "last": 62,
+          "count": 1
+        },
+        {
+          "a": "周泰",
+          "b": "孙权",
+          "chapters": [
+            69
+          ],
+          "first": 69,
+          "last": 69,
+          "count": 1
+        },
+        {
+          "a": "周泰",
+          "b": "张南",
+          "chapters": [
+            48
+          ],
+          "first": 48,
+          "last": 48,
+          "count": 1
+        },
+        {
+          "a": "周泰",
+          "b": "陆逊",
+          "chapters": [
+            84
+          ],
+          "first": 84,
+          "last": 84,
+          "count": 1
+        },
+        {
+          "a": "周瑜",
+          "b": "孙策",
+          "chapters": [
+            15
+          ],
+          "first": 15,
+          "last": 15,
+          "count": 1
+        },
+        {
+          "a": "周瑜",
+          "b": "张昭",
+          "chapters": [
+            44
+          ],
+          "first": 44,
+          "last": 44,
+          "count": 1
+        },
+        {
+          "a": "周瑜",
+          "b": "曹仁",
+          "chapters": [
+            51
+          ],
+          "first": 51,
+          "last": 51,
+          "count": 1
+        },
+        {
+          "a": "周瑜",
+          "b": "甘宁",
+          "chapters": [
+            46
+          ],
+          "first": 46,
+          "last": 46,
+          "count": 1
+        },
+        {
+          "a": "周瑜",
+          "b": "蒋钦",
+          "chapters": [
+            51
+          ],
+          "first": 51,
+          "last": 51,
+          "count": 1
+        },
+        {
+          "a": "周瑜",
+          "b": "诸葛瑾",
+          "chapters": [
+            44
+          ],
+          "first": 44,
+          "last": 44,
+          "count": 1
+        },
+        {
+          "a": "周瑜",
+          "b": "赵云",
+          "chapters": [
+            51
+          ],
+          "first": 51,
+          "last": 51,
+          "count": 1
+        },
+        {
+          "a": "周鲂",
+          "b": "曹休",
+          "chapters": [
+            97
+          ],
+          "first": 97,
+          "last": 97,
+          "count": 1
+        },
+        {
+          "a": "夏侯惇",
+          "b": "曹性",
+          "chapters": [
+            18
+          ],
+          "first": 18,
+          "last": 18,
+          "count": 1
+        },
+        {
+          "a": "夏侯惇",
+          "b": "耿纪",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "夏侯楙",
+          "b": "诸葛亮",
+          "chapters": [
+            93
+          ],
+          "first": 93,
+          "last": 93,
+          "count": 1
+        },
+        {
+          "a": "夏侯渊",
+          "b": "张郃",
+          "chapters": [
+            72
+          ],
+          "first": 72,
+          "last": 72,
+          "count": 1
+        },
+        {
+          "a": "夏侯渊",
+          "b": "曹操",
+          "chapters": [
+            72
+          ],
+          "first": 72,
+          "last": 72,
+          "count": 1
+        },
+        {
+          "a": "夏侯渊",
+          "b": "黄忠",
+          "chapters": [
+            72
+          ],
+          "first": 72,
+          "last": 72,
+          "count": 1
+        },
+        {
+          "a": "夏侯霸",
+          "b": "姜维",
+          "chapters": [
+            108
+          ],
+          "first": 108,
+          "last": 108,
+          "count": 1
+        },
+        {
+          "a": "太史慈",
+          "b": "孔融",
+          "chapters": [
+            11
+          ],
+          "first": 11,
+          "last": 11,
+          "count": 1
+        },
+        {
+          "a": "太史慈",
+          "b": "孙策",
+          "chapters": [
+            15
+          ],
+          "first": 15,
+          "last": 15,
+          "count": 1
+        },
+        {
+          "a": "太史慈",
+          "b": "张辽",
+          "chapters": [
+            53
+          ],
+          "first": 53,
+          "last": 53,
+          "count": 1
+        },
+        {
+          "a": "姜维",
+          "b": "张嶷",
+          "chapters": [
+            112
+          ],
+          "first": 112,
+          "last": 112,
+          "count": 1
+        },
+        {
+          "a": "姜维",
+          "b": "徐质",
+          "chapters": [
+            110
+          ],
+          "first": 110,
+          "last": 110,
+          "count": 1
+        },
+        {
+          "a": "姜维",
+          "b": "王瓘",
+          "chapters": [
+            115
+          ],
+          "first": 115,
+          "last": 115,
+          "count": 1
+        },
+        {
+          "a": "姜维",
+          "b": "诸葛绪",
+          "chapters": [
+            118
+          ],
+          "first": 118,
+          "last": 118,
+          "count": 1
+        },
+        {
+          "a": "姜维",
+          "b": "赵云",
+          "chapters": [
+            94
+          ],
+          "first": 94,
+          "last": 94,
+          "count": 1
+        },
+        {
+          "a": "姜维",
+          "b": "郤正",
+          "chapters": [
+            116
+          ],
+          "first": 116,
+          "last": 116,
+          "count": 1
+        },
+        {
+          "a": "姜维",
+          "b": "马遵",
+          "chapters": [
+            93
+          ],
+          "first": 93,
+          "last": 93,
+          "count": 1
+        },
+        {
+          "a": "孔融",
+          "b": "曹操",
+          "chapters": [
+            23
+          ],
+          "first": 23,
+          "last": 23,
+          "count": 1
+        },
+        {
+          "a": "孔融",
+          "b": "祢衡",
+          "chapters": [
+            23
+          ],
+          "first": 23,
+          "last": 23,
+          "count": 1
+        },
+        {
+          "a": "孔融",
+          "b": "管亥",
+          "chapters": [
+            11
+          ],
+          "first": 11,
+          "last": 11,
+          "count": 1
+        },
+        {
+          "a": "孔融",
+          "b": "荀彧",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "孙坚",
+          "b": "李傕",
+          "chapters": [
+            6
+          ],
+          "first": 6,
+          "last": 6,
+          "count": 1
+        },
+        {
+          "a": "孙坚",
+          "b": "程普",
+          "chapters": [
+            6
+          ],
+          "first": 6,
+          "last": 6,
+          "count": 1
+        },
+        {
+          "a": "孙坚",
+          "b": "袁绍",
+          "chapters": [
+            6
+          ],
+          "first": 6,
+          "last": 6,
+          "count": 1
+        },
+        {
+          "a": "孙坚",
+          "b": "赵弘",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "孙坚",
+          "b": "黄祖",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "孙夫人",
+          "b": "张飞",
+          "chapters": [
+            62
+          ],
+          "first": 62,
+          "last": 62,
+          "count": 1
+        },
+        {
+          "a": "孙夫人",
+          "b": "徐盛",
+          "chapters": [
+            55
+          ],
+          "first": 55,
+          "last": 55,
+          "count": 1
+        },
+        {
+          "a": "孙夫人",
+          "b": "赵云",
+          "chapters": [
+            62
+          ],
+          "first": 62,
+          "last": 62,
+          "count": 1
+        },
+        {
+          "a": "孙夫人",
+          "b": "陈武",
+          "chapters": [
+            55
+          ],
+          "first": 55,
+          "last": 55,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "宗预",
+          "chapters": [
+            106
+          ],
+          "first": 106,
+          "last": 106,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "曹操",
+          "chapters": [
+            62
+          ],
+          "first": 62,
+          "last": 62,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "董袭",
+          "chapters": [
+            69
+          ],
+          "first": 69,
+          "last": 69,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "诸葛亮",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "贾华",
+          "chapters": [
+            54
+          ],
+          "first": 54,
+          "last": 54,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "邓芝",
+          "chapters": [
+            87
+          ],
+          "first": 87,
+          "last": 87,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "阚泽",
+          "chapters": [
+            84
+          ],
+          "first": 84,
+          "last": 84,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "陆逊",
+          "chapters": [
+            84
+          ],
+          "first": 84,
+          "last": 84,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "陈武",
+          "chapters": [
+            55
+          ],
+          "first": 55,
+          "last": 55,
+          "count": 1
+        },
+        {
+          "a": "孙权",
+          "b": "鲁肃",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "孙皓",
+          "b": "王濬",
+          "chapters": [
+            121
+          ],
+          "first": 121,
+          "last": 121,
+          "count": 1
+        },
+        {
+          "a": "孙皓",
+          "b": "陆抗",
+          "chapters": [
+            121
+          ],
+          "first": 121,
+          "last": 121,
+          "count": 1
+        },
+        {
+          "a": "孙礼",
+          "b": "郭淮",
+          "chapters": [
+            100
+          ],
+          "first": 100,
+          "last": 100,
+          "count": 1
+        },
+        {
+          "a": "孙策",
+          "b": "曹操",
+          "chapters": [
+            17
+          ],
+          "first": 17,
+          "last": 17,
+          "count": 1
+        },
+        {
+          "a": "孙策",
+          "b": "袁术",
+          "chapters": [
+            15
+          ],
+          "first": 15,
+          "last": 15,
+          "count": 1
+        },
+        {
+          "a": "孙策",
+          "b": "许贡家客",
+          "chapters": [
+            29
+          ],
+          "first": 29,
+          "last": 29,
+          "count": 1
+        },
+        {
+          "a": "孙策",
+          "b": "郭嘉",
+          "chapters": [
+            29
+          ],
+          "first": 29,
+          "last": 29,
+          "count": 1
+        },
+        {
+          "a": "孙策",
+          "b": "陈生",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "孙韶",
+          "b": "徐盛",
+          "chapters": [
+            87
+          ],
+          "first": 87,
+          "last": 87,
+          "count": 1
+        },
+        {
+          "a": "孙韶",
+          "b": "曹丕",
+          "chapters": [
+            87
+          ],
+          "first": 87,
+          "last": 87,
+          "count": 1
+        },
+        {
+          "a": "孟优",
+          "b": "孟获",
+          "chapters": [
+            89
+          ],
+          "first": 89,
+          "last": 89,
+          "count": 1
+        },
+        {
+          "a": "孟节",
+          "b": "诸葛亮",
+          "chapters": [
+            90
+          ],
+          "first": 90,
+          "last": 90,
+          "count": 1
+        },
+        {
+          "a": "孟获",
+          "b": "朵思大王",
+          "chapters": [
+            90
+          ],
+          "first": 90,
+          "last": 90,
+          "count": 1
+        },
+        {
+          "a": "孟获",
+          "b": "董荼那",
+          "chapters": [
+            89
+          ],
+          "first": 89,
+          "last": 89,
+          "count": 1
+        },
+        {
+          "a": "孟获",
+          "b": "诸酋长",
+          "chapters": [
+            89
+          ],
+          "first": 89,
+          "last": 89,
+          "count": 1
+        },
+        {
+          "a": "孟达",
+          "b": "诸葛亮",
+          "chapters": [
+            95
+          ],
+          "first": 95,
+          "last": 95,
+          "count": 1
+        },
+        {
+          "a": "审配",
+          "b": "曹操",
+          "chapters": [
+            32
+          ],
+          "first": 32,
+          "last": 32,
+          "count": 1
+        },
+        {
+          "a": "审配",
+          "b": "辛毗",
+          "chapters": [
+            32
+          ],
+          "first": 32,
+          "last": 32,
+          "count": 1
+        },
+        {
+          "a": "少帝",
+          "b": "崔毅",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "少帝",
+          "b": "王允",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "少帝",
+          "b": "董卓",
+          "chapters": [
+            4
+          ],
+          "first": 4,
+          "last": 4,
+          "count": 1
+        },
+        {
+          "a": "山神",
+          "b": "诸葛亮",
+          "chapters": [
+            90
+          ],
+          "first": 90,
+          "last": 90,
+          "count": 1
+        },
+        {
+          "a": "崔琰",
+          "b": "曹操",
+          "chapters": [
+            33
+          ],
+          "first": 33,
+          "last": 33,
+          "count": 1
+        },
+        {
+          "a": "崔谅",
+          "b": "诸葛亮",
+          "chapters": [
+            93
+          ],
+          "first": 93,
+          "last": 93,
+          "count": 1
+        },
+        {
+          "a": "左慈",
+          "b": "曹操",
+          "chapters": [
+            69
+          ],
+          "first": 69,
+          "last": 69,
+          "count": 1
+        },
+        {
+          "a": "庞统",
+          "b": "张任",
+          "chapters": [
+            64
+          ],
+          "first": 64,
+          "last": 64,
+          "count": 1
+        },
+        {
+          "a": "庞统",
+          "b": "张飞",
+          "chapters": [
+            58
+          ],
+          "first": 58,
+          "last": 58,
+          "count": 1
+        },
+        {
+          "a": "庞统",
+          "b": "曹操",
+          "chapters": [
+            47
+          ],
+          "first": 47,
+          "last": 47,
+          "count": 1
+        },
+        {
+          "a": "庞统",
+          "b": "蒋干",
+          "chapters": [
+            47
+          ],
+          "first": 47,
+          "last": 47,
+          "count": 1
+        },
+        {
+          "a": "庞统",
+          "b": "诸葛亮",
+          "chapters": [
+            58
+          ],
+          "first": 58,
+          "last": 58,
+          "count": 1
+        },
+        {
+          "a": "庞统",
+          "b": "鲁肃",
+          "chapters": [
+            58
+          ],
+          "first": 58,
+          "last": 58,
+          "count": 1
+        },
+        {
+          "a": "张任",
+          "b": "诸葛亮",
+          "chapters": [
+            65
+          ],
+          "first": 65,
+          "last": 65,
+          "count": 1
+        },
+        {
+          "a": "张宝",
+          "b": "朱儁",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "张嶷",
+          "b": "祝融夫人",
+          "chapters": [
+            91
+          ],
+          "first": 91,
+          "last": 91,
+          "count": 1
+        },
+        {
+          "a": "张昭",
+          "b": "诸葛亮",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "张昭",
+          "b": "陆逊",
+          "chapters": [
+            84
+          ],
+          "first": 84,
+          "last": 84,
+          "count": 1
+        },
+        {
+          "a": "张松",
+          "b": "张肃",
+          "chapters": [
+            63
+          ],
+          "first": 63,
+          "last": 63,
+          "count": 1
+        },
+        {
+          "a": "张松",
+          "b": "曹操",
+          "chapters": [
+            61
+          ],
+          "first": 61,
+          "last": 61,
+          "count": 1
+        },
+        {
+          "a": "张温",
+          "b": "秦宓",
+          "chapters": [
+            87
+          ],
+          "first": 87,
+          "last": 87,
+          "count": 1
+        },
+        {
+          "a": "张著",
+          "b": "赵云",
+          "chapters": [
+            72
+          ],
+          "first": 72,
+          "last": 72,
+          "count": 1
+        },
+        {
+          "a": "张虎",
+          "b": "韩当",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "张让",
+          "b": "段珪",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "张让",
+          "b": "闵贡",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "张辽",
+          "b": "黄盖",
+          "chapters": [
+            50
+          ],
+          "first": 50,
+          "last": 50,
+          "count": 1
+        },
+        {
+          "a": "张郃",
+          "b": "张飞",
+          "chapters": [
+            71
+          ],
+          "first": 71,
+          "last": 71,
+          "count": 1
+        },
+        {
+          "a": "张郃",
+          "b": "曹洪",
+          "chapters": [
+            71
+          ],
+          "first": 71,
+          "last": 71,
+          "count": 1
+        },
+        {
+          "a": "张郃",
+          "b": "诸葛亮",
+          "chapters": [
+            97
+          ],
+          "first": 97,
+          "last": 97,
+          "count": 1
+        },
+        {
+          "a": "张郃",
+          "b": "郭淮",
+          "chapters": [
+            100
+          ],
+          "first": 100,
+          "last": 100,
+          "count": 1
+        },
+        {
+          "a": "张郃",
+          "b": "高览",
+          "chapters": [
+            30
+          ],
+          "first": 30,
+          "last": 30,
+          "count": 1
+        },
+        {
+          "a": "张闿",
+          "b": "曹嵩",
+          "chapters": [
+            10
+          ],
+          "first": 10,
+          "last": 10,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "曹豹",
+          "chapters": [
+            14
+          ],
+          "first": 14,
+          "last": 14,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "督邮",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "许褚",
+          "chapters": [
+            73
+          ],
+          "first": 73,
+          "last": 73,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "邓茂",
+          "chapters": [
+            1
+          ],
+          "first": 1,
+          "last": 1,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "邢道荣",
+          "chapters": [
+            52
+          ],
+          "first": 52,
+          "last": 52,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "金旋",
+          "chapters": [
+            53
+          ],
+          "first": 53,
+          "last": 53,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "雷铜",
+          "chapters": [
+            71
+          ],
+          "first": 71,
+          "last": 71,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "马超",
+          "chapters": [
+            66
+          ],
+          "first": 66,
+          "last": 66,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "高升",
+          "chapters": [
+            2
+          ],
+          "first": 2,
+          "last": 2,
+          "count": 1
+        },
+        {
+          "a": "张飞",
+          "b": "魏延",
+          "chapters": [
+            71
+          ],
+          "first": 71,
+          "last": 71,
+          "count": 1
+        },
+        {
+          "a": "张鲁",
+          "b": "曹操",
+          "chapters": [
+            68
+          ],
+          "first": 68,
+          "last": 68,
+          "count": 1
+        },
+        {
+          "a": "张鲁",
+          "b": "马超",
+          "chapters": [
+            65
+          ],
+          "first": 65,
+          "last": 65,
+          "count": 1
+        },
+        {
+          "a": "徐庶",
+          "b": "曹操",
+          "chapters": [
+            48
+          ],
+          "first": 48,
+          "last": 48,
+          "count": 1
+        },
+        {
+          "a": "徐晃",
+          "b": "杨奉",
+          "chapters": [
+            13
+          ],
+          "first": 13,
+          "last": 13,
+          "count": 1
+        },
+        {
+          "a": "徐盛",
+          "b": "陆逊",
+          "chapters": [
+            85
+          ],
+          "first": 85,
+          "last": 85,
+          "count": 1
+        },
+        {
+          "a": "忙牙长",
+          "b": "马岱",
+          "chapters": [
+            89
+          ],
+          "first": 89,
+          "last": 89,
+          "count": 1
+        },
+        {
+          "a": "文丑",
+          "b": "曹操",
+          "chapters": [
+            26
+          ],
+          "first": 26,
+          "last": 26,
+          "count": 1
+        },
+        {
+          "a": "文丑",
+          "b": "赵云",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "文聘",
+          "b": "曹操",
+          "chapters": [
+            56
+          ],
+          "first": 56,
+          "last": 56,
+          "count": 1
+        },
+        {
+          "a": "文鸯",
+          "b": "邓艾",
+          "chapters": [
+            111
+          ],
+          "first": 111,
+          "last": 111,
+          "count": 1
+        },
+        {
+          "a": "曹丕",
+          "b": "曹睿",
+          "chapters": [
+            92
+          ],
+          "first": 92,
+          "last": 92,
+          "count": 1
+        },
+        {
+          "a": "曹丕",
+          "b": "甄氏",
+          "chapters": [
+            33
+          ],
+          "first": 33,
+          "last": 33,
+          "count": 1
+        },
+        {
+          "a": "曹丕",
+          "b": "贾诩",
+          "chapters": [
+            86
+          ],
+          "first": 86,
+          "last": 86,
+          "count": 1
+        },
+        {
+          "a": "曹丕",
+          "b": "陆逊",
+          "chapters": [
+            85
+          ],
+          "first": 85,
+          "last": 85,
+          "count": 1
+        },
+        {
+          "a": "曹仁",
+          "b": "满宠",
+          "chapters": [
+            74
+          ],
+          "first": 74,
+          "last": 74,
+          "count": 1
+        },
+        {
+          "a": "曹仁",
+          "b": "牛金",
+          "chapters": [
+            51
+          ],
+          "first": 51,
+          "last": 51,
+          "count": 1
+        },
+        {
+          "a": "曹休",
+          "b": "曹操",
+          "chapters": [
+            56
+          ],
+          "first": 56,
+          "last": 56,
+          "count": 1
+        },
+        {
+          "a": "曹休",
+          "b": "陆逊",
+          "chapters": [
+            97
+          ],
+          "first": 97,
+          "last": 97,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "曹植",
+          "chapters": [
+            34
+          ],
+          "first": 34,
+          "last": 34,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "曹洪",
+          "chapters": [
+            6
+          ],
+          "first": 6,
+          "last": 6,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "杨修",
+          "chapters": [
+            73
+          ],
+          "first": 73,
+          "last": 73,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "淳于琼",
+          "chapters": [
+            30
+          ],
+          "first": 30,
+          "last": 30,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "满宠",
+          "chapters": [
+            74
+          ],
+          "first": 74,
+          "last": 74,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "焦触",
+          "chapters": [
+            48
+          ],
+          "first": 48,
+          "last": 48,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "献帝",
+          "chapters": [
+            20
+          ],
+          "first": 20,
+          "last": 20,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "王允",
+          "chapters": [
+            4
+          ],
+          "first": 4,
+          "last": 4,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "王垕",
+          "chapters": [
+            17
+          ],
+          "first": 17,
+          "last": 17,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "田氏",
+          "chapters": [
+            12
+          ],
+          "first": 12,
+          "last": 12,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "祢衡",
+          "chapters": [
+            23
+          ],
+          "first": 23,
+          "last": 23,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "秦庆童",
+          "chapters": [
+            23
+          ],
+          "first": 23,
+          "last": 23,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "荀攸",
+          "chapters": [
+            58
+          ],
+          "first": 58,
+          "last": 58,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "董昭",
+          "chapters": [
+            14
+          ],
+          "first": 14,
+          "last": 14,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "董贵妃",
+          "chapters": [
+            24
+          ],
+          "first": 24,
+          "last": 24,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "蔡中",
+          "chapters": [
+            46
+          ],
+          "first": 46,
+          "last": 46,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "蔡瑁",
+          "chapters": [
+            45
+          ],
+          "first": 45,
+          "last": 45,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "蔡阳",
+          "chapters": [
+            26
+          ],
+          "first": 26,
+          "last": 26,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "袁谭",
+          "chapters": [
+            32
+          ],
+          "first": 32,
+          "last": 32,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "许芝",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "许褚",
+          "chapters": [
+            12
+          ],
+          "first": 12,
+          "last": 12,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "贾诩",
+          "chapters": [
+            60
+          ],
+          "first": 60,
+          "last": 60,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "赵云",
+          "chapters": [
+            50
+          ],
+          "first": 50,
+          "last": 50,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "邹氏",
+          "chapters": [
+            16
+          ],
+          "first": 16,
+          "last": 16,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "阚泽",
+          "chapters": [
+            47
+          ],
+          "first": 47,
+          "last": 47,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "陈琳",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "马腾",
+          "chapters": [
+            58
+          ],
+          "first": 58,
+          "last": 58,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "马超",
+          "chapters": [
+            59
+          ],
+          "first": 59,
+          "last": 59,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "魏延",
+          "chapters": [
+            73
+          ],
+          "first": 73,
+          "last": 73,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "鲍信",
+          "chapters": [
+            10
+          ],
+          "first": 10,
+          "last": 10,
+          "count": 1
+        },
+        {
+          "a": "曹操",
+          "b": "黄盖",
+          "chapters": [
+            46
+          ],
+          "first": 46,
+          "last": 46,
+          "count": 1
+        },
+        {
+          "a": "曹洪",
+          "b": "甘宁",
+          "chapters": [
+            51
+          ],
+          "first": 51,
+          "last": 51,
+          "count": 1
+        },
+        {
+          "a": "曹洪",
+          "b": "马超",
+          "chapters": [
+            59
+          ],
+          "first": 59,
+          "last": 59,
+          "count": 1
+        },
+        {
+          "a": "曹爽",
+          "b": "桓范",
+          "chapters": [
+            108
+          ],
+          "first": 108,
+          "last": 108,
+          "count": 1
+        },
+        {
+          "a": "曹真",
+          "b": "诸葛亮",
+          "chapters": [
+            101
+          ],
+          "first": 101,
+          "last": 101,
+          "count": 1
+        },
+        {
+          "a": "曹真",
+          "b": "费耀",
+          "chapters": [
+            98
+          ],
+          "first": 98,
+          "last": 98,
+          "count": 1
+        },
+        {
+          "a": "曹睿",
+          "b": "马钧",
+          "chapters": [
+            106
+          ],
+          "first": 106,
+          "last": 106,
+          "count": 1
+        },
+        {
+          "a": "木鹿大王",
+          "b": "赵云",
+          "chapters": [
+            91
+          ],
+          "first": 91,
+          "last": 91,
+          "count": 1
+        },
+        {
+          "a": "李严",
+          "b": "诸葛亮",
+          "chapters": [
+            97
+          ],
+          "first": 97,
+          "last": 97,
+          "count": 1
+        },
+        {
+          "a": "李傕",
+          "b": "献帝",
+          "chapters": [
+            13
+          ],
+          "first": 13,
+          "last": 13,
+          "count": 1
+        },
+        {
+          "a": "李傕",
+          "b": "皇甫郦",
+          "chapters": [
+            13
+          ],
+          "first": 13,
+          "last": 13,
+          "count": 1
+        },
+        {
+          "a": "李傕",
+          "b": "贾诩",
+          "chapters": [
+            10
+          ],
+          "first": 10,
+          "last": 10,
+          "count": 1
+        },
+        {
+          "a": "李傕",
+          "b": "郭汜",
+          "chapters": [
+            13
+          ],
+          "first": 13,
+          "last": 13,
+          "count": 1
+        },
+        {
+          "a": "李恢",
+          "b": "马超",
+          "chapters": [
+            66
+          ],
+          "first": 66,
+          "last": 66,
+          "count": 1
+        },
+        {
+          "a": "李氏",
+          "b": "马邈",
+          "chapters": [
+            118
+          ],
+          "first": 118,
+          "last": 118,
+          "count": 1
+        },
+        {
+          "a": "李肃",
+          "b": "董卓",
+          "chapters": [
+            9
+          ],
+          "first": 9,
+          "last": 9,
+          "count": 1
+        },
+        {
+          "a": "杜预",
+          "b": "王濬",
+          "chapters": [
+            121
+          ],
+          "first": 121,
+          "last": 121,
+          "count": 1
+        },
+        {
+          "a": "杜预",
+          "b": "羊祜",
+          "chapters": [
+            121
+          ],
+          "first": 121,
+          "last": 121,
+          "count": 1
+        },
+        {
+          "a": "杨仪",
+          "b": "诸葛亮",
+          "chapters": [
+            105
+          ],
+          "first": 105,
+          "last": 105,
+          "count": 1
+        },
+        {
+          "a": "杨仪",
+          "b": "费祎",
+          "chapters": [
+            106
+          ],
+          "first": 106,
+          "last": 106,
+          "count": 1
+        },
+        {
+          "a": "杨仪",
+          "b": "魏延",
+          "chapters": [
+            105
+          ],
+          "first": 105,
+          "last": 105,
+          "count": 1
+        },
+        {
+          "a": "杨奉",
+          "b": "董承",
+          "chapters": [
+            13
+          ],
+          "first": 13,
+          "last": 13,
+          "count": 1
+        },
+        {
+          "a": "杨彪",
+          "b": "郭汜妻",
+          "chapters": [
+            13
+          ],
+          "first": 13,
+          "last": 13,
+          "count": 1
+        },
+        {
+          "a": "杨阜",
+          "b": "马超",
+          "chapters": [
+            65
+          ],
+          "first": 65,
+          "last": 65,
+          "count": 1
+        },
+        {
+          "a": "樊稠",
+          "b": "韩遂",
+          "chapters": [
+            10
+          ],
+          "first": 10,
+          "last": 10,
+          "count": 1
+        },
+        {
+          "a": "步骘",
+          "b": "诸葛亮",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "段珪",
+          "b": "闵贡",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "沮授",
+          "b": "袁绍",
+          "chapters": [
+            30
+          ],
+          "first": 30,
+          "last": 30,
+          "count": 1
+        },
+        {
+          "a": "法正",
+          "b": "黄忠",
+          "chapters": [
+            72
+          ],
+          "first": 72,
+          "last": 72,
+          "count": 1
+        },
+        {
+          "a": "泠苞",
+          "b": "魏延",
+          "chapters": [
+            64
+          ],
+          "first": 64,
+          "last": 64,
+          "count": 1
+        },
+        {
+          "a": "焦触",
+          "b": "韩当",
+          "chapters": [
+            48
+          ],
+          "first": 48,
+          "last": 48,
+          "count": 1
+        },
+        {
+          "a": "爰邵",
+          "b": "邓艾",
+          "chapters": [
+            117
+          ],
+          "first": 117,
+          "last": 117,
+          "count": 1
+        },
+        {
+          "a": "献帝",
+          "b": "董承",
+          "chapters": [
+            20
+          ],
+          "first": 20,
+          "last": 20,
+          "count": 1
+        },
+        {
+          "a": "玄德",
+          "b": "袁绍",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "玄德",
+          "b": "郑玄",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "玄德",
+          "b": "陈登",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "王允",
+          "b": "董卓",
+          "chapters": [
+            8
+          ],
+          "first": 8,
+          "last": 8,
+          "count": 1
+        },
+        {
+          "a": "王允",
+          "b": "蔡邕",
+          "chapters": [
+            9
+          ],
+          "first": 9,
+          "last": 9,
+          "count": 1
+        },
+        {
+          "a": "王允",
+          "b": "貂蝉",
+          "chapters": [
+            8
+          ],
+          "first": 8,
+          "last": 8,
+          "count": 1
+        },
+        {
+          "a": "王子服",
+          "b": "董承",
+          "chapters": [
+            20
+          ],
+          "first": 20,
+          "last": 20,
+          "count": 1
+        },
+        {
+          "a": "王平",
+          "b": "诸葛亮",
+          "chapters": [
+            97
+          ],
+          "first": 97,
+          "last": 97,
+          "count": 1
+        },
+        {
+          "a": "王必",
+          "b": "耿纪",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "王必",
+          "b": "金祎",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "王朗",
+          "b": "诸葛亮",
+          "chapters": [
+            94
+          ],
+          "first": 94,
+          "last": 94,
+          "count": 1
+        },
+        {
+          "a": "王连",
+          "b": "诸葛亮",
+          "chapters": [
+            88
+          ],
+          "first": 88,
+          "last": 88,
+          "count": 1
+        },
+        {
+          "a": "甘宁",
+          "b": "蔡和",
+          "chapters": [
+            47
+          ],
+          "first": 47,
+          "last": 47,
+          "count": 1
+        },
+        {
+          "a": "田续",
+          "b": "邓艾",
+          "chapters": [
+            120
+          ],
+          "first": 120,
+          "last": 120,
+          "count": 1
+        },
+        {
+          "a": "祝融夫人",
+          "b": "诸葛亮",
+          "chapters": [
+            91
+          ],
+          "first": 91,
+          "last": 91,
+          "count": 1
+        },
+        {
+          "a": "祝融夫人",
+          "b": "马忠",
+          "chapters": [
+            91
+          ],
+          "first": 91,
+          "last": 91,
+          "count": 1
+        },
+        {
+          "a": "种辑",
+          "b": "董承",
+          "chapters": [
+            20
+          ],
+          "first": 20,
+          "last": 20,
+          "count": 1
+        },
+        {
+          "a": "程德枢",
+          "b": "诸葛亮",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "管辂",
+          "b": "赵颜",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "糜竺",
+          "b": "陶谦",
+          "chapters": [
+            11
+          ],
+          "first": 11,
+          "last": 11,
+          "count": 1
+        },
+        {
+          "a": "羊祜",
+          "b": "陆抗",
+          "chapters": [
+            121
+          ],
+          "first": 121,
+          "last": 121,
+          "count": 1
+        },
+        {
+          "a": "耿纪",
+          "b": "金祎",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "耿纪",
+          "b": "韦晃",
+          "chapters": [
+            70
+          ],
+          "first": 70,
+          "last": 70,
+          "count": 1
+        },
+        {
+          "a": "胡烈",
+          "b": "钟会",
+          "chapters": [
+            120
+          ],
+          "first": 120,
+          "last": 120,
+          "count": 1
+        },
+        {
+          "a": "苗泽",
+          "b": "黄奎",
+          "chapters": [
+            58
+          ],
+          "first": 58,
+          "last": 58,
+          "count": 1
+        },
+        {
+          "a": "董卓",
+          "b": "貂蝉",
+          "chapters": [
+            9
+          ],
+          "first": 9,
+          "last": 9,
+          "count": 1
+        },
+        {
+          "a": "董卓",
+          "b": "陈留王",
+          "chapters": [
+            3
+          ],
+          "first": 3,
+          "last": 3,
+          "count": 1
+        },
+        {
+          "a": "蒋琬",
+          "b": "诸葛亮",
+          "chapters": [
+            97
+          ],
+          "first": 97,
+          "last": 97,
+          "count": 1
+        },
+        {
+          "a": "薛综",
+          "b": "诸葛亮",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "虞翻",
+          "b": "诸葛亮",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "袁尚",
+          "b": "袁熙",
+          "chapters": [
+            33
+          ],
+          "first": 33,
+          "last": 33,
+          "count": 1
+        },
+        {
+          "a": "袁尚",
+          "b": "袁谭",
+          "chapters": [
+            32
+          ],
+          "first": 32,
+          "last": 32,
+          "count": 1
+        },
+        {
+          "a": "袁绍",
+          "b": "逢纪",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "袁绍",
+          "b": "郭图",
+          "chapters": [
+            30
+          ],
+          "first": 30,
+          "last": 30,
+          "count": 1
+        },
+        {
+          "a": "袁绍",
+          "b": "陈琳",
+          "chapters": [
+            22
+          ],
+          "first": 22,
+          "last": 22,
+          "count": 1
+        },
+        {
+          "a": "袁绍",
+          "b": "韩馥",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "许仪",
+          "b": "钟会",
+          "chapters": [
+            117
+          ],
+          "first": 117,
+          "last": 117,
+          "count": 1
+        },
+        {
+          "a": "许褚",
+          "b": "赵云",
+          "chapters": [
+            31
+          ],
+          "first": 31,
+          "last": 31,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "诸葛瑾",
+          "chapters": [
+            44
+          ],
+          "first": 44,
+          "last": 44,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "费祎",
+          "chapters": [
+            104
+          ],
+          "first": 104,
+          "last": 104,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "邓芝",
+          "chapters": [
+            86
+          ],
+          "first": 86,
+          "last": 86,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "郑文",
+          "chapters": [
+            104
+          ],
+          "first": 104,
+          "last": 104,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "鄂焕",
+          "chapters": [
+            88
+          ],
+          "first": 88,
+          "last": 88,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "陆绩",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "雅丹",
+          "chapters": [
+            95
+          ],
+          "first": 95,
+          "last": 95,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "马良",
+          "chapters": [
+            85
+          ],
+          "first": 85,
+          "last": 85,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "马超",
+          "chapters": [
+            66
+          ],
+          "first": 66,
+          "last": 66,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "黄忠",
+          "chapters": [
+            71
+          ],
+          "first": 71,
+          "last": 71,
+          "count": 1
+        },
+        {
+          "a": "诸葛亮",
+          "b": "黄盖",
+          "chapters": [
+            43
+          ],
+          "first": 43,
+          "last": 43,
+          "count": 1
+        },
+        {
+          "a": "诸葛尚",
+          "b": "诸葛瞻",
+          "chapters": [
+            118
+          ],
+          "first": 118,
+          "last": 118,
+          "count": 1
+        },
+        {
+          "a": "诸葛诞",
+          "b": "贾充",
+          "chapters": [
+            112
+          ],
+          "first": 112,
+          "last": 112,
+          "count": 1
+        },
+        {
+          "a": "赵云",
+          "b": "赵范",
+          "chapters": [
+            52
+          ],
+          "first": 52,
+          "last": 52,
+          "count": 1
+        },
+        {
+          "a": "赵云",
+          "b": "邓芝",
+          "chapters": [
+            97
+          ],
+          "first": 97,
+          "last": 97,
+          "count": 1
+        },
+        {
+          "a": "赵云",
+          "b": "钟绅",
+          "chapters": [
+            42
+          ],
+          "first": 42,
+          "last": 42,
+          "count": 1
+        },
+        {
+          "a": "赵云",
+          "b": "钟缙",
+          "chapters": [
+            42
+          ],
+          "first": 42,
+          "last": 42,
+          "count": 1
+        },
+        {
+          "a": "赵云",
+          "b": "陆逊",
+          "chapters": [
+            85
+          ],
+          "first": 85,
+          "last": 85,
+          "count": 1
+        },
+        {
+          "a": "赵云",
+          "b": "韩德",
+          "chapters": [
+            93
+          ],
+          "first": 93,
+          "last": 93,
+          "count": 1
+        },
+        {
+          "a": "赵云",
+          "b": "麹义",
+          "chapters": [
+            7
+          ],
+          "first": 7,
+          "last": 7,
+          "count": 1
+        },
+        {
+          "a": "辛宪英",
+          "b": "辛敞",
+          "chapters": [
+            108
+          ],
+          "first": 108,
+          "last": 108,
+          "count": 1
+        },
+        {
+          "a": "迷当",
+          "b": "郭淮",
+          "chapters": [
+            110
+          ],
+          "first": 110,
+          "last": 110,
+          "count": 1
+        },
+        {
+          "a": "邓忠",
+          "b": "邓艾",
+          "chapters": [
+            118
+          ],
+          "first": 118,
+          "last": 118,
+          "count": 1
+        },
+        {
+          "a": "邓艾",
+          "b": "钟会",
+          "chapters": [
+            118
+          ],
+          "first": 118,
+          "last": 118,
+          "count": 1
+        },
+        {
+          "a": "阚泽",
+          "b": "黄盖",
+          "chapters": [
+            47
+          ],
+          "first": 47,
+          "last": 47,
+          "count": 1
+        },
+        {
+          "a": "陆逊",
+          "b": "黄承彦",
+          "chapters": [
+            85
+          ],
+          "first": 85,
+          "last": 85,
+          "count": 1
+        },
+        {
+          "a": "韩当",
+          "b": "黄盖",
+          "chapters": [
+            50
+          ],
+          "first": 50,
+          "last": 50,
+          "count": 1
+        },
+        {
+          "a": "韩浩",
+          "b": "黄忠",
+          "chapters": [
+            71
+          ],
+          "first": 71,
+          "last": 71,
+          "count": 1
+        },
+        {
+          "a": "韩玄",
+          "b": "黄忠",
+          "chapters": [
+            53
+          ],
+          "first": 53,
+          "last": 53,
+          "count": 1
+        },
+        {
+          "a": "韩遂",
+          "b": "马超",
+          "chapters": [
+            60
+          ],
+          "first": 60,
+          "last": 60,
+          "count": 1
+        },
+        {
+          "a": "韩遂将领",
+          "b": "马超",
+          "chapters": [
+            60
+          ],
+          "first": 60,
+          "last": 60,
+          "count": 1
+        },
+        {
+          "a": "马岱",
+          "b": "魏延",
+          "chapters": [
+            106
+          ],
+          "first": 106,
+          "last": 106,
+          "count": 1
+        },
+        {
+          "a": "马腾",
+          "b": "黄奎",
+          "chapters": [
+            58
+          ],
+          "first": 58,
+          "last": 58,
+          "count": 1
         }
       ],
       "scanned": true,
-      "book_session_id": "demo-sanguo",
+      "book_session_id": "demo",
       "trace": {
         "input_tokens": 0,
         "output_tokens": 0,
-        "chars": 732613,
+        "chars": 0,
         "duration_ms": 0
       }
     },
@@ -27290,6 +31415,772 @@
         "output_tokens": 15998,
         "chars": 649896,
         "duration_ms": 236964
+      }
+    },
+    "POST /api/agent/relationship-timeline#chronicles": {
+      "刘备|诸葛亮": {
+        "relations": [
+          {
+            "a": "刘备",
+            "b": "诸葛亮",
+            "verdict": {
+              "essence": "君臣遇合，鱼水相得，诸葛亮以智谋辅佐，刘备以信任托付，从未生间隙。",
+              "arc": "从初任军师到临终托孤，信赖不断加深直至全权委托。",
+              "asymmetric": false,
+              "view_a_on_b": "",
+              "view_b_on_a": "",
+              "sharp_point": "刘备临终托付后事并提醒马谡不可大用，既显识人之深，亦见对诸葛亮之绝对信任。",
+              "pivot_chapter": 86
+            },
+            "beats": [
+              {
+                "chapter": 42,
+                "scene": "诸葛亮告知刘备已料定曹操追兵，并安排接应。",
+                "state": "君臣·初显信任",
+                "valence": 3,
+                "change": "",
+                "evidence": "曹操一见云长，即勒住马回顾众将曰：“又中诸葛亮之计也！",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 50,
+                "scene": "诸葛亮与刘备在樊口一同观看周瑜火攻成功，后关羽回来自首。",
+                "state": "君臣·共同观战",
+                "valence": 2,
+                "change": "初次协同应对战事，关系平稳。",
+                "evidence": "”操曰：“吾笑诸葛亮、周瑜毕竟智谋不足。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 52,
+                "scene": "诸葛亮定计夺取零陵、桂阳等郡，刘备依计而行。",
+                "state": "君臣·计策倚重",
+                "valence": 4,
+                "change": "诸葛亮献计成功，刘备更信赖其谋略。",
+                "evidence": "瑜谓之曰：“吾欲起兵与刘备、诸葛亮共决雌雄，复夺城池。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 53,
+                "scene": "诸葛亮预言西北星坠对应皇族，后刘琦果然病亡。",
+                "state": "君臣·预言信服",
+                "valence": 3,
+                "change": "诸葛亮展示天文预判，刘备加深对其能力的信任。",
+                "evidence": "孔明曰：“亮夜观星象，见西北有星坠地，必应折一皇族。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 54,
+                "scene": "诸葛亮劝刘备应允与孙权之妹的婚事，并给予赵云三个锦囊。",
+                "state": "君臣·精心谋划",
+                "valence": 4,
+                "change": "诸葛亮为刘备长远利益设计，刘备完全采纳。",
+                "evidence": "刘备枭雄之辈，诸葛亮奸猾之徒，恐不似先生心地。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 55,
+                "scene": "诸葛亮预先派船只接应刘备从东吴返回，与刘备会合。",
+                "state": "君臣·周密保护",
+                "valence": 4,
+                "change": "诸葛亮确保刘备安全归来，进一步巩固信任。",
+                "evidence": "诸葛亮在此等候多时。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 67,
+                "scene": "诸葛亮假意哭求刘备归还三郡，刘备配合许诺长沙、零陵、桂阳。",
+                "state": "君臣·默契演戏",
+                "valence": 3,
+                "change": "两人合演骗过鲁肃，默契加深。",
+                "evidence": "却说孙权要索荆州，张昭献计曰：“刘备所倚仗者，诸葛亮耳。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 71,
+                "scene": "刘备与诸葛亮商议调兵，诸葛亮解释张飞饮酒是计。",
+                "state": "君臣·共同指挥",
+                "valence": 4,
+                "change": "诸葛亮解释军事部署，刘备在军事上更加依赖。",
+                "evidence": "玄德、孔明皆深然之，遂传令赵云、张飞为先锋，玄德与孔明亲自引兵十万，择日图汉中，传檄各处，严加提备。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 74,
+                "scene": "诸葛亮劝刘备进位汉中王，刘备同意。",
+                "state": "君臣·推动称王",
+                "valence": 5,
+                "change": "诸葛亮推动刘备地位提升，刘备对诸葛亮建议绝对信任。",
+                "evidence": "”孔明曰：“主公宜从权变，先进位汉中王，然后表奏天子，未为迟也。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 86,
+                "scene": "刘备临终托孤，并告诫诸葛亮马谡不可大用。",
+                "state": "托孤·全权委托",
+                "valence": 5,
+                "change": "刘备将江山和辅佐后主之责全权托付诸葛亮，信任达至顶峰。",
+                "evidence": "”贾诩谏曰：“刘备虽亡，必托孤于诸葛亮。",
+                "verified": true,
+                "match_score": 1.0
+              }
+            ]
+          }
+        ],
+        "pairs": [],
+        "scanned": true,
+        "book_session_id": "demo",
+        "trace": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "chars": 0,
+          "duration_ms": 0
+        }
+      },
+      "刘禅|诸葛亮": {
+        "relations": [
+          {
+            "a": "刘禅",
+            "b": "诸葛亮",
+            "verdict": {
+              "essence": "君信臣忠的典范，后主对相父全权托付，孔明鞠躬尽瘁",
+              "arc": "从依赖问计到全权委托北伐，信任日益牢固",
+              "asymmetric": false,
+              "view_a_on_b": "",
+              "view_b_on_a": "",
+              "sharp_point": "后主对诸葛亮自请贬官亦照准，君臣信任至深，毫无猜忌",
+              "pivot_chapter": 97
+            },
+            "beats": [
+              {
+                "chapter": 86,
+                "scene": "后主向诸葛亮问计，诸葛亮陈述已退四路敌军",
+                "state": "君臣·依赖",
+                "valence": 3,
+                "change": "",
+                "evidence": "孔明与后主共饮数杯，送后主出府。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 88,
+                "scene": "诸葛亮请求南征，后主应允",
+                "state": "君臣·支持",
+                "valence": 4,
+                "change": "后主从问计到主动批准出征，信任加深",
+                "evidence": "”孔明乃入朝奏后主曰：“臣观南蛮不服，实国家之大患也。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 92,
+                "scene": "后主出迎诸葛亮，诸葛亮自责并奏准优恤死者；诸葛亮上《出师表》北伐，后主准奏",
+                "state": "君臣·托付",
+                "valence": 5,
+                "change": "后主以礼相待并全权委托北伐，关系达到亲密顶峰",
+                "evidence": "”次日，后主早朝，大会官僚，孔明出班，上《出师表》一道。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 97,
+                "scene": "诸葛亮上表自贬，后主准奏，贬为右将军",
+                "state": "君臣·包纳",
+                "valence": 4,
+                "change": "诸葛亮因失街亭自请处分，后主仍予信任，包容其过错",
+                "evidence": "”后主从之，乃诏贬孔明为右将军，行丞相事，照旧总督军马，就命费祎赍诏到汉中。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 98,
+                "scene": "诸葛亮上《后出师表》，后主准其伐魏",
+                "state": "君臣·持续信任",
+                "valence": 5,
+                "change": "后主再次批准北伐，巩固了对诸葛亮军事决策的无条件信任",
+                "evidence": "后主览表甚喜，即敕令孔明出师。",
+                "verified": true,
+                "match_score": 1.0
+              }
+            ]
+          }
+        ],
+        "pairs": [],
+        "scanned": true,
+        "book_session_id": "demo",
+        "trace": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "chars": 0,
+          "duration_ms": 0
+        }
+      },
+      "司马懿|诸葛亮": {
+        "relations": [
+          {
+            "a": "司马懿",
+            "b": "诸葛亮",
+            "verdict": {
+              "essence": "一生宿敌，智谋相抗，一攻一守的经典对局",
+              "arc": "从初次交锋诸葛亮以空城计退敌，到诸葛亮病逝后仍以木像惊退司马懿，始终是诸葛亮主动设计、司马懿谨慎防守的不对称对抗",
+              "asymmetric": true,
+              "view_a_on_b": "自叹不如，畏诸葛亮如神",
+              "view_b_on_a": "视司马懿为劲敌，屡施计谋欲破之",
+              "sharp_point": "诸葛亮生前死后都能以虚虚实实之计不战而退司马懿，司马懿对诸葛亮的畏惧甚至延伸至其遗物",
+              "pivot_chapter": 105
+            },
+            "beats": [
+              {
+                "chapter": 96,
+                "scene": "孔明空城计退司马懿十五万大军",
+                "state": "敌对·初次交锋",
+                "valence": -4,
+                "change": "",
+                "evidence": "众官无不骇然，乃问孔明曰：“司马懿乃魏之名将，今统十五万精兵到此，见了丞相，便速退去，何也？",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 97,
+                "scene": "司马懿感叹自己不如诸葛亮；两人斗阵法，诸葛亮用八卦阵擒张虎、戴陵等，司马懿败退",
+                "state": "敌对·斗阵失利",
+                "valence": -4,
+                "change": "司马懿在斗阵中再次败于诸葛亮，加深了自叹不如的认知",
+                "evidence": "逊令诸葛瑾等拒守江陵，以敌司马懿。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 98,
+                "scene": "司马懿料孔明必出陈仓，命郝昭守之；司马懿奏魏主坚守不战，待蜀粮尽",
+                "state": "敌对·转入持久防御",
+                "valence": -2,
+                "change": "司马懿采取坚守策略，避免直接冲突，关系进入僵持阶段",
+                "evidence": "却说蜀兵前队哨至陈仓，回报孔明，说：“陈仓口已筑起一城，内有大将郝昭守把，深沟高垒，遍排鹿角，十分谨严。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 100,
+                "scene": "司马懿上计坚守不出，孔明用计烧魏粮车，劫寨获胜",
+                "state": "敌对·烧粮劫寨",
+                "valence": -3,
+                "change": "诸葛亮主动出击烧毁魏军粮车并劫寨，打破僵局，司马懿被动应对",
+                "evidence": "孔明见司马懿不出，思得一计，传令教各处皆拔寨而起。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 101,
+                "scene": "孔明分兵出箕谷、斜谷，令陈式不听令致败，斩陈式；两人斗阵法，孔明用八卦阵擒张虎等，司马懿败；孔明退兵用增灶法，司马懿疑有伏不敢追",
+                "state": "敌对·斗阵再败与疑兵退敌",
+                "valence": -4,
+                "change": "司马懿在斗阵中再次失败，且被诸葛亮的增灶疑兵所惑，不敢追击，进一步体现对诸葛亮计谋的畏惧",
+                "evidence": "次后，川口土人来报司马懿，说孔明退兵之时，未见添兵，只见增灶。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 103,
+                "scene": "司马懿保夏侯四将，率大军驻渭滨，坚守不战；孔明欲虚攻北原，暗取渭滨，司马懿识破，布置防御；司马懿料孔明必出陈仓，早有准备",
+                "state": "敌对·识破计策但依然固守",
+                "valence": -2,
+                "change": "司马懿识破诸葛亮的虚攻计划并做好准备，但仍坚持守势，双方继续对峙",
+                "evidence": "2020年教育部指导目录）》第一百二回 司马懿占北原渭桥 诸葛亮造木牛流马]",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 104,
+                "scene": "孔明上方谷火攻，因天雨失败",
+                "state": "敌对·火攻险胜",
+                "valence": -5,
+                "change": "诸葛亮设伏火攻几乎成功，但因天降大雨而失败，司马懿死里逃生，关系紧张达到顶点",
+                "evidence": "”卫尉辛毗曰：“司马懿本无战心，必因诸葛亮耻辱，众将忿怒之故，特上此表，欲更乞明旨，以遏诸将之心耳。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 105,
+                "scene": "司马懿见孔明木像，惊退",
+                "state": "敌对·死后余威",
+                "valence": -4,
+                "change": "诸葛亮病逝后，司马懿见其木像仍惊恐后退，表明恐惧延续至死后",
+                "evidence": "司马懿知孔明死信已确，乃复引兵追赶。",
+                "verified": true,
+                "match_score": 1.0
+              }
+            ]
+          }
+        ],
+        "pairs": [],
+        "scanned": true,
+        "book_session_id": "demo",
+        "trace": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "chars": 0,
+          "duration_ms": 0
+        }
+      },
+      "诸葛亮|鲁肃": {
+        "relations": [
+          {
+            "a": "诸葛亮",
+            "b": "鲁肃",
+            "verdict": {
+              "essence": "聪慧智者与忠厚使者的不对等联盟，孔明以智谋主导，鲁肃则被动应付",
+              "arc": "从互信合作到单方面利用与被动应付的不平衡关系",
+              "asymmetric": true,
+              "view_a_on_b": "孔明视鲁肃为忠厚可欺的盟友，可借其维持孙刘联盟并屡次以虚言拖延",
+              "view_b_on_a": "鲁肃视孔明为才智超群但狡黠难缠的盟友，既敬佩又无奈",
+              "sharp_point": "孔明屡次以虚言拖延荆州归还，尤以第五十六章令刘备大哭示弱之策最为无赖，使鲁肃三次空手而归",
+              "pivot_chapter": 56
+            },
+            "beats": [
+              {
+                "chapter": 42,
+                "scene": "鲁肃邀孔明同见孙权，欲促成孙刘联盟",
+                "state": "盟友·初步合作",
+                "valence": 4,
+                "change": "",
+                "evidence": "鲁肃遂别了玄德、刘琦，与孔明登舟，望柴桑郡来。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 43,
+                "scene": "鲁肃私下叮嘱孔明勿言曹操兵多，孔明应允",
+                "state": "盟友·信任试探",
+                "valence": 3,
+                "change": "鲁肃对孔明有所戒心，孔明暂时顺从以维系合作",
+                "evidence": "二人在舟中共议，鲁肃谓孔明曰：“先生见孙将军，切不可实言曹操兵多将广。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 45,
+                "scene": "孔明点破周瑜反间计，鲁肃惊服",
+                "state": "盟友·智谋压制",
+                "valence": 4,
+                "change": "孔明显露才智，鲁肃由戒惧转为敬佩",
+                "evidence": "”鲁肃遂连夜回见周瑜，备述孔明之言。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 46,
+                "scene": "鲁肃助孔明借船，后惊叹其神算",
+                "state": "盟友·高度信赖",
+                "valence": 5,
+                "change": "孔明草船借箭成功，鲁肃彻底信服",
+                "evidence": "鲁肃入见周瑜，备说孔明取箭之事。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 49,
+                "scene": "孔明告知鲁肃将借东风，鲁肃助其筑坛",
+                "state": "盟友·完全配合",
+                "valence": 5,
+                "change": "鲁肃对孔明言听计从，合作达到顶峰",
+                "evidence": "孔明辞别出帐，与鲁肃上马，来南屏山相度地势，令军士取东南方赤土筑坛。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 52,
+                "scene": "鲁肃讨荆州，孔明以刘琦尚在为由推托，并立暂借文书",
+                "state": "盟友·利益冲突初现",
+                "valence": 0,
+                "change": "首次出现利益矛盾，孔明以规则拖延，鲁肃勉为其难接受",
+                "evidence": "2020年教育部指导目录）》第五十二回 诸葛亮智辞鲁肃 赵子龙计取桂阳]",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 54,
+                "scene": "鲁肃再次讨荆州，孔明以取西川为辞拖延，又立文书",
+                "state": "盟友·单方面拖延",
+                "valence": -1,
+                "change": "孔明继续用计，鲁肃被动接受，关系开始紧张",
+                "evidence": "却说孔明闻鲁肃到，与玄德出城迎接。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 56,
+                "scene": "鲁肃奉孙权命再讨荆州，孔明使刘备大哭，以取西川为难推托",
+                "state": "盟友·敷衍拖沓",
+                "valence": -2,
+                "change": "孔明用情感手段再次敷衍，鲁肃彻底无奈，信任进一步削弱",
+                "evidence": "玄德与孔明商议，孔明曰：“鲁肃必不曾见吴侯，只到柴桑和周瑜商量了甚计策，来诱我耳。",
+                "verified": true,
+                "match_score": 1.0
+              }
+            ]
+          }
+        ],
+        "pairs": [],
+        "scanned": true,
+        "book_session_id": "demo",
+        "trace": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "chars": 0,
+          "duration_ms": 0
+        }
+      },
+      "刘备|曹操": {
+        "relations": [
+          {
+            "a": "刘备",
+            "b": "曹操",
+            "verdict": {
+              "essence": "一时依附的英雄，终成争天下的死敌",
+              "arc": "从依附合作到暗中较量，最终兵戎相见",
+              "asymmetric": false,
+              "view_a_on_b": "",
+              "view_b_on_a": "",
+              "sharp_point": "曹操直言天下英雄唯刘备与己，刘备惊雷掩饰，双方心照不宣",
+              "pivot_chapter": 21
+            },
+            "beats": [
+              {
+                "chapter": 16,
+                "scene": "刘备投曹操，曹操表荐刘备为豫州牧",
+                "state": "依附·重用",
+                "valence": 4,
+                "change": "",
+                "evidence": "”次日，即表荐刘备领豫州牧。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 17,
+                "scene": "刘备杀韩暹杨奉，曹操厚劳",
+                "state": "依附·赏劳",
+                "valence": 4,
+                "change": "刘备立功，曹操厚赏以笼络",
+                "evidence": "”珪曰：“韩暹、杨奉乃汉旧臣，因惧曹操而走，无家可依，暂归袁术，术必轻之，彼亦不乐为术用。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 18,
+                "scene": "曹操约刘备共图吕布",
+                "state": "同盟·合作",
+                "valence": 5,
+                "change": "为共同利益合作抗吕布",
+                "evidence": "荀彧曰：“可先使人往约刘备，待其回报，方可动兵。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 21,
+                "scene": "曹操煮酒论英雄，刘备借雷掩饰；刘备请兵截袁术，曹操允之",
+                "state": "表面同盟·暗藏机心",
+                "valence": 2,
+                "change": "曹操试探刘备，刘备惊惧并借机请兵脱离控制",
+                "evidence": "时郭嘉、程昱考较钱粮方回，知曹操已遣玄德进兵徐州，慌入谏曰：“丞相何故令刘备督军？",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 24,
+                "scene": "曹操东征徐州",
+                "state": "敌对·曹操攻刘备",
+                "valence": -4,
+                "change": "刘备借机离开并自立，曹操不容其坐大而征讨",
+                "evidence": "”丰曰：“今曹操东征刘玄德，许昌空虚，若以义兵乘虚而入，上可以保天子，下可以救万民。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 31,
+                "scene": "刘备欲袭许昌，被曹操击败，投奔刘表",
+                "state": "敌对·刘备惨败",
+                "valence": -5,
+                "change": "刘备主动进攻失败，彻底败逃",
+                "evidence": "刘备先从吕布，后事曹操，近投袁绍，皆不克终，足可见其为人。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 73,
+                "scene": "两军阵前对骂",
+                "state": "死敌·对峙",
+                "valence": -5,
+                "change": "已成死敌，相见即骂",
+                "evidence": "",
+                "verified": false,
+                "match_score": 0.0
+              }
+            ]
+          }
+        ],
+        "pairs": [],
+        "scanned": true,
+        "book_session_id": "demo",
+        "trace": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "chars": 0,
+          "duration_ms": 0
+        }
+      },
+      "诸葛亮|赵云": {
+        "relations": [
+          {
+            "a": "诸葛亮",
+            "b": "赵云",
+            "verdict": {
+              "essence": "君臣鱼水，上将与军师互敬互信",
+              "arc": "始终如一的上下级信任，从早期配合到赵云去世，关系始终融洽",
+              "asymmetric": false,
+              "view_a_on_b": "",
+              "view_b_on_a": "",
+              "sharp_point": "诸葛亮闻赵云死而跌足痛哭，足见二人情谊之深",
+              "pivot_chapter": 98
+            },
+            "beats": [
+              {
+                "chapter": 52,
+                "scene": "诸葛亮称赞赵云以大局为重",
+                "state": "君臣·信任",
+                "valence": 3,
+                "change": "",
+                "evidence": "”孔明大喜，责了军令状，选三千精兵付赵云去。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 73,
+                "scene": "诸葛亮命令赵云埋伏于土山，夜间擂鼓惊扰曹军",
+                "state": "君臣·听命",
+                "valence": 2,
+                "change": "正常调遣，关系无变化",
+                "evidence": "玄德与孔明来观形势，孔明见汉水上流头，有一带土山，可伏千馀人，乃回到营中，唤赵云吩咐：“汝可引五百人，皆带鼓角，伏于土山之下。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 87,
+                "scene": "诸葛亮调赵云回军，准备南征",
+                "state": "君臣·听命",
+                "valence": 2,
+                "change": "正常调遣，关系无变化",
+                "evidence": "却说赵云引兵杀出阳平关之次，忽报丞相有文书到，说益州耆帅雍闿结连蛮王孟获，起十万蛮兵，侵掠四郡，因此宣云回军，令马超坚守阳平关，丞相欲自南征。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 90,
+                "scene": "诸葛亮授计给赵云，诱敌并四擒孟获",
+                "state": "君臣·授计执行",
+                "valence": 3,
+                "change": "进一步体现信任，配合默契",
+                "evidence": "孔明先唤赵云、魏延入帐，向耳畔低言分付如此如此，二人受了计策先进。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 97,
+                "scene": "诸葛亮赞赏赵云不折一人一骑，赏赐金银，赵云辞谢",
+                "state": "君臣·嘉奖与辞谢",
+                "valence": 4,
+                "change": "诸葛亮高度赞赏，赵云谦逊，关系更近",
+                "evidence": "却说孔明回到汉中，计点军士，只少赵云、邓芝，心中甚忧，乃令关兴、张苞，各引一军接应。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 98,
+                "scene": "诸葛亮听闻赵云去世，跌足痛哭，后主追谥",
+                "state": "君臣·哀悼",
+                "valence": 5,
+                "change": "赵云去世，诸葛亮悲痛，体现深厚感情",
+                "evidence": "今幸蜀兵西出，诸葛亮甚不相疑。",
+                "verified": true,
+                "match_score": 1.0
+              }
+            ]
+          }
+        ],
+        "pairs": [],
+        "scanned": true,
+        "book_session_id": "demo",
+        "trace": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "chars": 0,
+          "duration_ms": 0
+        }
+      },
+      "关羽|曹操": {
+        "relations": [
+          {
+            "a": "关羽",
+            "b": "曹操",
+            "verdict": {
+              "essence": "义重恩深的降将与其惜才的枭雄，终因忠义大节而分道扬镳，却留下两难情义",
+              "arc": "从被迫降曹→厚待相敬→决意辞归→截击成敌→华容道因私恩放行",
+              "asymmetric": true,
+              "view_a_on_b": "关羽视曹操为暂可托身但终属汉贼的强主，感其厚遇却不忘本志",
+              "view_b_on_a": "曹操视关羽为义薄云天、不可羁縻的真英雄，既敬且憾",
+              "sharp_point": "华容道关羽以私恩放走曹操，公义与私情冲突至顶点",
+              "pivot_chapter": 50
+            },
+            "beats": [
+              {
+                "chapter": 25,
+                "scene": "关羽约三事降曹，曹操允诺",
+                "state": "暂时收留·厚待",
+                "valence": 2,
+                "change": "",
+                "evidence": "2020年教育部指导目录）》第二十五回 屯土山关公约三事 救白马曹操解重围]",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 26,
+                "scene": "关羽挂印封金，辞别曹操",
+                "state": "上下诀别·各怀其志",
+                "valence": 0,
+                "change": "关羽决意离去，曹操未阻，关系由隶属转为道义上的两清",
+                "evidence": "2020年教育部指导目录）》第二十六回 袁本初败兵折将 关云长挂印封金]",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 27,
+                "scene": "曹操亲送关羽，赠袍",
+                "state": "送别示好·恩义加码",
+                "valence": 3,
+                "change": "曹操主动赠袍送行，加深关羽欠下的恩情",
+                "evidence": "云长将曹操赠袍事，告知二嫂，催促车仗前行。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 42,
+                "scene": "关羽截出，曹操惊呼中计",
+                "state": "敌对·擒拿冲突",
+                "valence": -4,
+                "change": "关羽已归附刘备阵营，立场敌对，设伏截击曹操",
+                "evidence": "却说曹操见云长在旱路引军截出，疑有伏兵，不敢来追；",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 50,
+                "scene": "曹操在华容道遇关云长，以昔日恩情说动关云长放行",
+                "state": "恩义释敌·私情胜公令",
+                "valence": 2,
+                "change": "关羽念及旧恩，违抗军令放走曹操，敌对关系因私情而暂缓",
+                "evidence": "却说关云长放了曹操，引军自回。",
+                "verified": true,
+                "match_score": 1.0
+              }
+            ]
+          }
+        ],
+        "pairs": [],
+        "scanned": true,
+        "book_session_id": "demo",
+        "trace": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "chars": 0,
+          "duration_ms": 0
+        }
+      },
+      "刘备|吕布": {
+        "relations": [
+          {
+            "a": "刘备",
+            "b": "吕布",
+            "verdict": {
+              "essence": "相互利用的盟友，最终因利益冲突与信任破裂成为死敌",
+              "arc": "从敌对→短暂合作→受恩→背叛与决裂",
+              "asymmetric": true,
+              "view_a_on_b": "刘备视吕布为反复无信、可暂时利用但终须除之的祸害",
+              "view_b_on_a": "吕布视刘备为曾共患难、可交之友，辕门射戟后更以为有恩于人",
+              "sharp_point": "刘备在受吕布辕门射戟解困之恩后，仍以丁原、董卓事例暗示曹操杀吕，反噬最大恩人",
+              "pivot_chapter": 19
+            },
+            "beats": [
+              {
+                "chapter": 5,
+                "scene": "刘备加入三英战吕布，与关羽、张飞围攻吕布",
+                "state": "战场敌人",
+                "valence": -4,
+                "change": "",
+                "evidence": "2020年教育部指导目录）》第五回 发矫诏诸镇应曹公 破关兵三英战吕布]",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 14,
+                "scene": "吕布送还刘备家眷，刘备暂屯小沛",
+                "state": "从敌对转为缓和，暂时依傍关系",
+                "valence": 1,
+                "change": "吕布主动送回刘备家眷，刘备获得容身之所，敌对关系松动",
+                "evidence": "”许褚曰：“愿借精兵五万，斩刘备、吕布之头，献于丞相。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 15,
+                "scene": "吕布再次送还刘备家眷，二人和好",
+                "state": "表面和好的盟友",
+                "valence": 3,
+                "change": "吕布再次施恩，刘备与之正式和解，双方维持友好",
+                "evidence": "且说袁术知吕布袭了徐州，星夜差人至吕布处，许以粮五万斛、马五百匹、金银一万两、彩缎一千匹，使夹攻刘备。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 16,
+                "scene": "吕布辕门射戟，化解袁术对刘备的围攻",
+                "state": "受恩的盟友，吕布有恩于刘备",
+                "valence": 4,
+                "change": "吕布以高超武艺和威望解刘备之困，刘备欠下重大人情",
+                "evidence": "袁术大怒曰：“吕布受吾许多粮米，反以此儿戏之事偏护刘备。",
+                "verified": true,
+                "match_score": 1.0
+              },
+              {
+                "chapter": 19,
+                "scene": "吕布攻小沛，刘备弃城投曹操；刘备以丁原、董卓事例暗示曹操杀吕",
+                "state": "彻底决裂的死敌，刘备痛下杀手",
+                "valence": -5,
+                "change": "吕布为自保攻刘备，刘备被迫逃亡后借曹操之手反噬，恩断义绝",
+                "evidence": "且说吕布在下邳，自恃粮食足备，且有泗水之险，安心坐守，可保无虞。",
+                "verified": true,
+                "match_score": 1.0
+              }
+            ]
+          }
+        ],
+        "pairs": [],
+        "scanned": true,
+        "book_session_id": "demo",
+        "trace": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "chars": 0,
+          "duration_ms": 0
+        }
       }
     }
   },

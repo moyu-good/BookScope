@@ -59,6 +59,37 @@ export function installDemoFetch(): void {
       });
     }
 
+    // 关系编年端点按请求体分支：有 pair → 那对的编年，无 pair → 全员清单。
+    // 拦截器本来只认 "METHOD 路径"、不看 body，这里给这一个端点补看 pair_a/pair_b。
+    if (pathname === "/api/agent/relationship-timeline") {
+      let pairA: unknown;
+      let pairB: unknown;
+      try {
+        const parsed = init?.body ? JSON.parse(init.body as string) : {};
+        pairA = (parsed as Record<string, unknown>).pair_a;
+        pairB = (parsed as Record<string, unknown>).pair_b;
+      } catch {
+        /* 无 body / 解析失败 → 当全员清单走 */
+      }
+      if (typeof pairA === "string" && typeof pairB === "string") {
+        const chronicles = (jsonFixtures[`${method} ${pathname}#chronicles`] ??
+          {}) as Record<string, unknown>;
+        const key = [pairA, pairB].sort().join("|");
+        const cp = chronicles[key] ?? {
+          relations: [],
+          pairs: [],
+          scanned: false,
+          book_session_id: "demo",
+          trace: {},
+        };
+        return new Response(JSON.stringify(cp), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      // 无 pair → 落到下面通用查找，返全员清单
+    }
+
     const body = jsonFixtures[`${method} ${pathname}`];
     if (body === undefined) {
       return new Response(
