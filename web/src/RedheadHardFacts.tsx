@@ -1,0 +1,376 @@
+// ---------------------------------------------------------------------------
+// RedheadHardFacts — 公文硬信息提取表（1.6 红头文件垂直·第三块前端）
+//
+// 点"生成"→ 调 /api/agent/redhead/hard-facts（整份公文进上下文）→ 把散落各处的硬信息
+// 捞出来聚成一张速查表，按五类分组：时限 / 数字指标 / 适用范围 / 生效废止 / 责任主体。
+// 每条说清三件事：value（那个数 / 日期 / 范围 / 主体，要醒目）、context（管的什么事）、
+// evidence（钉一句原文）。
+//
+// 它跟公文结构解读的分工：结构解读是逐条款竖着拆（这条管啥）；硬信息表是横切（不管在哪条，
+// 只要是要照着办的硬信息就汇到一处），回答"我得记住哪几个数 / 哪几个日子 / 归谁管"。
+//
+// evidence-first（跟全站一个规矩）：原文核验过的盖"鉴"印；没核上的老实标"未在原文比对
+// 命中·仅供参考"；后端绝不编数字 / 日期——抽不到就不抽，value 必有原文撑。
+// facts 为空 → 优雅退场，不画空表。
+//
+// 数字善本水准的艺术化（1.6·只动视觉不动数据）——意象是古籍的"提要 / 纲目"：
+//   整份做成一卷"案牍要目"：五类各成一栏，每栏朱砂小标领起（像善本提要的纲目标目，
+//     朱书纲、墨书目）；栏内每条硬信息——value 用大宋体当目（读者扫表第一眼抓的就是那个
+//     数 / 日期），墨钉领格、context 走小字副行点明管啥，原文引文宋体留白收在末尾。
+//   克制是高级——朱砂只落在纲目标目、value 前的墨钉、钤印这几个语义位，绝不当大色块；
+//     栏与栏之间靠留白和一道朱砂细线分隔，不堆边框、不上花鸟山水、不堆古风。
+// ---------------------------------------------------------------------------
+
+import { useState } from "react";
+import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { SealMark } from "./SealMark";
+
+// ---- 后端契约（对着写，别改后端） ----
+
+interface HardFact {
+  kind: string; // 五类之一：时限 / 数字指标 / 适用范围 / 生效废止 / 责任主体
+  value: string; // 这条硬信息本身（那个数 / 日期 / 范围 / 主体），要醒目
+  context: string; // 这条管的什么事 / 出自哪条（可能空）
+  evidence: string;
+  verified: boolean;
+  match_score: number;
+}
+
+interface HardFactsResponse {
+  facts: HardFact[];
+  scanned: boolean;
+  book_session_id: string;
+  trace?: RunTrace;
+}
+
+interface RedheadHardFactsProps {
+  sessionId: string;
+  provider: string;
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+}
+
+// 五类纲目的固定展示顺序 + 各自一句"这一类是看啥的"导语（提要纲目的小注）。
+// 顺序跟后端 HARD_FACT_KINDS 一致——后端已按这个顺序排好 facts，前端顺着分组即可。
+const KIND_ORDER: readonly string[] = [
+  "时限",
+  "数字指标",
+  "适用范围",
+  "生效废止",
+  "责任主体",
+];
+
+const KIND_HINT: Record<string, string> = {
+  时限: "要赶的时间点",
+  数字指标: "要达到的量化目标",
+  适用范围: "管谁、管到哪",
+  生效废止: "这份文件的时效起止",
+  责任主体: "谁来办、谁牵头",
+};
+
+// 一条硬信息是否真有值（value 非空白才算抽到了——后端已保证，前端再兜一道）。
+function hasValue(v: string): boolean {
+  return v.trim().length > 0;
+}
+
+// 按 kind 把 facts 分组，按 KIND_ORDER 排栏，空类不出栏。
+function groupByKind(facts: HardFact[]): Array<{ kind: string; items: HardFact[] }> {
+  const groups: Array<{ kind: string; items: HardFact[] }> = [];
+  for (const kind of KIND_ORDER) {
+    const items = facts.filter((f) => f.kind === kind && hasValue(f.value));
+    if (items.length > 0) groups.push({ kind, items });
+  }
+  return groups;
+}
+
+export function RedheadHardFacts({
+  sessionId,
+  provider,
+  apiKey,
+  model,
+  baseUrl,
+}: RedheadHardFactsProps) {
+  const [result, setResult] = useState<HardFactsResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [trace, setTrace] = useState<RunTrace | null>(null);
+  // 某条点开看原文出处（用 kind+索引拼 key → 开/合）
+  const [openFact, setOpenFact] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    setOpenFact(null);
+    try {
+      const body: Record<string, unknown> = {
+        book_session_id: sessionId,
+        provider,
+        api_key: apiKey,
+      };
+      if (model) body.model = model;
+      if (baseUrl) body.base_url = baseUrl;
+      const resp = await fetch("/api/agent/redhead/hard-facts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        const j = (await resp.json().catch(() => null)) as
+          | { detail?: { message?: string } }
+          | null;
+        throw new Error(j?.detail?.message ?? `请求失败（${resp.status}）`);
+      }
+      const data = (await resp.json()) as HardFactsResponse;
+      setTrace(data.trace ?? null);
+      setResult(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // 抽到没：scanned 为真，且至少有一条带值的硬信息
+  const gotSomething =
+    !!result &&
+    result.scanned &&
+    (result.facts ?? []).some((f) => hasValue(f.value));
+
+  // ---- 未生成：入口卡片 ----
+  if (!result) {
+    return (
+      <div className="pt-4">
+        <h3
+          className="text-base font-bold text-[var(--color-ink)] mb-1 flex items-center gap-2"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {/* 红头点缀：标题前一道朱砂短脊，预告这是红头公文视图 */}
+          <span
+            className="h-4 w-[3px] rounded-full bg-[var(--color-seal)]"
+            aria-hidden="true"
+          />
+          硬信息提取表
+        </h3>
+        <p className="text-sm text-[var(--color-ink-muted)] mb-3">
+          一份红头文件里真正要照着办的硬信息——什么时候前办完、要达多少比例、管哪些单位、哪天生效哪天废止、谁来负责——往往散落在好几条款、好几页里。这功能把它们从全份里捞出来，聚成一张速查表，按五类分好，每条钉在原文。适合党政公文 / 红头文件。
+        </p>
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading || !apiKey}
+          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
+        >
+          {loading ? "读这份公文捞硬信息中（约 1 分钟）…" : "生成硬信息提取表"}
+        </button>
+        {error && (
+          <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
+            {error}
+          </p>
+        )}
+        {!apiKey && (
+          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
+            填了 API key 才能生成。
+          </p>
+        )}
+        {loading && (
+          <RunningProcess
+            label="读这份公文捞硬信息"
+            hint="整份公文喂进模型，把时限 / 数字 / 范围 / 起止日 / 责任主体五类硬信息全捞出来——每条都回原文核验，约 1 分钟。"
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ---- 已生成但没抽到：优雅退场，不画空表 ----
+  if (!gotSomething) {
+    return (
+      <div className="pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3
+            className="text-base font-bold text-[var(--color-ink)]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            硬信息提取表
+          </h3>
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
+          >
+            {loading ? "重出中…" : "重新生成"}
+          </button>
+        </div>
+        {loading ? (
+          <RunningProcess label="读这份公文捞硬信息" />
+        ) : (
+          <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
+            没捞到能钉在原文的硬信息——这份可能偏原则倡导、没有具体的时限 / 数字 / 范围 / 起止日，或者不是规范的红头文件。换一份规范公文，或稍后重试。
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const facts = result.facts ?? [];
+  const groups = groupByKind(facts);
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+  const verifiedCount = facts.filter((f) => f.verified && f.evidence).length;
+
+  // ---- 已抽到：案牍要目纲目表 ----
+  return (
+    <div className="pt-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3
+          className="text-base font-bold text-[var(--color-ink)]"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          硬信息提取表
+        </h3>
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
+        >
+          {loading ? "重出中…" : "重新生成"}
+        </button>
+      </div>
+
+      {/* 要目卷首：一道朱砂细线 + 居中卷题 + 收束短线，仿善本提要的卷端纲目页 */}
+      <div className="text-center mb-1">
+        <div
+          className="h-[2px] rounded-full mx-auto"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, var(--color-seal), transparent)",
+          }}
+        />
+        <p
+          className="mt-2.5 text-sm text-[var(--color-ink)] tracking-[0.3em]"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          案牍要目
+        </p>
+        <div className="mt-1.5 flex items-center justify-center gap-2">
+          <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
+          <span className="text-[11px] text-[var(--color-ink-muted)] tabular-nums">
+            硬信息 {total} 条 · 原文核验 {verifiedCount}/{total}
+          </span>
+          <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
+        </div>
+      </div>
+
+      {/* 五类纲目，逐栏排开 */}
+      <div className="mt-5 space-y-6">
+        {groups.map((g) => (
+          <section key={g.kind}>
+            {/* 纲目标目：朱书纲（类名）+ 墨书小注（这一类看啥）+ 条数 */}
+            <div className="flex items-baseline gap-2.5 mb-2.5">
+              {/* 朱砂纲：类名前一道竖脊领格，类名朱墨重笔 */}
+              <span
+                className="inline-flex items-center gap-2 shrink-0"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                <span
+                  className="h-4 w-[3px] rounded-full bg-[var(--color-seal)] opacity-80"
+                  aria-hidden="true"
+                />
+                <span className="text-[15px] font-bold text-[var(--color-seal)]">
+                  {g.kind}
+                </span>
+              </span>
+              {KIND_HINT[g.kind] && (
+                <span className="text-xs text-[var(--color-ink-muted)]">
+                  {KIND_HINT[g.kind]}
+                </span>
+              )}
+              <span className="ml-auto text-xs text-[var(--color-ink-muted)] tabular-nums">
+                {g.items.length} 条
+              </span>
+            </div>
+
+            {/* 栏内每条硬信息：墨钉领格 + value 当目（大宋体醒目）+ context 副行 + 原文 */}
+            <ul className="space-y-2.5">
+              {g.items.map((f, i) => {
+                const factKey = `${g.kind}-${i}`;
+                const isOpen = openFact === factKey;
+                const canOpen = !!f.evidence;
+                const verifiedOrigin = f.verified && !!f.evidence;
+                return (
+                  <li
+                    key={factKey}
+                    className="relative pl-4 py-0.5 border-l border-[var(--color-rule)]"
+                  >
+                    {/* 墨钉：每条目前的领格小钉（朱砂，核过的深一点） */}
+                    <span
+                      className="absolute left-[-3px] top-2 h-1.5 w-1.5 rounded-full"
+                      style={{
+                        background: "var(--color-seal)",
+                        opacity: verifiedOrigin ? 0.7 : 0.3,
+                      }}
+                      aria-hidden="true"
+                    />
+                    {/* value 当目：大宋体，是读者扫表第一眼抓的；核过的角上盖印 */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className="text-[15px] font-bold text-[var(--color-ink)] leading-snug"
+                        style={{ fontFamily: "var(--font-display)" }}
+                      >
+                        {f.value}
+                      </span>
+                      {verifiedOrigin ? (
+                        <SealMark size={16} title="原文已核验" />
+                      ) : (
+                        <span className="text-[11px] text-[var(--color-ink-muted)]">
+                          未在原文比对命中·仅供参考
+                        </span>
+                      )}
+                      {canOpen && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenFact((cur) =>
+                              cur === factKey ? null : factKey,
+                            )
+                          }
+                          className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                        >
+                          {isOpen ? "收起原文" : "看原文出处"}
+                        </button>
+                      )}
+                    </div>
+                    {/* context 副行：这条管的什么事，小字点明语境 */}
+                    {hasValue(f.context) && (
+                      <p className="mt-0.5 text-xs text-[var(--color-ink-muted)] leading-relaxed">
+                        {f.context}
+                      </p>
+                    )}
+                    {/* 点开的原文出处：宋体引文留白 */}
+                    {canOpen && isOpen && (
+                      <p
+                        className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 border-[var(--color-seal)]/40 pl-3"
+                        style={{ fontFamily: "var(--font-display)" }}
+                      >
+                        {f.evidence}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+
+      {!loading && (
+        <RunStats
+          trace={trace}
+          note={`硬信息 ${total} 条 · ${groups.length} 类`}
+        />
+      )}
+    </div>
+  );
+}

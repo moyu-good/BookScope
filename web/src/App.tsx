@@ -31,6 +31,12 @@ import { QuestionBreakdown } from "./QuestionBreakdown";
 import { Recap } from "./Recap";
 import { RedheadActionList } from "./RedheadActionList";
 import { RedheadDocStructure } from "./RedheadDocStructure";
+import { RedheadFormatCheck } from "./RedheadFormatCheck";
+import { RedheadGlossary } from "./RedheadGlossary";
+import { RedheadHardFacts } from "./RedheadHardFacts";
+import { RedheadPlainLanguage } from "./RedheadPlainLanguage";
+import { RedheadRelevance } from "./RedheadRelevance";
+import { RedheadTimeline } from "./RedheadTimeline";
 import { RelationshipTimeline } from "./RelationshipTimeline";
 import { RevisionList } from "./RevisionList";
 import type {
@@ -739,6 +745,12 @@ export function App() {
     | "revision"
     | "redhead"
     | "redhead_actions"
+    | "redhead_plain"
+    | "redhead_relevance"
+    | "redhead_hardfacts"
+    | "redhead_timeline"
+    | "redhead_glossary"
+    | "redhead_formatcheck"
   >("library");
   // 手机端左栏收成抽屉，这个控制开合
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1800,6 +1812,90 @@ export function App() {
                   baseUrl={effectiveBaseUrl()}
                 />
               </div>
+
+              <div className={mode === "redhead_plain" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="大白话翻译"
+                  subtitle="把一份红头文件的官话逐条翻成人话——「应当于三十日内予以办结」翻成「得在三十天内办完」。每条做成「官话 ↔ 白话」对照：上面摆原文，下面是大白话，背后原文核得到的盖「鉴」印。白话只忠实转述、绝不替你脑补原文没说的。适合党政公文 / 红头文件。"
+                />
+                <RedheadPlainLanguage
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
+              <div className={mode === "redhead_relevance" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="跟我相关"
+                  subtitle="说一句你是谁、什么处境，把一份红头文件里跟你直接相关的条款挑出来——这条管不管你、要你做什么、到几号、不办会怎样，每条钉在原文。适合党政公文 / 红头文件。"
+                />
+                <RedheadRelevance
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
+              <div className={mode === "redhead_hardfacts" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="硬信息提取"
+                  subtitle="把一份红头文件里所有钉死的硬信息抠出来——金额、比例、期限、门槛、数量、适用范围，逐条列清并标出处，省得自己在长文里翻。适合党政公文 / 红头文件。"
+                />
+                <RedheadHardFacts
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
+              <div className={mode === "redhead_timeline" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="关键时间轴"
+                  subtitle="把一份红头文件里所有跟时间有关的点排成一条线——什么时候起施行、几号前要办完、哪天截止、分几个阶段，按先后摆开，每个时间点钉在原文。适合党政公文 / 红头文件。"
+                />
+                <RedheadTimeline
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
+              <div className={mode === "redhead_glossary" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="名词解释"
+                  subtitle="把一份红头文件里的专有名词、简称、术语挑出来逐个解释——这个词在这份文件里指什么、依哪份上位文件定义的，每条钉在原文，看不懂的词不用再去别处查。适合党政公文 / 红头文件。"
+                />
+                <RedheadGlossary
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
+              <div className={mode === "redhead_formatcheck" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="规范性自检"
+                  subtitle="拿一份红头文件对照公文格式标准逐项核——发文字号、发文机关署名、成文日期、印章这些要素齐不齐、写得规不规范，缺的、不合规的列出来，每条说清依的哪条标准。适合党政公文 / 红头文件。"
+                />
+                <RedheadFormatCheck
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
             </>
           )}
 
@@ -1840,14 +1936,22 @@ type Mode =
   | "cards"
   | "revision"
   | "redhead"
-  | "redhead_actions";
+  | "redhead_actions"
+  | "redhead_plain"
+  | "redhead_relevance"
+  | "redhead_hardfacts"
+  | "redhead_timeline"
+  | "redhead_glossary"
+  | "redhead_formatcheck";
 
 // 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
 const WHOLE_BOOK_MODES = new Set<Mode>([
   "graph", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
   "timeline", "narrative", "consistency", "argument", "style", "technique",
-  "cards", "revision", "redhead", "redhead_actions",
+  "cards", "revision", "redhead", "redhead_actions", "redhead_plain",
+  "redhead_relevance", "redhead_hardfacts", "redhead_timeline",
+  "redhead_glossary", "redhead_formatcheck",
 ]);
 
 const NAV_MODES: { id: Mode; label: string }[] = [
@@ -1876,6 +1980,12 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   // 等单份+跨文件都 ship-quality 再亮出来单独发。代码留在仓里、用户点不到。
   // { id: "redhead", label: "公文结构" },
   // { id: "redhead_actions", label: "办事清单" },
+  // { id: "redhead_plain", label: "大白话翻译" },
+  // { id: "redhead_relevance", label: "跟我相关" },
+  // { id: "redhead_hardfacts", label: "硬信息提取" },
+  // { id: "redhead_timeline", label: "关键时间轴" },
+  // { id: "redhead_glossary", label: "名词解释" },
+  // { id: "redhead_formatcheck", label: "规范性自检" },
 ];
 
 // agent 编排菜单的功能名（后端 orchestrate FEATURE_MENU 的键）→ App 的 mode。
@@ -2116,6 +2226,60 @@ function NavIcon({
         <path d="M9 3.5h6v2H9z" />
         <path d="M9 10l1.4 1.4L13 9" />
         <path d="M9 15l1.4 1.4L13 14" />
+      </>
+    ),
+    redhead_plain: (
+      <>
+        <path d="M5 3h11l3 3v15H5z" />
+        <path d="M8 8.5h8" />
+        <path d="M8 11h5" />
+        <path d="M8 15.5h8" />
+        <path d="M8 18h5" />
+      </>
+    ),
+    // 跟我相关——文件 + 人像，挑出跟你相关的条款
+    redhead_relevance: (
+      <>
+        <path d="M5 3h9l3 3v6" />
+        <path d="M5 3v18h7" />
+        <circle cx="17" cy="16" r="2.5" />
+        <path d="M13.5 21a3.5 3.5 0 0 1 7 0" />
+      </>
+    ),
+    // 硬信息提取——文件 + 放大镜，把硬数据抠出来
+    redhead_hardfacts: (
+      <>
+        <path d="M5 3h9l3 3v5" />
+        <path d="M5 3v18h6" />
+        <circle cx="16.5" cy="15.5" r="3" />
+        <path d="M18.7 17.7 21 20" />
+      </>
+    ),
+    // 关键时间轴——文件 + 时钟
+    redhead_timeline: (
+      <>
+        <path d="M5 3h9l3 3v4" />
+        <path d="M5 3v18h6" />
+        <circle cx="16" cy="16" r="4" />
+        <path d="M16 14v2l1.4 1" />
+      </>
+    ),
+    // 名词解释——文件 + 引号气泡
+    redhead_glossary: (
+      <>
+        <path d="M5 3h9l3 3v5" />
+        <path d="M5 3v18h5" />
+        <path d="M12 13h8v6h-5l-3 2.5z" />
+        <path d="M14.5 15v2M17.5 15v2" />
+      </>
+    ),
+    // 规范性自检——文件 + 对勾盾
+    redhead_formatcheck: (
+      <>
+        <path d="M5 3h9l3 3v4" />
+        <path d="M5 3v18h6" />
+        <path d="M16.5 12 21 14v3c0 2.5-2 4-4.5 5C14 21 12 19.5 12 17v-3z" />
+        <path d="M14.7 16.8 16 18l2.5-2.6" />
       </>
     ),
     library: (
