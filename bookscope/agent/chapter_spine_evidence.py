@@ -9,9 +9,26 @@ GPU,贴 NORTH_STAR"查询时证据现场取 + 没原文不输出"。
 from __future__ import annotations
 
 import re
+from typing import Any
 
 # 断句:中文句末标点 + 换行;保留标点跟句子一起,免得证据片段缺尾。
 _SENT_SPLIT = re.compile(r"(?<=[。！？!?；;\n])")
+
+
+def chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
+    """章号 → 该章全部 chunk 原文拼接。各章级锚视图(关系/伏笔/矛盾/概念/支线/节奏…)按需
+    取证的共用入口:拿到这张表后,再用 ``evidence_for_pair`` / ``evidence_for_event`` 在对应章
+    原文里现捞那一句。
+
+    遍历 chunks,只收 ``chapter`` 是 int 且 ``text`` 非空的,同章多块按出现顺序换行拼接。
+    """
+    by_ch: dict[int, list[str]] = {}
+    for c in chunks:
+        ch = c.get("chapter")
+        txt = str(c.get("text", ""))
+        if isinstance(ch, int) and txt:
+            by_ch.setdefault(ch, []).append(txt)
+    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
 
 
 def split_sentences(text: str) -> list[str]:
@@ -70,6 +87,7 @@ def evidence_for_event(chapter_text: str, event: str) -> str:
 
 
 __all__ = [
+    "chapter_text_map",
     "split_sentences",
     "find_supporting_sentences",
     "evidence_for_pair",

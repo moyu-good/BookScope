@@ -27,6 +27,9 @@ import re
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import (
+    chapter_text_map as _chapter_text_map,
+)
 from bookscope.agent.chapter_spine_evidence import find_supporting_sentences
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
@@ -149,20 +152,6 @@ def _bigrams(text: str) -> list[str]:
     """把概括过的文本拆 2-gram 当检索词(中文没空格切词,用 bigram 衡量某句像不像在讲这件事)。"""
     e = re.sub(r"\s+", "", text or "")
     return list({e[i : i + 2] for i in range(len(e) - 1)})
-
-
-def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
-    """章号 → 该章全部 chunk 原文拼接。给每阶段按「概念怎么发展」在该章原文里现捞证据用。
-
-    同 ``chapter_spine_relationship._chapter_text_map`` 的做法(各功能自留一份,免跨模块耦合)。
-    """
-    by_ch: dict[int, list[str]] = {}
-    for c in chunks:
-        ch = c.get("chapter")
-        txt = str(c.get("text", ""))
-        if isinstance(ch, int) and txt:
-            by_ch.setdefault(ch, []).append(txt)
-    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
 
 
 def concept_evolution_from_spine(

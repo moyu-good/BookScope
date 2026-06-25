@@ -32,6 +32,9 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import (
+    chapter_text_map as _chapter_text_map,
+)
 from bookscope.agent.chapter_spine_evidence import evidence_for_event
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
@@ -134,17 +137,6 @@ def _parse_arcs(text: str) -> list[dict[str, Any]]:
         logger.warning("chapter_spine_foreshadow: 主解析失败,从截断抢救到 %d 条弧", len(salvaged))
         return salvaged
     return []
-
-
-def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
-    """章号 → 该章全部 chunk 原文拼接。给每条伏笔按 description 在埋点 / 回收章原文里现捞用。"""
-    by_ch: dict[int, list[str]] = {}
-    for c in chunks:
-        ch = c.get("chapter")
-        txt = str(c.get("text", ""))
-        if isinstance(ch, int) and txt:
-            by_ch.setdefault(ch, []).append(txt)
-    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
 
 
 def _attach_and_verify_evidence(

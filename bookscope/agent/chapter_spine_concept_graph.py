@@ -28,6 +28,9 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import (
+    chapter_text_map as _chapter_text_map,
+)
 from bookscope.agent.chapter_spine_evidence import find_supporting_sentences
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
@@ -145,20 +148,6 @@ def _coerce_nodes(raw_nodes: Any) -> list[str]:
             seen.add(name)
             names.append(name)
     return names
-
-
-def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
-    """章号 → 该章全部 chunk 原文拼接。给每条边按"这两个概念 + 这种关系"在该章现捞证据用。
-
-    照搬 ``chapter_spine_relationship._chapter_text_map`` 的做法,统一原文表口径。
-    """
-    by_ch: dict[int, list[str]] = {}
-    for c in chunks:
-        ch = c.get("chapter")
-        txt = str(c.get("text", ""))
-        if isinstance(ch, int) and txt:
-            by_ch.setdefault(ch, []).append(txt)
-    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
 
 
 def _edge_evidence(chapter_text: str, source: str, target: str, relation: str) -> str:

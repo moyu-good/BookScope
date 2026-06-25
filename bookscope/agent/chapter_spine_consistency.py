@@ -25,6 +25,9 @@ import re
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import (
+    chapter_text_map as _chapter_text_map,
+)
 from bookscope.agent.chapter_spine_evidence import find_supporting_sentences
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
@@ -120,20 +123,6 @@ def _collect_inventory(
             entry["events"] = events
         digest.append(entry)
     return digest, all_chs, evidence
-
-
-def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
-    """章号 → 该章全部 chunk 原文拼接。给每条矛盾按"这条矛盾的关键词"在各自章原文里捞证据用。
-
-    同 ``chapter_spine_relationship._chapter_text_map``,各 viz 现捞证据共用的章原文表。
-    """
-    by_ch: dict[int, list[str]] = {}
-    for c in chunks:
-        ch = c.get("chapter")
-        txt = str(c.get("text", ""))
-        if isinstance(ch, int) and txt:
-            by_ch.setdefault(ch, []).append(txt)
-    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
 
 
 def _conflict_terms(topic: str, conflict: str) -> list[str]:

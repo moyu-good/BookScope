@@ -30,6 +30,9 @@ from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent.chapter_spine_canon import build_spine_name_map
+from bookscope.agent.chapter_spine_evidence import (
+    chapter_text_map as _chapter_text_map,
+)
 from bookscope.agent.chapter_spine_evidence import split_sentences
 from bookscope.agent.chapter_spine_views import _canon, _norm_pair
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
@@ -265,17 +268,6 @@ def _build_one_chronicle(
     if pivot is not None and pivot not in beat_chs:
         verdict["pivot_chapter"] = min(sorted(beat_chs), key=lambda c: abs(c - pivot))
     return {"a": a, "b": b, "verdict": verdict, "beats": beats}
-
-
-def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
-    """章号 → 该章全部 chunk 原文拼接。给每幕按"这对人"在该章原文里捞证据用。"""
-    by_ch: dict[int, list[str]] = {}
-    for c in chunks:
-        ch = c.get("chapter")
-        txt = str(c.get("text", ""))
-        if isinstance(ch, int) and txt:
-            by_ch.setdefault(ch, []).append(txt)
-    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
 
 
 def _appellations(canonical: str, name_map: dict[str, str] | None) -> list[str]:

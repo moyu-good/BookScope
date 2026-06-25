@@ -14,21 +14,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from bookscope.agent.chapter_spine_evidence import (
+    chapter_text_map as _chapter_text_map,
+)
 from bookscope.agent.chapter_spine_evidence import evidence_for_event
-
-
-def _chapter_text_map(chunks: list[dict[str, Any]] | None) -> dict[int, str]:
-    """章号 → 该章全部 chunk 原文拼接。给每章按"它为什么紧/缓"在该章原文里现捞证据用。
-
-    跟 ``chapter_spine_relationship._chapter_text_map`` 同形(那是关系演变的样板)。
-    """
-    by_ch: dict[int, list[str]] = {}
-    for c in chunks or []:
-        ch = c.get("chapter")
-        txt = str(c.get("text", ""))
-        if isinstance(ch, int) and txt:
-            by_ch.setdefault(ch, []).append(txt)
-    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
 
 
 def _tension_query(rec: dict[str, Any]) -> str:

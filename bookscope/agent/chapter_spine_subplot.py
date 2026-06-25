@@ -29,6 +29,9 @@ import re
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import (
+    chapter_text_map as _chapter_text_map,
+)
 from bookscope.agent.chapter_spine_evidence import split_sentences
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
@@ -119,18 +122,6 @@ def _collect_timeline(
             entry["支线章"] = True
         timeline.append(entry)
     return timeline, all_chs, evidence, events_text
-
-
-def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
-    """章号 → 该章全部 chunk 原文拼接。给"按线名在该章原文里现捞证据"用(同
-    ``chapter_spine_relationship._chapter_text_map``)。"""
-    by_ch: dict[int, list[str]] = {}
-    for c in chunks:
-        ch = c.get("chapter")
-        txt = str(c.get("text", ""))
-        if isinstance(ch, int) and txt:
-            by_ch.setdefault(ch, []).append(txt)
-    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
 
 
 def _bigrams(text: str) -> set[str]:

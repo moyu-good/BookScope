@@ -42,9 +42,11 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import (
+    chapter_text_map as _chapter_text_map,
+)
 from bookscope.agent.chapter_spine_subplot import (
     DEFAULT_WEAVE_MAX_TOKENS,
-    _chapter_text_map,
     _thread_evidence,
     subplot_weave_from_spine,
 )
