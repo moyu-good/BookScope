@@ -43,20 +43,70 @@ def _tension_query(rec: dict[str, Any]) -> str:
     return " ".join(parts)
 
 
+def _event_text(ev: Any) -> str:
+    """章脉 events 一条:可能是字符串、也可能是 {event: ...},归一成一句话文本。"""
+    return str(ev.get("event", ev) if isinstance(ev, dict) else ev).strip()
+
+
+def _chapter_events(rec: dict[str, Any], chapter_text: str | None) -> list[dict[str, Any]]:
+    """把一章的 events 摊成 ``[{text, evidence, verified}]``,每条事件回该章原文现捞一句。
+
+    事件文本是模型概括的一句话,当不了精确子串;有原文(``chapter_text`` 非 None)时走
+    ``evidence_for_event``(2-gram 命中)在该章里捞最像在讲这件事的那句,捞到 → verified=True、
+    捞不到 → 空串 + verified=False(FE 标"待核",不硬塞无关原文)。``chapter_text=None`` 时不取证
+    (evidence 空、verified=False)。
+    """
+    out: list[dict[str, Any]] = []
+    for ev in rec.get("events") or []:
+        text = _event_text(ev)
+        if not text:
+            continue
+        evidence = evidence_for_event(chapter_text, text) if chapter_text else ""
+        out.append({"text": text, "evidence": evidence, "verified": bool(evidence)})
+    return out
+
+
+def _chapter_turnings(rec: dict[str, Any], chapter_text: str | None) -> list[dict[str, Any]]:
+    """把一章的 foreshadow 收束(payoff)当"转折"摊成 ``[{hook, kind, evidence, verified}]``。
+
+    章脉没有逐章 ``turning_points`` 字段(plot 维只有 events/tension/.../foreshadow);最贴近
+    "这章发生了转折"的可数、可锚信号是伏笔 **收束**——一条伏笔在这章被收掉,就是一个结构上的转折
+    点。埋(setup)不算转折(只是埋线),只收(payoff)算。每条回该章原文现捞证据(同 events)。
+    """
+    out: list[dict[str, Any]] = []
+    for fs in rec.get("foreshadow") or []:
+        if not isinstance(fs, dict):
+            continue
+        if str(fs.get("type", "")).strip() != "收":
+            continue
+        hook = str(fs.get("hook", "")).strip()
+        if not hook:
+            continue
+        evidence = evidence_for_event(chapter_text, hook) if chapter_text else ""
+        out.append({"hook": hook, "kind": "收", "evidence": evidence, "verified": bool(evidence)})
+    return out
+
+
 def narrative_curve_from_spine(
     spine: list[dict[str, Any]],
     chunks: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """叙事曲线视图:章脉逐章已有 tension/sentiment/pov/mainline,直接投影。
+    """叙事曲线视图:纵轴 = 这章能数出来的事(事件数 + 转折数),不是模型眼估的张力标量。
 
-    与 ``generate_narrative_curve_exhaustive`` 的产出同形,可 drop-in;但不再单独跑全书,
-    从共享章脉来(0 次 LLM)。
+    1.5.x 重做(作者拍板):旧版纵轴画的是 tension(0-10,模型一句话糊的标量,probe 实测绝对分跨次
+    抖 ±1、不可信),跟节奏曲线画的是同一个东西、重复。新版纵轴换成"能锚到原文、能数的事":
 
-    传 ``chunks``(全书原文,含 ``chapter``/``text``)时,每章 evidence 不再用章代表句
-    (``rec.get("evidence")``——那只是"这章最显眼那件事",未必关乎这章为什么紧),改成按
-    "这章为什么紧/缓"在该章原文里现捞:用本章首个事件 + char_states 拼成 query 走
-    ``evidence_for_event``。捞不到 → 空串 + verified=False(FE 标灰,不硬塞无关原文)。
-    ``chunks=None``(默认)时退回章代表句、保持老行为不变,向后兼容。
+    - ``event_count`` = 这章 ``events`` 条数(章脉情节维逐章抽的关键事件)。
+    - ``turning_count`` = 这章伏笔 **收束** 条数(章脉没有逐章 turning_points 字段,伏笔收掉=结构
+      转折,是最贴近"转折"的可数信号;埋线不算)。
+    - ``height`` = event_count + turning_count(前端画的高度),全是数出来的、每条能回原文核验。
+    - ``is_turning`` = turning_count > 0 → 前端朱砂点标"这章有转折"。
+    - ``events`` / ``turning_points``:逐条 ``{..., evidence, verified}``,点开看原文(复用按需取证)。
+
+    tension/sentiment/pov/mainline 仍带回,但只进选中章明细标"模型判读",**绝不再当纵轴**。
+
+    传 ``chunks``(全书原文)时每条事件/转折回该章原文现捞证据;``chunks=None`` 时不取证(evidence
+    空、verified=False),向后兼容、不报错。
     """
     chapter_text = _chapter_text_map(chunks) if chunks is not None else None
     out: list[dict[str, Any]] = []
@@ -64,20 +114,25 @@ def narrative_curve_from_spine(
         ch = rec.get("chapter")
         if not isinstance(ch, int):
             continue
-        if chapter_text is not None:
-            evidence = evidence_for_event(chapter_text.get(ch, ""), _tension_query(rec))
-            verified = bool(evidence)
-        else:
-            evidence = rec.get("evidence", "")
-            verified = rec.get("verified", False)
+        ct = chapter_text.get(ch, "") if chapter_text is not None else None
+        events = _chapter_events(rec, ct)
+        turnings = _chapter_turnings(rec, ct)
         out.append({
             "chapter": ch,
+            "event_count": len(events),
+            "turning_count": len(turnings),
+            "height": len(events) + len(turnings),
+            "is_turning": bool(turnings),
+            "events": events,
+            "turning_points": turnings,
+            # 以下三维只进选中章明细(标"模型判读"),不当纵轴:
             "tension": rec.get("tension", 0),
             "sentiment": rec.get("sentiment", 0),
             "pov": rec.get("pov", "群像"),
             "mainline": rec.get("mainline", True),
-            "evidence": evidence,
-            "verified": verified,
+            # 章代表句兜底(events 全空的"平铺过渡"章,明细里仍有一句可看):
+            "evidence": str(rec.get("evidence", "")).strip(),
+            "verified": rec.get("verified", False),
             "match_score": rec.get("match_score", 0.0),
         })
     out.sort(key=lambda c: c["chapter"])

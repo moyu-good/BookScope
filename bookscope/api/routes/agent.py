@@ -1169,11 +1169,12 @@ async def agent_narrative_curve(
     request: NarrativeCurveRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> NarrativeCurveResponse:
-    """据整本书逐章抽多维叙事曲线（WP-multidim-narrative-curve，probe GO）。
+    """据整本书的章脉派生叙事曲线:逐章事件密度 + 转折(伏笔收束)。
 
-    1.4 穷尽化：分段并发逐章判张力 + 情感方向 + 主导 POV + 主/支线 → 按章拼，覆盖全书每一章；
-    每章判定挂原文片段过 verify_citations（核不过的标低置信）。分段处理，明朝那种塞不进
-    context 的大书也能抽——撤了单次摘要时代的 ``_book_fits_long_context`` 大书返空守卫。
+    1.5.3 重做(并掉重复的"节奏"张力图):纵轴不再是 LLM 眼估的张力标量,换成**能数、能锚原文**
+    的信号——每章高度 = 事件数 + 伏笔收束数;伏笔在哪章收掉 = 结构转折(朱砂点)。从共享章脉
+    派生、命中缓存秒出;每条事件/收束回该章原文核验。张力/情感/POV 等只进选中章明细、标"模型
+    判读",不当纵轴(躲开"单标量眼估张力不可信"的病一)。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
 
@@ -1206,8 +1207,8 @@ async def agent_narrative_curve(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    # 1.x 章脉转向(ADR-010):从共享章脉派生,不再单独跑全书叙事曲线。章脉里逐章已有
-    # tension/sentiment/pov/mainline/evidence/verified,满精度投影;命中缓存秒出。
+    # 1.5.3 章脉派生:每章事件密度(events 数 + 伏笔收束数)当纵轴,转折=伏笔收束;
+    # 张力/情感/POV 降到明细标"模型判读"。命中缓存秒出。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
     chapters = narrative_curve_from_spine(spine, chunks=chunks)
     return NarrativeCurveResponse(

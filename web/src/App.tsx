@@ -20,7 +20,6 @@ import { EntityRecall } from "./EntityRecall";
 import { ErrorBanner } from "./ErrorBanner";
 import { ForeshadowArcs } from "./ForeshadowArcs";
 import { NarrativeCurve } from "./NarrativeCurve";
-import { PacingCurve } from "./PacingCurve";
 import { Timeline } from "./Timeline";
 import type { ApiError } from "./ErrorBanner";
 import { HistoryPanel } from "./HistoryPanel";
@@ -1651,26 +1650,11 @@ export function App() {
                 />
               </div>
 
-              <div className={mode === "pacing" ? "" : "hidden"}>
-                <CanvasHeader
-                  title="节奏"
-                  feature="pacing"
-                  subtitle="逐章看张力高低——哪几章松、哪几章是高潮，点柱看依据。"
-                />
-                <PacingCurve
-                  sessionId={currentSession.session_id}
-                  provider={provider}
-                  apiKey={apiKey}
-                  model={model}
-                  baseUrl={effectiveBaseUrl()}
-                />
-              </div>
-
               <div className={mode === "narrative" ? "" : "hidden"}>
                 <CanvasHeader
                   title="叙事曲线"
                   feature="narrative"
-                  subtitle="一道章节横轴叠四维——张力起落、情感正负、视角切换、主/支线，看出整本书的形状，点章看依据。"
+                  subtitle="逐章数事件数+转折数,看整本书哪几章戏多哪几章是转折,点章看这章发生了什么。"
                 />
                 <NarrativeCurve
                   sessionId={currentSession.session_id}
@@ -1845,7 +1829,7 @@ type Mode =
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
 const WHOLE_BOOK_MODES = new Set<Mode>([
   "graph", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
-  "timeline", "pacing", "narrative", "consistency", "argument", "style", "technique",
+  "timeline", "narrative", "consistency", "argument", "style", "technique",
   "cards", "revision", "redhead",
 ]);
 
@@ -1863,7 +1847,6 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "entity", label: "实体回溯" },
   { id: "recap", label: "前情回顾" },
   { id: "motif", label: "母题追踪" },
-  { id: "pacing", label: "节奏" },
   { id: "narrative", label: "叙事曲线" },
   { id: "consistency", label: "一致性" },
   { id: "argument", label: "论点结构" },
@@ -1920,8 +1903,7 @@ const CROSS_DIM_GOAL: Partial<Record<Mode, string>> = {
   subplot: "把各条支线的活跃休眠跟节奏、伏笔、时间线串起来，看哪条支线断更太久、几条线怎么交汇成高潮。",
   timeline: "把事件的真实时间先后跟节奏起伏、伏笔铺设串起来，看这本书的叙事顺序是怎么安排的。",
   entity: "把这个对象的全书轨迹跟时间线、人物关系串起来，看它在故事里起了什么作用。",
-  pacing: "把逐章的节奏松紧跟叙事曲线、伏笔和支线起落串起来，看这本书整体的张力是怎么铺排的。",
-  narrative: "把叙事曲线的四维起落跟节奏、人物弧线、支线编织串起来，看这本书整体是个什么形状。",
+  narrative: "把逐章的事件密度跟人物弧线、伏笔回收、支线编织串起来，看这本书的戏分布和转折是怎么铺排的。",
   consistency: "把设定前后矛盾跟人物关系、时间线串起来，看这些矛盾是孤立笔误还是牵动了情节。",
   argument: "把这本书的论证骨架跟关键概念的演进、全书有没有自相矛盾串起来，看它论证扎不扎实。",
   concept: "把这个概念的演进跟全书论证结构、相关母题串起来，看它在书里的分量和脉络。",
@@ -2045,11 +2027,11 @@ function NavIcon({
         <path d="m21 21-4.3-4.3" />
       </>
     ),
-    pacing: <path d="M5 20v-9M10 20V5M15 20v-6M20 20V8" />,
     narrative: (
       <>
-        <path d="M3 12c2-7 4 5 6-1s4 4 6-2 4 3 6-1" />
-        <path d="M3 18h18" />
+        <path d="M4 20v-5M8 20v-9M12 20v-3M16 20V7M20 20v-7" />
+        <path d="M3 20h18" />
+        <circle cx="16" cy="4.5" r="1.6" />
       </>
     ),
     consistency: (
@@ -2384,9 +2366,8 @@ const FEATURE_INFO: Record<string, string> = {
     "每条伏笔从埋点章拱到回收点章画一道弧——埋了没回收的画成灰虚线悬空，一眼挑出没填的坑，点弧看两端原文。",
   subplot:
     "每条情节支线一条横向泳道——活跃段亮、休眠段灰断，两条线同章交汇画连接节点。一眼看见哪条支线断更太久、哪几章是多线交汇的高潮，点活跃段 / 交汇看两段勾连原文。",
-  pacing: "逐章的张力曲线——哪几章松（拖沓）、哪几章是高潮，点柱看依据。",
   narrative:
-    "一道横轴叠四维——张力起落 + 情感正负 + 视角切换 + 主/支线，看出整本书是个什么形状，每章钉原文。",
+    "逐章数能数的事——每章高度 = 事件数 + 转折数（伏笔回收），朱砂点标转折章。点一章列出这章实际发生的几件事，每件回原文核验。张力只在明细里附带，标「模型判读」，不当高度。",
   consistency:
     "全书前后矛盾的两处对照（如第 5 章左撇子、第 80 章用右手），编的会被滤掉。",
   argument: "作者的论证骨架——主张 + 撑住它的原文 + 在哪章，一条条理清。",

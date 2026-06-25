@@ -1,17 +1,16 @@
 // ---------------------------------------------------------------------------
-// ChapterCurves —— 逐章曲线合视图（合并冗余功能：节奏 ⊂ 叙事曲线 + 人物弧线 三合一）
+// ChapterCurves —— 逐章曲线合视图（叙事曲线 + 人物弧线 二合一）
 //
-// roadmap「合视图不合能力」：把三件逐章曲线收进一个入口、内部切换，不丢任何能力。
-//   · 叙事曲线（山水长卷，四维：张力/情感/视角/主支线）—— 默认，最全
+// roadmap「合视图不合能力」：把逐章曲线收进一个入口、内部切换，不丢任何能力。
+//   · 叙事曲线（事件密度长卷：每章高度=事件数+转折数，朱砂点标转折，点章看发生的事）—— 默认
 //   · 人物弧线（工笔花鸟，角色戏份/处境）
-//   · 节奏（轻量张力速览，⊂ 叙事曲线的张力维，留作快看）
-// 三个子组件全挂载、只切显隐——切标签不丢已生成的数据、不白白重跑花钱。
+// 1.5.x「砍三为二」：原来的独立「节奏」(画 tension 标量) 跟叙事曲线画的是同一个东西、重复，
+// 已撤——新版叙事曲线纵轴换成能数的事，节奏维已并进去。子组件全挂载、只切显隐，切标签不丢数据。
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
 import { CharacterArc } from "./CharacterArc";
 import { NarrativeCurve } from "./NarrativeCurve";
-import { PacingCurve } from "./PacingCurve";
 
 interface ChapterCurvesProps {
   sessionId: string;
@@ -21,11 +20,10 @@ interface ChapterCurvesProps {
   baseUrl: string;
 }
 
-type Tab = "narrative" | "chararc" | "pacing";
+type Tab = "narrative" | "chararc";
 const TABS: { id: Tab; label: string }[] = [
   { id: "narrative", label: "叙事曲线" },
   { id: "chararc", label: "人物弧线" },
-  { id: "pacing", label: "节奏" },
 ];
 
 export function ChapterCurves(props: ChapterCurvesProps) {
@@ -57,9 +55,6 @@ export function ChapterCurves(props: ChapterCurvesProps) {
       </div>
       <div className={tab === "chararc" ? "" : "hidden"}>
         <CharacterArc {...props} />
-      </div>
-      <div className={tab === "pacing" ? "" : "hidden"}>
-        <PacingCurve {...props} />
       </div>
     </div>
   );

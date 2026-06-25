@@ -477,20 +477,24 @@ class NarrativeCurveRequest(BaseModel):
 
 
 class NarrativeCurveResponse(BaseModel):
-    """POST /api/agent/narrative-curve 响应体。
+    """POST /api/agent/narrative-curve 响应体（1.5.x 重做：纵轴换成能数的事，非张力标量）。
 
-    ``chapters`` 是逐章多维结构，给前端在节奏曲线之上叠维画整本书的"形状"：
-    每章一条 ``{chapter, tension(0-10), sentiment(-5..5), pov, mainline, evidence,
-    verified, match_score}``——``evidence`` 过原文核验，``verified=false`` 的章前端
-    标低置信/淡化（evidence-first：核不过的维度不当确定结论画）。
+    ``chapters`` 是逐章事件密度结构：每章高度 = ``event_count + turning_count``，都是从
+    章脉 events / 伏笔回收数出来、每条能锚原文的；``is_turning`` 标转折章（朱砂点）。前端点
+    一章列出 ``events`` / ``turning_points``（各条带 evidence + verified，evidence-first：核
+    不过的标"待核"）。``tension`` 等四维仍带回，但只进选中章明细标"模型判读"，不当纵轴。
     """
 
     chapters: list[dict] = Field(
         default_factory=list,
         description=(
-            "逐章多维结构，按章号排序。每条 {chapter:int, tension:0-10, "
-            "sentiment:-5..5, pov:str, mainline:bool, evidence:str, verified:bool, "
-            "match_score:float}；evidence 过原文核验，verified=false 的标低置信。"
+            "逐章事件密度结构，按章号排序。每条 {chapter:int, event_count:int, "
+            "turning_count:int, height:int(=event+turning), is_turning:bool, "
+            "events:[{text, evidence, verified}], "
+            "turning_points:[{hook, kind, evidence, verified}], "
+            "tension:0-10, sentiment:-5..5, pov:str, mainline:bool, "
+            "evidence:str(章代表句兜底), verified:bool, match_score:float}。"
+            "events/turning_points 每条 evidence 过原文核验，verified=false 的标待核。"
         ),
     )
     scanned: bool = Field(

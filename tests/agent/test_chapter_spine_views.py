@@ -14,20 +14,37 @@ from bookscope.agent.chapter_spine_views import (
 def _spine() -> list[dict]:
     return [
         {"chapter": 2, "tension": 8, "sentiment": -3, "pov": "甲", "mainline": True,
-         "events": [{"event": "甲打乙", "evidence": "x"}], "evidence": "甲打了乙",
-         "verified": True, "match_score": 1.0},
+         "events": [{"event": "甲打乙", "evidence": "x"}, {"event": "乙逃走"}],
+         "foreshadow": [{"type": "收", "hook": "兄弟反目"}, {"type": "埋", "hook": "埋个雷"}],
+         "evidence": "甲打了乙", "verified": True, "match_score": 1.0},
         {"chapter": 1, "tension": 2, "sentiment": 1, "pov": "群像", "mainline": False,
-         "events": [], "evidence": "开篇", "verified": False, "match_score": 0.3},
+         "events": [], "foreshadow": [], "evidence": "开篇", "verified": False,
+         "match_score": 0.3},
     ]
 
 
-def test_narrative_curve_from_spine_projects_and_sorts() -> None:
+def test_narrative_curve_counts_events_and_turnings() -> None:
+    # 新版纵轴:event_count + turning_count(伏笔收束),不再是 tension 标量
     out = narrative_curve_from_spine(_spine())
     assert [c["chapter"] for c in out] == [1, 2]          # 升序
     c2 = next(c for c in out if c["chapter"] == 2)
+    assert c2["event_count"] == 2                          # 两个事件
+    assert c2["turning_count"] == 1                        # 只数"收"(收束),"埋"不算转折
+    assert c2["height"] == 3                               # 2 + 1
+    assert c2["is_turning"] is True
+    assert [e["text"] for e in c2["events"]] == ["甲打乙", "乙逃走"]
+    assert c2["turning_points"][0]["hook"] == "兄弟反目"
+    c1 = next(c for c in out if c["chapter"] == 1)
+    assert c1["event_count"] == 0 and c1["turning_count"] == 0
+    assert c1["height"] == 0 and c1["is_turning"] is False  # 平铺过渡章
+
+
+def test_narrative_curve_keeps_tension_in_detail_not_axis() -> None:
+    # tension/sentiment/pov/mainline 仍带回(进选中章明细标"模型判读"),但不当纵轴
+    out = narrative_curve_from_spine(_spine())
+    c2 = next(c for c in out if c["chapter"] == 2)
     assert c2["tension"] == 8 and c2["sentiment"] == -3
     assert c2["pov"] == "甲" and c2["mainline"] is True
-    assert c2["verified"] is True and c2["evidence"] == "甲打了乙"
 
 
 def test_narrative_curve_skips_bad_chapter() -> None:
@@ -52,58 +69,54 @@ def test_pacing_tension_clamped_to_1_5() -> None:
     assert out[1]["tension"] == 5      # 10/2=5
 
 
-# ── 病二:证据要现捞、真讲"这章为什么紧/缓",不挂章代表句 ─────────────────────
+# ── 每条事件/转折回该章原文现捞证据(点开看原文) ─────────────────────────────
 def _evidence_spine() -> list[dict]:
-    """高张力章(决战)和低张力章(休整),各自 events/char_states 指向原文里不同的句。"""
+    """一章里多个事件 + 一个伏笔收束,各自指向原文里不同的句。"""
     return [
         {"chapter": 5, "tension": 9, "sentiment": -4, "pov": "甲", "mainline": True,
-         "events": [{"event": "甲乙两军决战于城下"}],
-         "char_states": [{"name": "甲", "state": "陷入苦战"}],
-         # 章代表句故意写成跟张力无关的闲笔,验证不再被挂上来
-         "evidence": "这章最显眼是城外有人卖酒。", "verified": True, "match_score": 1.0},
-        {"chapter": 1, "tension": 2, "sentiment": 1, "pov": "群像", "mainline": False,
-         "events": [{"event": "众人在营中休整饮酒"}],
-         "char_states": [{"name": "甲", "state": "暂得喘息"}],
-         "evidence": "开篇随便一句。", "verified": False, "match_score": 0.3},
+         "events": [{"event": "甲乙两军决战于城下"}, {"event": "甲陷入苦战"}],
+         "foreshadow": [{"type": "收", "hook": "当年那把剑终于出鞘"}],
+         "evidence": "章代表句", "verified": True, "match_score": 1.0},
     ]
 
 
 def _chunks() -> list[dict]:
     return [
-        {"chapter": 5, "text": "城外有人卖酒。甲乙两军决战于城下,杀声震天,甲陷入苦战。"},
-        {"chapter": 1, "text": "天色尚早。众人在营中休整饮酒,甲暂得喘息,谈笑风生。"},
+        {"chapter": 5, "text": "城外有人卖酒。甲乙两军决战于城下,杀声震天,甲陷入苦战。"
+                               "当年那把剑终于出鞘,寒光逼人。"},
     ]
 
 
-def test_narrative_curve_evidence_fetched_explains_tension() -> None:
+def test_narrative_curve_events_anchored_to_text() -> None:
     out = narrative_curve_from_spine(_evidence_spine(), chunks=_chunks())
-    hi = next(c for c in out if c["chapter"] == 5)
-    # 高张力章 evidence 必须真讲"为什么紧"(决战/苦战),不是章代表句那句卖酒闲笔
-    assert "决战" in hi["evidence"] or "苦战" in hi["evidence"]
-    assert hi["evidence"] != "这章最显眼是城外有人卖酒。"
-    assert hi["verified"] is True
-    lo = next(c for c in out if c["chapter"] == 1)
-    # 低张力章 evidence 真讲"为什么缓"(休整)
-    assert "休整" in lo["evidence"]
-    assert lo["verified"] is True
+    c = out[0]
+    # 每条事件回该章原文现捞那句,捞到 → verified=True
+    ev0 = c["events"][0]
+    assert "决战" in ev0["evidence"] and ev0["verified"] is True
+    ev1 = c["events"][1]
+    assert "苦战" in ev1["evidence"] and ev1["verified"] is True
+    # 伏笔收束(转折)也回原文现捞
+    tp = c["turning_points"][0]
+    assert "出鞘" in tp["evidence"] and tp["verified"] is True
 
 
-def test_narrative_curve_evidence_empty_marks_unverified() -> None:
-    # 原文里压根捞不到支撑句(章原文跟 events/char_states 完全不沾)→ 空串 + verified=False,不硬塞
-    spine = [{"chapter": 7, "tension": 8, "events": [{"event": "甲乙决战"}],
-              "char_states": [{"name": "甲", "state": "苦战"}], "evidence": "章代表句"}]
+def test_narrative_curve_event_evidence_empty_marks_unverified() -> None:
+    # 原文里压根捞不到支撑句 → 该事件 evidence 空串 + verified=False,不硬塞无关原文
+    spine = [{"chapter": 7, "tension": 8, "events": [{"event": "甲乙决战"}], "evidence": "章代表句"}]
     chunks = [{"chapter": 7, "text": "完全无关的一段描写风景的文字。"}]
     out = narrative_curve_from_spine(spine, chunks=chunks)
-    assert out[0]["evidence"] == ""
-    assert out[0]["verified"] is False
+    ev = out[0]["events"][0]
+    assert ev["evidence"] == "" and ev["verified"] is False
 
 
-def test_narrative_curve_chunks_none_keeps_old_behavior() -> None:
-    # chunks=None(默认)时退回章代表句、向后兼容(老调用方不传 chunks 不报错、行为不变)
+def test_narrative_curve_chunks_none_skips_evidence() -> None:
+    # chunks=None(默认)时不取证(events 计数仍在),向后兼容、不报错
     out = narrative_curve_from_spine(_spine())
     c2 = next(c for c in out if c["chapter"] == 2)
-    assert c2["evidence"] == "甲打了乙"      # 章代表句原样
-    assert c2["verified"] is True
+    assert c2["event_count"] == 2                  # 计数不依赖 chunks
+    assert c2["events"][0]["evidence"] == ""       # 没 chunks → 不取证
+    assert c2["events"][0]["verified"] is False
+    assert c2["evidence"] == "甲打了乙"             # 章代表句兜底仍在
 
 
 def test_pacing_note_fetched_when_no_event() -> None:

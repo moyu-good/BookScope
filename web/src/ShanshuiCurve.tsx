@@ -1,27 +1,47 @@
 // ---------------------------------------------------------------------------
-// ShanshuiCurve — 叙事张力的山水长卷（NarrativeCurve 的品读视图）
+// ShanshuiCurve — 事件密度曲线（NarrativeCurve 的品读视图）
 //
-// 把逐章张力数据画成水墨山水：山势=张力起落，平缓处留白成江水，朱砂点=核验过的高潮章。
-// 不是装饰画——山的形状就是真数据（probe 实测张力相对形状跨次稳，σ≈0.5），点任一章回原文。
+// 1.5.x 重做(作者拍板):旧版纵轴画的是 tension(模型一句话糊的标量,跨次抖、不可信),还跟节奏曲线
+// 画同一个东西、重复。新版纵轴换成"能数的事":每章高度 = 事件数 + 转折数(伏笔回收),全是从章脉
+// events/foreshadow 数出来、每条能回原文核验的。山势起落=哪几章戏多、哪几章平铺过渡;朱砂点=有
+// 转折的章(伏笔在这章收掉)。tension 不再进这张图,只在选中章明细里附带标"模型判读"。
 //
-// 细节化：远/中/近三层墨色叠出纵深 + 烟霭留白带 + 平滑山脊（Catmull-Rom）+ 皴笔回脊 + 江水涟漪 + 钤印。
-// 动画：长卷自左向右徐徐展开——**纯 CSS clip-path 扫场**，默认态完全可见、动画只是增强。绝不用
-//   requestAnimationFrame 当显示开关（headless / 后台标签会暂停 rAF，那样画面会卡成空白）。
-// 找节点：鼠标移到哪就吸附到最近那一章，浮出标注（不必精准点中），点选则钉住看原文。
-// 张力诚实呈现：只给相对档（平缓/起伏/紧张/高潮），不印"9/10"那种假精确（绝对分跨次会抖）。
+// 还是水墨长卷的底子:墨色面积铺出戏分布 + 平滑山脊(Catmull-Rom) + 朱砂点标转折 + 钤印。
+// 动画:纯 CSS clip-path 扫场,默认态完全可见、动画只增强。绝不用 rAF 当显示开关(headless/后台
+// 标签会暂停 rAF,那样画面会卡成空白)。鼠标移到哪吸附到最近那章,点选钉住看那章发生的几件事。
 // ---------------------------------------------------------------------------
 
 import { useMemo, useRef, useState } from "react";
 
 import { smoothLine } from "./vizCurve";
 
+export interface CurveEvent {
+  text: string;
+  evidence: string;
+  verified: boolean;
+}
+
+export interface CurveTurning {
+  hook: string;
+  kind: string;
+  evidence: string;
+  verified: boolean;
+}
+
 export interface CurveChapter {
   chapter: number;
+  event_count: number;
+  turning_count: number;
+  height: number; // event_count + turning_count，纵轴
+  is_turning: boolean;
+  events: CurveEvent[];
+  turning_points: CurveTurning[];
+  // 以下只进选中章明细，标"模型判读"，不当纵轴：
   tension: number;
   sentiment: number;
   pov: string;
   mainline: boolean;
-  evidence: string;
+  evidence: string; // 章代表句兜底
   verified: boolean;
   match_score: number;
 }
@@ -35,28 +55,10 @@ interface ShanshuiCurveProps {
 const W = 760;
 const PAD_L = 30;
 const PAD_R = 18;
-const TOP = 20;
-const RANGE = 132; // 张力 0-10 映射到的山高
-const BASE = TOP + RANGE; // 山脚 / 水岸基线
-const WATER = 22;
-const H = BASE + WATER + 26;
-
-// 视角配色(古籍色,循环);"群像"走中性灰
-const POV_PALETTE = ["#8c6b4f", "#5f7a6b", "#9a5b52", "#6b6f8c", "#8a7a4a", "#5b7d8a", "#7a5b6b"];
-
-// 情感方向 → 天色冷暖(暮霭式氛围,只给相对趋势不报精确值):正暖、负冷、平不染
-function sentSky(s: number): { fill: string; opacity: number } | null {
-  if (s > 0) return { fill: "#bd8a52", opacity: Math.min(0.16, (s / 5) * 0.16) };
-  if (s < 0) return { fill: "#5b7d8a", opacity: Math.min(0.16, (-s / 5) * 0.16) };
-  return null;
-}
-
-export function tensionBand(t: number): string {
-  if (t >= 8) return "高潮";
-  if (t >= 6) return "紧张";
-  if (t >= 4) return "起伏";
-  return "平缓";
-}
+const TOP = 22;
+const RANGE = 150; // 高度映射到的山高
+const BASE = TOP + RANGE; // 山脚基线
+const H = BASE + 30;
 
 export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurveProps) {
   const [hover, setHover] = useState<number | null>(null);
@@ -65,58 +67,43 @@ export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurvePro
   const layout = useMemo(() => {
     const n = chapters.length;
     const inner = W - PAD_L - PAD_R;
+    // 纵轴按全书最高那章归一(至少留 1,免得全 0 时除零);留头部余量不顶到天。
+    const maxH = Math.max(1, ...chapters.map((c) => c.height));
     const xAt = (i: number) => PAD_L + (n <= 1 ? inner / 2 : (i / (n - 1)) * inner);
-    const ridgeY = (t: number) =>
-      BASE - (Math.max(0, Math.min(10, t)) / 10) * RANGE;
+    const yAt = (h: number) => BASE - (Math.max(0, h) / maxH) * RANGE;
+    // 三章滑动平均出一条柔和的远景脊，叠在实测脊后面给纵深
     const sm = (i: number) => {
-      const a = chapters[Math.max(0, i - 1)].tension;
-      const b = chapters[Math.min(n - 1, i + 1)].tension;
-      return (a + chapters[i].tension + b) / 3;
+      const a = chapters[Math.max(0, i - 1)].height;
+      const b = chapters[Math.min(n - 1, i + 1)].height;
+      return (a + chapters[i].height + b) / 3;
     };
-    const near: [number, number][] = chapters.map((c, i) => [xAt(i), ridgeY(c.tension)]);
-    const mid: [number, number][] = chapters.map((_, i) => [
-      xAt(i),
-      BASE - (sm(i) / 10) * RANGE * 0.78 - 18,
-    ]);
-    const far: [number, number][] = chapters.map((_, i) => [
-      xAt(i),
-      BASE - (sm(i) / 10) * RANGE * 0.5 - 34,
-    ]);
-    const peaks = chapters
-      .map((c, i) => ({ c, i, x: xAt(i), y: ridgeY(c.tension) }))
-      .filter((p) => p.c.verified && p.c.tension >= 6)
-      .sort((a, b) => b.c.tension - a.c.tension)
-      .slice(0, 8);
-    return { n, inner, xAt, ridgeY, near, mid, far, peaks };
+    const near: [number, number][] = chapters.map((c, i) => [xAt(i), yAt(c.height)]);
+    const far: [number, number][] = chapters.map((_, i) => [xAt(i), yAt(sm(i) * 0.62)]);
+    // 转折章 = 有伏笔回收的章 → 朱砂点钉在它的脊高上
+    const turns = chapters
+      .map((c, i) => ({ c, i, x: xAt(i), y: yAt(c.height) }))
+      .filter((p) => p.c.is_turning);
+    return { n, inner, maxH, xAt, yAt, near, far, turns };
   }, [chapters]);
 
-  // 视角 → 固定颜色(按首次出现分配,"群像"中性灰)
-  const povColor = useMemo(() => {
-    const map = new Map<string, string>();
-    let next = 0;
-    for (const c of chapters) {
-      if (map.has(c.pov)) continue;
-      map.set(
-        c.pov,
-        c.pov === "群像" ? "var(--color-ink-muted)" : POV_PALETTE[next++ % POV_PALETTE.length],
-      );
-    }
-    return map;
-  }, [chapters]);
-
-  const { n, inner, xAt, ridgeY, near, mid, far, peaks } = layout;
+  const { n, inner, maxH, xAt, yAt, near, far, turns } = layout;
 
   const baseR = `L${W - PAD_R},${BASE} L${PAD_L},${BASE} Z`;
   const nearPath = smoothLine(near) + ` ${baseR}`;
-  const midPath = smoothLine(mid) + ` ${baseR}`;
   const farPath = smoothLine(far) + ` ${baseR}`;
   const ridgePath = smoothLine(near);
-  const innerRidge = (drop: number) =>
-    smoothLine(near.map(([x, y]) => [x, Math.min(BASE, y + drop)] as [number, number]));
 
   const idxOf = (chapter: number) => chapters.findIndex((c) => c.chapter === chapter);
   const hoverC = hover != null ? chapters[idxOf(hover)] : null;
   const selC = selected != null ? chapters[idxOf(selected)] : null;
+
+  // 横向参考刻度（事件数标尺）：把 maxH 分 3~4 档画淡线，让"几件事"读得出绝对量
+  const ticks = useMemo(() => {
+    const step = maxH <= 4 ? 1 : Math.ceil(maxH / 4);
+    const out: number[] = [];
+    for (let v = step; v <= maxH; v += step) out.push(v);
+    return out;
+  }, [maxH]);
 
   function handleMove(e: React.PointerEvent<SVGRectElement>) {
     const svg = svgRef.current;
@@ -134,94 +121,79 @@ export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurvePro
       className="w-full border border-[var(--color-rule)] rounded"
       style={{ background: "var(--color-paper)", touchAction: "none" }}
     >
-      {/* 入场扫场：纯 CSS（不跑也是完全可见，动画只是增强；绝不用 rAF 当显示开关） */}
+      {/* 入场扫场：纯 CSS（不跑也完全可见，动画只增强；绝不用 rAF 当显示开关） */}
       <style>{`@keyframes ss-sweep{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}`}</style>
 
-      {/* 静态山水（随长卷展开） */}
+      {/* 事件数横向参考刻度 */}
+      {ticks.map((v) => {
+        const y = yAt(v);
+        return (
+          <g key={`tick-${v}`}>
+            <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="var(--color-rule)" strokeWidth={0.5} opacity={0.55} />
+            <text x={PAD_L - 4} y={y + 3} textAnchor="end" fontSize={8} fill="var(--color-ink-muted)">
+              {v}
+            </text>
+          </g>
+        );
+      })}
+
       <g style={{ animation: "ss-sweep .85s ease-out" }}>
-        {/* 情感天色:每章一抹暮霭,暖=往上走(喜/胜)、冷=往下沉(悲/败)。氛围式,只给相对趋势 */}
-        {chapters.map((c, i) => {
-          const sky = sentSky(c.sentiment);
-          if (!sky) return null;
-          const cw = inner / Math.max(1, n);
-          return (
-            <rect key={`sky-${i}`} x={xAt(i) - cw / 2} y={TOP} width={cw} height={BASE - TOP} fill={sky.fill} opacity={sky.opacity} />
-          );
-        })}
-        <path d={farPath} fill="var(--color-ink)" opacity={0.08} />
-        {/* 烟霭留白带：纸色压一层，把远山推远 */}
-        <rect x={PAD_L} y={TOP + 6} width={inner} height={42} fill="var(--color-paper)" opacity={0.42} />
-        <path d={midPath} fill="var(--color-ink)" opacity={0.16} />
-        <path d={nearPath} fill="var(--color-ink)" opacity={0.3} />
-        {/* 皴笔：近山内两条更淡的回脊纹理 */}
-        <path d={innerRidge(10)} fill="none" stroke="var(--color-ink)" strokeWidth={0.5} opacity={0.16} />
-        <path d={innerRidge(22)} fill="none" stroke="var(--color-ink)" strokeWidth={0.5} opacity={0.1} />
-        {/* 山脊主线 */}
-        <path d={ridgePath} fill="none" stroke="var(--color-ink)" strokeWidth={1.1} strokeLinejoin="round" opacity={0.5} />
-        {/* 江水 + 涟漪 */}
-        <rect x={PAD_L} y={BASE} width={inner} height={WATER} fill="var(--color-paper-raised)" opacity={0.65} />
-        <line x1={PAD_L + 16} y1={BASE + 7} x2={PAD_L + inner * 0.42} y2={BASE + 7} stroke="var(--color-rule)" strokeWidth={0.6} opacity={0.8} />
-        <line x1={PAD_L + inner * 0.52} y1={BASE + 13} x2={W - PAD_R - 22} y2={BASE + 13} stroke="var(--color-rule)" strokeWidth={0.6} opacity={0.7} />
-        <line x1={PAD_L + inner * 0.2} y1={BASE + 17} x2={PAD_L + inner * 0.62} y2={BASE + 17} stroke="var(--color-rule)" strokeWidth={0.5} opacity={0.55} />
-        {/* 视角色带:每章一格,色=主导视角、实=主线/淡=支线。把原来藏在点击里的两维提到面上 */}
-        {chapters.map((c, i) => {
-          const cw = inner / Math.max(1, n);
-          return (
-            <rect
-              key={`pov-${i}`}
-              x={xAt(i) - cw / 2}
-              y={BASE + WATER + 2}
-              width={Math.max(0.8, cw - 0.4)}
-              height={8}
-              fill={povColor.get(c.pov) ?? "var(--color-ink-muted)"}
-              opacity={c.mainline ? 0.62 : 0.22}
+        {/* 远景脊：淡墨垫底给纵深 */}
+        <path d={farPath} fill="var(--color-ink)" opacity={0.1} />
+        {/* 近景面积：戏分布主体 */}
+        <path d={nearPath} fill="var(--color-ink)" opacity={0.28} />
+        {/* 脊主线 */}
+        <path d={ridgePath} fill="none" stroke="var(--color-ink)" strokeWidth={1.1} strokeLinejoin="round" opacity={0.55} />
+        {/* 基线 */}
+        <line x1={PAD_L} y1={BASE} x2={W - PAD_R} y2={BASE} stroke="var(--color-ink-muted)" strokeWidth={0.8} opacity={0.5} />
+
+        {/* 朱砂题点：有伏笔回收的转折章。竖一道淡引线 + 圈点，让转折章在面上跳出来 */}
+        {turns.map((p) => (
+          <g key={`tp-${p.i}`}>
+            <line x1={p.x} y1={p.y} x2={p.x} y2={BASE} stroke="var(--color-seal)" strokeWidth={0.7} opacity={0.32} />
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={selected === p.c.chapter ? 5 : 3.4}
+              fill="var(--color-seal)"
+              opacity={0.92}
             />
-          );
-        })}
-        {/* 朱砂题点：核验过的高潮章 */}
-        {peaks.map((p) => (
-          <circle
-            key={`pk-${p.i}`}
-            cx={p.x}
-            cy={p.y}
-            r={selected === p.c.chapter ? 5 : 3.2}
-            fill="var(--color-seal)"
-            opacity={0.9}
-          />
+          </g>
         ))}
+
         {/* 章号刻度 */}
         {chapters.map((c, i) =>
           n <= 20 || i % 5 === 0 ? (
-            <text key={`ax-${i}`} x={xAt(i)} y={H - 7} textAnchor="middle" fontSize={9} fill="var(--color-ink-muted)">
+            <text key={`ax-${i}`} x={xAt(i)} y={H - 8} textAnchor="middle" fontSize={9} fill="var(--color-ink-muted)">
               {c.chapter}
             </text>
           ) : null,
         )}
       </g>
 
-      {/* 悬停吸附：竖向引导 + 山脊上的圈 + 浮动标注（相对档，不印精确分） */}
+      {/* 悬停吸附：竖向引导 + 脊上的圈 + 浮动标注（事件数/转折数） */}
       {hoverC && hover !== selected && (
         <g style={{ pointerEvents: "none" }}>
-          <line x1={xAt(idxOf(hover!))} y1={ridgeY(hoverC.tension)} x2={xAt(idxOf(hover!))} y2={BASE + WATER} stroke="var(--color-ink-muted)" strokeWidth={0.7} strokeDasharray="2 2" opacity={0.55} />
-          <circle cx={xAt(idxOf(hover!))} cy={ridgeY(hoverC.tension)} r={3.6} fill="none" stroke="var(--color-seal)" strokeWidth={1.4} opacity={0.85} />
-          <text x={Math.min(W - PAD_R - 4, Math.max(PAD_L + 4, xAt(idxOf(hover!))))} y={Math.max(TOP, ridgeY(hoverC.tension) - 8)} textAnchor="middle" fontSize={11} fill="var(--color-ink)" style={{ fontFamily: "var(--font-display)" }}>
-            第{hoverC.chapter}章 · {tensionBand(hoverC.tension)}
+          <line x1={xAt(idxOf(hover!))} y1={yAt(hoverC.height)} x2={xAt(idxOf(hover!))} y2={BASE} stroke="var(--color-ink-muted)" strokeWidth={0.7} strokeDasharray="2 2" opacity={0.55} />
+          <circle cx={xAt(idxOf(hover!))} cy={yAt(hoverC.height)} r={3.6} fill="none" stroke="var(--color-seal)" strokeWidth={1.4} opacity={0.85} />
+          <text x={Math.min(W - PAD_R - 4, Math.max(PAD_L + 4, xAt(idxOf(hover!))))} y={Math.max(TOP, yAt(hoverC.height) - 8)} textAnchor="middle" fontSize={11} fill="var(--color-ink)" style={{ fontFamily: "var(--font-display)" }}>
+            第{hoverC.chapter}章 · {hoverC.event_count}事{hoverC.turning_count > 0 ? ` · ${hoverC.turning_count}转` : ""}
           </text>
         </g>
       )}
 
-      {/* 选中章：钉住的竖向朱砂线 + 山脊大点 */}
+      {/* 选中章：钉住的竖向朱砂线 + 脊上大点 */}
       {selC && (
         <g style={{ pointerEvents: "none" }}>
-          <line x1={xAt(idxOf(selected!))} y1={TOP} x2={xAt(idxOf(selected!))} y2={BASE + WATER} stroke="var(--color-seal)" strokeWidth={1} opacity={0.5} />
-          <circle cx={xAt(idxOf(selected!))} cy={ridgeY(selC.tension)} r={5} fill="var(--color-seal)" />
+          <line x1={xAt(idxOf(selected!))} y1={TOP} x2={xAt(idxOf(selected!))} y2={BASE} stroke="var(--color-seal)" strokeWidth={1} opacity={0.5} />
+          <circle cx={xAt(idxOf(selected!))} cy={yAt(selC.height)} r={5} fill="var(--color-seal)" />
         </g>
       )}
 
       {/* 钤印（数字善本签名） */}
-      <rect x={W - PAD_R - 30} y={TOP - 4} width={26} height={26} rx={3} fill="var(--color-seal)" opacity={0.92} />
-      <text x={W - PAD_R - 17} y={TOP + 4} textAnchor="middle" fontSize={10} fill="var(--color-paper)" style={{ fontFamily: "var(--font-display)" }}>书</text>
-      <text x={W - PAD_R - 17} y={TOP + 15} textAnchor="middle" fontSize={10} fill="var(--color-paper)" style={{ fontFamily: "var(--font-display)" }}>鉴</text>
+      <rect x={W - PAD_R - 30} y={TOP - 6} width={26} height={26} rx={3} fill="var(--color-seal)" opacity={0.92} />
+      <text x={W - PAD_R - 17} y={TOP + 2} textAnchor="middle" fontSize={10} fill="var(--color-paper)" style={{ fontFamily: "var(--font-display)" }}>书</text>
+      <text x={W - PAD_R - 17} y={TOP + 13} textAnchor="middle" fontSize={10} fill="var(--color-paper)" style={{ fontFamily: "var(--font-display)" }}>鉴</text>
 
       {/* 透明覆盖层：吸附 hover + 点选 */}
       <rect

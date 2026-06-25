@@ -1,17 +1,18 @@
 // ---------------------------------------------------------------------------
-// NarrativeCurve — 多维叙事曲线（WP-multidim-narrative-curve，probe GO）
+// NarrativeCurve — 事件密度曲线（1.5.x 重做，作者拍板）
 //
-// 点生成 → 调 /api/agent/narrative-curve（整本进上下文逐章抽四维）→ 画成「山水长卷」品读视图
-// （见 ShanshuiCurve）：山势=张力起落、平缓处留白成江水、朱砂点=核验过的高潮章，点任一章看
-// 那章原文。张力诚实呈现——只给相对档（平缓/起伏/紧张/高潮），不印"9/10"那种假精确：probe
-// 实测张力相对形状跨次稳（σ≈0.5），但绝对分会抖 ±1，所以画形状、不当测量值显示。
-// 情感/视角维度噪声较大（probe：情感会翻号、视角在某人/群像间晃），只在选中章的明细里附带列出，
-// 标"模型判读"，不画进主图。
+// 砍三为二:旧的「节奏」(柱状画 tension)和「叙事曲线」(山水画 tension)画的是同一个东西、都吃
+// 模型糊出来的张力标量,合并成这一条。纵轴从"张力分"换成"能数的事"——每章高度 = 事件数 + 转折数
+// (从章脉 events / 伏笔回收数出来,每条能锚原文)。转折章标朱砂点,点一章 → 列出这章实际发生的
+// 几件事,每件能看原文。张力留在选中章明细里标"模型判读",绝不再当纵轴。
+//
+// 点生成 → 调 /api/agent/narrative-curve(从共享章脉派生,命中缓存秒出)→ 画成事件密度长卷
+// (见 ShanshuiCurve)。evidence-first:这章没事件就标"平铺过渡"。
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
-import { ShanshuiCurve, tensionBand, type CurveChapter } from "./ShanshuiCurve";
+import { ShanshuiCurve, type CurveChapter } from "./ShanshuiCurve";
 
 interface NarrativeCurveProps {
   sessionId: string;
@@ -19,6 +20,12 @@ interface NarrativeCurveProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+}
+
+function sentLabel(s: number): string {
+  if (s > 0) return "偏暖";
+  if (s < 0) return "偏沉";
+  return "平";
 }
 
 export function NarrativeCurve({
@@ -85,7 +92,7 @@ export function NarrativeCurve({
           叙事曲线
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          把全书逐章张力画成一幅水墨山水长卷——山势起落就是剧情松紧，一眼看出整本书是个什么"形状"，点任一章看那章原文。
+          逐章数能数的事——每章高度 = 事件数 + 转折数（伏笔回收），一眼看出整本书哪几章戏多、哪几章是转折。点一章列出这章实际发生的几件事，每件回原文核验。
         </p>
         <button
           type="button"
@@ -108,7 +115,7 @@ export function NarrativeCurve({
         {loading && (
           <RunningProcess
             label="读全书出叙事曲线"
-            hint="整本书喂进模型逐章判张力——每章判定都回原文核验，约 1 分钟。"
+            hint="整本书喂进模型逐章精读出章脉，再数每章的事件和伏笔回收，约 1 分钟。"
           />
         )}
       </div>
@@ -116,7 +123,7 @@ export function NarrativeCurve({
   }
 
   const n = chapters.length;
-  const verifiedN = chapters.filter((c) => c.verified).length;
+  const turningN = chapters.filter((c) => c.is_turning).length;
   const sel = selected != null ? chapters.find((c) => c.chapter === selected) : null;
 
   return (
@@ -139,7 +146,7 @@ export function NarrativeCurve({
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        {n} 章（原文核验 {verifiedN}/{n} 章）。一幅画把四维同收:山势=张力、天色暖冷=情感(暖往上走/冷往下沉)、底部色带=主导视角(换色=换视角、实笔=主线·淡笔=支线)、朱砂点=核验过的高潮章。鼠标移过去吸附最近章、点看那章原文。都是模型判读的相对趋势,不报精确分数。
+        {n} 章 · 转折章 {turningN} 处（朱砂点）。山高 = 这章的事件数 + 转折数，都是从章脉数出来、每条能回原文的，不是模型眼估的张力。鼠标移过去吸附最近章、点看这章发生了什么。
       </p>
 
       <ShanshuiCurve chapters={chapters} selected={selected} onSelect={setSelected} />
@@ -147,21 +154,70 @@ export function NarrativeCurve({
       {sel && (
         <div className="mt-3 p-3 rounded border border-[var(--color-rule)] bg-white">
           <p className="text-sm font-bold text-[var(--color-ink)]">
-            第 {sel.chapter} 章 · {tensionBand(sel.tension)}
-            <span className="font-normal text-[var(--color-ink-muted)]">
-              {" "}
-              · 情感{" "}
-              {sel.sentiment > 0 ? "偏暖" : sel.sentiment < 0 ? "偏沉" : "平"} · 视角「
-              {sel.pov}」· {sel.mainline ? "主线" : "支线"}（模型判读）
-            </span>
+            第 {sel.chapter} 章 · {sel.event_count} 件事
+            {sel.turning_count > 0 && (
+              <span style={{ color: "var(--color-seal)" }}> · {sel.turning_count} 处转折</span>
+            )}
           </p>
-          <p className="mt-1 text-sm text-[var(--color-ink)] leading-relaxed">
-            {sel.evidence || "（这章没给出原文依据）"}
-          </p>
-          <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-            {sel.verified
-              ? "原文已核验"
-              : "原文未在书中比对命中——这章判读仅供参考"}
+
+          {/* 这章实际发生的几件事，每件回原文核验 */}
+          {sel.events.length > 0 ? (
+            <ul className="mt-2 space-y-2">
+              {sel.events.map((ev, i) => (
+                <li key={`ev-${i}`} className="text-sm">
+                  <p className="text-[var(--color-ink)]">· {ev.text}</p>
+                  {ev.evidence ? (
+                    <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)] border-l-2 border-[var(--color-rule)] pl-2 leading-relaxed">
+                      {ev.evidence}
+                      <span className="ml-1" style={{ color: "var(--color-seal)" }} title="原文已核验">
+                        ✓核
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)]">
+                      原文未在书中比对命中——待核
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
+              这章没数出关键事件——平铺过渡 / 待核。
+            </p>
+          )}
+
+          {/* 转折（伏笔回收）单列 */}
+          {sel.turning_points.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-bold" style={{ color: "var(--color-seal)" }}>
+                这章的转折（伏笔回收）
+              </p>
+              <ul className="mt-1 space-y-2">
+                {sel.turning_points.map((tp, i) => (
+                  <li key={`tp-${i}`} className="text-sm">
+                    <p className="text-[var(--color-ink)]">· {tp.hook}</p>
+                    {tp.evidence ? (
+                      <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)] border-l-2 pl-2 leading-relaxed" style={{ borderColor: "var(--color-seal)" }}>
+                        {tp.evidence}
+                        <span className="ml-1" style={{ color: "var(--color-seal)" }} title="原文已核验">
+                          ✓核
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)]">
+                        原文未命中——待核
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 张力等四维：只附带，标"模型判读"，不当纵轴 */}
+          <p className="mt-3 pt-2 border-t border-[var(--color-rule)] text-xs text-[var(--color-ink-muted)]">
+            模型判读（仅供参考，不当数据）：张力 {sel.tension}/10 · 情感{sentLabel(sel.sentiment)} · 视角「{sel.pov}」· {sel.mainline ? "主线" : "支线"}
           </p>
         </div>
       )}
