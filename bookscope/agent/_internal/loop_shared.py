@@ -234,6 +234,24 @@ def read_openai_choice_content(response: Any) -> str:
     return ""
 
 
+def read_openai_finish_reason(response: Any) -> str | None:
+    """从 OpenAI 形态 response 抽 ``choices[0].finish_reason``。
+
+    两家 adapter 都把它放进 ``choices[0].finish_reason``（``deepseek_r2.py``
+    原生、``anthropic_r2.py`` 由 ``stop_reason`` 翻译）。截断时是 ``"length"``，
+    正常结束是 ``"stop"``。兼容 dict / SDK 对象 / 缓存反序列化三种形态，走
+    ``resp_field`` 兜底；任一层缺失返 ``None``（当作"不知道是否截断"，调用方按
+    保守处理，不臆断截断）。
+    """
+    if response is None:
+        return None
+    choices = resp_field(response, "choices")
+    if not choices:
+        return None
+    fr = resp_field(choices[0], "finish_reason")
+    return fr if isinstance(fr, str) else None
+
+
 def read_openai_usage(response: Any) -> tuple[int, int]:
     """从 OpenAI 形态 response 抽 ``(prompt_tokens, completion_tokens)``。
 

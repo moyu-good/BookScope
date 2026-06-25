@@ -19,6 +19,7 @@ from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent._internal.longctx_system import build_longctx_system
+from bookscope.agent._internal.loop_shared import read_openai_finish_reason
 
 logger = logging.getLogger(__name__)
 
@@ -96,8 +97,13 @@ def run_segments(
     model: str,
     max_tokens: int,
     char_budget: int = DEFAULT_CHAR_BUDGET,
+    max_chapters: int | None = DEFAULT_MAX_CHAPTERS,
     max_workers: int | None = None,
     cache_enabled: bool = True,
+    continue_fn: Callable[
+        [list[dict[str, Any]], list[dict[str, Any]]], list[dict[str, Any]]
+    ]
+    | None = None,
 ) -> list[list[dict[str, Any]]]:
     """map 引擎：按字符预算分段 → 并发逐段抽 → 返回**每段**解析出的条目列表（不合并）。
 
@@ -106,9 +112,17 @@ def run_segments(
     解析不出 → 该段返 ``[]``，不拖垮整体。reduce（合并）由调用方按各功能的 key 决定，所以这里
     只返回 ``list[每段条目列表]``，保段序（段按章序排，所以"先出现"= 章靠前的段）。
 
+    ``max_chapters`` 透传给 ``segment_chunks`` 当章闸（1.5.2 方案 B）：默认沿用全局
+    ``DEFAULT_MAX_CHAPTERS=12``，章脉 char/plot 重维传更小的专用值让单段输出不爆 max_tokens。
+
+    ``continue_fn``（1.5.2 方案 C）：某段 **finish_reason=length 截断且只抢救回部分章** 时，
+    用 ``continue_fn(seg, partial)`` 再发一次"只抽差掉的章"的调用，返回补抽到的条目，append 进
+    该段结果——把"截断悄悄丢章"变"截断补抽回来"。``None`` 则不补抽（截断时记 warning 后照旧返
+    抢救到的部分）。截断判定靠 ``finish_reason``（1.5.2 方案 A），不再盲抢救。
+
     缓存默认开：同段同书重看直接命中（map-reduce 下坏段只跳过、不一坏全挂，开缓存安全）。
     """
-    segments = segment_chunks(chunks, char_budget)
+    segments = segment_chunks(chunks, char_budget, max_chapters)
     if not segments:
         return []
 
@@ -128,11 +142,36 @@ def run_segments(
         except Exception as exc:  # noqa: BLE001 — 单段失败跳过
             logger.warning("exhaustive 段调用抛 %s: %s；跳过该段", type(exc).__name__, exc)
             return []
+        # 方案 A：先读 finish_reason，把"截没截"变成可观测量，再解析。
+        truncated = read_openai_finish_reason(resp) == "length"
         try:
-            return parse_fn(llm_client.extract_final_text(resp)) or []
+            parsed = parse_fn(llm_client.extract_final_text(resp)) or []
         except Exception as exc:  # noqa: BLE001
             logger.warning("exhaustive 段解析抛 %s；跳过该段", type(exc).__name__)
             return []
+        if not truncated:
+            return parsed
+        # finish_reason=length：这段被输出长度截断了（不是"模型真没抽到"）。
+        if not parsed:
+            logger.warning("exhaustive 段被 max_tokens 截断且一条都没抢救到；跳过该段")
+            return parsed
+        logger.warning(
+            "exhaustive 段被 max_tokens 截断，抢救到 %d 条%s",
+            len(parsed),
+            "，续抽补完" if continue_fn is not None else "（未配续抽，丢掉差掉的章）",
+        )
+        if continue_fn is None:
+            return parsed
+        # 方案 C：对差掉的章续抽补完，append 进本段结果。续抽自身也可能再截断，但
+        # continue_fn 内部按"还差哪些章"递减，最终收敛；这里只负责 append。
+        try:
+            extra = continue_fn(seg, parsed) or []
+        except Exception as exc:  # noqa: BLE001 — 续抽失败不拖垮主结果
+            logger.warning("exhaustive 段续抽抛 %s；保留已抢救的部分", type(exc).__name__)
+            return parsed
+        if extra:
+            parsed = [*parsed, *extra]
+        return parsed
 
     workers = resolve_workers(max_workers)
     if workers <= 1 or len(segments) <= 1:
@@ -269,9 +308,14 @@ def mapreduce_per_chapter(
     model: str,
     max_tokens: int,
     char_budget: int = DEFAULT_CHAR_BUDGET,
+    max_chapters: int | None = DEFAULT_MAX_CHAPTERS,
     max_workers: int | None = None,
     cache_enabled: bool = True,
     correct_fn: Callable[[list[dict[str, Any]], list[dict[str, Any]]], None] | None = None,
+    continue_fn: Callable[
+        [list[dict[str, Any]], list[dict[str, Any]]], list[dict[str, Any]]
+    ]
+    | None = None,
 ) -> list[dict[str, Any]]:
     """按章 map-reduce 便捷壳：``run_segments`` → (逐段章号纠偏) → ``merge_by_chapter``。
 
@@ -283,6 +327,9 @@ def mapreduce_per_chapter(
     丢掉（明朝实测 158 章只剩 30）。所以这里在 merge **之前**逐段把每段结果的章号纠偏成命中
     chunk 的真章号（``correct_fn(seg, chunks)`` 原地改），再按真章号去重。``correct_fn=None``
     则不纠偏（调用方自行处理）。
+
+    ``max_chapters`` / ``continue_fn`` 透传给 ``run_segments``（1.5.2 方案 B/C）：默认沿用全局
+    章闸 12、不续抽，调用方（章脉）按需传更小章闸 + 续抽回调。
     """
     outs = run_segments(
         chunks=chunks,
@@ -293,8 +340,10 @@ def mapreduce_per_chapter(
         model=model,
         max_tokens=max_tokens,
         char_budget=char_budget,
+        max_chapters=max_chapters,
         max_workers=max_workers,
         cache_enabled=cache_enabled,
+        continue_fn=continue_fn,
     )
     if correct_fn is not None:
         for seg in outs:

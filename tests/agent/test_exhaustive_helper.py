@@ -233,3 +233,150 @@ def test_merge_keyed_points_default_dedups_same_chapter() -> None:
         outs, key_fn=lambda c: c["name"], point_fields=["points"]
     )
     assert [p["v"] for p in out[0]["points"]] == [1]
+
+
+# ── 1.5.2 方案 A/B/C：finish_reason 可观测 + 章闸透传 + 截断续抽 ───────────────
+
+
+def _resp(text: str, finish_reason: str = "stop") -> dict:
+    """造一个带 finish_reason 的 OpenAI 形态 response（run_segment 读其 finish_reason）。"""
+    return {
+        "choices": [{"message": {"content": text}, "finish_reason": finish_reason}],
+    }
+
+
+class _FakeFinish:
+    """每段按 finish_reason 区分返回；extract_final_text 读回 content。"""
+
+    def extract_final_text(self, resp):  # noqa: ANN001, ANN201
+        return resp["choices"][0]["message"]["content"]
+
+
+def test_run_segments_passes_max_chapters_down(monkeypatch) -> None:  # noqa: ANN001
+    # 方案 B：run_segments 把 max_chapters 透传给 segment_chunks（不再写死全局 12）。
+    seen = {}
+
+    def _spy_segment(  # noqa: ANN202
+        chunks,  # noqa: ANN001
+        char_budget=ex.DEFAULT_CHAR_BUDGET,  # noqa: ANN001
+        max_chapters=ex.DEFAULT_MAX_CHAPTERS,  # noqa: ANN001
+    ):
+        seen["max_chapters"] = max_chapters
+        return [chunks]  # 一段省事
+
+    monkeypatch.setattr(ex, "segment_chunks", _spy_segment)
+    monkeypatch.setattr(ex, "invoke_client_cached", lambda *_a, **_k: _resp('{"chapters": []}'))
+    ex.run_segments(
+        chunks=[{"chunk_id": "c0", "chapter": 1, "text": "甲"}],
+        instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100,
+        max_chapters=6, max_workers=1,
+    )
+    assert seen["max_chapters"] == 6
+
+
+def test_run_segments_default_max_chapters_unchanged(monkeypatch) -> None:  # noqa: ANN001
+    # 不传 max_chapters → 沿用全局 DEFAULT_MAX_CHAPTERS（别的穷尽化功能行为不变）。
+    seen = {}
+
+    def _spy_segment(  # noqa: ANN202
+        chunks,  # noqa: ANN001
+        char_budget=ex.DEFAULT_CHAR_BUDGET,  # noqa: ANN001
+        max_chapters=ex.DEFAULT_MAX_CHAPTERS,  # noqa: ANN001
+    ):
+        seen["max_chapters"] = max_chapters
+        return [chunks]
+
+    monkeypatch.setattr(ex, "segment_chunks", _spy_segment)
+    monkeypatch.setattr(ex, "invoke_client_cached", lambda *_a, **_k: _resp('{"chapters": []}'))
+    ex.run_segments(
+        chunks=[{"chunk_id": "c0", "chapter": 1, "text": "甲"}],
+        instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100, max_workers=1,
+    )
+    assert seen["max_chapters"] == ex.DEFAULT_MAX_CHAPTERS == 12
+
+
+def test_run_segment_no_finish_reason_is_not_truncated(monkeypatch) -> None:  # noqa: ANN001
+    # finish_reason 缺失（老 Fake / 缓存形态）→ 当"不知道是否截断"，不触发续抽，行为不变。
+    called = {"continue": False}
+
+    def _continue(_seg, _partial):  # noqa: ANN001, ANN202
+        called["continue"] = True
+        return [{"chapter": 99}]
+
+    monkeypatch.setattr(
+        ex, "invoke_client_cached",
+        lambda *_a, **_k: {"_seg": 0},  # 无 choices → finish_reason None
+    )
+
+    class _C:
+        def extract_final_text(self, _resp):  # noqa: ANN001, ANN201
+            return json.dumps({"chapters": [{"chapter": 1}]})
+
+    outs = ex.run_segments(
+        chunks=[{"chunk_id": "c0", "chapter": 1, "text": "甲"}],
+        instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_C(), model="m", max_tokens=100, max_workers=1,
+        continue_fn=_continue,
+    )
+    assert called["continue"] is False
+    assert [c["chapter"] for c in outs[0]] == [1]
+
+
+def test_run_segment_truncated_calls_continue_and_appends(monkeypatch) -> None:  # noqa: ANN001
+    # 方案 A + C：finish_reason=length 且抢救到部分 → 调 continue_fn 把差掉的章补回来 append。
+    monkeypatch.setattr(
+        ex, "invoke_client_cached",
+        lambda *_a, **_k: _resp(json.dumps({"chapters": [{"chapter": 1}]}), "length"),
+    )
+
+    def _continue(seg, partial):  # noqa: ANN001, ANN202
+        assert [c["chapter"] for c in partial] == [1]  # 拿到已抢救的
+        return [{"chapter": 2}, {"chapter": 3}]  # 补回差掉的两章
+
+    outs = ex.run_segments(
+        chunks=[{"chunk_id": f"c{i}", "chapter": i, "text": "甲"} for i in (1, 2, 3)],
+        instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100,
+        char_budget=100000, max_chapters=12, max_workers=1,
+        continue_fn=_continue,
+    )
+    # 一段（章闸 12、字数够）→ 截断抢救 1 章 + 续抽补 2 章 = 三章齐
+    assert [c["chapter"] for c in outs[0]] == [1, 2, 3]
+
+
+def test_run_segment_truncated_without_continue_keeps_partial(monkeypatch) -> None:  # noqa: ANN001
+    # 截断但没配 continue_fn → 保留抢救到的部分（不补、不丢光），行为跟旧版一致。
+    monkeypatch.setattr(
+        ex, "invoke_client_cached",
+        lambda *_a, **_k: _resp(json.dumps({"chapters": [{"chapter": 1}]}), "length"),
+    )
+    outs = ex.run_segments(
+        chunks=[{"chunk_id": "c0", "chapter": 1, "text": "甲"}],
+        instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100, max_workers=1,
+    )
+    assert [c["chapter"] for c in outs[0]] == [1]
+
+
+def test_run_segment_truncated_empty_does_not_continue(monkeypatch) -> None:  # noqa: ANN001
+    # 截断且一条都没抢救到 → 不续抽（无 partial 可接着），返空。
+    called = {"continue": False}
+
+    def _continue(_seg, _partial):  # noqa: ANN001, ANN202
+        called["continue"] = True
+        return [{"chapter": 1}]
+
+    monkeypatch.setattr(
+        ex, "invoke_client_cached",
+        lambda *_a, **_k: _resp("不是JSON半截", "length"),
+    )
+    outs = ex.run_segments(
+        chunks=[{"chunk_id": "c0", "chapter": 1, "text": "甲"}],
+        instruction="x", user_msg="y", parse_fn=_parse,
+        llm_client=_FakeFinish(), model="m", max_tokens=100, max_workers=1,
+        continue_fn=_continue,
+    )
+    assert called["continue"] is False
+    assert outs[0] == []

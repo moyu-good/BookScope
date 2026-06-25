@@ -19,7 +19,13 @@ import json
 import logging
 from typing import Any
 
-from bookscope.agent._internal.exhaustive import DEFAULT_CHAR_BUDGET, mapreduce_per_chapter
+from bookscope.agent._internal.exhaustive import (
+    DEFAULT_CHAR_BUDGET,
+    DEFAULT_MAX_CHAPTERS,
+    mapreduce_per_chapter,
+)
+from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
@@ -30,7 +36,20 @@ from bookscope.agent.utils.json_parsing import strip_code_fence as _strip_code_f
 logger = logging.getLogger(__name__)
 
 DEFAULT_SPINE_MAX_TOKENS = 8000
-"""分维后单维输出比全维一趟小;配 D-7 章闸(每段 ≤12 章)够用,留 reasoning 头。"""
+"""分维后单维输出比全维一趟小;配章闸够用,留 reasoning 头。"""
+
+# ── 章脉专用章闸(1.5.2 方案 B) ──────────────────────────────────────────────
+# 全局 DEFAULT_MAX_CHAPTERS=12 按"全维一趟"时代定,没复核分维后短章网文单维会不会爆。
+# 实测:char(present/relations/char_states 三数组)、plot(events/tension/sentiment/pov/
+# mainline/foreshadow 七字段)两个重维 12 章 × 每章带 evidence,加 flash 的 reasoning 一起
+# 冲爆 8000(probe 情节维 17 章已吃 5759 token content,reasoning 另算)。所以 char/plot 这
+# 两个重维用更小的专用章闸,让单段输出不爆;concept(每章只 claims 一数组,最轻)沿用全局 12。
+# 只给章脉这两维收窄,**不动 exhaustive 的全局默认**——人物图/实体表等别的穷尽化功能照旧 12。
+_SPINE_HEAVY_DIM_MAX_CHAPTERS = 6
+"""char/plot 重维每段章闸(收窄);concept 轻维不传、走全局 12。"""
+
+_SPINE_CONTINUE_MAX_ROUNDS = 3
+"""续抽最多补几轮——防止某段反复截断导致无限补抽,补满几轮还差就停(留 warning)。"""
 
 SPINE_SCHEMA_VERSION = "v1"
 """章脉记录结构版本——升级要让缓存整本失效(接 ADR-008 L3,迁移计划第 5 步)。"""
@@ -158,6 +177,85 @@ def _make_parser(dim: str):  # noqa: ANN202 — 返回闭包 parse_fn 喂 mapred
     return _parse
 
 
+def _segment_chapter_count(seg: list[dict[str, Any]]) -> int:
+    """这段原文覆盖几个不同章(看 chunk 的真 chapter 字段)。续抽据此判"还差几章"。"""
+    return len({c.get("chapter") for c in seg if isinstance(c.get("chapter"), int)})
+
+
+def _make_continue_fn(
+    dim: str,
+    instruction: str,
+    *,
+    llm_client: Any,
+    model: str,
+    max_tokens: int,
+    cache_enabled: bool,
+):  # noqa: ANN202 — 返回闭包 continue_fn 喂 mapreduce
+    """造该维的续抽回调(1.5.2 方案 C):某段截断只抢救回部分章时,把差掉的章补抽回来。
+
+    判据用**数量**不用具体章号:段原文覆盖 N 个章(看 chunk 真 chapter),抢救回 M 条,差 N-M 章。
+    不点名"第几章"是因为这一步章号还没纠偏(模型自报的小章号在多卷书里撞号、不可靠),改让模型
+    "接着上次没抽完的往下抽"。最多补 ``_SPINE_CONTINUE_MAX_ROUNDS`` 轮防无限补,补满还差就停。
+    续抽的章号同样在合并前由 ``_correct_by_evidence`` 纠偏,这里不管。
+    """
+    parse = _make_parser(dim)
+
+    def _continue(
+        seg: list[dict[str, Any]], partial: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        covered = _segment_chapter_count(seg)
+        if covered == 0:  # 段不带章号(向后兼容路) → 没法判差几章,不续抽
+            return []
+        seg_text = "".join(str(c.get("text", "")) for c in seg)
+        extra: list[dict[str, Any]] = []
+        got = list(partial)
+        for _round in range(_SPINE_CONTINUE_MAX_ROUNDS):
+            missing = covered - len(got)
+            if missing <= 0:
+                break
+            # 接着上次没抽完的往下抽:告诉模型已抽 len(got) 章、只补剩下的,别重复。
+            cont_instr = (
+                instruction
+                + f"\n\n注意:你上次已经抽完了本段前 {len(got)} 个章,被长度截断了。"
+                + f"现在请**只抽你还没抽的、本段剩下的约 {missing} 个章**,接着往下,"
+                + "别重复前面抽过的章。"
+            )
+            system = build_longctx_system(seg_text, cont_instr)
+            try:
+                resp = invoke_client_cached(
+                    llm_client,
+                    model=model,
+                    system=system,
+                    tools=[],
+                    messages=[{"role": "user", "content": _USER_MSG}],
+                    max_tokens=max_tokens,
+                    cache_enabled=cache_enabled,
+                )
+            except Exception as exc:  # noqa: BLE001 — 续抽调用失败就停,保已有的
+                logger.warning(
+                    "chapter_spine[%s]: 续抽调用抛 %s,停止续抽", dim, type(exc).__name__
+                )
+                break
+            try:
+                more = parse(llm_client.extract_final_text(resp)) or []
+            except Exception:  # noqa: BLE001
+                more = []
+            if not more:  # 这轮没补到 → 再补也大概率空,停
+                break
+            extra.extend(more)
+            got.extend(more)
+        if extra:
+            logger.warning(
+                "chapter_spine[%s]: 段截断续抽补回 %d 条(本段共约 %d 章)",
+                dim,
+                len(extra),
+                covered,
+            )
+        return extra
+
+    return _continue
+
+
 def _correct_by_evidence(records: list[dict[str, Any]], chunks: list[dict[str, Any]]) -> None:
     """合并前逐段把每条记录的章号纠偏成命中 chunk 的真章号(同 narrative,ADR-010 D-2)。
 
@@ -220,7 +318,11 @@ def build_chapter_spine(
     """整本一次精读,出带证据的逐章章脉(ADR-010 单一事实源)。
 
     分维抽取:小说跑 人物维 + 情节维;``genre="theory"`` 加 概念维。每维 ``mapreduce_per_chapter``
-    (D-7 章闸 + 合并前 ``_correct_by_evidence`` 纠偏),再按真章号跨维 union。空 → ``[]``。
+    (章闸 + 合并前 ``_correct_by_evidence`` 纠偏),再按真章号跨维 union。空 → ``[]``。
+
+    1.5.2 健壮性:char/plot 两个重维用更小的专用章闸(``_SPINE_HEAVY_DIM_MAX_CHAPTERS``)让单段
+    输出不爆 ``max_tokens``(方案 B);某段仍被截断时靠 ``continue_fn`` 把差掉的章续抽补完、不悄悄
+    丢(方案 C)。concept 轻维沿用全局章闸、不续抽。**不动 exhaustive 全局默认**——别的穷尽化功能照旧。
 
     Returns: ``[{chapter, present, relations, char_states, events, tension, sentiment, pov,
     mainline, foreshadow, [claims], evidence, verified, match_score}]``,按章号升序。
@@ -231,6 +333,21 @@ def build_chapter_spine(
 
     dim_lists: list[list[dict[str, Any]]] = []
     for dim, instruction in dims:
+        # char/plot 重维收窄章闸 + 开续抽;concept 轻维走全局默认、不续抽。
+        heavy = dim != "concept"
+        dim_max_chapters = _SPINE_HEAVY_DIM_MAX_CHAPTERS if heavy else DEFAULT_MAX_CHAPTERS
+        continue_fn = (
+            _make_continue_fn(
+                dim,
+                instruction,
+                llm_client=llm_client,
+                model=model,
+                max_tokens=max_tokens,
+                cache_enabled=True,
+            )
+            if heavy
+            else None
+        )
         recs = mapreduce_per_chapter(
             chunks=chunks,
             instruction=instruction,
@@ -240,8 +357,10 @@ def build_chapter_spine(
             model=model,
             max_tokens=max_tokens,
             char_budget=char_budget,
+            max_chapters=dim_max_chapters,
             max_workers=max_workers,
             correct_fn=_correct_by_evidence,
+            continue_fn=continue_fn,
         )
         dim_lists.append(recs)
 

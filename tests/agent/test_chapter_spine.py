@@ -147,3 +147,111 @@ def test_build_chapter_spine_theory_adds_concept_dim(monkeypatch) -> None:  # no
     cs.build_chapter_spine(chunks=[], llm_client=_FakeClient(), model="m", genre="theory")
     assert len(calls) == 3                       # 理论书加概念维
     assert cs._INSTR_CONCEPT in calls
+
+
+# ── 1.5.2 方案 B：char/plot 重维收窄章闸,concept 轻维走全局,全局默认不动 ──────
+def test_build_chapter_spine_per_dim_chapter_cap(monkeypatch) -> None:  # noqa: ANN001
+    by_dim: dict[str, int] = {}
+    has_continue: dict[str, bool] = {}
+
+    def _fake_mapreduce(**kwargs):  # noqa: ANN003, ANN202
+        instr = kwargs["instruction"]
+        dim = {cs._INSTR_CHAR: "char", cs._INSTR_PLOT: "plot",
+               cs._INSTR_CONCEPT: "concept"}[instr]
+        by_dim[dim] = kwargs["max_chapters"]
+        has_continue[dim] = kwargs.get("continue_fn") is not None
+        return []
+
+    monkeypatch.setattr(cs, "mapreduce_per_chapter", _fake_mapreduce)
+    cs.build_chapter_spine(chunks=[], llm_client=_FakeClient(), model="m", genre="theory")
+    # 重维收窄到专用小章闸,轻维走全局 12
+    assert by_dim["char"] == cs._SPINE_HEAVY_DIM_MAX_CHAPTERS
+    assert by_dim["plot"] == cs._SPINE_HEAVY_DIM_MAX_CHAPTERS
+    assert by_dim["concept"] == cs.DEFAULT_MAX_CHAPTERS == 12
+    # 续抽只挂重维
+    assert has_continue["char"] is True
+    assert has_continue["plot"] is True
+    assert has_continue["concept"] is False
+
+
+def test_spine_heavy_cap_smaller_than_global() -> None:
+    # 专用章闸必须比全局小才有意义;全局默认本身不被改动
+    assert cs._SPINE_HEAVY_DIM_MAX_CHAPTERS < cs.DEFAULT_MAX_CHAPTERS
+
+
+# ── 1.5.2 方案 C：续抽把段截断丢的章补回来,章数对齐 ──────────────────────────
+class _SegFakeClient:
+    """按调用次数返不同 content;extract_final_text 读回上次塞的 content。"""
+
+    def __init__(self, texts: list[str]) -> None:
+        self._texts = list(texts)
+        self.i = 0
+
+    def extract_final_text(self, resp):  # noqa: ANN001, ANN201
+        return resp["choices"][0]["message"]["content"]
+
+
+def test_continue_fn_refills_dropped_chapters(monkeypatch) -> None:  # noqa: ANN001
+    # 段覆盖 6 章,首次截断只抢救回 3 章(传给 continue_fn 当 partial),续抽补回剩下 3 章。
+    seg = [{"chunk_id": f"c{i}", "chapter": i, "text": "正文"} for i in range(1, 7)]
+    partial = [{"chapter": i} for i in (1, 2, 3)]  # 自报章号(还没纠偏),数量=3
+
+    cont_calls = {"n": 0}
+
+    def _fake_invoke(*_a, **_k):  # noqa: ANN002, ANN003, ANN202
+        cont_calls["n"] += 1
+        # 第一轮续抽补回 4、5、6 三章,凑齐 6 章
+        return {"choices": [{"message": {"content": json.dumps(
+            {"chapters": [{"chapter": 4, "tension": 5, "evidence": "e"},
+                          {"chapter": 5, "tension": 5, "evidence": "e"},
+                          {"chapter": 6, "tension": 5, "evidence": "e"}]})},
+            "finish_reason": "stop"}]}
+
+    monkeypatch.setattr(cs, "invoke_client_cached", _fake_invoke)
+    cont = cs._make_continue_fn(
+        "plot", cs._INSTR_PLOT,
+        llm_client=_SegFakeClient([]), model="m", max_tokens=8000, cache_enabled=True,
+    )
+    extra = cont(seg, partial)
+    assert cont_calls["n"] == 1                       # 一轮就补齐,不多打
+    assert [c["chapter"] for c in extra] == [4, 5, 6]  # 补回差掉的三章
+    # partial(3) + extra(3) = 6,对齐段覆盖章数
+    assert len(partial) + len(extra) == cs._segment_chapter_count(seg) == 6
+
+
+def test_continue_fn_stops_at_max_rounds(monkeypatch) -> None:  # noqa: ANN001
+    # 续抽每轮只补 1 章、永远补不齐 → 最多打 _SPINE_CONTINUE_MAX_ROUNDS 轮就停,不无限补。
+    seg = [{"chunk_id": f"c{i}", "chapter": i, "text": "正文"} for i in range(1, 11)]
+    partial = [{"chapter": 1}]
+    n = {"i": 0}
+
+    def _fake_invoke(*_a, **_k):  # noqa: ANN002, ANN003, ANN202
+        n["i"] += 1
+        return {"choices": [{"message": {"content": json.dumps(
+            {"chapters": [{"chapter": 100 + n["i"], "tension": 5, "evidence": "e"}]})},
+            "finish_reason": "length"}]}  # 每轮补 1 章还截断
+
+    monkeypatch.setattr(cs, "invoke_client_cached", _fake_invoke)
+    cont = cs._make_continue_fn(
+        "plot", cs._INSTR_PLOT,
+        llm_client=_SegFakeClient([]), model="m", max_tokens=8000, cache_enabled=True,
+    )
+    extra = cont(seg, partial)
+    assert n["i"] == cs._SPINE_CONTINUE_MAX_ROUNDS    # 补满上限轮就停
+    assert len(extra) == cs._SPINE_CONTINUE_MAX_ROUNDS
+
+
+def test_continue_fn_no_chapter_field_skips(monkeypatch) -> None:  # noqa: ANN001
+    # 段不带 chapter(向后兼容路)→ 判不出差几章,不续抽,不打调用。
+    called = {"n": 0}
+    monkeypatch.setattr(
+        cs, "invoke_client_cached",
+        lambda *_a, **_k: called.__setitem__("n", called["n"] + 1) or {},
+    )
+    cont = cs._make_continue_fn(
+        "char", cs._INSTR_CHAR,
+        llm_client=_SegFakeClient([]), model="m", max_tokens=8000, cache_enabled=True,
+    )
+    extra = cont([{"chunk_id": "c0", "text": "无章号"}], [{"chapter": 1}])
+    assert extra == []
+    assert called["n"] == 0
