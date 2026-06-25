@@ -30,6 +30,7 @@ import type { QAEntry } from "./historyStorage";
 import { Onboarding } from "./Onboarding";
 import { QuestionBreakdown } from "./QuestionBreakdown";
 import { Recap } from "./Recap";
+import { RedheadDocStructure } from "./RedheadDocStructure";
 import { RelationshipTimeline } from "./RelationshipTimeline";
 import { RevisionList } from "./RevisionList";
 import type {
@@ -736,6 +737,7 @@ export function App() {
     | "technique"
     | "cards"
     | "revision"
+    | "redhead"
   >("library");
   // 手机端左栏收成抽屉，这个控制开合
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1784,6 +1786,20 @@ export function App() {
                   baseUrl={effectiveBaseUrl()}
                 />
               </div>
+
+              <div className={mode === "redhead" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="公文结构解读"
+                  subtitle="把一份红头文件拆开看——先列发文字号、发文机关、成文日期等八项头要素，对照公文格式标准看缺没缺；再把正文逐条排开：这条管什么事、是硬要求还是软倡导、谁去做、什么期限、依据哪份上位文件，每条钉在原文。适合党政公文 / 红头文件。"
+                />
+                <RedheadDocStructure
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
             </>
           )}
 
@@ -1822,14 +1838,15 @@ type Mode =
   | "motif"
   | "technique"
   | "cards"
-  | "revision";
+  | "revision"
+  | "redhead";
 
 // 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
 const WHOLE_BOOK_MODES = new Set<Mode>([
   "graph", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
   "timeline", "pacing", "narrative", "consistency", "argument", "style", "technique",
-  "cards", "revision",
+  "cards", "revision", "redhead",
 ]);
 
 const NAV_MODES: { id: Mode; label: string }[] = [
@@ -1855,6 +1872,7 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "cards", label: "知识卡片" },
   { id: "style", label: "文体体检" },
   { id: "revision", label: "改稿清单" },
+  { id: "redhead", label: "公文结构" },
 ];
 
 // agent 编排菜单的功能名（后端 orchestrate FEATURE_MENU 的键）→ App 的 mode。
@@ -2080,6 +2098,14 @@ function NavIcon({
         <path d="M8 4h8v3H8z" />
         <path d="M6 5h2v0M16 5h2v15H6V5h0" />
         <path d="M9 12l1.6 1.6L13.5 11M9 16.5h4" />
+      </>
+    ),
+    redhead: (
+      <>
+        <path d="M5 3h11l3 3v15H5z" />
+        <path d="M8 8h6" />
+        <path d="M8 11.5h8" />
+        <circle cx="16.5" cy="16" r="2.5" />
       </>
     ),
     library: (
