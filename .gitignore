@@ -47,6 +47,9 @@ inject_mingchao.py
 scripts/_tmp_*
 scripts/_shot_*
 
+# 1.6 红头文件垂直语料：本地采集的党政公文，纯测试语料，绝不入库
+tests/file/redhead_corpus/
+
 # 发布脚本含真名扫描模式 + 仅本地运维用，绝不入库（同 CLAUDE.md 道理）
 scripts/publish-public.sh
 

@@ -1872,7 +1872,9 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "cards", label: "知识卡片" },
   { id: "style", label: "文体体检" },
   { id: "revision", label: "改稿清单" },
-  { id: "redhead", label: "公文结构" },
+  // 1.6 红头文件公文功能暂藏:引擎还在做透(头要素已修,跨文件锚定/条款补全未完),
+  // 等单份+跨文件都 ship-quality 再亮出来单独发。代码留在仓里、用户点不到。
+  // { id: "redhead", label: "公文结构" },
 ];
 
 // agent 编排菜单的功能名（后端 orchestrate FEATURE_MENU 的键）→ App 的 mode。
