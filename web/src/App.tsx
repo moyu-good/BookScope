@@ -29,6 +29,7 @@ import type { QAEntry } from "./historyStorage";
 import { Onboarding } from "./Onboarding";
 import { QuestionBreakdown } from "./QuestionBreakdown";
 import { Recap } from "./Recap";
+import { RedheadActionList } from "./RedheadActionList";
 import { RedheadDocStructure } from "./RedheadDocStructure";
 import { RelationshipTimeline } from "./RelationshipTimeline";
 import { RevisionList } from "./RevisionList";
@@ -737,6 +738,7 @@ export function App() {
     | "cards"
     | "revision"
     | "redhead"
+    | "redhead_actions"
   >("library");
   // 手机端左栏收成抽屉，这个控制开合
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1784,6 +1786,20 @@ export function App() {
                   baseUrl={effectiveBaseUrl()}
                 />
               </div>
+
+              <div className={mode === "redhead_actions" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="办事清单"
+                  subtitle="把一份红头文件拆成一张能勾的待办清单——每条说清做什么、谁去做、到几号、凭哪份上位文件，硬要求排最前，每条钉在原文。读完一份公文，照着这张表挨条办就行。适合党政公文 / 红头文件。"
+                />
+                <RedheadActionList
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
             </>
           )}
 
@@ -1823,14 +1839,15 @@ type Mode =
   | "technique"
   | "cards"
   | "revision"
-  | "redhead";
+  | "redhead"
+  | "redhead_actions";
 
 // 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
 const WHOLE_BOOK_MODES = new Set<Mode>([
   "graph", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
   "timeline", "narrative", "consistency", "argument", "style", "technique",
-  "cards", "revision", "redhead",
+  "cards", "revision", "redhead", "redhead_actions",
 ]);
 
 const NAV_MODES: { id: Mode; label: string }[] = [
@@ -1858,6 +1875,7 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   // 1.6 红头文件公文功能暂藏:引擎还在做透(头要素已修,跨文件锚定/条款补全未完),
   // 等单份+跨文件都 ship-quality 再亮出来单独发。代码留在仓里、用户点不到。
   // { id: "redhead", label: "公文结构" },
+  // { id: "redhead_actions", label: "办事清单" },
 ];
 
 // agent 编排菜单的功能名（后端 orchestrate FEATURE_MENU 的键）→ App 的 mode。
@@ -2090,6 +2108,14 @@ function NavIcon({
         <path d="M8 8h6" />
         <path d="M8 11.5h8" />
         <circle cx="16.5" cy="16" r="2.5" />
+      </>
+    ),
+    redhead_actions: (
+      <>
+        <rect x="6" y="4" width="12" height="17" rx="1.5" />
+        <path d="M9 3.5h6v2H9z" />
+        <path d="M9 10l1.4 1.4L13 9" />
+        <path d="M9 15l1.4 1.4L13 14" />
       </>
     ),
     library: (
