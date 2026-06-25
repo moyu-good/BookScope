@@ -21,9 +21,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import find_supporting_sentences
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
     salvage_closed_objects,
@@ -120,6 +122,47 @@ def _collect_inventory(
     return digest, all_chs, evidence
 
 
+def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
+    """章号 → 该章全部 chunk 原文拼接。给每条矛盾按"这条矛盾的关键词"在各自章原文里捞证据用。
+
+    同 ``chapter_spine_relationship._chapter_text_map``,各 viz 现捞证据共用的章原文表。
+    """
+    by_ch: dict[int, list[str]] = {}
+    for c in chunks:
+        ch = c.get("chapter")
+        txt = str(c.get("text", ""))
+        if isinstance(ch, int) and txt:
+            by_ch.setdefault(ch, []).append(txt)
+    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
+
+
+def _conflict_terms(topic: str, conflict: str) -> list[str]:
+    """把"这条矛盾"拆成检索词:topic(涉及的设定/人物,整词)+ conflict 拆 2-gram。
+
+    topic 多是实体名/设定名(如"安禄山惯用手"),字面常原样出现在原文,当主检索词;conflict 是模型
+    概括过的一句话(如"前说左撇子后用右手"),整句当不了子串,拆 2-gram 衡量"哪句最像在讲这件事"
+    (中文没空格切词,同 ``evidence_for_event`` 思路)。两者合一组词,命中越多的句越像这条矛盾。
+    """
+    terms: list[str] = []
+    t = (topic or "").strip()
+    if t:
+        terms.append(t)
+    c = re.sub(r"\s+", "", conflict or "")
+    terms.extend({c[i : i + 2] for i in range(len(c) - 1)})
+    return terms
+
+
+def _scan_snippet(chapter_text: str, topic: str, conflict: str) -> str:
+    """一条矛盾的某一处 snippet:在那章原文里按 topic/conflict 关键词现捞最相关那句。
+
+    捞到 → 那句;捞不到(这条矛盾在那章原文里找不到支撑句)→ 空串,交给下游"任一空就丢"守卫
+    拦掉这条(不 cry wolf:在原文里坐实不了的矛盾不出)。绝不退回章代表句——那只代表这章最显眼
+    的事、未必关乎这条矛盾,正是病二的张冠李戴。
+    """
+    hits = find_supporting_sentences(chapter_text, _conflict_terms(topic, conflict), 1)
+    return hits[0] if hits else ""
+
+
 def _parse_scan(text: str) -> list[dict[str, Any]] | None:
     """解析 ``{"contradictions":[...]}``;三层兜底(直解析 / 切首个对象 / 截断抢救)。
 
@@ -155,6 +198,7 @@ def consistency_scan_from_spine(
     spine: list[dict[str, Any]],
     llm_client: Any,
     model: str,
+    chunks: list[dict[str, Any]] | None = None,
     max_tokens: int = DEFAULT_SCAN_MAX_TOKENS,
     cache_enabled: bool = True,
 ) -> list[dict[str, Any]] | None:
@@ -162,12 +206,21 @@ def consistency_scan_from_spine(
 
     矛盾形态同 ``generate_consistency_scan``:
     ``{topic, conflict, a:{snippet, chapter, verified}, b:{snippet, chapter, verified}}``。
-    两处章号必须都是章脉真实章且互不相同(防 LLM 编),两处 snippet 取那两章章脉已核验的
-    evidence。按 topic 去重。
+    两处章号必须都是章脉真实章且互不相同(防 LLM 编),按 topic 去重。
+
+    **证据怎么来(治病二·证据张冠李戴)**:传了 ``chunks``(全书原文)时,a/b 两处 snippet 各自按
+    "这条矛盾的 topic/conflict 关键词"在**各自章原文**里现捞最相关那句(``_scan_snippet``),
+    不再统一挂"那章最显眼的代表句"。``chunks=None`` 时保持旧行为——两处 snippet 取那两章章脉已
+    核验的代表句(向后兼容,端点接线由主 Claude 统一加 ``chunks=``)。
+
+    两种模式都走"a_snip / b_snip 任一空就丢这条矛盾"守卫:旧行为下防的是"章脉那章没留证据",
+    现捞模式下防的是"这条矛盾在那章原文捞不到支撑句"(不 cry wolf)。
     """
     digest, all_chs, evidence = _collect_inventory(spine)
     if not all_chs:
         return None
+
+    chapter_text = _chapter_text_map(chunks) if chunks else {}
 
     user_content = json.dumps({"chapters": digest}, ensure_ascii=False)
     try:
@@ -208,10 +261,16 @@ def consistency_scan_from_spine(
         key = topic or conflict
         if not key or key in seen:
             continue
-        a_snip = evidence.get(a_ch, "")
-        b_snip = evidence.get(b_ch, "")
+        if chunks:
+            # 现捞:按这条矛盾的关键词在各自章原文里找支撑句(治病二,见 docstring)
+            a_snip = _scan_snippet(chapter_text.get(a_ch, ""), topic, conflict)
+            b_snip = _scan_snippet(chapter_text.get(b_ch, ""), topic, conflict)
+        else:
+            # 旧行为:章脉那章已核验的代表句(向后兼容)
+            a_snip = evidence.get(a_ch, "")
+            b_snip = evidence.get(b_ch, "")
         if not a_snip or not b_snip:
-            continue  # 章脉那章没留证据(立身之本:没证据不输出)
+            continue  # 没证据不输出:旧行为=章脉那章没证据,现捞=这条矛盾捞不到支撑句
         seen.add(key)
         out.append({
             "topic": topic,

@@ -26,8 +26,10 @@
 
 **输出形态对齐 style_issues 的 dropped_thread 条目**:``{type:"dropped_thread", what, chapter,
 snippet, verified}``,FE 照旧读。``chapter`` = 这条线最后活跃(就此消失)的那一章;``snippet``
-取那一章的章脉证据(已核验原文,章级锚);``what`` 一句话说清"哪条线、起于哪章、在哪章后消失"。
-另带更全的字段(线名 / 起于 / 末活跃 / 沉默尾巴长度),FE 要画"失踪支线"专列时用。
+是这条线在末活跃章里的证据——传了 ``chunks`` 就**按失踪线名在末活跃章原文里现捞**那句真讲这条
+线的话(证"这章这条线还在动"),没传则退回那一章的章代表句(向后兼容);``what`` 一句话说清
+"哪条线、起于哪章、在哪章后消失"。另带更全的字段(线名 / 起于 / 末活跃 / 沉默尾巴长度),
+FE 要画"失踪支线"专列时用。
 
 任意环节空 / 抽不出 / 调用降级 → 返 ``[]``(没判出失踪,合法,不是失败)。复核调用抛异常时
 **不**退回"全报"(那会 cry wolf),而是返 ``[]``——审稿工具宁可这次漏报,不可乱报。
@@ -42,6 +44,8 @@ from typing import Any
 from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent.chapter_spine_subplot import (
     DEFAULT_WEAVE_MAX_TOKENS,
+    _chapter_text_map,
+    _thread_evidence,
     subplot_weave_from_spine,
 )
 from bookscope.agent.utils.json_parsing import (
@@ -113,6 +117,23 @@ def _events_around(
     return evs
 
 
+def _chapter_events_text(by_ch: dict[int, dict[str, Any]], ch: int) -> str:
+    """取某一章的事件文本拼接(给"按失踪线名现捞末活跃章证据"拼 query 用)。
+
+    线名抽象,光拿它去原文按字面捞命中弱;加这章的事件文本一起当检索词,更容易落到真讲这条线
+    的那句(同 ``chapter_spine_subplot._collect_timeline`` 的 events_text 思路)。
+    """
+    rec = by_ch.get(ch)
+    if not rec:
+        return ""
+    evs: list[str] = []
+    for e in rec.get("events", []) or []:
+        text = str(e.get("event", e) if isinstance(e, dict) else e).strip()
+        if text:
+            evs.append(text)
+    return " ".join(evs)
+
+
 def _parse_verdicts(text: str) -> dict[str, bool]:
     """把复核 LLM 的 ``{"verdicts":[...]}`` 解析成 线名→是否真失踪;三层兜底。
 
@@ -160,6 +181,7 @@ def dropped_threads_from_spine(
     spine: list[dict[str, Any]],
     llm_client: Any,
     model: str,
+    chunks: list[dict[str, Any]] | None = None,
     max_tokens: int = DEFAULT_WEAVE_MAX_TOKENS,
     review_max_tokens: int = DEFAULT_REVIEW_MAX_TOKENS,
     cache_enabled: bool = True,
@@ -180,8 +202,8 @@ def dropped_threads_from_spine(
                 "type": "dropped_thread",
                 "what": "「<线名>」起于第X章、推进到第Y章后再没下文（全书共Z章）",
                 "chapter": 末活跃章 Y,         # 这条线就此消失的那一章
-                "snippet": <第Y章的章脉证据>,   # 已核验原文,章级锚
-                "verified": <第Y章证据是否非空>,
+                "snippet": <第Y章里按失踪线名现捞的那句>,  # 证"这章这条线还在动"
+                "verified": <snippet 是否非空>,
                 "thread": <线名>,
                 "started_chapter": X,
                 "last_active_chapter": Y,
@@ -200,6 +222,7 @@ def dropped_threads_from_spine(
         spine=spine,
         llm_client=llm_client,
         model=model,
+        chunks=chunks,
         max_tokens=max_tokens,
         cache_enabled=cache_enabled,
     )
@@ -207,6 +230,8 @@ def dropped_threads_from_spine(
         return []  # 支线编织降级 / 没支线:没判出失踪,合法
 
     by_ch = _spine_by_chapter(spine)
+    # 传了 chunks 才现捞:按失踪线名在末活跃章原文里找真讲这条线的那句(证"这章它还在动")。
+    chapter_text = _chapter_text_map(chunks) if chunks else {}
 
     # ── 第一步:算术筛"可疑失踪"候选 ────────────────────────────────────────
     candidates: list[dict[str, Any]] = []
@@ -218,7 +243,15 @@ def dropped_threads_from_spine(
         silent_tail = last_ch - last_active
         if silent_tail < min_silent_tail:
             continue  # 活到接近末章的(含主线):没消失,跳过
-        snippet = str(by_ch.get(last_active, {}).get("evidence", "")).strip()
+        if chunks:
+            # 末活跃章原文里按"这条失踪线名"现捞,不挂章代表句(那是这章最显眼的别的事)。
+            snippet = _thread_evidence(
+                chapter_text.get(last_active, ""),
+                sp["name"],
+                _chapter_events_text(by_ch, last_active),
+            )
+        else:
+            snippet = str(by_ch.get(last_active, {}).get("evidence", "")).strip()
         candidates.append({
             "thread": sp["name"],
             "started_chapter": started,

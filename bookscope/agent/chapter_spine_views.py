@@ -14,26 +14,81 @@ from __future__ import annotations
 
 from typing import Any
 
+from bookscope.agent.chapter_spine_evidence import evidence_for_event
 
-def narrative_curve_from_spine(spine: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """叙事曲线视图:章脉逐章已有 tension/sentiment/pov/mainline/evidence/verified,直接投影。
+
+def _chapter_text_map(chunks: list[dict[str, Any]] | None) -> dict[int, str]:
+    """章号 → 该章全部 chunk 原文拼接。给每章按"它为什么紧/缓"在该章原文里现捞证据用。
+
+    跟 ``chapter_spine_relationship._chapter_text_map`` 同形(那是关系演变的样板)。
+    """
+    by_ch: dict[int, list[str]] = {}
+    for c in chunks or []:
+        ch = c.get("chapter")
+        txt = str(c.get("text", ""))
+        if isinstance(ch, int) and txt:
+            by_ch.setdefault(ch, []).append(txt)
+    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
+
+
+def _tension_query(rec: dict[str, Any]) -> str:
+    """拼"这章为什么紧"的检索词:本章首个事件 + 各人物处境,拿去原文里捞真讲这件事的那句。
+
+    张力高/低是情节判定,本章 events 首条最能代表"这章发生了什么"、char_states 补"谁处境如何",
+    合起来当 query 比章代表句精准——章代表句只是"这章最显眼那件事",未必关乎这章的张力来源。
+    """
+    parts: list[str] = []
+    events = rec.get("events")
+    if isinstance(events, list) and events:
+        first = events[0]
+        text = str(first.get("event", first) if isinstance(first, dict) else first).strip()
+        if text:
+            parts.append(text)
+    states = rec.get("char_states")
+    if isinstance(states, list):
+        for st in states:
+            if isinstance(st, dict):
+                s = str(st.get("state", "")).strip()
+                if s:
+                    parts.append(s)
+    return " ".join(parts)
+
+
+def narrative_curve_from_spine(
+    spine: list[dict[str, Any]],
+    chunks: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """叙事曲线视图:章脉逐章已有 tension/sentiment/pov/mainline,直接投影。
 
     与 ``generate_narrative_curve_exhaustive`` 的产出同形,可 drop-in;但不再单独跑全书,
     从共享章脉来(0 次 LLM)。
+
+    传 ``chunks``(全书原文,含 ``chapter``/``text``)时,每章 evidence 不再用章代表句
+    (``rec.get("evidence")``——那只是"这章最显眼那件事",未必关乎这章为什么紧),改成按
+    "这章为什么紧/缓"在该章原文里现捞:用本章首个事件 + char_states 拼成 query 走
+    ``evidence_for_event``。捞不到 → 空串 + verified=False(FE 标灰,不硬塞无关原文)。
+    ``chunks=None``(默认)时退回章代表句、保持老行为不变,向后兼容。
     """
+    chapter_text = _chapter_text_map(chunks) if chunks is not None else None
     out: list[dict[str, Any]] = []
     for rec in spine:
         ch = rec.get("chapter")
         if not isinstance(ch, int):
             continue
+        if chapter_text is not None:
+            evidence = evidence_for_event(chapter_text.get(ch, ""), _tension_query(rec))
+            verified = bool(evidence)
+        else:
+            evidence = rec.get("evidence", "")
+            verified = rec.get("verified", False)
         out.append({
             "chapter": ch,
             "tension": rec.get("tension", 0),
             "sentiment": rec.get("sentiment", 0),
             "pov": rec.get("pov", "群像"),
             "mainline": rec.get("mainline", True),
-            "evidence": rec.get("evidence", ""),
-            "verified": rec.get("verified", False),
+            "evidence": evidence,
+            "verified": verified,
             "match_score": rec.get("match_score", 0.0),
         })
     out.sort(key=lambda c: c["chapter"])
@@ -49,12 +104,20 @@ def _rescale_tension_10_to_5(t: Any) -> int:
     return max(1, min(5, n))
 
 
-def pacing_from_spine(spine: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """节奏曲线视图:章脉张力(0-10)压到 1-5,note 取本章第一个事件、没有就用 evidence。
+def pacing_from_spine(
+    spine: list[dict[str, Any]],
+    chunks: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """节奏曲线视图:章脉张力(0-10)压到 1-5,note 取本章第一个事件、没有就现捞。
 
     与 ``generate_pacing_curve`` 的产出同形(``{chapter, tension(1-5), note}``)。节奏和叙事
     曲线本就高度重叠,共享章脉后两者同源、不再各跑一遍。
+
+    note 优先用本章首个事件(那本就是"这章发生了什么"、不是章代表句)。没有事件时:传
+    ``chunks`` 则按"这章为什么紧/缓"在该章原文里现捞(同叙事曲线,走 ``evidence_for_event``),
+    捞不到留空;``chunks=None``(默认)退回章代表句 ``rec.get("evidence")``、保持老行为。
     """
+    chapter_text = _chapter_text_map(chunks) if chunks is not None else None
     out: list[dict[str, Any]] = []
     for rec in spine:
         ch = rec.get("chapter")
@@ -66,7 +129,10 @@ def pacing_from_spine(spine: list[dict[str, Any]]) -> list[dict[str, Any]]:
             first = events[0]
             note = str(first.get("event", first) if isinstance(first, dict) else first).strip()
         if not note:
-            note = str(rec.get("evidence", "")).strip()
+            if chapter_text is not None:
+                note = evidence_for_event(chapter_text.get(ch, ""), _tension_query(rec))
+            else:
+                note = str(rec.get("evidence", "")).strip()
         out.append({
             "chapter": ch,
             "tension": _rescale_tension_10_to_5(rec.get("tension", 0)),

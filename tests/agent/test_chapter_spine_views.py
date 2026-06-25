@@ -52,6 +52,85 @@ def test_pacing_tension_clamped_to_1_5() -> None:
     assert out[1]["tension"] == 5      # 10/2=5
 
 
+# ── 病二:证据要现捞、真讲"这章为什么紧/缓",不挂章代表句 ─────────────────────
+def _evidence_spine() -> list[dict]:
+    """高张力章(决战)和低张力章(休整),各自 events/char_states 指向原文里不同的句。"""
+    return [
+        {"chapter": 5, "tension": 9, "sentiment": -4, "pov": "甲", "mainline": True,
+         "events": [{"event": "甲乙两军决战于城下"}],
+         "char_states": [{"name": "甲", "state": "陷入苦战"}],
+         # 章代表句故意写成跟张力无关的闲笔,验证不再被挂上来
+         "evidence": "这章最显眼是城外有人卖酒。", "verified": True, "match_score": 1.0},
+        {"chapter": 1, "tension": 2, "sentiment": 1, "pov": "群像", "mainline": False,
+         "events": [{"event": "众人在营中休整饮酒"}],
+         "char_states": [{"name": "甲", "state": "暂得喘息"}],
+         "evidence": "开篇随便一句。", "verified": False, "match_score": 0.3},
+    ]
+
+
+def _chunks() -> list[dict]:
+    return [
+        {"chapter": 5, "text": "城外有人卖酒。甲乙两军决战于城下,杀声震天,甲陷入苦战。"},
+        {"chapter": 1, "text": "天色尚早。众人在营中休整饮酒,甲暂得喘息,谈笑风生。"},
+    ]
+
+
+def test_narrative_curve_evidence_fetched_explains_tension() -> None:
+    out = narrative_curve_from_spine(_evidence_spine(), chunks=_chunks())
+    hi = next(c for c in out if c["chapter"] == 5)
+    # 高张力章 evidence 必须真讲"为什么紧"(决战/苦战),不是章代表句那句卖酒闲笔
+    assert "决战" in hi["evidence"] or "苦战" in hi["evidence"]
+    assert hi["evidence"] != "这章最显眼是城外有人卖酒。"
+    assert hi["verified"] is True
+    lo = next(c for c in out if c["chapter"] == 1)
+    # 低张力章 evidence 真讲"为什么缓"(休整)
+    assert "休整" in lo["evidence"]
+    assert lo["verified"] is True
+
+
+def test_narrative_curve_evidence_empty_marks_unverified() -> None:
+    # 原文里压根捞不到支撑句(章原文跟 events/char_states 完全不沾)→ 空串 + verified=False,不硬塞
+    spine = [{"chapter": 7, "tension": 8, "events": [{"event": "甲乙决战"}],
+              "char_states": [{"name": "甲", "state": "苦战"}], "evidence": "章代表句"}]
+    chunks = [{"chapter": 7, "text": "完全无关的一段描写风景的文字。"}]
+    out = narrative_curve_from_spine(spine, chunks=chunks)
+    assert out[0]["evidence"] == ""
+    assert out[0]["verified"] is False
+
+
+def test_narrative_curve_chunks_none_keeps_old_behavior() -> None:
+    # chunks=None(默认)时退回章代表句、向后兼容(老调用方不传 chunks 不报错、行为不变)
+    out = narrative_curve_from_spine(_spine())
+    c2 = next(c for c in out if c["chapter"] == 2)
+    assert c2["evidence"] == "甲打了乙"      # 章代表句原样
+    assert c2["verified"] is True
+
+
+def test_pacing_note_fetched_when_no_event() -> None:
+    # 没事件时 note 现捞、真讲这章动静,不退到章代表句
+    spine = [{"chapter": 5, "tension": 9, "events": [],
+              "char_states": [{"name": "甲", "state": "陷入苦战"}],
+              "evidence": "这章最显眼是城外有人卖酒。"}]
+    chunks = [{"chapter": 5, "text": "城外有人卖酒。甲乙两军决战于城下,甲陷入苦战。"}]
+    out = pacing_from_spine(spine, chunks=chunks)
+    assert "苦战" in out[0]["note"]
+    assert out[0]["note"] != "这章最显眼是城外有人卖酒。"
+
+
+def test_pacing_note_prefers_first_event_even_with_chunks() -> None:
+    # 有事件时 note 仍用首个事件(那本就是这章发生了什么,不是章代表句)
+    out = pacing_from_spine(_evidence_spine(), chunks=_chunks())
+    hi = next(c for c in out if c["chapter"] == 5)
+    assert hi["note"] == "甲乙两军决战于城下"
+
+
+def test_pacing_chunks_none_keeps_old_behavior() -> None:
+    # chunks=None 时无事件退回章代表句,老行为不变
+    out = pacing_from_spine(_spine())
+    c1 = next(c for c in out if c["chapter"] == 1)
+    assert c1["note"] == "开篇"
+
+
 # ── 章级锚视图(出路 B)─────────────────────────────────────────────────────
 def _rel_spine() -> list[dict]:
     return [

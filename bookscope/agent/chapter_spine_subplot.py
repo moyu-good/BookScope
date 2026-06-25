@@ -25,9 +25,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import split_sentences
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
     salvage_closed_objects,
@@ -72,17 +74,20 @@ _WEAVE_INSTR = (
 
 def _collect_timeline(
     spine: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], set[int], dict[int, str]]:
-    """从章脉收逐章梗概(给模型认支线/交汇的线索)+ 全部章集 + 章级证据。
+) -> tuple[list[dict[str, Any]], set[int], dict[int, str], dict[int, str]]:
+    """从章脉收逐章梗概(给模型认支线/交汇的线索)+ 全部章集 + 章级证据 + 章级事件文本。
 
     每章给:事件前几条、在场人物前几个、是否主线——够让模型在全书视野里认出"哪条线在这章
     推进、两条线在哪章碰头"。不发原文(走 L2 缓存按清单命中)。
 
-    返回 (timeline, 全部章集, 章号→证据)。
+    返回 (timeline, 全部章集, 章号→证据, 章号→事件文本)。末一项给"按线名现捞"拼 query 用:
+    线名是模型概括的抽象短语,光拿它去原文按字面捞命中弱;加上这章的事件文本一起当检索词,
+    更容易落到真讲这条线的那句。
     """
     timeline: list[dict[str, Any]] = []
     all_chs: set[int] = set()
     evidence: dict[int, str] = {}
+    events_text: dict[int, str] = {}
     for rec in spine:
         if not isinstance(rec, dict):
             continue
@@ -100,6 +105,7 @@ def _collect_timeline(
             if isinstance(events, list)
             else []
         )
+        events_text[ch] = " ".join(e for e in evs if e)
         present = rec.get("present")
         ppl = (
             [str(p).strip() for p in present[:_MAX_PRESENT_PER_CH] if str(p).strip()]
@@ -112,7 +118,59 @@ def _collect_timeline(
         if rec.get("mainline") is False:  # 默认主线,只标支线章(省 token)
             entry["支线章"] = True
         timeline.append(entry)
-    return timeline, all_chs, evidence
+    return timeline, all_chs, evidence, events_text
+
+
+def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
+    """章号 → 该章全部 chunk 原文拼接。给"按线名在该章原文里现捞证据"用(同
+    ``chapter_spine_relationship._chapter_text_map``)。"""
+    by_ch: dict[int, list[str]] = {}
+    for c in chunks:
+        ch = c.get("chapter")
+        txt = str(c.get("text", ""))
+        if isinstance(ch, int) and txt:
+            by_ch.setdefault(ch, []).append(txt)
+    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
+
+
+def _bigrams(text: str) -> set[str]:
+    """拆 2-gram 当检索词(中文没空格切词,用 bigram 衡量某句像不像在讲这个)。"""
+    e = re.sub(r"\s+", "", text or "")
+    return {e[i : i + 2] for i in range(len(e) - 1)}
+
+
+def _thread_evidence(
+    chapter_text: str, thread_name: str, chapter_events: str
+) -> str:
+    """从一章原文里现捞最支撑"这条支线在这章的动静"的那句;线名不沾的句子不要、返空。
+
+    线名是模型概括的抽象短语(如"赤壁备战线"),双层打分(同
+    ``chapter_spine_relationship._pair_evidence`` 的思路):
+
+    - 主键 = **线名 bigram 命中数**,必须 > 0——一句话连线名半个字都不沾,不可能是这条线的证据,
+      宁可空着标灰(防"光靠 events 命中把无关句拉进来"的张冠李戴)。
+    - 次键 = 这章 events 的 bigram 重叠数——线名沾上的句子里,再用"这章发生了什么"把最贴的那句
+      顶上来。
+    - 末键 = 短句优先(更聚焦)。
+
+    捞不到(没有任何句子沾线名)→ 空串(没原文支撑不输出,FE 标灰)。
+    """
+    if not chapter_text or not thread_name:
+        return ""
+    name_bg = _bigrams(thread_name)
+    if not name_bg:
+        return ""
+    event_bg = _bigrams(chapter_events)
+    best: tuple[tuple[int, int, int], str] | None = None
+    for s in split_sentences(chapter_text):
+        name_hit = sum(1 for bg in name_bg if bg in s)
+        if name_hit == 0:
+            continue  # 连线名半个字都不沾 → 不是这条线的证据
+        event_hit = sum(1 for bg in event_bg if bg in s)
+        score = (name_hit, event_hit, -len(s))
+        if best is None or score > best[0]:
+            best = (score, s)
+    return best[1] if best else ""
 
 
 def _coerce_subplots(raw: Any, all_chs: set[int]) -> list[dict[str, Any]]:
@@ -235,6 +293,7 @@ def subplot_weave_from_spine(
     spine: list[dict[str, Any]],
     llm_client: Any,
     model: str,
+    chunks: list[dict[str, Any]] | None = None,
     max_tokens: int = DEFAULT_WEAVE_MAX_TOKENS,
     cache_enabled: bool = True,
 ) -> dict[str, Any] | None:
@@ -245,13 +304,22 @@ def subplot_weave_from_spine(
     "intersections":[{subplots:[a,b], chapter, evidence}]}``。
 
     支线 / 交汇都锚到章脉里**真有的章**(过滤掉编出来的章号);交汇两条线必须都在交汇章活跃
-    (双线守卫)。两端 evidence 取章脉那章已核验的证据(章级锚,出路 B):支线 evidence 取它
-    最早活跃章那一章的章脉证据;交汇出单条 evidence 取交汇那章的章脉证据(FE 的 a_evidence /
-    b_evidence 都回退到这条也画得出)。verified 取章脉那章的核验位。
+    (双线守卫)。
+
+    **证据怎么来**(病二·证据张冠李戴的修法):
+
+    - 传了 ``chunks``(全书原文)→ 按"线名"在锚定章原文里**现捞**最支撑这条线的那句
+      (``_thread_evidence``)。支线证据取它最早活跃章里真讲这条线的那句;交汇的 a_evidence /
+      b_evidence 按**两条线各自的线名**分别现捞——两条线的证据本该不同,旧实现两个都回退到同
+      一条章代表句,是额外的病,这里治掉。捞不到 → 空串、verified=False(FE 标灰,不硬塞无关
+      原文)。
+    - 没传 ``chunks``(向后兼容,端点未接线时)→ 保持旧行为:两端 evidence 取章脉那章的章代表句,
+      a_evidence / b_evidence 都回退到同一条。
     """
-    timeline, all_chs, evidence = _collect_timeline(spine)
+    timeline, all_chs, evidence, events_text = _collect_timeline(spine)
     if not all_chs:
         return None
+    chapter_text = _chapter_text_map(chunks) if chunks else {}
 
     user_content = json.dumps({"timeline": timeline}, ensure_ascii=False)
     try:
@@ -275,23 +343,38 @@ def subplot_weave_from_spine(
     if weave is None:
         return None
 
-    # 章级锚:支线 evidence 取它最早活跃章的章脉证据(verified 同取那章)。
+    # 支线 evidence:传了 chunks 就按线名在最早活跃章原文现捞,没传退回章脉那章的章代表句。
     for sp in weave["subplots"]:
         anchor = sp["active_chapters"][0]
-        sp["evidence"] = evidence.get(anchor, "")
-        sp["verified"] = bool(sp["evidence"])
-        sp["match_score"] = 1.0 if sp["evidence"] else 0.0
+        if chunks:
+            ev = _thread_evidence(
+                chapter_text.get(anchor, ""), sp["name"], events_text.get(anchor, "")
+            )
+        else:
+            ev = evidence.get(anchor, "")
+        sp["evidence"] = ev
+        sp["verified"] = bool(ev)
+        sp["match_score"] = 1.0 if ev else 0.0
 
-    # 交汇出单条 evidence(交汇那章的章脉证据);FE 双字段都回退到它也画得出。
+    # 交汇:传了 chunks 就在交汇章原文里按 A 线名、B 线名**各自**现捞(两条线证据本该不同);
+    # 没传则两端都退回交汇那章的章代表句(旧行为,a/b 同句)。
     for it in weave["intersections"]:
-        ev = evidence.get(it["chapter"], "")
-        it["evidence"] = ev
-        it["a_evidence"] = ev
-        it["b_evidence"] = ev
-        it["a_verified"] = bool(ev)
-        it["b_verified"] = bool(ev)
-        it["a_match_score"] = 1.0 if ev else 0.0
-        it["b_match_score"] = 1.0 if ev else 0.0
+        ch = it["chapter"]
+        if chunks:
+            ch_text = chapter_text.get(ch, "")
+            ch_events = events_text.get(ch, "")
+            a_ev = _thread_evidence(ch_text, it["subplots"][0], ch_events)
+            b_ev = _thread_evidence(ch_text, it["subplots"][1], ch_events)
+            it["evidence"] = a_ev or b_ev
+        else:
+            a_ev = b_ev = evidence.get(ch, "")
+            it["evidence"] = a_ev
+        it["a_evidence"] = a_ev
+        it["b_evidence"] = b_ev
+        it["a_verified"] = bool(a_ev)
+        it["b_verified"] = bool(b_ev)
+        it["a_match_score"] = 1.0 if a_ev else 0.0
+        it["b_match_score"] = 1.0 if b_ev else 0.0
 
     return weave
 

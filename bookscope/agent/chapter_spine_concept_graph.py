@@ -28,6 +28,7 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import find_supporting_sentences
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
     salvage_closed_objects,
@@ -146,11 +147,39 @@ def _coerce_nodes(raw_nodes: Any) -> list[str]:
     return names
 
 
+def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
+    """章号 → 该章全部 chunk 原文拼接。给每条边按"这两个概念 + 这种关系"在该章现捞证据用。
+
+    照搬 ``chapter_spine_relationship._chapter_text_map`` 的做法,统一原文表口径。
+    """
+    by_ch: dict[int, list[str]] = {}
+    for c in chunks:
+        ch = c.get("chapter")
+        txt = str(c.get("text", ""))
+        if isinstance(ch, int) and txt:
+            by_ch.setdefault(ch, []).append(txt)
+    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
+
+
+def _edge_evidence(chapter_text: str, source: str, target: str, relation: str) -> str:
+    """从锚定章原文里现捞最讲"这两个概念 + 这种关系"的那句;捞不到返空。
+
+    ``find_supporting_sentences`` 按"命中几个不同词"打分(同命中数短句优先),传
+    ``[source, target, relation]`` 让两个概念都出现、又沾这种关系类型的句子排最前。捞不到任何
+    句子(原文里这章压根没这两个概念)→ 返空串,由调用方标 verified=False、不硬塞章代表句。
+    """
+    if not chapter_text:
+        return ""
+    hits = find_supporting_sentences(chapter_text, [source, target, relation], top_k=1)
+    return hits[0] if hits else ""
+
+
 def concept_graph_from_spine(
     *,
     spine: list[dict[str, Any]],
     llm_client: Any,
     model: str,
+    chunks: list[dict[str, Any]] | None = None,
     max_tokens: int = DEFAULT_GRAPH_MAX_TOKENS,
     cache_enabled: bool = True,
 ) -> dict[str, Any] | None:
@@ -161,8 +190,16 @@ def concept_graph_from_spine(
     (同 :class:`bookscope.api.schemas.GraphEdge`)。
 
     每条边的 chapter 必须是章脉里**真有主张**的章(LLM 自报,用真章集校验,锚不到真实章的边丢——
-    防 LLM 编章号);evidence 取那章章脉已核验的章级证据;``verified=True`` 当且仅当锚到了真实章
-    且那章有证据。source/target 都要落在 nodes 里(模型漏列的端点补进 nodes)。
+    防 LLM 编章号)。source/target 都要落在 nodes 里(模型漏列的端点补进 nodes)。
+
+    **证据(evidence)按 ``chunks`` 在不在分两种行为**:
+
+    - **给了 ``chunks``(全书原文)**:每条边的 evidence 不再用章级代表句,改成在锚定章原文里按
+      ``[source, target, relation]`` 现捞最讲"这两个概念的这种关系"的那句(``_edge_evidence``)。
+      捞不到 → 空串、``verified=False``,不硬塞这章最显眼的别的主张(治"证据张冠李戴")。
+      ``verified=True`` 当且仅当锚到真实章**且**在那章原文现捞到了支撑句。
+    - **``chunks=None``(默认,向后兼容)**:沿用旧行为——evidence 取那章章脉已核验的章级代表句,
+      ``verified=True`` 当且仅当锚到真实章且那章有代表句。端点接线统一传 ``chunks`` 由主 Claude 做。
 
     **端点接线**:概念维只在 ``genre="theory"`` 的章脉里有,所以端点调本视图前要
     ``get_or_build_spine(..., genre="theory")``。这会和别处(人物图等)默认 fiction-genre 的
@@ -173,6 +210,9 @@ def concept_graph_from_spine(
     digest, claim_chs, evidence = _collect_claims(spine)
     if not claim_chs:
         return None  # 没 claims:小说章脉 / 没跑 theory 维,概念图不适用
+
+    # 给了 chunks → 按边在锚定章原文现捞证据;没给 → 退回章代表句(向后兼容)。
+    chapter_text = _chapter_text_map(chunks) if chunks else None
 
     user_content = json.dumps({"chapters": digest}, ensure_ascii=False)
     try:
@@ -208,7 +248,13 @@ def concept_graph_from_spine(
             continue
         ch = e.get("chapter")
         anchored = isinstance(ch, int) and ch in claim_chs  # 锚到真有主张的章(防编)
-        snip = evidence.get(ch, "") if anchored else ""
+        if not anchored:
+            snip = ""
+        elif chapter_text is not None:
+            # 现捞:按"这两个概念 + 这种关系"在锚定章原文里找真讲这条关系的那句。
+            snip = _edge_evidence(chapter_text.get(ch, ""), source, target, relation)
+        else:
+            snip = evidence.get(ch, "")  # 向后兼容:没传 chunks 退回章代表句
         raw_strength = e.get("strength")
         strength = raw_strength if isinstance(raw_strength, int) else 3
         strength = max(1, min(5, strength))  # 夹到 1-5,缺失 / 越界落 3 档

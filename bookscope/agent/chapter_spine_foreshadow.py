@@ -15,7 +15,14 @@
 
 **便宜 + 稳**:只发埋点 + 事件摘要(不发原文),走 L2 缓存按清单命中,同书零成本。配对失败 /
 解析不出 → 返 None,端点照走(不 break)。arc 锚到章脉里**真有埋点的章**(防 LLM 编章号),
-回收章须是真实章且晚于埋点;两端原文取章脉那一章已核验过的 evidence(章级锚)。
+回收章须是真实章且晚于埋点。
+
+**两端 evidence 怎么来**(病二修复,2026-06-25):传了 ``chunks`` 时,两端原文不再挂"那一章
+最显眼那件事"的章代表句(``rec["evidence"]``)——那只代表本章最抢眼的事、未必关乎这条伏笔,
+会出现"埋的是断剑、挂的却是同章另一桩无关事"的张冠李戴。改成按这条伏笔的 ``description``
+在埋点章 / 回收章原文里**现捞**最贴那句(走 ``evidence_for_event`` 的 bigram 命中),再过
+``verify_citations`` 标 verified。捞不到 → 空串 + verified=False(FE 标灰,绝不硬塞无关章代表句)。
+没传 ``chunks`` 时退回老行为(章代表句、不带 verified),向后兼容。
 """
 
 from __future__ import annotations
@@ -25,6 +32,8 @@ import logging
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
+from bookscope.agent.chapter_spine_evidence import evidence_for_event
+from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
     salvage_closed_objects,
@@ -127,9 +136,57 @@ def _parse_arcs(text: str) -> list[dict[str, Any]]:
     return []
 
 
+def _chapter_text_map(chunks: list[dict[str, Any]]) -> dict[int, str]:
+    """章号 → 该章全部 chunk 原文拼接。给每条伏笔按 description 在埋点 / 回收章原文里现捞用。"""
+    by_ch: dict[int, list[str]] = {}
+    for c in chunks:
+        ch = c.get("chapter")
+        txt = str(c.get("text", ""))
+        if isinstance(ch, int) and txt:
+            by_ch.setdefault(ch, []).append(txt)
+    return {ch: "\n".join(parts) for ch, parts in by_ch.items()}
+
+
+def _attach_and_verify_evidence(
+    arcs: list[dict[str, Any]],
+    chunks: list[dict[str, Any]],
+) -> None:
+    """每条弧两端按这条伏笔的 ``description`` 在埋点 / 回收章原文里现捞那句,过 verify_citations。
+
+    **不再挂章代表句**(那只代表这章最显眼的事、未必关乎这条伏笔,会"埋的是断剑、挂同章另一桩
+    无关事")。改成 ``evidence_for_event(章原文, description)``——伏笔 description 是概括过的一句话,
+    跟事件描述同性质(当不了精确子串),用 bigram 命中数衡量哪句最像在讲这条伏笔。捞不到 → 空串、
+    verified=False(不硬塞无关原文)。回收端只对 resolved 弧捞;断弧两端 payoff 留空。
+    """
+    evidence_map = build_evidence_map(chunks)
+    text_by_ch = _chapter_text_map(chunks)
+    for arc in arcs:
+        desc = arc["description"]
+        s_ch = arc["setup_chapter"]
+        p_ch = arc["payoff_chapter"]
+        arc["setup_evidence"] = evidence_for_event(text_by_ch.get(s_ch, ""), desc)
+        arc["payoff_evidence"] = (
+            evidence_for_event(text_by_ch.get(p_ch, ""), desc)
+            if isinstance(p_ch, int)
+            else ""
+        )
+        # 两端各当一条 citation 过核验:埋点锚 setup 章、回收锚 payoff 章。
+        cits = [
+            {"snippet": arc["setup_evidence"], "chapter": s_ch},
+            {"snippet": arc["payoff_evidence"], "chapter": p_ch if isinstance(p_ch, int) else 0},
+        ]
+        verify_citations(cits, evidence_map)
+        s_vc, p_vc = cits
+        arc["setup_verified"] = bool(arc["setup_evidence"]) and bool(s_vc.get("verified", False))
+        arc["payoff_verified"] = bool(arc["payoff_evidence"]) and bool(p_vc.get("verified", False))
+        arc["setup_match_score"] = s_vc.get("match_score", 0.0)
+        arc["payoff_match_score"] = p_vc.get("match_score", 0.0) if arc["payoff_evidence"] else 0.0
+
+
 def foreshadow_from_spine(
     *,
     spine: list[dict[str, Any]],
+    chunks: list[dict[str, Any]] | None = None,
     llm_client: Any,
     model: str,
     max_tokens: int = DEFAULT_MATCH_MAX_TOKENS,
@@ -140,7 +197,12 @@ def foreshadow_from_spine(
     弧形态同 ``generate_foreshadow_arcs_exhaustive``:
     ``{description, setup_chapter, payoff_chapter|None, setup_evidence, payoff_evidence, status}``。
     setup_chapter 必须是章脉里**真有埋点**的章(否则丢,防 LLM 编);payoff 须晚于 setup
-    且是真有回收点的章,否则归断弧。两端 evidence 取章脉那章已核验的证据。
+    且是真有回收点的章,否则归断弧。
+
+    **两端 evidence**:传了 ``chunks`` → 按这条伏笔的 ``description`` 在埋点 / 回收章原文里现捞
+    那句,过 ``verify_citations`` 附 ``setup_verified`` / ``payoff_verified`` / ``*_match_score``,
+    捞不到标空 + verified=False(病二修复,不挂章代表句)。没传 ``chunks`` → 退回老行为:两端取
+    章脉那章的章代表句、不带 verified 字段(向后兼容,端点接线前不崩)。
     """
     setups, timeline, setup_chs, all_chs, evidence = _collect_inventory(spine)
     if not setup_chs:
@@ -184,6 +246,10 @@ def foreshadow_from_spine(
             }
         )
     out.sort(key=lambda x: x["setup_chapter"])
+    # 传了 chunks:两端 evidence 从章代表句换成按 description 现捞 + 核验(病二修复)。
+    # 没传:保留上面填的章代表句、不带 verified,老行为不变(端点接线前不崩)。
+    if chunks is not None and out:
+        _attach_and_verify_evidence(out, chunks)
     return out or None
 
 

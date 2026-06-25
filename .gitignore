@@ -36,6 +36,9 @@ data/demo/
 !/docs/internal/WORKFLOW.md
 !/docs/internal/case-study/
 
+# 设计工作文档（WP-* 设计稿 / 审计清单）：含 [[memory]] 链接 + 内部方法论锚，本地用不公开（同 docs/internal 道理）。
+/docs/design/
+
 # Scratch / test files
 test_book.txt
 inject_mingchao.py
