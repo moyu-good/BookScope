@@ -13,11 +13,11 @@ import json
 from bookscope.agent import cross_doc
 
 
-def _head(num="", doc_type="", org="", date=""):
+def _head(num="", doc_type="", org="", date="", title=""):
     """造一份文脉的 head(只填测试关心的几个要素,其余按 doc_spine 形态补空待核)。"""
     fields = {
         "发文字号": num, "文种": doc_type, "发文机关": org, "主送机关": "",
-        "抄送机关": "", "标题事由": "", "成文日期": date, "签发人": "",
+        "抄送机关": "", "标题事由": title, "成文日期": date, "签发人": "",
     }
     return [
         {"field": k, "value": v, "evidence": "", "verified": bool(v), "match_score": 0.0}
@@ -33,7 +33,10 @@ def _clause(ch, matter="", basis=""):
     }
 
 
-# 三层一摞:省意见 ← 市方案(依据省) ← 县通知(依据市)。字号是身份证。
+# 三层一摞:省意见 / 市方案 / 县通知。字号是身份证。
+# 注意:这里 clause 的 basis 全留空,好让下面这批用例**只测 LLM 推理那一路**——本地 basis_ref
+# 兜底那一路另有 ``test_local_basis_*`` 专测(否则 fixture 自带的 basis 会额外冒出依据关系,
+# 把"只测 LLM 这一条"的断言搅乱)。
 _SPINES = [
     {
         "schema_version": "v1",
@@ -43,15 +46,12 @@ _SPINES = [
     {
         "schema_version": "v1",
         "head": _head(num="市发〔2024〕5号", doc_type="通知", org="某市政府", date="2024年3月1日"),
-        "clauses": [
-            _clause(1, "落实省里部署", basis="省发〔2024〕1号"),
-            _clause(2, "细化任务"),
-        ],
+        "clauses": [_clause(1, "落实省里部署"), _clause(2, "细化任务")],
     },
     {
         "schema_version": "v1",
         "head": _head(num="县发〔2024〕9号", doc_type="通知", org="某县政府", date="2024年5月1日"),
-        "clauses": [_clause(1, "据市通知办理", basis="市发〔2024〕5号")],
+        "clauses": [_clause(1, "据市通知办理")],
     },
 ]
 
@@ -225,7 +225,7 @@ def test_org_name_normalized(monkeypatch):
         {"head": _head(num="财发〔2024〕1号", doc_type="意见", org="财政部", date="2024年1月1日"),
          "clauses": [_clause(1, "x")]},
         {"head": _head(num="财发〔2024〕2号", doc_type="通知", org="财", date="2024年2月1日"),
-         "clauses": [_clause(1, "y", basis="财发〔2024〕1号")]},
+         "clauses": [_clause(1, "y")]},  # basis 留空,只测机关归一不掺 basis 兜底关系
     ]
     # 机关归一把「财」归到「财政部」(stub build_spine_name_map 出别名→canonical 表)。
     monkeypatch.setattr(cross_doc, "build_spine_name_map", lambda **_k: {"财": "财政部"})
@@ -321,3 +321,84 @@ def test_strips_code_fence(monkeypatch):
     r = _run()
     assert r is not None
     assert len(r["relations"]) == 1
+
+
+# ── 没字号的文件靠标题进网络(地方法规场景) ─────────────────────────────────────
+def test_doc_without_number_anchors_by_title(monkeypatch):
+    """没发文字号的地方法规(广东 / 广州条例)用标题当 anchor,照样进网络、能被引到。
+
+    营商环境链的真实形态:722 条例有字号;广东条例没字号,只有标题《广东省优化营商环境条例》,
+    正文「根据《优化营商环境条例》制定本条例」按标题引 722。
+    """
+    spines = [
+        # 722:有字号
+        {"head": _head(num="国务院令第722号", doc_type="条例", org="国务院",
+                       title="优化营商环境条例", date="2019年10月22日"),
+         "clauses": [_clause(1, "总则")]},
+        # 广东条例:没字号,靠标题进网络;正文按标题引 722
+        {"head": _head(num="", doc_type="条例", org="广东省人民代表大会常务委员会",
+                       title="广东省优化营商环境条例", date="2020年7月1日"),
+         "clauses": [_clause(1, "据上位条例制定", basis="《优化营商环境条例》")]},
+    ]
+    # LLM 这次什么都不推(返空),全靠本地 basis_ref 兜底——验"按标题引"那条捞得出来。
+    _patch(monkeypatch, json.dumps({"relations": []}))
+    r = _run(spines=spines)
+    assert r is not None
+    # 广东条例靠标题当 anchor 进了 docs(没字号也在)
+    anchors = {d["字号"] for d in r["docs"]}
+    assert "广东省优化营商环境条例" in anchors
+    # 本地兜底捞出"广东条例 依据 722"(按标题引解析回 722 的字号 anchor)
+    rels = r["relations"]
+    assert any(
+        x["from_doc"] == "广东省优化营商环境条例"
+        and x["to_doc"] == "国务院令第722号"
+        and x["kind"] == "依据"
+        for x in rels
+    )
+
+
+# ── 本地 basis_ref 兜底:LLM 漏了,正文引用照样坐实依据 ──────────────────────────
+def test_local_basis_ref_caught_even_when_llm_misses(monkeypatch):
+    """LLM 一条关系都没推出来,但条款 basis_ref 正文引到另一份 → 本地兜底坐实"依据"。"""
+    spines = [
+        {"head": _head(num="省发〔2024〕1号", doc_type="意见", org="某省政府"),
+         "clauses": [_clause(1, "总体要求")]},
+        {"head": _head(num="市发〔2024〕5号", doc_type="通知", org="某市政府"),
+         "clauses": [_clause(1, "落实", basis="省发〔2024〕1号")]},
+    ]
+    _patch(monkeypatch, json.dumps({"relations": []}))  # LLM 啥也没推
+    r = _run(spines=spines)
+    assert r is not None
+    rels = r["relations"]
+    assert len(rels) == 1
+    assert rels[0]["from_doc"] == "市发〔2024〕5号"
+    assert rels[0]["to_doc"] == "省发〔2024〕1号"
+    assert rels[0]["kind"] == "依据"
+    assert rels[0]["chapter_anchor"] == 1  # basis 来自第 1 条款,锚得准
+
+
+def test_local_basis_ref_to_outside_doc_dropped(monkeypatch):
+    """basis_ref 引的是这摞之外的文件 → 解析不到 anchor,本地不坐实(不编)。"""
+    spines = [
+        {"head": _head(num="省发〔2024〕1号", doc_type="意见", org="某省政府"),
+         "clauses": [_clause(1, "据国家文件", basis="国发〔2099〕99号")]},  # 引清单外
+        {"head": _head(num="市发〔2024〕5号", doc_type="通知", org="某市政府"),
+         "clauses": [_clause(1, "细化")]},
+    ]
+    _patch(monkeypatch, json.dumps({"relations": []}))
+    assert _run(spines=spines) is None  # 引的不在这摞里,锚不到 → 无关系 → None
+
+
+def test_llm_failure_keeps_local_relations(monkeypatch):
+    """LLM 调用抛错,但本地 basis_ref 已捞到关系 → 不返 None,链不全塌。"""
+    spines = [
+        {"head": _head(num="省发〔2024〕1号", doc_type="意见", org="某省政府"),
+         "clauses": [_clause(1, "总体要求")]},
+        {"head": _head(num="市发〔2024〕5号", doc_type="通知", org="某市政府"),
+         "clauses": [_clause(1, "落实", basis="省发〔2024〕1号")]},
+    ]
+    _patch(monkeypatch, "{}", raises=RuntimeError("LLM boom"))
+    r = _run(spines=spines)
+    assert r is not None  # 本地那路兜住了
+    assert len(r["relations"]) == 1
+    assert r["relations"][0]["kind"] == "依据"

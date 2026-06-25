@@ -438,6 +438,37 @@ def test_level_single_doc_returns_none():
     ) is None
 
 
+def test_level_anchors_doc_without_number_by_title(monkeypatch):
+    """没字号的地方法规(广东条例)靠标题进上下级一致性,层级落差照样判得出。
+
+    营商环境链真实形态:722 条例(国务院,层级 1,有字号);广东条例(省人大常委会,层级 2,没
+    字号、只有标题)。早先只认字号 → 广东条例整个进不来 → 凑不出 1/2 落差 → 视图返 None。
+    """
+    spines = [
+        {"head": _head(num="国务院令第722号", doc_type="条例", org="国务院",
+                       date="2019年10月22日", title="优化营商环境条例"),
+         "clauses": [_clause(1, "全国通用规则", evidence="政府应当依法保护市场主体。")]},
+        {"head": _head(num="", doc_type="条例", org="广东省人民代表大会常务委员会",
+                       date="2020年7月1日", title="广东省优化营商环境条例"),
+         "clauses": [_clause(1, "地方细化", evidence="本省加设备案前置审批一项。")]},
+    ]
+    # 模型用每份的 id 当 upper/lower:722 有字号 → id 是字号;广东没字号 → id 是标题。
+    payload = json.dumps({"deviations": [{
+        "topic": "备案审批", "detail": "省条例加设了上位没有的前置审批", "deviation": "加码",
+        "upper": "国务院令第722号", "lower": "广东省优化营商环境条例",
+        "upper_clause": 1, "lower_clause": 1,
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = cdv.level_consistency_from_spines(
+        doc_spines=spines, llm_client=_FakeClient(), model="m",
+    )
+    assert out is not None  # 层级落差判出来了(没因广东条例缺字号而塌)
+    assert len(out) == 1
+    assert out[0]["upper"]["doc"] == "国务院令第722号"            # 722 靠字号 anchor
+    assert out[0]["lower"]["doc"] == "广东省优化营商环境条例"     # 广东靠标题 anchor
+    assert out[0]["deviation"] == "加码"
+
+
 def test_level_consistent_returns_empty(monkeypatch):
     """都一致(LLM 返空数组)→ [] 而非 None(区分'都对得上'和'失败')。"""
     _patch(monkeypatch, json.dumps({"deviations": []}))

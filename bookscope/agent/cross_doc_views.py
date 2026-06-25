@@ -64,6 +64,58 @@ def _head_value(spine: dict[str, Any], field: str) -> str:
     return ""
 
 
+def _doc_anchor(spine: dict[str, Any]) -> str:
+    """一份文脉的 anchor id:发文字号优先,没字号(地方法规)退标题。口径同 cross_doc。
+
+    政策演变 / 上下级一致性两个视图也得跟 cross_doc 一样认没字号的地方法规——只认字号,广东 /
+    广州条例整个进不来,演变断档、上下级落差也凑不出(实测两视图 None 的根因之一)。
+    """
+    return _head_value(spine, _HEAD_ID_FIELD) or _head_value(spine, _HEAD_TITLE_FIELD)
+
+
+def _norm_title(s: str) -> str:
+    """标题归一(给引用匹配用):去书名号《》和首尾空白。口径同 cross_doc。"""
+    return (s or "").strip().strip("《》").strip()
+
+
+def _build_ref_map(doc_spines: list[dict[str, Any]]) -> dict[str, str]:
+    """造 引用串(字号 / 归一标题)→ anchor 表:模型给的 doc/upper/lower 不管填字号还是标题都解析得回。
+
+    某份靠字号当 anchor(722),但模型也可能用它的标题来指——这表把字号 + 归一标题都映回 anchor,
+    两种叫法都认。同 cross_doc 的引用解析表,只是这边用在 policy/level 两个视图。
+    """
+    ref: dict[str, str] = {}
+    for spine in doc_spines:
+        if not isinstance(spine, dict):
+            continue
+        anchor = _doc_anchor(spine)
+        if not anchor:
+            continue
+        num = _head_value(spine, _HEAD_ID_FIELD)
+        title = _norm_title(_head_value(spine, _HEAD_TITLE_FIELD))
+        if num:
+            ref.setdefault(num, anchor)
+        if title:
+            ref.setdefault(title, anchor)
+        ref.setdefault(anchor, anchor)
+    return ref
+
+
+def _resolve_doc_ref(raw: str, real_nums: set[str], ref_map: dict[str, str]) -> str:
+    """把模型给的文件标识解析回真实 anchor;解析不到返空串(丢这条,不编)。口径同 cross_doc。"""
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    if s in real_nums:
+        return s
+    nt = _norm_title(s)
+    if nt in ref_map:
+        return ref_map[nt]
+    if s in ref_map:
+        return ref_map[s]
+    return ""
+
+
 def _clause_evidence_map(spine: dict[str, Any]) -> dict[int, str]:
     """一份文脉里 条款序号 → 该条款已核验的 evidence(原文片段)。
 
@@ -226,17 +278,19 @@ _MAX_POLICY_STAGES = 30
 _MAX_CLAUSE_REQS_PER_DOC = 6   # 每份取前几条「关键要求」当线索,够看演变又不撑爆 input
 
 _POLICY_INSTR = (
-    "下面 docs 是一摞围绕同一主题的党政机关公文,每份给了:字号、文种、发文机关、成文日期、"
-    "标题事由,以及这份文件的几条关键要求(事项)。用户会给一个**政策主题**。\n"
+    "下面 docs 是一摞围绕同一主题的党政机关公文,每份给了一个 **id(文件标识,有字号的是字号,"
+    "没字号的地方法规是标题)**,以及 文种、发文机关、成文日期、标题事由和这份文件的几条关键要求"
+    "(事项)。用户会给一个**政策主题**。\n"
     "请在这摞文件里挑出和这个主题相关的文件,**按成文日期先后**排出这项政策的演变——每个阶段"
-    "对应哪份文件(字号)、这一份相对上一份在要求上**改了什么**(新增 / 收紧 / 放宽 / 删去 / 调整)。\n"
+    "对应哪份文件(填它的 id)、这一份相对上一份在要求上**改了什么**"
+    "(新增 / 收紧 / 放宽 / 删去 / 调整)。\n"
     "- order 从 1 起递增,按成文日期升序。\n"
     "- 只挑清单里**确实涉及**这个主题的文件,只据清单、不编。\n"
     "- **这摞文件里没有这个主题就返回空数组,绝不编造演变。**\n"
     "- 第一份是政策起点(没有「上一份」),change 写它确立了什么;之后每份说清相对上一份的变化。\n"
     "change 用一句话说清这一步改了什么。\n"
     "严格输出 JSON(别的话别说、别加 markdown 围栏):\n"
-    '{"stages":[{"order":序号整数,"doc":"对应文件的发文字号","change":"相对上一份改了什么"}]}'
+    '{"stages":[{"order":序号整数,"doc":"对应文件的 id","change":"相对上一份改了什么"}]}'
 )
 
 _USER_MSG_POLICY = "请按上面的要求排出政策演变。"
@@ -250,10 +304,11 @@ def _collect_policy_inventory(
     dict[str, str],               # 字号 → 成文日期(排序用)
     dict[str, dict[int, str]],    # 字号 → {条款序号: 已核 evidence}(现取 snippet 用)
 ]:
-    """从一摞文脉收 紧凑清单 + 真实字号集 + 字号→成文日期 + 字号→条款证据表。
+    """从一摞文脉收 紧凑清单 + 真实 anchor 集 + anchor→成文日期 + anchor→条款证据表。
 
-    只收有**发文字号**的文件(字号是身份证,没字号对不上演变阶段——同 cross_doc 的纪律)。
-    同字号重复只留第一份。每份摘 标题事由 + 前几条款事项当「关键要求」线索。
+    锚 id 优先发文字号,没字号(地方法规)退标题(同 cross_doc 的 ``_doc_anchor``)。两者都没的
+    文脉排出演变阶段也对不上,丢。同 anchor 重复只留第一份。每份摘 标题事由 + 前几条款事项当
+    「关键要求」线索。
     """
     digest: list[dict[str, Any]] = []
     real_nums: set[str] = set()
@@ -263,12 +318,12 @@ def _collect_policy_inventory(
     for spine in doc_spines:
         if not isinstance(spine, dict):
             continue
-        num = _head_value(spine, _HEAD_ID_FIELD)
-        if not num or num in real_nums:
+        anchor = _doc_anchor(spine)
+        if not anchor or anchor in real_nums:
             continue
-        real_nums.add(num)
-        date_of[num] = _head_value(spine, _HEAD_DATE_FIELD)
-        ev_of[num] = _clause_evidence_map(spine)
+        real_nums.add(anchor)
+        date_of[anchor] = _head_value(spine, _HEAD_DATE_FIELD)
+        ev_of[anchor] = _clause_evidence_map(spine)
 
         reqs: list[str] = []
         clauses = spine.get("clauses")
@@ -283,10 +338,11 @@ def _collect_policy_inventory(
                     break
 
         digest.append({
-            "字号": num,
+            "id": anchor,
+            "字号": _head_value(spine, _HEAD_ID_FIELD),
             "文种": _head_value(spine, _HEAD_DOC_TYPE_FIELD),
             "发文机关": _head_value(spine, _HEAD_ORG_FIELD),
-            "成文日期": date_of[num],
+            "成文日期": date_of[anchor],
             "标题事由": _head_value(spine, _HEAD_TITLE_FIELD),
             "关键要求": reqs,
         })
@@ -353,6 +409,7 @@ def policy_evolution_from_spines(
     digest, real_nums, date_of, ev_of = _collect_policy_inventory(doc_spines)
     if not real_nums:
         return None
+    ref_map = _build_ref_map(doc_spines)
 
     topic = (topic or "").strip()
     payload: dict[str, Any] = {"docs": digest}
@@ -385,9 +442,9 @@ def policy_evolution_from_spines(
     for st in parsed:
         if not isinstance(st, dict):
             continue
-        doc = str(st.get("doc", "")).strip()
-        if doc not in real_nums or doc in seen_doc:
-            continue  # 锚到真实字号(防编);同一文件去重
+        doc = _resolve_doc_ref(str(st.get("doc", "")), real_nums, ref_map)
+        if not doc or doc in seen_doc:
+            continue  # 锚到真实文件(字号或标题都认,防编);同一文件去重
         snippet = _any_clause_evidence(ev_of.get(doc, {}))
         if not snippet:
             continue  # 这份文脉没留任何已核证据:丢这阶段(锚不到原文不输出)
@@ -422,8 +479,14 @@ DEFAULT_LEVEL_MAX_TOKENS = 16000
 
 # 机关层级:从机关名 / 文种行文方向判出谁是上位。数字越小越靠上(中央 1 < 省 2 < 市 3 < 县 4)。
 # 判不准退 0(未知层级)——未知层级之间不强判上下级,交给 LLM 据清单实质判。
+#
+# 覆盖地方法规的发文机关:地方性法规是**人大常委会**发的(「广东省人民代表大会常务委员会」),
+# 不是政府发文。这类机关名里总带「省 / 市 / 县」前缀,所以省 / 市 / 县这几个子串关键词已经能
+# 判出层级——广东省人大常委会含「省」判 2,广州市人大常委会含「市」判 3。中央一级补上「全国
+# 人民代表大会」(全国人大常委会发的国家级法律),免得只靠「全国」漏掉变体。匹配取「最具体
+# (数字最大)」那级,省市县字样优先于部委。
 _LEVEL_KEYWORDS: tuple[tuple[int, tuple[str, ...]], ...] = (
-    (1, ("中共中央", "国务院", "中央", "全国", "部", "委", "国家")),
+    (1, ("中共中央", "国务院", "中央", "全国人民代表大会", "全国", "部", "委", "国家")),
     (2, ("省", "自治区", "直辖市")),
     (3, ("市", "地区", "州", "盟")),
     (4, ("县", "区", "旗", "乡", "镇")),
@@ -461,9 +524,10 @@ def _collect_level_inventory(
     dict[str, int],               # 字号 → 层级
     dict[str, dict[int, str]],    # 字号 → {条款序号: 已核 evidence}
 ]:
-    """从一摞文脉收 紧凑清单(标好层级)+ 真实字号集 + 字号→层级 + 字号→条款证据表。
+    """从一摞文脉收 紧凑清单(标好层级)+ 真实 anchor 集 + anchor→层级 + anchor→条款证据表。
 
-    只收有发文字号的文件。每份按发文机关判层级(``_org_level``),把层级标进清单当线索。
+    锚 id 优先发文字号,没字号(地方法规)退标题(同 cross_doc 的 ``_doc_anchor``)。每份按发文
+    机关判层级(``_org_level``),把层级标进清单当线索。
     """
     digest: list[dict[str, Any]] = []
     real_nums: set[str] = set()
@@ -473,13 +537,13 @@ def _collect_level_inventory(
     for spine in doc_spines:
         if not isinstance(spine, dict):
             continue
-        num = _head_value(spine, _HEAD_ID_FIELD)
-        if not num or num in real_nums:
+        anchor = _doc_anchor(spine)
+        if not anchor or anchor in real_nums:
             continue
-        real_nums.add(num)
+        real_nums.add(anchor)
         org = _head_value(spine, _HEAD_ORG_FIELD)
-        level_of[num] = _org_level(org)
-        ev_of[num] = _clause_evidence_map(spine)
+        level_of[anchor] = _org_level(org)
+        ev_of[anchor] = _clause_evidence_map(spine)
 
         clauses_brief: list[dict[str, Any]] = []
         clauses = spine.get("clauses")
@@ -497,10 +561,11 @@ def _collect_level_inventory(
                 })
 
         digest.append({
-            "字号": num,
+            "id": anchor,
+            "字号": _head_value(spine, _HEAD_ID_FIELD),
             "文种": _head_value(spine, _HEAD_DOC_TYPE_FIELD),
             "发文机关": org,
-            "层级": level_of[num],   # 1 中央 2 省 3 市 4 县,0 未知
+            "层级": level_of[anchor],   # 1 中央 2 省 3 市 4 县,0 未知
             "条款": clauses_brief,
         })
     return digest, real_nums, level_of, ev_of
@@ -518,7 +583,8 @@ def _has_hierarchy(level_of: dict[str, int]) -> bool:
 
 _LEVEL_INSTR = (
     "下面 docs 是同一主题、不同层级党政机关发的一摞公文(层级:1=中央 2=省 3=市 4=县,0=层级未知)。"
-    "每份给了 字号 / 文种 / 发文机关 / 层级,以及每条款的 事项 / 指令类型。\n"
+    "每份给了一个 **id(文件标识,有字号是字号,没字号的地方法规是标题)**、文种 / 发文机关 / 层级,"
+    "以及每条款的 事项 / 指令类型。\n"
     "请找出**上下级文件对同一件事要求对不上**的地方——上位文件(层级数小)说 X,下位文件(层级数大)"
     "落成了 X',方向 / 标准 / 力度变了,或上位有要求下位没接住。\n"
     "deviation 只能填以下三个之一(按实质判,落不进就别列这条):\n"
@@ -530,14 +596,14 @@ _LEVEL_INSTR = (
     "② 合理的下位细化(上位定原则、下位定具体办法,是正常落实不是走样);\n"
     "③ 上位明确授权下位自定 / 因地制宜的事项(下位据此细化是被授权的,不算走样);\n"
     "④ 不同阶段的合理调整(政策随时间推进的正常演进)。\n"
-    "- upper 必须是层级**更靠上**(层级数更小)的那份文件字号,lower 是更靠下的;两份必须层级不同。\n"
+    "- upper 必须是层级**更靠上**(层级数更小)的那份文件 id,lower 是更靠下的;两份必须层级不同。\n"
     "- 只依据给出的清单,别编清单里没有的对不上。错报一条比漏报一条更糟"
     "(读者可能拿这个结论去办事 / 申诉)。\n"
     "topic 写涉及的事项;detail 用一句话说清哪里对不上。\n"
     "upper_clause / lower_clause 写各自文件里涉及这条的**条款序号整数**(说不清留空 / 不填)。\n"
     "严格输出 JSON(别的话别说、别加 markdown 围栏):\n"
     '{"deviations":[{"topic":"涉及的事项","detail":"哪里对不上","deviation":"走样",'
-    '"upper":"上位文件字号","lower":"下位文件字号",'
+    '"upper":"上位文件 id","lower":"下位文件 id",'
     '"upper_clause":条款序号整数,"lower_clause":条款序号整数}]}'
 )
 
@@ -619,6 +685,7 @@ def level_consistency_from_spines(
     digest, real_nums, level_of, ev_of = _collect_level_inventory(doc_spines)
     if not real_nums or not _has_hierarchy(level_of):
         return None  # 没上下级落差:这个视图本就该掉(题材自适应)
+    ref_map = _build_ref_map(doc_spines)
 
     user_content = json.dumps({"docs": digest}, ensure_ascii=False)
     try:
@@ -647,10 +714,10 @@ def level_consistency_from_spines(
     for c in parsed:
         if not isinstance(c, dict):
             continue
-        upper = str(c.get("upper", "")).strip()
-        lower = str(c.get("lower", "")).strip()
-        # 锚到真实字号 + 两份不同 + upper 层级严格高于 lower(防编 / 防把平级当上下级)
-        if upper not in real_nums or lower not in real_nums or upper == lower:
+        upper = _resolve_doc_ref(str(c.get("upper", "")), real_nums, ref_map)
+        lower = _resolve_doc_ref(str(c.get("lower", "")), real_nums, ref_map)
+        # 锚到真实文件(字号或标题都认)+ 两份不同 + upper 层级严格高于 lower(防编 / 防把平级当上下级)
+        if not upper or not lower or upper == lower:
             continue
         up_lv, lo_lv = level_of.get(upper, _MIN_LEVEL), level_of.get(lower, _MIN_LEVEL)
         if up_lv <= _MIN_LEVEL or lo_lv <= _MIN_LEVEL or up_lv >= lo_lv:

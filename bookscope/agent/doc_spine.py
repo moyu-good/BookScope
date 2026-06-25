@@ -33,15 +33,10 @@ from typing import Any
 
 from bookscope.agent._internal.exhaustive import (
     DEFAULT_CHAR_BUDGET,
-    mapreduce_per_chapter,
+    run_segments,
 )
 from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent.chapter_spine import (
-    _SPINE_HEAVY_DIM_MAX_CHAPTERS,
-    _correct_by_evidence,
-    _make_continue_fn,
-)
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
@@ -55,7 +50,18 @@ DOC_SPINE_SCHEMA_VERSION = "v1"
 """文脉记录结构版本——升级要让缓存整份失效(接 ADR-008,与章脉 SPINE_SCHEMA_VERSION 同理)。"""
 
 DEFAULT_DOC_SPINE_MAX_TOKENS = 8000
-"""条款维单段输出与头要素维一次抽取的 max_tokens;配条款闸够用,留 reasoning 头。"""
+"""条款维单段输出与头要素维一次抽取的 max_tokens;配章节闸够用,留 reasoning 头。"""
+
+_DOC_CLAUSE_MAX_CHAPTERS = 3
+"""条款维分段的章节闸(收窄)。
+
+公文一个「章」(章节,如「第三章 市场环境」)往往塞十几条「条款」,每条带 evidence + 多字段;
+一段攒太多章节、条款数堆上去会冲爆 8000 输出(同章脉重维爆 token 的道理)。章脉重维章闸是 6,
+公文条款比逐章字段还密(一章十几条),收得更紧到 3——一段最多 3 个章节、几十条以内,留足
+8000 余量;太大的章节靠 ``run_segments`` 的字数闸先断段。"""
+
+_DOC_CLAUSE_CONTINUE_MAX_ROUNDS = 4
+"""条款维某段被截断时最多续抽几轮——每轮让模型「接着没抽完的往下抽」,补满或某轮空了就停。"""
 
 # 15 法定公文文种(《党政机关公文处理工作条例》)。
 _STATUTORY_DOC_TYPES: tuple[str, ...] = (
@@ -349,6 +355,123 @@ def _build_head_elements(
     return elements
 
 
+def _verify_clause_evidence(
+    records: list[dict[str, Any]], chunks: list[dict[str, Any]]
+) -> None:
+    """逐条款给 evidence 过 verify_citations 附 verified/match_score——**但绝不动条款序号**。
+
+    这是公文条款维和章脉决定性的不同(722 条款只剩个位数的根因):
+
+    章脉的 ``_correct_by_evidence`` 会拿命中 chunk 的真**章**号去覆盖记录的 chapter——这是为
+    多卷书每卷标题重数那个场景设计的。可公文里 chunk 的 ``chapter`` 是「第一章 总则」这种**章节**
+    号(722 条例 ~7 章),而条款维的 ``chapter`` 是「第一条…第N条」的**条款**序号(几十条)。拿章节
+    号去覆盖条款号,会把同一章里的几十条全压成同一个号,``merge_by_chapter`` 再一去重 → 几十条
+    只剩个位数。所以条款维这里只核证据、不覆盖序号——条款序号由 ``_renumber_clauses`` 跨段全局
+    顺排,保住每一条。
+    """
+    evidence = build_evidence_map(chunks)
+    citations = [{"snippet": r.get("evidence", "")} for r in records]
+    verify_citations(citations, evidence)
+    for rec, vc in zip(records, citations, strict=True):
+        rec["verified"] = bool(vc.get("verified", False))
+        rec["match_score"] = vc.get("match_score", 0.0)
+
+
+def _renumber_clauses(seg_outs: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """跨段把条款拍平 + 按出现顺序全局重排序号(1…N),压平段内重复的局部序号。
+
+    每段都从「第 1 条」起自己数(map 引擎按段独立抽),跨段会撞号。公文条款是单文件里一条线、
+    天然 disjoint 又有序,所以合并就是**按段序拼接**(段按章节序排 → 拼出来就是正文顺序)再
+    全局顺排序号——不靠模型自报的段内号去重(那会把后段的「第 1 条」当成前段第 1 条丢掉,正是
+    旧路把几十条压成个位数的另一半原因)。
+
+    去重只去**整条 evidence 完全相同**的(同一条款被相邻段都抽到,如跨段边界);序号不同但内容
+    不同的条款全保留。重排后 ``chapter`` = 全局条款序号(1 起)。
+    """
+    flat: list[dict[str, Any]] = []
+    seen_ev: set[str] = set()
+    for seg in seg_outs:
+        # 段内按模型自报序号排稳,保正文顺序(map 引擎不保证段内已排序)。
+        seg_sorted = sorted(
+            seg, key=lambda c: c["chapter"] if isinstance(c.get("chapter"), int) else 0
+        )
+        for cl in seg_sorted:
+            ev = str(cl.get("evidence", "")).strip()
+            # evidence 空的也保留(不是每条都有逐字证据);非空且整条重复才去。
+            if ev and ev in seen_ev:
+                continue
+            if ev:
+                seen_ev.add(ev)
+            flat.append(cl)
+    for i, cl in enumerate(flat, start=1):
+        cl["chapter"] = i
+    return flat
+
+
+def _make_clause_continue_fn(
+    *,
+    llm_client: Any,
+    model: str,
+    max_tokens: int,
+    cache_enabled: bool,
+):  # noqa: ANN202 — 返回闭包 continue_fn 喂 run_segments
+    """造条款维的续抽回调:某段被 max_tokens 截断只抽回部分条款时,接着把剩下的条款补抽回来。
+
+    **跟章脉的 ``_make_continue_fn`` 决定性不同**:章脉按「段覆盖几个章」算还差几条(章数 ==
+    chunk 真 chapter 数,可数)。公文一个 chunk 章节里塞十几条条款,「段覆盖几章」根本不等于
+    「该抽几条」,数不出差几条。所以这里不靠数量判,改靠**信号**:模型上轮被截断(finish_reason=
+    length)就再发一轮「接着上次没抽完的往下抽」,直到某轮没补到新条款 / 也没再被截断 / 补满
+    ``_DOC_CLAUSE_CONTINUE_MAX_ROUNDS`` 轮。用 doc_spine 自己的条款 parser(``"clauses"`` 键),
+    不是章脉的 ``"chapters"`` parser——这点是另一处必须自己造而不能复用的原因。
+    """
+    from bookscope.agent._internal.loop_shared import read_openai_finish_reason
+
+    parse = _make_clause_parser()
+
+    def _continue(
+        seg: list[dict[str, Any]], partial: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        seg_text = "".join(str(c.get("text", "")) for c in seg)
+        extra: list[dict[str, Any]] = []
+        got = len(partial)
+        for _round in range(_DOC_CLAUSE_CONTINUE_MAX_ROUNDS):
+            cont_instr = (
+                _INSTR_CLAUSE
+                + f"\n\n注意:你上次已经抽完了本段前 {got} 条条款,被长度截断了。"
+                + "现在请**只抽你还没抽的、本段剩下的条款**,接着往下抽,别重复前面抽过的条款。"
+            )
+            system = build_longctx_system(seg_text, cont_instr)
+            try:
+                resp = invoke_client_cached(
+                    llm_client,
+                    model=model,
+                    system=system,
+                    tools=[],
+                    messages=[{"role": "user", "content": _USER_MSG}],
+                    max_tokens=max_tokens,
+                    cache_enabled=cache_enabled,
+                )
+            except Exception as exc:  # noqa: BLE001 — 续抽调用失败就停,保已有的
+                logger.warning("doc_spine[clause]: 续抽调用抛 %s,停止续抽", type(exc).__name__)
+                break
+            truncated = read_openai_finish_reason(resp) == "length"
+            try:
+                more = parse(llm_client.extract_final_text(resp)) or []
+            except Exception:  # noqa: BLE001
+                more = []
+            if not more:  # 这轮没补到 → 再补也大概率空,停
+                break
+            extra.extend(more)
+            got += len(more)
+            if not truncated:  # 这轮抽完了没再被截断 → 补齐了,停
+                break
+        if extra:
+            logger.warning("doc_spine[clause]: 段截断续抽补回 %d 条条款", len(extra))
+        return extra
+
+    return _continue
+
+
 def build_doc_spine(
     *,
     chunks: list[dict[str, Any]],
@@ -362,16 +485,20 @@ def build_doc_spine(
 ) -> dict[str, Any]:
     """一份公文精读一次,出带证据的「文脉」(头要素维 + 条款维)。
 
-    复用章脉骨架:
+    复用章脉骨架,但条款维**不能整套照搬** ``mapreduce_per_chapter``:
 
-    - **条款维**走 ``mapreduce_per_chapter``(分段 + 并发 + ``_correct_by_evidence`` 证据纠偏 +
-      ``_make_continue_fn`` 截断续抽),单元从「章」换成「条款序号」(内部仍用 ``chapter`` 键)。
-      章脉的重维专用条款闸(``_SPINE_HEAVY_DIM_MAX_CHAPTERS``)照用——一段公文条款带证据同样可能
-      撑爆 max_tokens。
+    - **条款维**走底层 ``run_segments``(分段 + 并发 + 截断兜底)+ 自接两步:逐段证据核验
+      (``_verify_clause_evidence``,只核不动序号)、跨段全局重排序号(``_renumber_clauses``)。
+      为什么不套 ``mapreduce_per_chapter``:它合并前会跑 ``_correct_by_evidence`` 拿命中 chunk 的
+      真**章节**号覆盖记录序号,再按它 merge 去重——公文 chunk 的 chapter 是「第一章 总则」(722
+      ~7 章),条款维要的是「第一条…第N条」(几十条),拿章节号覆盖条款号会把同章几十条压成一个
+      号、去重后只剩个位数(722 只抽到 ~2 条的根因)。截断丢条款靠 ``run_segments`` 自带的拆小重抽
+      + 条款版续抽(``_make_clause_continue_fn``)两道兜底。
     - **头要素维**一次抽整份头要素,每要素 evidence 过 ``verify_citations``。
 
     Args:
-        chunks: 这份公文的 chunk 列表,每条含 ``chunk_id`` / ``chapter``(=条款序号) / ``text``。
+        chunks: 这份公文的 chunk 列表,每条含 ``chunk_id`` / ``chapter``(=章节号,非条款号) /
+            ``text``。条款序号由条款维抽取后全局顺排,不取 chunk 的 chapter。
         llm_client: duck-typed LLM client(同 AgentLoop / 章脉)。
         model: 模型名。
         full_text: 这份公文的**完整原文**(含公布头)。传了头要素维就用它抽取 + 兜底锚定——
@@ -379,7 +506,7 @@ def build_doc_spine(
             噪声丢掉、不进任何 chunk,只拿 chunks 拼全文这些公布头要素就抽不到也核不过。不传则
             退回 ``chunks`` 拼接(向后兼容,标准「X发〔年〕号 + 通知」格式头要素都在正文,够用)。
         max_tokens: 条款维单段 + 头要素维一次抽取的 max_tokens。
-        char_budget / max_workers: 透传给 ``mapreduce_per_chapter`` 的分段预算 / 并发数。
+        char_budget / max_workers: 透传给 ``run_segments`` 的分段预算 / 并发数。
         cache_enabled: 是否走 L2 缓存(默认开,同份公文重看命中)。
 
     Returns:
@@ -405,16 +532,23 @@ def build_doc_spine(
         cache_enabled=cache_enabled,
     )
 
-    # 条款维:重型逐条款(每条带 evidence + 多字段)同章脉重维,收窄条款闸 + 开续抽防截断丢条款。
-    continue_fn = _make_continue_fn(
-        "clause",
-        _INSTR_CLAUSE,
+    # 条款维:重型逐条款(每条带 evidence + 多字段)同章脉重维,收窄章闸 + 开续抽防截断丢条款。
+    #
+    # **不能套 ``mapreduce_per_chapter``**:那台机器为「书的章」设计,合并前会跑
+    # ``_correct_by_evidence`` 拿命中 chunk 的真**章节**号覆盖记录序号,再按它 ``merge_by_chapter``
+    # 去重。公文 chunk 的 chapter 是「第一章 总则」这种章节(722 ~7 章),条款维要的是「第一条…
+    # 第N条」(几十条)——拿章节号覆盖条款号会把同章几十条压成一个号、去重后只剩个位数(722 只
+    # 抽到 ~2 条的根因)。所以这里直接用底层 ``run_segments`` 分段并发抽,自己接:
+    #   1. 每段证据核验(``_verify_clause_evidence``,只核不覆盖序号);
+    #   2. 跨段全局重排序号(``_renumber_clauses``,按正文顺序顺排 1…N,压平段内撞号 + 去整条重复)。
+    # 截断丢条款仍靠 ``run_segments`` 自带的拆小重抽 + 续抽(continue_fn)两道兜底。
+    continue_fn = _make_clause_continue_fn(
         llm_client=llm_client,
         model=model,
         max_tokens=max_tokens,
         cache_enabled=cache_enabled,
     )
-    clauses = mapreduce_per_chapter(
+    seg_outs = run_segments(
         chunks=chunks,
         instruction=_INSTR_CLAUSE,
         user_msg=_USER_MSG,
@@ -423,12 +557,14 @@ def build_doc_spine(
         model=model,
         max_tokens=max_tokens,
         char_budget=char_budget,
-        max_chapters=_SPINE_HEAVY_DIM_MAX_CHAPTERS,
+        max_chapters=_DOC_CLAUSE_MAX_CHAPTERS,
         max_workers=max_workers,
         cache_enabled=cache_enabled,
-        correct_fn=_correct_by_evidence,
         continue_fn=continue_fn,
     )
+    for seg in seg_outs:
+        _verify_clause_evidence(seg, chunks)
+    clauses = _renumber_clauses(seg_outs)
 
     return {
         "schema_version": DOC_SPINE_SCHEMA_VERSION,
