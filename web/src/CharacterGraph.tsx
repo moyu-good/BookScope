@@ -49,6 +49,23 @@ function canvasSize(nodeCount: number): { w: number; h: number } {
 // 防重叠最小间距:任何两个节点近于此就强分开,免得堆成一坨(节点半径 6~15,留够间隙)。
 const MIN_SEP = 30;
 
+// 缩放上下限:太小看不清字、太大一颗星占满屏。
+const K_MIN = 0.3;
+const K_MAX = 4;
+
+// 只有成员够多的社区才配叫"一方"——三国大网一碎会分出一堆单人小社区(华雄一方、丁奉一方),
+// 那不是阵营是噪声。门槛 4:至少四个人常同场才当一个群标进图例。
+const MIN_CAMP = 4;
+// 图例里最多列几个群代表,免得一排标签糊一脸。
+const MAX_CAMP = 5;
+
+// 视角:缩放比 k + 平移 tx/ty。边和节点都画进 translate(tx ty) scale(k) 的 <g> 里,整图能缩能拖。
+interface View {
+  k: number;
+  tx: number;
+  ty: number;
+}
+
 interface Node {
   x: number;
   y: number;
@@ -148,12 +165,18 @@ export function CharacterGraph({
     null,
   );
   const [unit, setUnit] = useState<"person" | "concept">("person");
+  // 视角:缩放 + 平移。默认无缩放无平移,等节点冷却后 fit 一次铺满。
+  const [view, setView] = useState<View>({ k: 1, tx: 0, ty: 0 });
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const simRef = useRef<Map<string, Node>>(new Map());
   const rafRef = useRef<number | null>(null);
   const coolRef = useRef(0);
   const dragRef = useRef<string | null>(null);
+  // 已对当前这批数据做过 fit 没有——只 fit 一次,免得每帧重算抖。
+  const fittedRef = useRef(false);
+  // 在空白背景按下拖动 = 平移整图;记起点的 SVG 坐标 + 按下那刻的 tx/ty。
+  const panRef = useRef<{ sx: number; sy: number; tx: number; ty: number } | null>(null);
   // 记录在某个节点上按下的起点——松手时若几乎没动（是「点」不是「拖」）就当点击，跳关系演变。
   const downRef = useRef<{ name: string; x: number; y: number; moved: boolean } | null>(null);
   const [, setFrame] = useState(0);
@@ -243,14 +266,18 @@ export function CharacterGraph({
     return d;
   }, [data]);
 
-  // 每个阵营(前几大社区)选戏份最重的人当代表,给图例打标签("■ 刘备一方")。
+  // 图例阵营代表:只收成员数 ≥ MIN_CAMP 的群(单人/极小群是网碎出来的噪声,不算阵营),
+  // 按群大小取前 MAX_CAMP 个,每个群挑戏份最重的人当代表名。communities 已按大小降序编号(id 0 最大)。
   const campReps = useMemo(() => {
     if (!data) return [] as { id: number; name: string }[];
     const ids = [...communities.values()];
     const numC = ids.length ? Math.max(...ids) + 1 : 0;
-    const ringN = Math.min(numC, 6);
+    // 每个群多少人
+    const sizes = new Array<number>(numC).fill(0);
+    for (const cid of communities.values()) sizes[cid] += 1;
     const reps: { id: number; name: string }[] = [];
-    for (let id = 0; id < ringN; id++) {
+    for (let id = 0; id < numC && reps.length < MAX_CAMP; id++) {
+      if (sizes[id] < MIN_CAMP) continue; // 太小的群不进图例、不标"X一方"
       let best: string | null = null;
       let bestDeg = -1;
       for (const nm of data.nodes) {
@@ -283,6 +310,8 @@ export function CharacterGraph({
     });
     simRef.current = sim;
     coolRef.current = 0;
+    fittedRef.current = false; // 新数据没 fit 过,等冷却后再 fit
+    setView({ k: 1, tx: 0, ty: 0 }); // 视角复位,免得拿上一批的缩放看新图
     setFrame((f) => f + 1); // 立刻按初始坐标画一帧——别等 rAF（后台标签页 / 省电模式 rAF 会被掐，否则图空白）
     startSim();
     return stopSim;
@@ -306,6 +335,11 @@ export function CharacterGraph({
       else coolRef.current = 0;
       if (coolRef.current > 40 || ticks > 1000) {
         rafRef.current = null; // 冷却（静止）或到硬上限 ~600 帧：停 rAF 省 CPU
+        // 布局定型了,对这批数据 fit 一次铺满(只第一次,后面拖/缩放不再自动覆盖用户视角)。
+        if (!fittedRef.current) {
+          fittedRef.current = true;
+          fitToBounds();
+        }
         return;
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -406,6 +440,39 @@ export function CharacterGraph({
     return { x: loc.x, y: loc.y };
   }
 
+  // SVG viewBox 坐标 → 节点逻辑坐标:节点画在 translate(tx ty) scale(k) 的 <g> 里,
+  // 屏幕(viewBox)坐标 = tx + k * 逻辑坐标,反推 逻辑 = (viewBox - t) / k。拖节点必须扣这步否则跟手错位。
+  function svgToLogical(sx: number, sy: number, v: View): { x: number; y: number } {
+    return { x: (sx - v.tx) / v.k, y: (sy - v.ty) / v.k };
+  }
+
+  // 算所有节点的包围盒,设视角让它带 ~10% 余量铺满视口(viewBox W×H),再居中。
+  // 一打开就铺满可读,不是缩成一小撮。节点没初始化好就跳过。
+  function fitToBounds() {
+    const sim = simRef.current;
+    if (!sim || sim.size === 0) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of sim.values()) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    if (!isFinite(minX)) return;
+    const bw = Math.max(1, maxX - minX);
+    const bh = Math.max(1, maxY - minY);
+    // 0.9 = 留 10% 余量,别贴边
+    let k = Math.min(W / bw, H / bh) * 0.9;
+    k = Math.max(K_MIN, Math.min(K_MAX, k));
+    // 把盒中心摆到视口中心:viewport_center = t + k * box_center → t = vpCenter - k*boxCenter
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    setView({ k, tx: W / 2 - k * cx, ty: H / 2 - k * cy });
+  }
+
   function onNodeDown(name: string, e: React.PointerEvent) {
     e.stopPropagation();
     dragRef.current = name;
@@ -417,6 +484,13 @@ export function CharacterGraph({
   }
 
   function onMove(e: React.PointerEvent) {
+    // 在空白背景上按下拖动 = 平移整图(只改 tx/ty,不动任何节点)。
+    const pan = panRef.current;
+    if (pan) {
+      const { x: sx, y: sy } = toSvg(e.clientX, e.clientY);
+      setView((v) => ({ ...v, tx: pan.tx + (sx - pan.sx), ty: pan.ty + (sy - pan.sy) }));
+      return;
+    }
     const name = dragRef.current;
     if (!name) return;
     // 起点挪过 4px 就算真在拖（不是手抖的点），松手时不再触发跳转。
@@ -424,7 +498,9 @@ export function CharacterGraph({
     if (dn && !dn.moved && Math.hypot(e.clientX - dn.x, e.clientY - dn.y) > 4) {
       dn.moved = true;
     }
-    const { x, y } = toSvg(e.clientX, e.clientY);
+    // 节点画在 transform 过的 <g> 里,toSvg 给的是 viewBox 坐标,要扣掉缩放平移回到逻辑坐标,否则跟手错位。
+    const { x: sx, y: sy } = toSvg(e.clientX, e.clientY);
+    const { x, y } = svgToLogical(sx, sy, view);
     const p = simRef.current.get(name);
     if (p) {
       p.x = Math.max(PAD, Math.min(W - PAD, x));
@@ -436,6 +512,11 @@ export function CharacterGraph({
   }
 
   function onUp() {
+    // 结束背景平移
+    if (panRef.current) {
+      panRef.current = null;
+      return;
+    }
     const name = dragRef.current;
     if (name) {
       const p = simRef.current.get(name);
@@ -451,6 +532,45 @@ export function CharacterGraph({
     dragRef.current = null;
     coolRef.current = 0;
     if (rafRef.current == null) startSim();
+  }
+
+  // 滚轮缩放,朝光标缩:缩放后光标下那个点不动。cx/cy 是光标在 viewBox 里的位置。
+  // 经典式 newT = cx - (cx - t) * (newK/k),x/y 同理。k 夹在 K_MIN~K_MAX。
+  function onWheel(e: React.WheelEvent) {
+    e.preventDefault();
+    const { x: cx, y: cy } = toSvg(e.clientX, e.clientY);
+    setView((v) => {
+      const factor = Math.exp(-e.deltaY * 0.0015); // 上滚放大、下滚缩小,指数让缩放手感均匀
+      const newK = Math.max(K_MIN, Math.min(K_MAX, v.k * factor));
+      const ratio = newK / v.k;
+      return { k: newK, tx: cx - (cx - v.tx) * ratio, ty: cy - (cy - v.ty) * ratio };
+    });
+  }
+
+  // 在空白背景按下 = 准备平移。节点的 onNodeDown 已 stopPropagation,所以按在节点上收不到这个,正好分开。
+  function onBgDown(e: React.PointerEvent) {
+    const { x: sx, y: sy } = toSvg(e.clientX, e.clientY);
+    setView((v) => {
+      panRef.current = { sx, sy, tx: v.tx, ty: v.ty };
+      return v;
+    });
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  }
+
+  // 围着光标按钮缩放(+/−):以视口中心为锚,跟滚轮一个算法。
+  function zoomBy(factor: number) {
+    const cx = W / 2;
+    const cy = H / 2;
+    setView((v) => {
+      const newK = Math.max(K_MIN, Math.min(K_MAX, v.k * factor));
+      const ratio = newK / v.k;
+      return { k: newK, tx: cx - (cx - v.tx) * ratio, ty: cy - (cy - v.ty) * ratio };
+    });
+  }
+
+  // 重置视角:重新按当前节点位置 fit 铺满(不是死板复位到 k=1,那样大图又缩成一小撮)。
+  function resetView() {
+    fitToBounds();
   }
 
   if (!data) {
@@ -581,13 +701,41 @@ export function CharacterGraph({
           >
             换成{otherTitle}
           </button>
+          {/* 缩放 / 平移控制:滚轮也能缩、空白处拖能平移,这几个按钮给不爱滚轮的人。 */}
+          <button
+            type="button"
+            onClick={() => zoomBy(1.25)}
+            disabled={loading}
+            title="放大"
+            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
+          >
+            ＋
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomBy(0.8)}
+            disabled={loading}
+            title="缩小"
+            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
+          >
+            －
+          </button>
+          <button
+            type="button"
+            onClick={resetView}
+            disabled={loading}
+            title="把整张图重新铺满视口"
+            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
+          >
+            重置视角
+          </button>
         </div>
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        {data.nodes.length} 个{noun}、{data.edges.length} 条关系。星图：每个{noun}是一颗星、戏份越重越亮，星色按阵营分群；连线=关系（敌红亲绿、越粗越亲密）；可拖动星子、点连线看那一章的原文出处（点开现取）。
+        {data.nodes.length} 个{noun}、{data.edges.length} 条关系。星图：每个{noun}是一颗星、戏份越重越亮，星色按共现群组近似上色；连线=关系（敌红亲绿、越粗越亲密）；滚轮缩放、空白处拖动平移、拖星子挪位、点连线看那一章的原文出处（点开现取）。
       </p>
-      {/* 图例:关系类型 + 阵营 */}
+      {/* 图例:关系类型 + 几个大群代表 */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
         {(["foe", "kin", "neutral"] as RelKind[]).map((k) => (
           <span key={k} className="inline-flex items-center gap-1.5">
@@ -595,14 +743,19 @@ export function CharacterGraph({
             {EDGE_KIND_LABEL[k]}
           </span>
         ))}
-        {campReps.length > 0 && <span className="opacity-70">阵营：</span>}
+        {campReps.length > 0 && <span className="opacity-70">主要群组：</span>}
         {campReps.map((c) => (
           <span key={c.id} className="inline-flex items-center gap-1">
             <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: communityColor(c.id) }} />
-            {c.name}一方
+            {c.name} 等
           </span>
         ))}
       </div>
+      {campReps.length > 0 && (
+        <p className="text-[11px] text-[var(--color-ink-muted)] opacity-70 mb-2">
+          分群是按"谁和谁常同场"的共现聚类近似算的，不是剧情阵营的定论；只列了最大的几个群，单人小群不算群。
+        </p>
+      )}
 
       {!loading && (
         <RunStats trace={data.trace as RunTrace} note={`${data.edges.length} 条关系`} />
@@ -612,13 +765,18 @@ export function CharacterGraph({
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full border border-[var(--color-rule)] rounded touch-none"
-        style={{ maxHeight: 560, background: NIGHT_SKY }}
+        style={{ maxHeight: 560, background: NIGHT_SKY, cursor: "grab" }}
+        onPointerDown={onBgDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerLeave={onUp}
+        onWheel={onWheel}
       >
         {/* 星图：夜空底 + 人物=星(亮度按戏份)+ 阵营=星色 + 关系=星座连线。闪烁用纯 CSS,不靠 rAF。 */}
+        {/* StarTwinkleStyle 是 <style> 不能进 transform 的 <g>(否则被当图形元素),留在外层。 */}
         <StarTwinkleStyle />
+        {/* 缩放平移层:边和节点都在这个 <g> 里,整图能缩能拖。defs / style 留在外面。 */}
+        <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
         {/* 边：星座连线 */}
         {data.edges.map((e, i) => {
           const a = sim.get(e.source);
@@ -687,6 +845,7 @@ export function CharacterGraph({
             </g>
           );
         })}
+        </g>
       </svg>
 
       {sel && (
