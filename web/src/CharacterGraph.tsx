@@ -33,6 +33,8 @@ interface CharacterGraphProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  // 点一个人物星子 → 跳到关系演变看他的关系（可选，不传则只能拖动，行为跟以前一样）。
+  onSelectPerson?: (name: string) => void;
 }
 
 const PAD = 46;
@@ -136,6 +138,7 @@ export function CharacterGraph({
   apiKey,
   model,
   baseUrl,
+  onSelectPerson,
 }: CharacterGraphProps) {
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -151,6 +154,8 @@ export function CharacterGraph({
   const rafRef = useRef<number | null>(null);
   const coolRef = useRef(0);
   const dragRef = useRef<string | null>(null);
+  // 记录在某个节点上按下的起点——松手时若几乎没动（是「点」不是「拖」）就当点击，跳关系演变。
+  const downRef = useRef<{ name: string; x: number; y: number; moved: boolean } | null>(null);
   const [, setFrame] = useState(0);
 
   // 选中某条边 → 若边没带 upfront 证据(章脉转向后的人物图,出路 B),按需调
@@ -404,6 +409,7 @@ export function CharacterGraph({
   function onNodeDown(name: string, e: React.PointerEvent) {
     e.stopPropagation();
     dragRef.current = name;
+    downRef.current = { name, x: e.clientX, y: e.clientY, moved: false };
     const p = simRef.current.get(name);
     if (p) p.fixed = true;
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -413,6 +419,11 @@ export function CharacterGraph({
   function onMove(e: React.PointerEvent) {
     const name = dragRef.current;
     if (!name) return;
+    // 起点挪过 4px 就算真在拖（不是手抖的点），松手时不再触发跳转。
+    const dn = downRef.current;
+    if (dn && !dn.moved && Math.hypot(e.clientX - dn.x, e.clientY - dn.y) > 4) {
+      dn.moved = true;
+    }
     const { x, y } = toSvg(e.clientX, e.clientY);
     const p = simRef.current.get(name);
     if (p) {
@@ -430,6 +441,13 @@ export function CharacterGraph({
       const p = simRef.current.get(name);
       if (p) p.fixed = false;
     }
+    // 在节点上按下、几乎没动就松手 = 点这个人 → 跳关系演变。拖过了不触发，不破坏拖动。
+    // 只对人物图开放：概念节点跳关系演变（讲的是人）没意义。
+    const dn = downRef.current;
+    if (dn && !dn.moved && dn.name === name && unit === "person" && onSelectPerson) {
+      onSelectPerson(dn.name);
+    }
+    downRef.current = null;
     dragRef.current = null;
     coolRef.current = 0;
     if (rafRef.current == null) startSim();
@@ -643,9 +661,12 @@ export function CharacterGraph({
           return (
             <g
               key={`n-${name}`}
-              style={{ cursor: "grab" }}
+              style={{ cursor: unit === "person" && onSelectPerson ? "pointer" : "grab" }}
               onPointerDown={(ev) => onNodeDown(name, ev)}
             >
+              {unit === "person" && onSelectPerson && (
+                <title>{`点 ${name} 看他的关系演变（拖动可挪位）`}</title>
+              )}
               {(() => {
                 const color = communityColor(communities.get(name) ?? 0);
                 const dur = 2.4 + (deg % 4) * 0.7; // 错开闪烁,别齐刷刷

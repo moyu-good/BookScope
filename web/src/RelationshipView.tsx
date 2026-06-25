@@ -28,6 +28,9 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function RelationshipView(props: RelationshipViewProps) {
   const [tab, setTab] = useState<Tab>("graph");
+  // 在关系网里点一个人 → 切到关系演变、聚焦这个人。每次点都换一个新对象引用，
+  // 让关系演变那边的 effect 重新触发（同名连点也能重新聚焦）。
+  const [focusPerson, setFocusPerson] = useState<{ name: string } | null>(null);
   return (
     <div>
       <div className="flex flex-wrap gap-1.5 mb-1">
@@ -51,10 +54,16 @@ export function RelationshipView(props: RelationshipViewProps) {
         })}
       </div>
       <div className={tab === "graph" ? "" : "hidden"}>
-        <CharacterGraph {...props} />
+        <CharacterGraph
+          {...props}
+          onSelectPerson={(name) => {
+            setFocusPerson({ name });
+            setTab("reltime");
+          }}
+        />
       </div>
       <div className={tab === "reltime" ? "" : "hidden"}>
-        <RelationshipTimeline {...props} />
+        <RelationshipTimeline {...props} focusPerson={focusPerson} />
       </div>
     </div>
   );

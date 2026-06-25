@@ -11,7 +11,7 @@
 // 敌友色温：每幕节点颜色按 valence 从暖(盟)到冷(敌)取色——这是数据色，不跟主题走。
 // ---------------------------------------------------------------------------
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 
 // ---- 新接口契约 ----
@@ -58,6 +58,9 @@ interface RelationshipTimelineProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  // 从关系网点了某个人跳过来时带上他的名字（每次点都是新对象引用，连点同一人也能重新聚焦）。
+  // 不传 / 为空时跟以前完全一样。
+  focusPerson?: { name: string } | null;
 }
 
 // 敌友色温：valence -5..+5 → 暖(盟，朱) ←→ 冷(敌，青)。0 取中间灰青。
@@ -94,6 +97,7 @@ export function RelationshipTimeline({
   apiKey,
   model,
   baseUrl,
+  focusPerson,
 }: RelationshipTimelineProps) {
   // 全员对清单（不传 pair 的那次返回）
   const [pairs, setPairs] = useState<PairBrief[] | null>(null);
@@ -116,6 +120,9 @@ export function RelationshipTimeline({
   // pivot 点击滚动到对应那一幕
   const beatRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const [flashCh, setFlashCh] = useState<number | null>(null);
+
+  // 从关系网点过来的人：记住已处理过的那次点击（按对象引用），免得 pairs/effect 重跑时重复聚焦。
+  const handledFocusRef = useRef<{ name: string } | null>(null);
 
   function reqBody(extra?: Record<string, unknown>): Record<string, unknown> {
     const body: Record<string, unknown> = {
@@ -217,6 +224,33 @@ export function RelationshipTimeline({
   }, [pairs, query]);
 
   const cur = selKey ? chronicles[selKey] ?? null : null;
+
+  // 从关系网点了某个人跳过来：先确保有清单（没拉过就拉一次），
+  // 再把搜索框填成他的名字（列表立刻只剩含他的对）。若含他的对里有明显最重的一对，顺手下钻。
+  useEffect(() => {
+    if (!focusPerson) return;
+    // 同一次点击（同一对象引用）只处理一次
+    if (handledFocusRef.current === focusPerson) return;
+
+    // 还没拉清单：拉一次（会先按全局 top 自动选一对），等 pairs 到了 effect 会重跑再聚焦。
+    if (!pairs) {
+      if (apiKey && !listLoading) void loadPairs();
+      return; // 先别标已处理——等 pairs 回来重跑这个 effect 才真正聚焦
+    }
+
+    handledFocusRef.current = focusPerson;
+    const name = focusPerson.name;
+    setQuery(name);
+
+    // 含这个人的所有对里挑 count 最高的下钻（pairs 已按 count 降序，第一个命中即最重）。
+    const hit = pairs.find((p) => p.a === name || p.b === name);
+    if (hit) {
+      const k = pairKey(hit.a, hit.b);
+      void loadChronicle(hit.a, hit.b, k);
+    }
+    // loadPairs / loadChronicle 是稳定闭包，pairs / focusPerson 变化才需重跑
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPerson, pairs]);
 
   function scrollToBeat(ch: number) {
     const el = beatRefs.current[ch];
