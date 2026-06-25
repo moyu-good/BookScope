@@ -2975,8 +2975,10 @@ def _collect_doc_spines(
     spines: list[dict] = []
     for sid in session_ids:
         assembler = _resolve_assembler(store, sid)
-        _full, chunks = _long_context_inputs(assembler)
-        spine = get_or_build_doc_spine(chunks=chunks, llm_client=llm_client, model=model)
+        full_text, chunks = _long_context_inputs(assembler)
+        spine = get_or_build_doc_spine(
+            chunks=chunks, llm_client=llm_client, model=model, full_text=full_text
+        )
         spines.append(spine)
     return spines
 
@@ -3000,7 +3002,9 @@ async def agent_redhead_doc_structure(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    spine = get_or_build_doc_spine(chunks=chunks, llm_client=rec, model=model)
+    spine = get_or_build_doc_spine(
+        chunks=chunks, llm_client=rec, model=model, full_text=full_text
+    )
     head = spine.get("head") or []
     clauses = spine.get("clauses") or []
     return RedheadDocStructureResponse(
