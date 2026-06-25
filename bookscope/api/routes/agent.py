@@ -90,6 +90,14 @@ from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.orchestrate import orchestrate
 from bookscope.agent.question_processor import rewrite_followup
 from bookscope.agent.recap import generate_recap
+from bookscope.agent.redhead_format_check import format_check_from_spine
+from bookscope.agent.redhead_glossary import glossary_from_spine
+from bookscope.agent.redhead_hard_facts import hard_facts_from_spine
+from bookscope.agent.redhead_plain import plain_language_from_spine
+from bookscope.agent.redhead_relevance import relevance_from_spine
+from bookscope.agent.redhead_timeline import (
+    timeline_from_spine as redhead_timeline_from_spine,
+)
 from bookscope.agent.study_cards import generate_study_cards
 from bookscope.agent.style_issues import generate_style_issues
 from bookscope.agent.suggested_questions import generate_book_questions
@@ -149,9 +157,16 @@ from bookscope.api.schemas import (
     RedheadDependencyGraphResponse,
     RedheadDocStructureRequest,
     RedheadDocStructureResponse,
+    RedheadFormatCheckResponse,
+    RedheadGlossaryResponse,
+    RedheadHardFactsResponse,
     RedheadLevelConsistencyResponse,
+    RedheadPlainLanguageResponse,
     RedheadPolicyEvolutionRequest,
     RedheadPolicyEvolutionResponse,
+    RedheadRelevanceRequest,
+    RedheadRelevanceResponse,
+    RedheadTimelineResponse,
     RelationshipTimelineRequest,
     RelationshipTimelineResponse,
     Review,
@@ -3110,6 +3125,170 @@ async def agent_redhead_level_consistency(
         conflicts=conflicts or [],
         scanned=conflicts is not None,
         trace=_run_trace(rec, "", _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/redhead/plain-language",
+    response_model=RedheadPlainLanguageResponse,
+)
+async def agent_redhead_plain_language(
+    request: RedheadDocStructureRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadPlainLanguageResponse:
+    """大白话翻译:把公文体逐条款翻成人话,每句白话锚回原条款(核原文不核白话)。"""
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = plain_language_from_spine(
+        chunks=chunks, llm_client=rec, model=model, full_text=full_text
+    )
+    items = result.get("items") or []
+    return RedheadPlainLanguageResponse(
+        items=items,
+        scanned=bool(items),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/redhead/relevance",
+    response_model=RedheadRelevanceResponse,
+)
+async def agent_redhead_relevance(
+    request: RedheadRelevanceRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadRelevanceResponse:
+    """跟我相关:据用户身份(role)筛出这份公文里跟他相关的条款 + 对他的义务/利好/条件。"""
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = relevance_from_spine(
+        chunks=chunks, role=request.role, llm_client=rec, model=model, full_text=full_text
+    )
+    items = result.get("items") or []
+    return RedheadRelevanceResponse(
+        role=result.get("role", request.role),
+        items=items,
+        scanned=bool(items),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/redhead/hard-facts",
+    response_model=RedheadHardFactsResponse,
+)
+async def agent_redhead_hard_facts(
+    request: RedheadDocStructureRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadHardFactsResponse:
+    """硬信息提取表:把散落全文的时限/数字指标/适用范围/生效废止/责任主体聚成速查表。"""
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = hard_facts_from_spine(
+        chunks=chunks, llm_client=rec, model=model, full_text=full_text
+    )
+    facts = result.get("facts") or []
+    return RedheadHardFactsResponse(
+        facts=facts,
+        scanned=bool(facts),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/redhead/timeline",
+    response_model=RedheadTimelineResponse,
+)
+async def agent_redhead_timeline(
+    request: RedheadDocStructureRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadTimelineResponse:
+    """关键时间轴:抽这份公文里的时间节点(申报/实施/过渡/生效/废止)排成时序。"""
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = redhead_timeline_from_spine(
+        chunks=chunks, llm_client=rec, model=model, full_text=full_text
+    )
+    nodes = result.get("nodes") or []
+    return RedheadTimelineResponse(
+        nodes=nodes,
+        scanned=bool(nodes),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/redhead/glossary",
+    response_model=RedheadGlossaryResponse,
+)
+async def agent_redhead_glossary(
+    request: RedheadDocStructureRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadGlossaryResponse:
+    """名词解释:挑出这份公文里普通人看不懂的术语/政策黑话,用人话释义。"""
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = glossary_from_spine(
+        chunks=chunks, llm_client=rec, model=model, full_text=full_text
+    )
+    terms = result.get("terms") or []
+    return RedheadGlossaryResponse(
+        terms=terms,
+        scanned=bool(terms),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/redhead/format-check",
+    response_model=RedheadFormatCheckResponse,
+)
+async def agent_redhead_format_check(
+    request: RedheadDocStructureRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadFormatCheckResponse:
+    """规范性自检:对照 GB/T 9704 看这份公文该有的要素齐不齐、文种对不对(有国标当标准答案)。"""
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = format_check_from_spine(
+        chunks=chunks, llm_client=rec, model=model, full_text=full_text
+    )
+    checks = result.get("checks") or []
+    return RedheadFormatCheckResponse(
+        checks=checks,
+        summary=result.get("summary") or {},
+        scanned=bool(checks),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
     )
 
 

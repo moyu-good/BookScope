@@ -939,6 +939,110 @@ class RedheadLevelConsistencyResponse(BaseModel):
     )
 
 
+class RedheadPlainLanguageResponse(BaseModel):
+    """POST /api/agent/redhead/plain-language 响应体（大白话翻译）。"""
+
+    items: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "逐条款白话，每条 {chapter, matter(原公文体), plain(大白话), evidence(原文), "
+            "verified, match_score}。白话是原文转述，核的是原文不是白话。"
+        ),
+    )
+    scanned: bool = Field(default=False, description="false=失败，前端提示重试。")
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
+class RedheadRelevanceRequest(RedheadDocStructureRequest):
+    """POST /api/agent/redhead/relevance 请求体（跟我相关）。比单份解读多一个身份。"""
+
+    role: str = Field(
+        ..., min_length=1, max_length=100,
+        description="用户身份（个体户/某局/企业…），据此筛相关条款。",
+    )
+
+
+class RedheadRelevanceResponse(BaseModel):
+    """POST /api/agent/redhead/relevance 响应体。"""
+
+    role: str = Field(default="", description="回显请求里的身份。")
+    items: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "跟这个身份相关的条款，每条 {chapter, matter, relevance(高/中), "
+            "bearing(义务/利好/条件), note(对你一句话), evidence, verified, "
+            "match_score}。不相关的不返。"
+        ),
+    )
+    scanned: bool = Field(default=False, description="false=失败；true+空=没冲你来的条款。")
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
+class RedheadHardFactsResponse(BaseModel):
+    """POST /api/agent/redhead/hard-facts 响应体（硬信息提取表）。"""
+
+    facts: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "散落全文的硬信息，每条 {kind(时限/数字指标/适用范围/生效废止/责任主体), value, "
+            "context, evidence, verified, match_score}。"
+        ),
+    )
+    scanned: bool = Field(default=False, description="false=失败；true+空=没抽到硬信息。")
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
+class RedheadTimelineResponse(BaseModel):
+    """POST /api/agent/redhead/timeline 响应体（关键时间轴）。"""
+
+    nodes: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "按时序排的时间节点，每条 {when(日期或相对期), what, chapter, evidence, verified, "
+            "match_score}。"
+        ),
+    )
+    scanned: bool = Field(default=False, description="false=失败；true+空=没带时间的要求。")
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
+class RedheadGlossaryResponse(BaseModel):
+    """POST /api/agent/redhead/glossary 响应体（名词解释）。"""
+
+    terms: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "公文术语释义，每条 {term, explanation(人话), chapter, evidence(术语出现的原句), "
+            "verified, match_score}。"
+        ),
+    )
+    scanned: bool = Field(default=False, description="false=失败；true+空=没挑到难词。")
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
+class RedheadFormatCheckResponse(BaseModel):
+    """POST /api/agent/redhead/format-check 响应体（规范性自检，对照 GB/T 9704）。"""
+
+    checks: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "逐要素核查，每条 {item, status(齐/缺/存疑), note, evidence, verified, rule_note}。"
+        ),
+    )
+    summary: dict = Field(
+        default_factory=dict,
+        description="汇总 {ok, missing, unsure, total, text, extraction_trustworthy}。",
+    )
+    scanned: bool = Field(default=False, description="false=失败；true=核过。")
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
 class TimelineRequest(BaseModel):
     """POST /api/agent/timeline 请求体（时间线/事件梳理）。BYOK。"""
 
@@ -1544,6 +1648,13 @@ __all__ = [
     "RedheadLevelConsistencyResponse",
     "RedheadPolicyEvolutionRequest",
     "RedheadPolicyEvolutionResponse",
+    "RedheadFormatCheckResponse",
+    "RedheadGlossaryResponse",
+    "RedheadHardFactsResponse",
+    "RedheadPlainLanguageResponse",
+    "RedheadRelevanceRequest",
+    "RedheadRelevanceResponse",
+    "RedheadTimelineResponse",
     "RelationshipTimelineRequest",
     "RelationshipTimelineResponse",
     "Review",

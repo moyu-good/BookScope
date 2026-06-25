@@ -102,7 +102,9 @@ def test_narrative_curve_events_anchored_to_text() -> None:
 
 def test_narrative_curve_event_evidence_empty_marks_unverified() -> None:
     # 原文里压根捞不到支撑句 → 该事件 evidence 空串 + verified=False,不硬塞无关原文
-    spine = [{"chapter": 7, "tension": 8, "events": [{"event": "甲乙决战"}], "evidence": "章代表句"}]
+    spine = [
+        {"chapter": 7, "tension": 8, "events": [{"event": "甲乙决战"}], "evidence": "章代表句"}
+    ]
     chunks = [{"chapter": 7, "text": "完全无关的一段描写风景的文字。"}]
     out = narrative_curve_from_spine(spine, chunks=chunks)
     ev = out[0]["events"][0]
