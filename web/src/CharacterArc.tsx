@@ -25,6 +25,9 @@ interface CharacterArcProps {
 // 角色配色取一组克制的古籍色（不刺眼、可区分），循环用
 const ARC_PALETTE = ["#9a5b52", "#5f7a6b", "#8c6b4f", "#6b6f8c", "#8a7a4a", "#5b7d8a"];
 
+// 选择器默认只列戏份最重的前几个主要角色，剩下的折进"看全部"
+const MAIN_COUNT = 8;
+
 interface SelectedPoint {
   name: string;
   chapter: number;
@@ -55,12 +58,17 @@ export function CharacterArc({
   const [trace, setTrace] = useState<RunTrace | null>(null);
   const [selected, setSelected] = useState<SelectedPoint | null>(null);
   const [focusChar, setFocusChar] = useState<string | null>(null);
+  // 选择器：搜人名过滤 + 默认只列主要角色、"看全部"展开
+  const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
   async function load() {
     setLoading(true);
     setError(null);
     setSelected(null);
     setFocusChar(null);
+    setQuery("");
+    setShowAll(false);
     try {
       const body: Record<string, unknown> = {
         book_session_id: sessionId,
@@ -109,6 +117,29 @@ export function CharacterArc({
     characters.forEach((c, i) => map.set(c.name, ARC_PALETTE[i % ARC_PALETTE.length]));
     return map;
   }, [characters]);
+
+  // 角色按"戏份"降序——戏份 = 全书各章 presence 之和（跟花鸟里挑枝同一口径）。
+  // 顺带带上出场章数，列表里给用户看一眼分量。
+  const ranked = useMemo(() => {
+    if (!characters) return [] as { name: string; weight: number; chapters: number }[];
+    return [...characters]
+      .map((c) => ({
+        name: c.name,
+        weight: c.points.reduce((s, p) => s + p.presence, 0),
+        chapters: c.points.length,
+      }))
+      .sort((a, b) => b.weight - a.weight);
+  }, [characters]);
+
+  // 搜索过滤：输"刘备"只剩名字含刘备的
+  const filtered = useMemo(() => {
+    const q = query.trim();
+    if (!q) return ranked;
+    return ranked.filter((r) => r.name.includes(q));
+  }, [ranked, query]);
+
+  // 默认只列前 MAIN_COUNT 个主要角色；点"看全部"或正在搜索时铺开全部命中
+  const visibleList = showAll || query.trim() ? filtered : filtered.slice(0, MAIN_COUNT);
 
   if (!characters) {
     return (
@@ -177,40 +208,93 @@ export function CharacterArc({
         每个角色一枝：枝条上扬=得势、下垂=落难，着花越繁=这章戏越重。点一朵花看那章原文；淡空心花=原文没核验上。处境/戏份只画相对起落（模型判读，不报精确分）。
       </p>
 
-      {/* 看全部 / 单个角色 */}
-      <div className="flex flex-wrap items-center gap-2 mb-2 text-xs">
-        <button
-          type="button"
-          onClick={() => setFocusChar(null)}
-          className={[
-            "px-2 py-0.5 rounded border transition-colors",
-            focusChar === null
-              ? "border-[var(--color-seal)] text-[var(--color-seal)]"
-              : "border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)]",
-          ].join(" ")}
-        >
-          看全部
-        </button>
-        {characters.map((c) => (
+      {/* ── 选择器：搜人名 + 按戏份排序的角色清单（几百号人也挑得动） ── */}
+      <div className="mb-3">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="搜人名，如「刘备」——只看他一枝"
+          className="w-full text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-white focus:border-[var(--color-seal)] outline-none"
+        />
+        <div className="mt-2 max-h-44 overflow-y-auto rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)]">
+          {/* 看全部一枝不挑：回到全员小多图 */}
           <button
-            key={c.name}
             type="button"
-            onClick={() => setFocusChar((cur) => (cur === c.name ? null : c.name))}
-            className={[
-              "px-2 py-0.5 rounded border transition-colors flex items-center gap-1",
-              focusChar === c.name
-                ? "border-[var(--color-seal)] text-[var(--color-seal)]"
-                : "border-[var(--color-rule)] text-[var(--color-ink)] hover:border-[var(--color-seal)]",
-            ].join(" ")}
+            onClick={() => {
+              setFocusChar(null);
+              setSelected(null);
+            }}
+            className="w-full text-left px-3 py-2 flex items-center gap-2 border-b border-[var(--color-rule)] hover:bg-[var(--color-seal-soft)] transition-colors"
+            style={focusChar === null ? { background: "var(--color-seal-soft)" } : undefined}
           >
+            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-[var(--color-ink-muted)]" aria-hidden />
             <span
-              className="inline-block w-2.5 h-2.5 rounded-sm"
-              style={{ background: charColor.get(c.name) }}
-              aria-hidden
-            />
-            {c.name}
+              className="text-sm"
+              style={{ color: focusChar === null ? "var(--color-seal)" : "var(--color-ink)" }}
+            >
+              看全部（戏份最重的几枝）
+            </span>
           </button>
-        ))}
+
+          {visibleList.length === 0 ? (
+            <p className="px-3 py-3 text-xs text-[var(--color-ink-muted)]">
+              没找到名字含「{query}」的角色。
+            </p>
+          ) : (
+            <ul>
+              {visibleList.map((r) => {
+                const on = focusChar === r.name;
+                return (
+                  <li key={r.name}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFocusChar((cur) => (cur === r.name ? null : r.name));
+                        setSelected(null);
+                      }}
+                      className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 border-b border-[var(--color-rule)] last:border-b-0 hover:bg-[var(--color-seal-soft)] transition-colors"
+                      style={on ? { background: "var(--color-seal-soft)" } : undefined}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                          style={{ background: charColor.get(r.name) }}
+                          aria-hidden
+                        />
+                        <span
+                          className="text-sm truncate"
+                          style={{
+                            fontFamily: "var(--font-display)",
+                            color: on ? "var(--color-seal)" : "var(--color-ink)",
+                          }}
+                        >
+                          {r.name}
+                        </span>
+                      </span>
+                      <span className="text-xs text-[var(--color-ink-muted)] tabular-nums shrink-0">
+                        {r.chapters} 章
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* 默认折叠时给一个"看全部"展开；正在搜索就不显示（搜索已铺开命中项） */}
+        {!query.trim() && filtered.length > MAIN_COUNT && (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="mt-1.5 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+          >
+            {showAll
+              ? "收起，只看主要角色"
+              : `看全部 ${filtered.length} 个角色 ›`}
+          </button>
+        )}
       </div>
 
       <HuaniaoArc
