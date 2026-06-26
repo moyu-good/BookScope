@@ -14,6 +14,14 @@
 import { useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import {
+  READER_FONTS,
+  READER_SIZES,
+  loadReaderFontId,
+  saveReaderFontId,
+  loadReaderSizeId,
+  saveReaderSizeId,
+} from "./readerFont";
 
 interface Annotation {
   layer: "foreshadow" | "motif" | "contradiction" | "entity";
@@ -77,8 +85,27 @@ export function AnnotatedReader({
   const [trace, setTrace] = useState<RunTrace | null>(null);
   // 当前选中的注释（全局唯一索引），右侧批注栏据它显示
   const [selected, setSelected] = useState<number | null>(null);
+  // 章正文阅读区的字体 / 字号——只作用于章正文，存 localStorage，刷新不丢
+  const [fontId, setFontId] = useState<string>(loadReaderFontId);
+  const [sizeId, setSizeId] = useState<string>(loadReaderSizeId);
   // 章节容器引用，用来"跳到 target 章那处"
   const chapterRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+
+  function pickFont(id: string) {
+    setFontId(id);
+    saveReaderFontId(id);
+  }
+  function pickSize(id: string) {
+    setSizeId(id);
+    saveReaderSizeId(id);
+  }
+  // 解析成实际样式值（找不到就回退到列表里的默认项）
+  const readerFont =
+    READER_FONTS.find((f) => f.id === fontId) ?? READER_FONTS[0];
+  const readerSize =
+    READER_SIZES.find((s) => s.id === sizeId) ??
+    READER_SIZES.find((s) => s.id === "m") ??
+    READER_SIZES[0];
 
   function toggleLayer(id: Annotation["layer"]) {
     setLayers((prev) => {
@@ -225,14 +252,22 @@ export function AnnotatedReader({
           setMotif={setMotif}
           compact
         />
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || layers.size === 0}
-          className="shrink-0 text-xs px-2.5 py-1.5 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "重出中…" : "换层重生成"}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <ReaderTypeControls
+            fontId={fontId}
+            sizeId={sizeId}
+            onFont={pickFont}
+            onSize={pickSize}
+          />
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading || layers.size === 0}
+            className="shrink-0 text-xs px-2.5 py-1.5 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
+          >
+            {loading ? "重出中…" : "换层重生成"}
+          </button>
+        </div>
       </div>
 
       {total === 0 ? (
@@ -271,6 +306,9 @@ export function AnnotatedReader({
                     annotations={byChapter.get(c.chapter) ?? []}
                     selected={selected}
                     onSelect={setSelected}
+                    fontFamily={readerFont.fontFamily}
+                    fontSize={readerSize.fontSize}
+                    lineHeight={readerSize.lineHeight}
                   />
                 </div>
               ))}
@@ -383,6 +421,63 @@ function LayerToggles({
 }
 
 // ---------------------------------------------------------------------------
+// 阅读字体 / 字号选择——只作用于章正文阅读区。两个克制的下拉，跟工具栏其它控件同
+// 风格（CSS 变量、text-xs、与「换层重生成」一致的边框圆角）。选了即存 localStorage。
+// ---------------------------------------------------------------------------
+function ReaderTypeControls({
+  fontId,
+  sizeId,
+  onFont,
+  onSize,
+}: {
+  fontId: string;
+  sizeId: string;
+  onFont: (id: string) => void;
+  onSize: (id: string) => void;
+}) {
+  const selectCls =
+    "text-xs px-2 py-1.5 rounded border border-[var(--color-rule)] bg-white text-[var(--color-ink)] hover:border-[var(--color-seal)] focus:border-[var(--color-seal)] outline-none transition-colors cursor-pointer";
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <label className="sr-only" htmlFor="reader-font">
+        阅读字体
+      </label>
+      <select
+        id="reader-font"
+        value={fontId}
+        onChange={(e) => onFont(e.target.value)}
+        className={selectCls}
+        title="正文字体"
+        aria-label="正文字体"
+      >
+        {READER_FONTS.map((f) => (
+          <option key={f.id} value={f.id}>
+            {f.label}
+          </option>
+        ))}
+      </select>
+      <label className="sr-only" htmlFor="reader-size">
+        阅读字号
+      </label>
+      <select
+        id="reader-size"
+        value={sizeId}
+        onChange={(e) => onSize(e.target.value)}
+        className={selectCls}
+        title="正文字号"
+        aria-label="正文字号"
+      >
+        {READER_SIZES.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 一章原文 + 行间记号
 //
 // 行间只挂逐字可定位（anchor==="exact"）的注释：把章原文按段（双换行 / 单换行）切，
@@ -397,11 +492,17 @@ function ChapterBody({
   annotations,
   selected,
   onSelect,
+  fontFamily,
+  fontSize,
+  lineHeight,
 }: {
   text: string;
   annotations: { a: Annotation; i: number }[];
   selected: number | null;
   onSelect: (i: number | null) => void;
+  fontFamily: string;
+  fontSize: string;
+  lineHeight: string;
 }) {
   const paras = useMemo(() => {
     const split = text.split(/\n{1,}/).map((p) => p.trim()).filter(Boolean);
@@ -445,8 +546,8 @@ function ChapterBody({
 
   return (
     <div
-      className="text-[14px] leading-[1.9] text-[var(--color-ink)] space-y-2"
-      style={{ fontFamily: "var(--font-display)" }}
+      className="text-[var(--color-ink)] space-y-2"
+      style={{ fontFamily, fontSize, lineHeight }}
     >
       {paras.map((p, idx) => (
         <p key={idx} className="whitespace-pre-wrap">
