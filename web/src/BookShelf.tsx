@@ -3,15 +3,18 @@ import type { ApiError } from "./ErrorBanner";
 import { formatRelativeTime } from "./historyStorage";
 
 // ---------------------------------------------------------------------------
-// 书柜：函套卡片网格形态
+// 书柜：函套书脊 × 书目索引 的融合形态
 //
-// 数据来源：GET /api/sessions（永远 200，空 list 也合法）
-// 一本书一张卡。读 / 进分析台是卡脚两个明确的按钮，不再靠"点书脊"猜动作。
-// 选中态：印章红左竖条 + 加粗书名 + 朱砂淡底。
-// 删除：卡脚行内二次确认（点"删除"变"确认 / 取消"，5 秒未点回退）。
+// 一架函套，列成目录。整体是一份清单（本数多也好扫），但每一行最左压一条
+// 按题材染色的"函套书脊条"——一眼看出是一架摆开的函套书，不是干巴巴的列表。
 //
-// 同一本书上传过多次 → 合并成一张卡，指向最近用过的那份 session，
-// 卡上标「× N 份」，不在书架堆重复书脊。
+// 一行从左到右：题材色书脊条 → 书名（宋体）→ 题材签 + 语言 + 最近访问
+//   → 行内「读」（朱砂实底）/「进分析台」（描边）两个动作 → 删除。
+// 同名多份合一行，标「× N 份」，指向最近用过的那份 session。
+//
+// 数据来源：GET /api/sessions（永远 200，空 list 也合法）。
+// 选中态：书脊加粗 + 书名加粗 + 整行朱砂淡底 + 左缘朱砂细线。
+// 删除：行内二次确认（点"删除"变"确认 / 取消"，5 秒未点回退）。
 //
 // 父组件 props 控制：
 // - activeSessionId：当前选中的 session
@@ -114,6 +117,26 @@ function buildShelf(sessions: SessionMetadata[]): ShelfEntry[] {
   return [...byTitle.values()];
 }
 
+/**
+ * 题材 → 书脊色。
+ * 取自 session.genre（封闭集：小说/历史/理论/论文/公文/诗歌/工具书/其他），
+ * 也兜住 App.tsx 里那套同义写法（novel/fiction/网文/架空/玄幻 ↔ 小说；
+ * paper/哲学/学术 ↔ 理论；poem/散文 ↔ 诗歌……）。认不出 / 空 genre 走中性灰。
+ *
+ * 公文走朱砂（与 accent 同源），小说历史走暖琥珀木调，理论论文工具书走墨青，
+ * 诗歌走柔青——一架函套按题材分色，扫一眼就归得了类。
+ */
+function spineColor(genre: string | undefined): string {
+  const g = (genre ?? "").trim().toLowerCase();
+  if (!g) return "var(--color-rule)";
+  if (/(公文|红头)/.test(g)) return "var(--color-seal)";
+  if (/(小说|novel|fiction|网文|历史|架空|玄幻|history)/.test(g)) return "#b4763a";
+  if (/(理论|论文|paper|哲学|philosophy|工具书|nonfiction|学术|工具)/.test(g))
+    return "#3a6378";
+  if (/(诗|poem|poetry|散文|verse)/.test(g)) return "#6f6391";
+  return "var(--color-rule)";
+}
+
 export function BookShelf({
   activeSessionId,
   onSelect,
@@ -195,7 +218,7 @@ export function BookShelf({
           书柜
         </h2>
         <span className="text-xs text-[var(--color-ink-muted)]">
-          每本两个门：「读」进阅读器 · 「进分析台」只跑分析
+          一架函套列成目录 · 每本两个门：「读」进阅读器 ·「进分析台」只跑分析
         </span>
       </div>
       <ShelfBody
@@ -259,14 +282,15 @@ function ShelfBody(props: {
 
   const shelf = buildShelf(state.sessions);
 
+  // 一份目录：行与行之间用极细 rule 隔开（像书目的栏线），外面一圈函套描边。
   return (
-    <ul className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]">
+    <ul className="flex flex-col rounded border border-[var(--color-rule)] overflow-hidden divide-y divide-[var(--color-rule)]">
       {shelf.map((entry) => {
         const s = entry.session;
         const isActive = s.session_id === activeSessionId;
         const isConfirming = s.session_id === confirmingId;
         return (
-          <BookCard
+          <BookRow
             key={s.session_id}
             entry={entry}
             isActive={isActive}
@@ -283,7 +307,7 @@ function ShelfBody(props: {
   );
 }
 
-function BookCard(props: {
+function BookRow(props: {
   entry: ShelfEntry;
   isActive: boolean;
   isConfirming: boolean;
@@ -305,29 +329,46 @@ function BookCard(props: {
   } = props;
   const { session, dupeCount } = entry;
   const genre = session.genre?.trim();
+  const spine = spineColor(session.genre);
 
-  // 视觉：active 走 印章红左竖条 + 朱砂淡底 + 高对比；inactive 走 中性纸面
-  const cardClass = [
-    "group relative flex items-stretch rounded border bg-[var(--color-paper-raised)] transition-colors",
+  // 一行 = 一条函套书脊领头的目录项。
+  // active：整行朱砂淡底 + 左缘朱砂细线（与书脊条并列，强调"这本正在用"）。
+  const rowClass = [
+    "group relative flex items-stretch transition-colors",
     isActive
-      ? "border-[var(--color-seal)]/60 bg-[var(--color-seal-soft)] shadow-sm"
-      : "border-[var(--color-rule)] hover:border-[var(--color-seal)]/40",
-  ].join(" ");
-
-  const stripeClass = [
-    "w-1 shrink-0 rounded-l",
-    isActive ? "bg-[var(--color-seal)]" : "bg-transparent",
+      ? "bg-[var(--color-seal-soft)]"
+      : "bg-[var(--color-paper-raised)] hover:bg-[var(--color-paper-sunken)]",
   ].join(" ");
 
   return (
-    <li className={cardClass}>
-      <span aria-hidden className={stripeClass} />
-      <div className="flex flex-col flex-1 min-w-0 pl-3 pr-3 py-2.5 gap-2">
-        {/* 书名 + 题材标 */}
-        <div className="flex flex-col gap-1 min-w-0">
-          <div className="flex items-start gap-2 min-w-0">
+    <li className={rowClass}>
+      {/* active 左缘朱砂细线——盖在书脊条外侧，一眼定位"在用的这本" */}
+      {isActive ? (
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--color-seal)]"
+        />
+      ) : null}
+
+      {/* 题材色书脊条：一条立着的小书脊，行的辨识度全靠它 */}
+      <span
+        aria-hidden
+        className="shrink-0 self-stretch my-1.5 ml-2 w-1.5 rounded-full"
+        style={{
+          backgroundColor: spine,
+          // 选中 / hover 时书脊更实、略宽，像被抽出来一点
+          opacity: isActive ? 1 : 0.78,
+        }}
+        title={genre ? `题材：${genre}` : "未分类"}
+      />
+
+      {/* 行主体：书名一行 + 找书线索一行，右侧贴行内动作 */}
+      <div className="flex flex-1 items-center gap-3 min-w-0 pl-3 pr-3 py-2.5">
+        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+          {/* 书名（宋体）+ ×N 份 */}
+          <div className="flex items-baseline gap-2 min-w-0">
             <span
-              className="text-sm leading-snug text-[var(--color-ink)] flex-1 min-w-0 truncate"
+              className="text-sm leading-snug text-[var(--color-ink)] truncate"
               style={{
                 fontFamily: "var(--font-display)",
                 fontWeight: isActive ? 600 : 400,
@@ -338,14 +379,14 @@ function BookCard(props: {
             </span>
             {dupeCount > 1 ? (
               <span
-                className="shrink-0 text-[0.65rem] px-1.5 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] leading-none mt-0.5"
-                title={`同名书上传了 ${dupeCount} 份，这张卡指向最近用过的那份`}
+                className="shrink-0 text-[0.65rem] px-1.5 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] leading-none"
+                title={`同名书上传了 ${dupeCount} 份，这行指向最近用过的那份`}
               >
                 × {dupeCount} 份
               </span>
             ) : null}
           </div>
-          {/* 找书线索：题材标（空则不显）+ 语言 + 最近访问 */}
+          {/* 找书线索：题材签（空则不显）+ 语言 + 最近访问 */}
           <div className="flex items-center gap-1.5 flex-wrap text-xs text-[var(--color-ink-muted)]">
             {genre ? (
               <span className="px-1.5 py-0.5 rounded-full bg-[var(--color-paper-sunken)] border border-[var(--color-rule)] leading-none text-[var(--color-ink)]">
@@ -360,8 +401,8 @@ function BookCard(props: {
           </div>
         </div>
 
-        {/* 卡脚：两个明确的门 + 删除 */}
-        <div className="flex items-center gap-2 mt-0.5">
+        {/* 行内动作：两个门 + 删除 */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={onRead}
@@ -381,36 +422,34 @@ function BookCard(props: {
             进分析台
           </button>
 
-          <div className="ml-auto flex items-center">
-            {isConfirming ? (
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={onConfirmDelete}
-                  className="text-xs px-2 py-1 rounded bg-[var(--color-seal)] text-white hover:brightness-110"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  确认
-                </button>
-                <button
-                  type="button"
-                  onClick={onCancelDelete}
-                  className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-                >
-                  取消
-                </button>
-              </div>
-            ) : (
+          {isConfirming ? (
+            <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={onAskDelete}
-                aria-label={`删除 ${session.book_title}`}
-                className="text-xs px-2 py-1 rounded text-[var(--color-ink-muted)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--color-seal)] transition-opacity"
+                onClick={onConfirmDelete}
+                className="text-xs px-2 py-1 rounded bg-[var(--color-seal)] text-white hover:brightness-110"
+                style={{ fontFamily: "var(--font-display)" }}
               >
-                删除
+                确认
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={onCancelDelete}
+                className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+              >
+                取消
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onAskDelete}
+              aria-label={`删除 ${session.book_title}`}
+              className="text-xs px-2 py-1 rounded text-[var(--color-ink-muted)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--color-seal)] transition-opacity"
+            >
+              删除
+            </button>
+          )}
         </div>
       </div>
     </li>
