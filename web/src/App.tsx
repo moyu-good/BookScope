@@ -29,8 +29,12 @@ import type { QAEntry } from "./historyStorage";
 import { Onboarding } from "./Onboarding";
 import { QuestionBreakdown } from "./QuestionBreakdown";
 import { Recap } from "./Recap";
+import { Dossier } from "./Dossier";
 import { RedheadActionList } from "./RedheadActionList";
+import { RedheadDependencyGraph } from "./RedheadDependencyGraph";
 import { RedheadDocStructure } from "./RedheadDocStructure";
+import { RedheadLevelConsistency } from "./RedheadLevelConsistency";
+import { RedheadPolicyEvolution } from "./RedheadPolicyEvolution";
 import { RedheadFormatCheck } from "./RedheadFormatCheck";
 import { RedheadGlossary } from "./RedheadGlossary";
 import { RedheadHardFacts } from "./RedheadHardFacts";
@@ -698,6 +702,32 @@ function saveAutoSuggest(enabled: boolean): void {
   }
 }
 
+// 卷宗（1.6 跨文件）持久化——选进卷宗的 session_id 一组，刷新不丢、跨视图共享。
+// 跟 LLM 配置一个套路：纯本机存储，不上送服务端。
+const DOSSIER_STORAGE_KEY = "bookscope_dossier_v1";
+
+function loadDossier(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(DOSSIER_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((x): x is string => typeof x === "string");
+  } catch {
+    return [];
+  }
+}
+
+function saveDossier(ids: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DOSSIER_STORAGE_KEY, JSON.stringify(ids));
+  } catch {
+    // 隐私模式 / 配额满 / SSR ——失败默默忽略
+  }
+}
+
 export function App() {
   // 配置区 —— 从 localStorage 恢复，刷新页面不丢
   const persisted = loadPersistedConfig();
@@ -743,6 +773,7 @@ export function App() {
     | "technique"
     | "cards"
     | "revision"
+    | "dossier"
     | "redhead"
     | "redhead_actions"
     | "redhead_plain"
@@ -751,6 +782,9 @@ export function App() {
     | "redhead_timeline"
     | "redhead_glossary"
     | "redhead_formatcheck"
+    | "redhead_depgraph"
+    | "redhead_policy"
+    | "redhead_level"
   >("library");
   // 手机端左栏收成抽屉，这个控制开合
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -778,6 +812,18 @@ export function App() {
   const [currentSession, setCurrentSession] = useState<SessionMetadata | null>(
     null,
   );
+
+  // 卷宗（1.6 跨文件）：选进一组 session_id，三个跨文件视图共享。落 localStorage 刷新不丢。
+  const [dossierIds, setDossierIds] = useState<string[]>(loadDossier);
+  useEffect(() => {
+    saveDossier(dossierIds);
+  }, [dossierIds]);
+  const toggleDossier = useCallback((id: string) => {
+    setDossierIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }, []);
+  const clearDossier = useCallback(() => setDossierIds([]), []);
 
   // 当前书的体量估算（全书结构类分析大书会慢/贵/可能截断,提前提醒）。
   // 拿 TOC（每章 word_count，纯数据不调 LLM）算总字数;取不到就当不知道、不提醒。
@@ -1899,6 +1945,64 @@ export function App() {
             </>
           )}
 
+          {/* ── 卷宗 + 跨文件视图（1.6 红头文件·跨文件层）──
+              不挂在「案上当前书」下：跨文件功能认的是一组 session（卷宗），
+              跟单份功能正交。三视图都至少要 2 份才跑（组件内守卫 + 入口提示）。 */}
+          <div className={mode === "dossier" ? "" : "hidden"}>
+            <CanvasHeader
+              title="卷宗"
+              subtitle="从书库已上传的文档里多选一组、归成一份卷宗——三个跨文件视图（依据链网 / 政策演变 / 上下级一致性）都跑这一组。挑相关的几份（如一份上位规定 + 几份配套实施件），至少 2 份。选中状态本机保存，刷新不丢。"
+            />
+            <Dossier
+              selectedIds={dossierIds}
+              onToggle={toggleDossier}
+              onClear={clearDossier}
+              refreshTrigger={shelfRefresh}
+            />
+          </div>
+
+          <div className={mode === "redhead_depgraph" ? "" : "hidden"}>
+            <CanvasHeader
+              title="依据链网"
+              subtitle="把一卷宗里好几份公文的关系画成一张有向网——谁依据谁、谁落实谁、新文件废了哪份旧的、机关之间谁管谁。文件按层级依据分层排，关系全从原文锚出来。先去「卷宗」选一组（≥2 份）。适合一组相关的党政公文 / 红头文件。"
+            />
+            <RedheadDependencyGraph
+              bookSessionIds={dossierIds}
+              provider={provider}
+              apiKey={apiKey}
+              model={model}
+              baseUrl={effectiveBaseUrl()}
+            />
+          </div>
+
+          <div className={mode === "redhead_policy" ? "" : "hidden"}>
+            <CanvasHeader
+              title="政策演变"
+              subtitle="把一卷宗里好几份公文按成文日期排成一条线——哪份先出、改了什么、再哪份接着改，看一项政策怎么一步步演变到现在，每阶段钉一句原话。可只盯一个主题排。先去「卷宗」选一组（≥2 份）。适合一组同主题、有先后的党政公文。"
+            />
+            <RedheadPolicyEvolution
+              bookSessionIds={dossierIds}
+              provider={provider}
+              apiKey={apiKey}
+              model={model}
+              baseUrl={effectiveBaseUrl()}
+            />
+          </div>
+
+          <div className={mode === "redhead_level" ? "" : "hidden"}>
+            <CanvasHeader
+              title="上下级一致性"
+              subtitle="把卷宗里上位文件和下位文件并排勘对，挑出对不上的地方——走样 / 加码 / 漏落实，每处上下两栏对照、各钉原话。需要卷宗里有明确上下级关系的公文（上位规定 + 下位实施件）。先去「卷宗」选一组（≥2 份）。"
+            />
+            <RedheadLevelConsistency
+              bookSessionIds={dossierIds}
+              provider={provider}
+              apiKey={apiKey}
+              model={model}
+              baseUrl={effectiveBaseUrl()}
+            />
+          </div>
+
           <Footer />
         </div>
       </main>
@@ -1935,6 +2039,7 @@ type Mode =
   | "technique"
   | "cards"
   | "revision"
+  | "dossier"
   | "redhead"
   | "redhead_actions"
   | "redhead_plain"
@@ -1942,7 +2047,10 @@ type Mode =
   | "redhead_hardfacts"
   | "redhead_timeline"
   | "redhead_glossary"
-  | "redhead_formatcheck";
+  | "redhead_formatcheck"
+  | "redhead_depgraph"
+  | "redhead_policy"
+  | "redhead_level";
 
 // 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
@@ -1978,6 +2086,7 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   { id: "revision", label: "改稿清单" },
   // 1.6 红头文件公文功能暂藏:引擎还在做透(头要素已修,跨文件锚定/条款补全未完),
   // 等单份+跨文件都 ship-quality 再亮出来单独发。代码留在仓里、用户点不到。
+  // 单份功能：
   // { id: "redhead", label: "公文结构" },
   // { id: "redhead_actions", label: "办事清单" },
   // { id: "redhead_plain", label: "大白话翻译" },
@@ -1986,6 +2095,11 @@ const NAV_MODES: { id: Mode; label: string }[] = [
   // { id: "redhead_timeline", label: "关键时间轴" },
   // { id: "redhead_glossary", label: "名词解释" },
   // { id: "redhead_formatcheck", label: "规范性自检" },
+  // 跨文件层（1.6 卷宗 + 三视图，同样暂藏）：
+  // { id: "dossier", label: "卷宗" },
+  // { id: "redhead_depgraph", label: "依据链网" },
+  // { id: "redhead_policy", label: "政策演变" },
+  // { id: "redhead_level", label: "上下级一致性" },
 ];
 
 // agent 编排菜单的功能名（后端 orchestrate FEATURE_MENU 的键）→ App 的 mode。
@@ -2280,6 +2394,40 @@ function NavIcon({
         <path d="M5 3v18h6" />
         <path d="M16.5 12 21 14v3c0 2.5-2 4-4.5 5C14 21 12 19.5 12 17v-3z" />
         <path d="M14.7 16.8 16 18l2.5-2.6" />
+      </>
+    ),
+    // 卷宗——函套 / 文件夹收一摞文书
+    dossier: (
+      <>
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <path d="M3 11h18" />
+      </>
+    ),
+    // 依据链网——分层节点 + 有向连线（层级依据图）
+    redhead_depgraph: (
+      <>
+        <rect x="9" y="3" width="6" height="3.5" rx="0.6" />
+        <rect x="3.5" y="14" width="6" height="3.5" rx="0.6" />
+        <rect x="14.5" y="14" width="6" height="3.5" rx="0.6" />
+        <path d="M11 6.5 6.8 14M13 6.5 17 14" />
+      </>
+    ),
+    // 政策演变——纪年轴 + 阶段点（编年时序）
+    redhead_policy: (
+      <>
+        <path d="M6 3v18" />
+        <circle cx="6" cy="7" r="1.6" />
+        <circle cx="6" cy="12.5" r="1.6" />
+        <circle cx="6" cy="18" r="1.6" />
+        <path d="M10 7h9M10 12.5h7M10 18h9" />
+      </>
+    ),
+    // 上下级一致性——两栏并排勘合（对照校核）
+    redhead_level: (
+      <>
+        <rect x="3.5" y="5" width="7" height="14" rx="1" />
+        <rect x="13.5" y="5" width="7" height="14" rx="1" />
+        <path d="M12 8v8" strokeDasharray="2 2" />
       </>
     ),
     library: (
