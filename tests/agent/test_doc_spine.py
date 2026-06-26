@@ -284,3 +284,51 @@ def test_coerce_clause_drops_non_int_chapter():
     assert ok["chapter"] == 2
     assert ok["instruction_type"] == "信息告知"  # 缺指令类型退兜底
     assert ok["deadline"] == ""  # 缺时限留空
+
+
+# ── 头要素新增:密级 / 紧急程度(GB/T 9704 版头要素,研究笔记 004 §3.1)─────────────
+def test_classification_and_urgency_in_head_fields():
+    """密级 / 紧急程度 进了头要素清单(产品级安全信号 + 紧急信号)。"""
+    assert "密级" in ds._HEAD_FIELDS
+    assert "紧急程度" in ds._HEAD_FIELDS
+
+
+def test_classification_urgency_blank_pending_when_absent(monkeypatch):
+    """绝大多数公文不标密级/紧急程度——抽不到留空待核,绝不硬凑。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    by_field = {el["field"]: el for el in spine["head"]}
+    for f in ("密级", "紧急程度"):
+        assert by_field[f]["value"] == ""  # 没标就留空
+        assert by_field[f]["verified"] is False  # 标待核
+
+
+def test_classification_extracted_and_verified(monkeypatch):
+    """涉密+特急件:密级/紧急程度抽到且 evidence 命中原文 → 收下并核过。"""
+    chunks = [
+        {"chunk_id": "h0", "chapter": 0,
+         "text": "机密★1年 特急 市发展改革委文件 X发〔2024〕5号 "
+                 "关于做好新能源补贴申报的通知。"},
+        {"chunk_id": "c1", "chapter": 1,
+         "text": "各县区发展改革局应当于2024年6月30日前完成材料汇总上报。"},
+    ]
+    head = _head_payload([
+        {"field": "密级", "value": "机密", "evidence": "机密★1年 特急 市发展改革委文件"},
+        {"field": "紧急程度", "value": "特急", "evidence": "机密★1年 特急 市发展改革委文件"},
+    ])
+    spine = _run(monkeypatch, head_text=head, clause_text=_full_clauses(), chunks=chunks)
+    by_field = {el["field"]: el for el in spine["head"]}
+    assert by_field["密级"]["value"] == "机密"
+    assert by_field["密级"]["verified"] is True
+    assert by_field["紧急程度"]["value"] == "特急"
+    assert by_field["紧急程度"]["verified"] is True
+
+
+# ── instruction_type 接行文方向先验(研究笔记 004 §3.2)──────────────────────────
+def test_clause_prompt_carries_direction_prior():
+    """条款维 prompt 把上行/下行/平行的行文方向先验喂进去了,文种名出现在 prompt 里。"""
+    instr = ds._INSTR_CLAUSE
+    assert "上行文" in instr and "下行文" in instr and "平行文" in instr
+    # 文种名嵌进先验(请示=上行、命令=下行、函=平行)
+    assert "请示" in instr and "命令" in instr and "函" in instr
+    # 点明上行文的措辞别误判成对下级硬要求
+    assert "别判成对下级" in instr or "别判成对下级的硬要求" in instr
