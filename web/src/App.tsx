@@ -40,6 +40,7 @@ import { RedheadGlossary } from "./RedheadGlossary";
 import { RedheadHardFacts } from "./RedheadHardFacts";
 import { RedheadPlainLanguage } from "./RedheadPlainLanguage";
 import { RedheadRelevance } from "./RedheadRelevance";
+import { RedheadStakes } from "./RedheadStakes";
 import { RedheadTimeline } from "./RedheadTimeline";
 import { RelationshipTimeline } from "./RelationshipTimeline";
 import { RevisionList } from "./RevisionList";
@@ -778,6 +779,7 @@ export function App() {
     | "redhead_actions"
     | "redhead_plain"
     | "redhead_relevance"
+    | "redhead_stakes"
     | "redhead_hardfacts"
     | "redhead_timeline"
     | "redhead_glossary"
@@ -1929,6 +1931,20 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "redhead_stakes" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="利害与风向"
+                  subtitle="说一句你是谁，把这份公文藏着的机会（可争取的红利）、风险（暴露面 / 代价）挑出来，每条标含金量（真金白银 / 有条件 / 空头倡导）、钉原文；再研判它透出的政策风向——弦外之音，标研判、不当核实的事实。适合党政公文 / 红头文件。"
+                />
+                <RedheadStakes
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "redhead_hardfacts" ? "" : "hidden"}>
                 <CanvasHeader
                   title="硬信息提取"
@@ -2086,6 +2102,7 @@ type Mode =
   | "redhead_actions"
   | "redhead_plain"
   | "redhead_relevance"
+  | "redhead_stakes"
   | "redhead_hardfacts"
   | "redhead_timeline"
   | "redhead_glossary"
@@ -2100,7 +2117,7 @@ const WHOLE_BOOK_MODES = new Set<Mode>([
   "graph", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
   "timeline", "narrative", "consistency", "argument", "style", "technique",
   "cards", "revision", "redhead", "redhead_actions", "redhead_plain",
-  "redhead_relevance", "redhead_hardfacts", "redhead_timeline",
+  "redhead_relevance", "redhead_stakes", "redhead_hardfacts", "redhead_timeline",
   "redhead_glossary", "redhead_formatcheck",
 ]);
 
@@ -2187,6 +2204,7 @@ const NAV_GROUPS: NavGroup[] = [
     key: "redhead_act",
     title: "公文 · 抓重点办事",
     modes: [
+      { id: "redhead_stakes", label: "利害与风向" },
       { id: "redhead_actions", label: "办事清单" },
       { id: "redhead_relevance", label: "跟我相关" },
       { id: "redhead_hardfacts", label: "硬信息提取" },
@@ -2487,6 +2505,16 @@ function NavIcon({
         <path d="M5 3v18h7" />
         <circle cx="17" cy="16" r="2.5" />
         <path d="M13.5 21a3.5 3.5 0 0 1 7 0" />
+      </>
+    ),
+    // 利害与风向——天平(权衡机会/风险)
+    redhead_stakes: (
+      <>
+        <path d="M12 3v18" />
+        <path d="M5 7h14" />
+        <path d="M5 7l-2.5 5.5a3 3 0 0 0 5 0z" />
+        <path d="M19 7l-2.5 5.5a3 3 0 0 0 5 0z" />
+        <path d="M8 21h8" />
       </>
     ),
     // 硬信息提取——文件 + 放大镜，把硬数据抠出来

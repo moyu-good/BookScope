@@ -1007,6 +1007,60 @@ class RedheadRelevanceResponse(BaseModel):
     trace: dict = Field(default_factory=dict, description="运行用量 trace。")
 
 
+class RedheadStakesRequest(RedheadDocStructureRequest):
+    """POST /api/agent/redhead/stakes 请求体（利害与风向：机会/风险/信号 + 含金量，按角色）。
+
+    比单份解读多一个身份：同一份公文，个体户/投资人/某局看到的利害与风向不同。
+    """
+
+    role: str = Field(
+        ..., min_length=1, max_length=100,
+        description="用户身份（个体户/投资人/某局/企业…），据此研判利害与风向。",
+    )
+
+
+class RedheadStakesResponse(BaseModel):
+    """POST /api/agent/redhead/stakes 响应体（利害与风向）。
+
+    两种证据契约（1.6.1 evidence-first 升级）：机会/风险=**证据层**（锚原文、过核验、可盖鉴印）；
+    信号=**评估层**（标研判 + 引发它的原文基础 + 置信度，绝不盖鉴印冒充事实）。裸推断零容忍。
+    含金量（substance）按钱学森开环/闭环判：闭环(指令+主体+时限+考核罚则)=真金白银，开环(纯号召)=空头。
+    """
+
+    role: str = Field(default="", description="回显用户身份。")
+    opportunities: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "机会（可争取的红利）。每条 {what, why（对这角色为何是机会）, action（可采取的动作）, "
+            "substance（真金白银/有条件兑现/空头倡导）, substance_reason（凭哪些 marker 判，锚原文）, "
+            "horizon（近/远/无期）, evidence, verified, match_score}。证据层，按 substance 排序。"
+        ),
+    )
+    risks: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "风险（暴露面/代价）。每条 {what, cost（代价/后果）, substance, substance_reason, "
+            "horizon, evidence, verified, match_score}。证据层，按 substance 排序。"
+        ),
+    )
+    signals: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "信号（弦外之音/政策风向）。每条 {direction（研判出的方向）, basis（引发它的原文片段列表）, "
+            "confidence（高/中/低）}。评估层——标研判、绝不盖鉴印；无原文基础的信号一条都不出。"
+        ),
+    )
+    recommendation: str = Field(
+        default="",
+        description="系统一句话建议（带立场、轻重缓急）：哪些真金白银值得马上动、哪些空头别当真。",
+    )
+    scanned: bool = Field(
+        default=False, description="false=失败/非公文退场；true+空=没研判出。"
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
 class RedheadHardFactsResponse(BaseModel):
     """POST /api/agent/redhead/hard-facts 响应体（硬信息提取表）。"""
 

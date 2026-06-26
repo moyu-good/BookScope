@@ -100,6 +100,7 @@ from bookscope.agent.redhead_glossary import glossary_from_spine
 from bookscope.agent.redhead_hard_facts import hard_facts_from_spine
 from bookscope.agent.redhead_plain import plain_language_from_spine
 from bookscope.agent.redhead_relevance import relevance_from_spine
+from bookscope.agent.redhead_stakes import stakes_from_doc
 from bookscope.agent.redhead_timeline import (
     timeline_from_spine as redhead_timeline_from_spine,
 )
@@ -173,6 +174,8 @@ from bookscope.api.schemas import (
     RedheadPolicyEvolutionResponse,
     RedheadRelevanceRequest,
     RedheadRelevanceResponse,
+    RedheadStakesRequest,
+    RedheadStakesResponse,
     RedheadTimelineResponse,
     RelationshipTimelineRequest,
     RelationshipTimelineResponse,
@@ -3258,6 +3261,40 @@ async def agent_redhead_relevance(
         role=result.get("role", request.role),
         items=items,
         scanned=bool(items),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/redhead/stakes", response_model=RedheadStakesResponse)
+async def agent_redhead_stakes(
+    request: RedheadStakesRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadStakesResponse:
+    """利害与风向:按角色研判这份公文藏的机会/风险(带含金量:真金白银 vs 空头)+ 透出的信号(弦外之音)。
+
+    机会/风险=证据层(锚原文核验);信号=评估层(标研判+置信度+原文基础,绝不盖鉴印)。
+    含金量按开环/闭环判:闭环(有主体+时限+考核罚则)=真金白银,开环(纯号召)=空头倡导。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = stakes_from_doc(
+        chunks=chunks, role=request.role, llm_client=rec, model=model, full_text=full_text
+    )
+    opportunities = result.get("opportunities") or []
+    risks = result.get("risks") or []
+    signals = result.get("signals") or []
+    return RedheadStakesResponse(
+        role=result.get("role", request.role),
+        opportunities=opportunities,
+        risks=risks,
+        signals=signals,
+        recommendation=result.get("recommendation", ""),
+        scanned=bool(opportunities or risks or signals),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
