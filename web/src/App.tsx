@@ -1458,7 +1458,6 @@ export function App() {
                 title="选一本书"
                 subtitle="从书库挑一本，或上传新的——选定后左栏会列出能对它做的事。"
               />
-              {!currentSession && <CapabilityShowcase />}
               <Onboarding type="first_visit" triggered />
               <BookShelf
                 activeSessionId={currentSession?.session_id ?? null}
@@ -1469,6 +1468,7 @@ export function App() {
                 pendingAutoSelectId={pendingAutoSelectId}
                 onAutoSelected={handleAutoSelected}
               />
+              {!currentSession && <CapabilityShowcase />}
               <Onboarding
                 type="first_switch"
                 triggered={hasSwitched}
@@ -2806,7 +2806,13 @@ function Sidebar(props: {
       {/* 模式导航——按意图分五组，每组一个可折叠小标题；组内图标 + 一个词。
           活动项朱砂左边线 + 淡底；题材突出的组标题描朱、不突出的默认收起。 */}
       <nav className="flex-1 px-2.5 overflow-y-auto">
-        {NAV_GROUPS.map((group) => {
+        {!hasBook && (
+          <p className="px-2.5 py-3 text-[11px] text-[var(--color-ink-muted)] leading-relaxed">
+            先从书柜挑一本书，这里就列出能对它做的分析。
+          </p>
+        )}
+        {hasBook &&
+          NAV_GROUPS.map((group) => {
           // 跨垂直隐藏(#18):不在当前题材可见集里的组直接不渲染(公文藏书组 / 书藏公文组);
           // visible 为 null(没 genre/认不出)时全渲染。
           if (visible && !visible.has(group.key)) return null;
@@ -4428,13 +4434,13 @@ function CapabilityShowcase() {
   return (
     <section className="mt-10">
       <p className="text-sm text-[var(--color-ink-muted)] mb-4 leading-relaxed">
-        选一本书，BookScope 替你深读——下面每件事都现读现答、每个结论钉在原文上：
+        ↑ 上面挑一本书，左栏就列出能对它做的事。选了书能做这些（都现读现答、结论钉在原文）：
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 stagger">
         {CAPABILITIES.map((c) => (
           <div
             key={c.t}
-            className="rounded-lg border border-[var(--color-rule)] p-4 hover:border-[var(--color-seal)] transition-colors"
+            className="rounded-lg border border-[var(--color-rule)] p-4"
             style={{
               background: "var(--color-paper-raised)",
               boxShadow: "var(--shadow-soft)",
