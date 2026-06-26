@@ -35,6 +35,7 @@ interface HeadElement {
   evidence: string;
   verified: boolean;
   match_score: number;
+  not_applicable?: boolean; // 法规本体(条例/规定/办法…)无此"发文"要素 → 显"本文种无此项"而非"待核"，且不计入分母
 }
 
 interface Clause {
@@ -223,6 +224,9 @@ export function RedheadDocStructure({
   const head = result.head ?? [];
   const clauses = result.clauses ?? [];
   const headFilled = head.filter((h) => hasValue(h.value)).length;
+  // 分母只数"本文种该有"的要素——法规本体没有发文字号/密级/签发人这些,标了 N/A 的不算分母,
+  // 免得一份条例显"3/10"像抽坏了(其实适用的 4 项都抽到了 → 显"4/4")。
+  const headApplicable = head.filter((h) => !h.not_applicable).length;
   const clauseVerified = clauses.filter((c) => c.verified && c.evidence).length;
 
   // 版头意象：标题事由抽出来当版头大标题（公文版头正中那行），其余八项照常列在红线下。
@@ -285,7 +289,7 @@ export function RedheadDocStructure({
         <div className="mt-2 flex items-center justify-center gap-2">
           <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
           <span className="text-[11px] text-[var(--color-ink-muted)] tabular-nums">
-            头要素 抽到 {headFilled}/{head.length || 8}
+            头要素 抽到 {headFilled}/{headApplicable || head.length || 8}
           </span>
           <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
         </div>
@@ -350,6 +354,10 @@ export function RedheadDocStructure({
                         </button>
                       )}
                     </div>
+                  ) : h.not_applicable ? (
+                    <span className="text-sm text-[var(--color-ink-muted)]">
+                      本文种无此项
+                    </span>
                   ) : (
                     <span className="text-sm text-[var(--color-ink-muted)] italic">
                       待核

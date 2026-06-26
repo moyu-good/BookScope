@@ -302,6 +302,51 @@ def test_classification_urgency_blank_pending_when_absent(monkeypatch):
         assert by_field[f]["verified"] is False  # 标待核
 
 
+# ── 法规本体 N/A 区分:条例没有的"发文"要素标"本文种无此项"不标待核 ───────────────────
+def test_regulation_marks_na_not_pending(monkeypatch):
+    """法规本体(条例)结构上没有发文字号/密级/紧急程度/主送/抄送/签发人 → 标 not_applicable,
+    区别于待核(该有却没抽到)。文种/发文机关/标题事由/成文日期这些法规该有的不标 N/A。
+    回应作者:一份条例显"头要素 3/10、全待核"会让人以为抽坏了,其实是文件本就没那 6 项。"""
+    head = _head_payload([
+        {"field": "文种", "value": "条例", "evidence": "制定本条例"},
+        {"field": "发文机关", "value": "广州市人民代表大会常务委员会",
+         "evidence": "广州市第十五届人民代表大会常务委员会第四十二次会议通过"},
+        {"field": "标题事由", "value": "广州市优化营商环境条例",
+         "evidence": "广州市优化营商环境条例"},
+        {"field": "成文日期", "value": "2020年10月28日",
+         "evidence": "2020年10月28日广州市第十五届人民代表大会常务委员会第四十二次会议通过"},
+    ])
+    chunks = [
+        {"chunk_id": "h0", "chapter": 0,
+         "text": "广州市优化营商环境条例 2020年10月28日广州市第十五届人民代表大会常务委员会"
+                 "第四十二次会议通过 第一条 为优化营商环境，制定本条例。"},
+    ]
+    spine = _run(
+        monkeypatch, head_text=head,
+        clause_text=_clause_payload([
+            {"chapter": 1, "matter": "立法目的", "instruction_type": "依据陈述",
+             "actor": "", "deadline": "", "basis_ref": "",
+             "evidence": "第一条 为优化营商环境，制定本条例。"},
+        ]),
+        chunks=chunks,
+    )
+    by_field = {el["field"]: el for el in spine["head"]}
+    # 法规没有的 6 个"发文"要素 → not_applicable=True(空值,但不是待核)
+    for f in ("发文字号", "密级", "紧急程度", "主送机关", "抄送机关", "签发人"):
+        assert by_field[f].get("not_applicable") is True, f"{f} 该标本文种无此项"
+        assert by_field[f]["value"] == ""
+    # 法规该有的 4 项不标 N/A
+    for f in ("文种", "发文机关", "标题事由", "成文日期"):
+        assert by_field[f].get("not_applicable") is not True, f"{f} 不该标 N/A"
+
+
+def test_notice_head_no_na(monkeypatch):
+    """普通公文(通知)不标 N/A——空要素仍是待核(该有可能没抽到,不是文种没有)。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    for el in spine["head"]:
+        assert el.get("not_applicable") is not True
+
+
 def test_classification_extracted_and_verified(monkeypatch):
     """涉密+特急件:密级/紧急程度抽到且 evidence 命中原文 → 收下并核过。"""
     chunks = [
