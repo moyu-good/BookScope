@@ -25,8 +25,9 @@ class TestDefaultModelFor:
     def test_deepseek_unchanged(self) -> None:
         assert default_model_for("deepseek") == "deepseek-v4-flash"
 
-    def test_anthropic_unchanged(self) -> None:
-        assert default_model_for("anthropic") == "claude-sonnet-4-6"
+    def test_anthropic_default_is_opus(self) -> None:
+        # 1.5.4 起 anthropic 默认 = claude-opus-4-8(对齐前端 preset 留空项"默认最强")
+        assert default_model_for("anthropic") == "claude-opus-4-8"
 
     def test_unknown_falls_back_to_deepseek(self) -> None:
         """Literal 在 schema 层兜底，这里只是 dict.get 默认值演练。"""

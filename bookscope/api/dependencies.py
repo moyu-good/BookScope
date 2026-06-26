@@ -31,9 +31,12 @@ from bookscope.api.session_storage import JSONFileSessionStorage
 
 DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     "deepseek": "deepseek-v4-flash",
-    "anthropic": "claude-sonnet-4-6",
+    "anthropic": "claude-opus-4-8",
 }
-"""默认模型名（ADR-002 v2 + 第 30 轮）。请求不传 model 时使用。"""
+"""默认模型名（ADR-002 v2 + 第 30 轮；anthropic 默认 1.5.4 由 sonnet-4-6 改 opus-4-8——
+前端 preset 留空项标的是"默认最强"=opus,留空=用后端默认,二者必须对得上;且用户主动选
+Anthropic 备选档时给最强 Claude 合理,大众便宜档由 deepseek-flash 这个 provider 兜底）。
+请求不传 model 时使用。"""
 
 
 DEFAULT_SESSIONS_ROOT: Path = Path("data/sessions")

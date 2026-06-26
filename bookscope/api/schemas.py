@@ -62,7 +62,7 @@ class AgentAskRequest(BaseModel):
         default=None,
         description=(
             "覆盖默认 model（可选）。不传时由 provider 决定默认值："
-            "deepseek -> deepseek-v4-flash；anthropic -> claude-sonnet-4-6。"
+            "deepseek -> deepseek-v4-flash；anthropic -> claude-opus-4-8。"
         ),
     )
     base_url: str | None = Field(
