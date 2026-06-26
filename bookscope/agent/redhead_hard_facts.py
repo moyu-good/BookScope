@@ -56,10 +56,19 @@ logger = logging.getLogger(__name__)
 HARD_FACTS_SCHEMA_VERSION = "v1"
 """硬信息表结构版本——升级要让从文脉派生的这层重算(文脉缓存不受影响,只是这层重跑)。"""
 
-DEFAULT_HARD_FACTS_MAX_TOKENS = 1500
-"""一次扫全份抽硬信息的 max_tokens。一份公文的硬信息条目不会太多(几条到几十条),1500 够装
-一张表,还留足 reasoning 头(deepseek-v4-flash 把 reasoning_content 算进 max_tokens,
-见 reference_reasoning_model_token_budget)。"""
+DEFAULT_HARD_FACTS_MAX_TOKENS = 8000
+"""一次扫全份抽硬信息的 max_tokens。
+
+**1500 是返 0 的根因**:这功能把整份公文原文进上下文(``build_longctx_system`` 全文),
+跟时间轴(只喂逐条款紧凑清单、输入轻)不是一码事——全文进上下文后,deepseek-v4-flash 会
+先吐一大段 ``reasoning_content``,而它把 reasoning 也算进 max_tokens(见
+reference_reasoning_model_token_budget)。1500 这点预算全被 reasoning 吃光,
+``finish_reason=length`` 而 ``content`` 是空的,解析自然抽到 0 条(国办意见实测:
+1500→content 空、facts 0;8000→正常抽到「2020年底前」等)。
+
+所以对齐**同样把整份原文进上下文**的兄弟那档:``doc_spine._build_head_elements`` 走
+``DEFAULT_DOC_SPINE_MAX_TOKENS = 8000``。8000 装得下一张几十条的硬信息表,还给
+reasoning 留足头;真被截断有 ``salvage_closed_objects`` 抢救兜底。"""
 
 # 五类硬信息(封闭集)。落不进这五类的条目丢——不让模型自造一类硬信息(同文种 / 指令类型封闭集
 # 的纪律)。顺序就是速查表里分组的展示顺序。
@@ -209,7 +218,9 @@ def hard_facts_from_spine(
         full_text: 这份公文的**完整原文**(含公布头)。传了抽取就用它进上下文 + 当核验兜底锚
             (公布头在"第一章"前会被分块层丢掉,光拿 chunks 拼全文里的生效日期等可能核不过);
             没传退回 ``chunks`` 拼接(向后兼容)。
-        max_tokens: 一次扫全份抽硬信息的 max_tokens(一张表够用)。
+        max_tokens: 一次扫全份抽硬信息的 max_tokens。整份原文进上下文后 reasoning 也吃这个
+            预算(deepseek-v4-flash),太小会被 reasoning 吃光导致 content 空、抽 0 条——
+            默认 8000 对齐 ``doc_spine`` 同样全文进上下文那档。
         max_workers: 占位,不生效(一次扫全份不分段)。
         cache_enabled: 是否走 L2 缓存(默认开;抽取层 + 文脉层都吃)。
         **spine_kwargs: 透传给 ``get_or_build_doc_spine`` 的其余参数(char_budget 等)。
