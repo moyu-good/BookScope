@@ -469,6 +469,62 @@ def test_level_anchors_doc_without_number_by_title(monkeypatch):
     assert out[0]["deviation"] == "加码"
 
 
+def test_level_deviation_types_include_dichu():
+    """封闭集补了立法法本名「抵触」(真正的违法标签)。"""
+    assert "抵触" in cdv.DEVIATION_TYPES
+    for t in ("抵触", "走样", "加码", "漏落实"):
+        assert t in cdv.DEVIATION_TYPES
+
+
+def test_level_accepts_dichu_deviation(monkeypatch):
+    """模型用立法法术语「抵触」标走样 → 落进封闭集、不被滤掉。"""
+    payload = json.dumps({"deviations": [{
+        "topic": "补贴标准", "detail": "下位违反上位强制规定", "deviation": "抵触",
+        "upper": "省发〔2024〕1号", "lower": "市发〔2024〕5号",
+        "upper_clause": 1, "lower_clause": 1,
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _level(payload)
+    assert len(out) == 1
+    assert out[0]["deviation"] == "抵触"
+
+
+def test_org_variation_authority_subjects():
+    """变通权主体认得出:民族自治地方 / 经济特区 → True;一般省市政府 → False。"""
+    assert cdv._has_variation_authority("内蒙古自治区人民代表大会常务委员会") is True
+    assert cdv._has_variation_authority("延边朝鲜族自治州人民政府") is True
+    assert cdv._has_variation_authority("某某自治县人民政府") is True
+    assert cdv._has_variation_authority("某民族乡人民政府") is True
+    assert cdv._has_variation_authority("深圳经济特区") is True
+    assert cdv._has_variation_authority("某省政府") is False
+    assert cdv._has_variation_authority("某省某市政府") is False
+    assert cdv._has_variation_authority("") is False
+
+
+def test_org_level_autonomous_subjects_keep_level():
+    """变通权主体的层级照样判得出(自治州→3 / 自治县→4 / 自治区→2)。"""
+    assert cdv._org_level("内蒙古自治区人大常委会") == 2
+    assert cdv._org_level("延边朝鲜族自治州政府") == 3
+    assert cdv._org_level("某自治县政府") == 4
+    assert cdv._org_level("某省政府") == 2
+
+
+def test_level_digest_carries_variation_flag():
+    """收清单时把「变通权」标进 digest(喂给 LLM 做抵触/变通区分用)。"""
+    spines = [
+        {"head": _head(num="国发〔2024〕1号", doc_type="决定", org="国务院",
+                       date="2024年1月1日", title="全国统一规则"),
+         "clauses": [_clause(1, "x", evidence="国务院定的全国规则。")]},
+        {"head": _head(num="", doc_type="单行条例", org="某某自治县人民代表大会",
+                       date="2024年3月1日", title="某自治县变通规定"),
+         "clauses": [_clause(1, "y", evidence="本自治县据自治权变通如下。")]},
+    ]
+    digest, _nums, _lv, _ev = cdv._collect_level_inventory(spines)
+    by_org = {d["发文机关"]: d for d in digest}
+    assert by_org["国务院"]["变通权"] is False
+    assert by_org["某某自治县人民代表大会"]["变通权"] is True
+
+
 def test_level_consistent_returns_empty(monkeypatch):
     """都一致(LLM 返空数组)→ [] 而非 None(区分'都对得上'和'失败')。"""
     _patch(monkeypatch, json.dumps({"deviations": []}))
