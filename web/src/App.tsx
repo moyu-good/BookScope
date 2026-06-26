@@ -682,6 +682,33 @@ function savePersistedConfig(config: PersistedConfig): void {
   }
 }
 
+const APP_VERSION = "1.5.4";
+
+// 主题(亮/暗,#20)持久化——默认亮(没存过/解析失败都按亮,不惊动老用户)。
+// 应用在 <html data-theme>;index.css 的 [data-theme="dark"] 接管暗色 palette。
+const THEME_STORAGE_KEY = "bookscope_theme_v1";
+type ThemeMode = "light" | "dark";
+
+function loadTheme(): ThemeMode {
+  if (typeof window === "undefined") return "light";
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark"
+      ? "dark"
+      : "light";
+  } catch {
+    return "light";
+  }
+}
+
+function saveTheme(theme: ThemeMode): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    /* 隐私模式 / 配额满——忽略 */
+  }
+}
+
 // 自动建议开关持久化——单独存一个布尔，默认开（没存过 / 解析失败都按开）。
 const AUTO_SUGGEST_STORAGE_KEY = "bookscope_auto_suggest_v1";
 
@@ -749,6 +776,14 @@ export function App() {
   const [baseUrl, setBaseUrl] = useState(persisted?.baseUrl ?? "");
   // LLM 配置降级——收进设置抽屉，不占头版
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 主题(亮/暗,#20):存 localStorage,应用在 <html data-theme>,暗色 palette 由 index.css 接管。
+  const [theme, setTheme] = useState<ThemeMode>(loadTheme);
+  useEffect(() => {
+    saveTheme(theme);
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", theme);
+    }
+  }, [theme]);
   // app-shell 当前主画布显示哪一件事（左栏导航切换）
   const [mode, setMode] = useState<
     | "library"
@@ -1386,6 +1421,8 @@ export function App() {
               setBaseUrl={setBaseUrl}
               autoSuggestEnabled={autoSuggestEnabled}
               setAutoSuggestEnabled={setAutoSuggestEnabled}
+              theme={theme}
+              setTheme={setTheme}
               onClose={() => setSettingsOpen(false)}
             />
           )}
@@ -4172,14 +4209,35 @@ function SettingsDrawer(props: {
   setBaseUrl: (s: string) => void;
   autoSuggestEnabled: boolean;
   setAutoSuggestEnabled: (b: boolean) => void;
+  theme: ThemeMode;
+  setTheme: (t: ThemeMode) => void;
   onClose: () => void;
 }) {
   const {
     onClose,
     autoSuggestEnabled,
     setAutoSuggestEnabled,
+    theme,
+    setTheme,
     ...config
   } = props;
+  const [clearing, setClearing] = useState(false);
+  const [clearMsg, setClearMsg] = useState("");
+  async function handleClearCache() {
+    if (clearing) return;
+    setClearing(true);
+    setClearMsg("");
+    try {
+      const resp = await fetch("/api/cache/clear", { method: "POST" });
+      setClearMsg(
+        resp.ok ? "分析缓存已清空,下次分析重新现算。" : "清理失败,稍后再试。",
+      );
+    } catch {
+      setClearMsg("清理失败,稍后再试。");
+    } finally {
+      setClearing(false);
+    }
+  }
   return (
     <div
       className="reveal mt-6 rounded-lg border border-[var(--color-rule)] p-4"
@@ -4258,6 +4316,99 @@ function SettingsDrawer(props: {
             }}
           />
         </button>
+      </div>
+
+      {/* 暗色主题(#20) */}
+      <div
+        className="mt-4 pt-4 flex items-start justify-between gap-4"
+        style={{ borderTop: "1px solid var(--color-rule)" }}
+      >
+        <div className="min-w-0">
+          <div
+            className="text-sm text-[var(--color-ink)]"
+            style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
+          >
+            暗色主题
+          </div>
+          <p className="mt-1 text-xs text-[var(--color-ink-muted)] leading-relaxed">
+            护眼的暗色案头（暖炭墨调，不是冷黑）。设置存在本地，刷新不丢。
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={theme === "dark"}
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="relative shrink-0 mt-0.5 inline-flex h-6 w-11 items-center rounded-full transition-colors"
+          style={{
+            background:
+              theme === "dark" ? "var(--color-seal)" : "var(--color-rule)",
+          }}
+        >
+          <span
+            className="inline-block rounded-full bg-white transition-transform"
+            style={{
+              transform:
+                theme === "dark" ? "translateX(1.4rem)" : "translateX(0.18rem)",
+              width: "1.05rem",
+              height: "1.05rem",
+            }}
+          />
+        </button>
+      </div>
+
+      {/* 清分析缓存(#20) */}
+      <div
+        className="mt-4 pt-4"
+        style={{ borderTop: "1px solid var(--color-rule)" }}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div
+              className="text-sm text-[var(--color-ink)]"
+              style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
+            >
+              清分析缓存
+            </div>
+            <p className="mt-1 text-xs text-[var(--color-ink-muted)] leading-relaxed">
+              结果像旧的、或换了书重抓后想强制重算时点一下。只清分析缓存，书不会删；下次分析重新现算（会重新花 token）。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleClearCache}
+            disabled={clearing}
+            className="shrink-0 mt-0.5 text-xs px-3 py-1.5 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
+          >
+            {clearing ? "清理中…" : "清缓存"}
+          </button>
+        </div>
+        {clearMsg && (
+          <p className="mt-2 text-xs text-[var(--color-seal)]">{clearMsg}</p>
+        )}
+      </div>
+
+      {/* 关于(#20) */}
+      <div
+        className="mt-4 pt-4 text-xs text-[var(--color-ink-muted)] leading-relaxed"
+        style={{ borderTop: "1px solid var(--color-rule)" }}
+      >
+        <div
+          className="text-sm text-[var(--color-ink)] mb-1"
+          style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
+        >
+          关于
+        </div>
+        书鉴 · BookScope v{APP_VERSION}——查询时智能代理 + 原文证据的深读引擎。BYOK：你的
+        key 只存本地、随请求直发你选的 LLM，不经 BookScope 服务器。
+        <a
+          href="https://github.com/moyu-good/BookScope"
+          target="_blank"
+          rel="noreferrer"
+          className="ml-1 text-[var(--color-seal)] hover:underline"
+        >
+          代码仓库
+        </a>
       </div>
     </div>
   );

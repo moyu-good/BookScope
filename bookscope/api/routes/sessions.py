@@ -182,6 +182,28 @@ async def delete_session(
     return None
 
 
+@sessions_router.post("/cache/clear")
+async def clear_analysis_cache() -> dict:
+    """清空分析缓存（LLM 响应 / 章脉 / 文脉 / 知识图谱）——结果像旧的、或重抓后想强制重算时用。
+
+    不删 session 本身（书还在、不用重新上传），只清派生分析的缓存;下次跑分析重新现算
+    （会重新花 token）。设置面板「清缓存」按钮调它。
+    """
+    # 局部 import：清缓存是低频维护操作,没必要在模块顶层拉一堆 _internal 缓存模块。
+    from bookscope.agent._internal.chapter_spine_cache import clear_spine_cache
+    from bookscope.agent._internal.doc_spine_cache import clear_doc_spine_cache
+    from bookscope.agent._internal.kg_book_cache import clear_book_kg_cache
+    from bookscope.agent._internal.kg_cache import clear_kg_cache
+    from bookscope.agent._internal.llm_cache import clear_llm_cache
+
+    clear_llm_cache()
+    clear_doc_spine_cache()
+    clear_spine_cache()
+    clear_kg_cache()
+    clear_book_kg_cache()
+    return {"cleared": True, "message": "分析缓存已清空,下次分析重新现算。"}
+
+
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------

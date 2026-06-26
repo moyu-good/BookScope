@@ -29,6 +29,54 @@
     0 24px 64px oklch(28% 0.04 40 / 0.2);
 }
 
+/* ---------------------------------------------------------------------------
+ * 暗色主题——数字善本案头的"夜读"版。
+ * 思路不是把浅色机械反相，而是"旧书搁在暗处":底色是带暖 hue 的深墨/炭暖，
+ * 不是冷黑也不是蓝黑；纸面/案头/函套的相对层次照旧(raised 最亮、desk 最深)；
+ * 正文转暖浅墨(不刺眼纯白)；朱砂提亮一档当唯一 accent 仍跳得出。
+ * 运行时由 [data-theme="dark"] 覆盖,@theme 里的浅色原值不动(浅色是默认)。
+ * ------------------------------------------------------------------------- */
+[data-theme="dark"] {
+  /* 纸面三层：暖炭墨，raised 略亮浮起、sunken 略暗凹陷，层次同浅色 */
+  --color-paper: oklch(23% 0.012 70);
+  --color-paper-raised: oklch(27% 0.014 70); /* 比纸略亮的卡片面 */
+  --color-paper-sunken: oklch(19.5% 0.011 70); /* 略凹的底，嵌入区 */
+  /* 墨色反成暖浅墨正文——约 88% 而非纯白，长读不刺眼；muted 暖灰 */
+  --color-ink: oklch(89% 0.014 70);
+  --color-ink-muted: oklch(67% 0.016 65);
+  /* 朱砂是灵魂 accent：暗底上提亮一档 + 略加 chroma 才跳，但仍是朱砂红 */
+  --color-seal: oklch(62% 0.2 31);
+  --color-seal-soft: oklch(62% 0.2 31 / 0.16); /* 朱砂淡底相应提透明度才看得见 */
+  --color-rule: oklch(34% 0.012 60); /* 暗中间调分隔线 */
+  --color-desk: oklch(14% 0.014 64); /* 案头底色——最深的暖炭，衬册页浮起 */
+  --color-case: oklch(17.5% 0.013 70); /* 函套色——左栏，比主区略深 */
+  --color-folio-edge: oklch(33% 0.014 60); /* 册页描边——暗中间调 */
+
+  /* 暗背景上硬投影难看：基色压到近黑、扩散更大、透明度更低，靠描边托起层次 */
+  --shadow-soft: 0 1px 2px oklch(0% 0 0 / 0.3), 0 6px 22px oklch(0% 0 0 / 0.32);
+  --shadow-raised: 0 2px 8px oklch(0% 0 0 / 0.34),
+    0 18px 46px oklch(0% 0 0 / 0.42);
+  --shadow-folio: 0 2px 12px oklch(0% 0 0 / 0.36),
+    0 28px 70px oklch(0% 0 0 / 0.55);
+}
+
+/* 暗色案头底：深炭暖 + 极淡暖晕(渐变换成微提亮而非压暗，避免死黑) */
+[data-theme="dark"] body {
+  background-image: linear-gradient(
+    135deg,
+    oklch(22% 0.02 66 / 0.55),
+    transparent 62%
+  );
+}
+
+/* 暗色册页：暖炭纸面 + 极淡墨点纹理(暗底上纹理改用微亮点，否则全黑看不见) */
+[data-theme="dark"] .folio {
+  background-image: radial-gradient(
+    oklch(100% 0 0 / 0.02) 0.5px,
+    transparent 0.6px
+  );
+}
+
 html,
 body,
 #root {
