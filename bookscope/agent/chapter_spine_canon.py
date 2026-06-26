@@ -47,7 +47,19 @@ deepseek-flash 这类 reasoning 模型会把整个 max_tokens 预算烧在 reaso
 而且没必要:关系图只显示按连接度排前 40 的主干(``top_n=40``),别名碎裂只在高频主要人物间
 要紧(刘备/刘玄德、孔明/诸葛亮);几百个一次性小角色既不碎裂、也进不了主干。取 2× 显示量(80)
 当候选,既盖住显示的 40 + 边界别名变体,又把任务收到 reasoning 不爆的小规模。排在 80 名之外的
-长尾人名保持原样(不合并)——它们本就到不了主干。"""
+长尾人名,LLM 不判,改走 ``_fold_in_longtail_aliases`` 的零成本规则兜底(见下)。"""
+
+_LONGTAIL_ALIAS_MIN_LEN = 2
+"""长尾别名兜底:只收**长度 ≥ 这个**的短名。
+
+单字名(操/超/亮)歧义太大——"操"既是"曹操"的字、也可能撞别人;一个字当子串太容易误中,
+保守起见单字一律不靠规则合并(要合也得 LLM 在 top-80 里看上下文判)。"""
+
+_LONGTAIL_ALIAS_MAX_LEN = 3
+"""长尾别名兜底:只收**长度 ≤ 这个**的短名。
+
+要兜的是"裸字/号"这类碎裂(玄德 freq=6 没合进刘备),它们都短(2-3 字)。更长的名字基本是
+独立全名,不该靠子串规则往别人身上并——长度封顶把误合面再收一道。"""
 
 _CANON_INSTR = (
     "下面是一本书里出现的人物称呼清单(逐章抽出来的,同一个人可能有大名、字、号、小名、"
@@ -164,6 +176,67 @@ def _parse_groups(text: str, names: set[str]) -> dict[str, str]:
     return name_map
 
 
+def _fold_in_longtail_aliases(
+    name_map: dict[str, str], all_names: list[str]
+) -> dict[str, str]:
+    """把 top-80 之外、LLM 没看过的**低频短名**用零成本规则归一到已确定的本名。
+
+    **要修的病**(#13):"刘玄德"(高频、进了 LLM 候选)被合进"刘备",但裸"玄德"(freq=6、排
+    80 名外)永远进不了候选 → 关系图里"玄德"碎成独立节点。任何书主角的低频别名都这么碎,不只
+    demo。简单抬 ``DEFAULT_CANON_MAX_NAMES`` 会把 reasoning 模型的 token 烧爆(见该常量注释),
+    所以改用**不调 LLM** 的子串规则兜底。
+
+    **规则(保守,高置信才合,宁漏不错)**:
+    一个还没归一的短名 ``t``(长度在 ``[_LONGTAIL_ALIAS_MIN_LEN, _LONGTAIL_ALIAS_MAX_LEN]``),
+    若它是 LLM **已确定的某一组**里某个称呼(该组的 canonical 或别名都算)的**真子串**
+    (``t in 称呼 and t != 称呼``),且**全局只有这一组**有称呼含它,就把 ``t`` 归到那组的
+    canonical。命中多组(歧义)一律不合,各自留着。
+
+    **为什么不爆 token**:纯字符串比对,0 次 LLM 调用。
+
+    **为什么不错合**:
+    1. 只比 LLM **已经判过、已合并**的称呼——锚是"刘玄德⊂里的玄德",不是凭空猜;
+    2. 子串要求**严格包含且不等**,曹操和马腾不会因都姓"曹/马"而合(全名互不为子串);
+    3. **歧义即弃**:``t`` 若被多组的称呼都含(如某短名同时是两个不同人称呼的一部分),不合;
+    4. 单字名(长度 1)直接不收(``_LONGTAIL_ALIAS_MIN_LEN=2``)——"操"这种一字太容易误中;
+    5. 只往 ``t`` **真子串**的称呼上并,不会把"曹操"并进"操"(方向固定:短名找含它的长称呼)。
+
+    Args:
+        name_map: LLM 出的 别名→canonical 表(可能空——LLM 失败时上游传 ``{}``)。
+        all_names: 章脉里出现的**全部**人名(含长尾),来自 ``collect_spine_names``。
+
+    Returns:
+        在 ``name_map`` 基础上**补**了长尾别名的新表(不改原表)。补不出就原样返回。
+    """
+    # 已被 LLM 归一过的称呼集合:左边的别名 + 右边的 canonical 都算"已确定锚"。
+    resolved = set(name_map) | set(name_map.values())
+    if not resolved:
+        return dict(name_map)
+
+    # 每个 canonical 组的全部称呼:canonical 自己 + 所有映射到它的别名。
+    group_appellations: dict[str, set[str]] = {}
+    for alias, canonical in name_map.items():
+        group_appellations.setdefault(canonical, set()).update({canonical, alias})
+
+    out = dict(name_map)
+    for t in all_names:
+        t = t.strip()
+        if not (_LONGTAIL_ALIAS_MIN_LEN <= len(t) <= _LONGTAIL_ALIAS_MAX_LEN):
+            continue
+        if t in resolved:
+            continue  # 已是某组的称呼 / canonical,LLM 已处理,别动
+        # 找所有"某称呼真包含 t"的组;只在唯一一组命中时才合(歧义即弃)。
+        hit_canonicals = {
+            canonical
+            for canonical, appels in group_appellations.items()
+            for appel in appels
+            if t in appel and t != appel
+        }
+        if len(hit_canonicals) == 1:
+            out[t] = next(iter(hit_canonicals))
+    return out
+
+
 def build_spine_name_map(
     *,
     spine: list[dict[str, Any]],
@@ -179,6 +252,11 @@ def build_spine_name_map(
     又把任务收到 reasoning 模型不爆 max_tokens 的小规模(见 ``DEFAULT_CANON_MAX_NAMES``)。
     只发人名清单(不发原文),走 L2 缓存按清单命中。0/1 个名字没什么可并的、直接返恒等表。
     LLM 调用 / 解析任一步出意外都返空表——关系图照画(``_canon`` 拿空表走原样),绝不 break。
+
+    **LLM 判完再过一道长尾兜底**(``_fold_in_longtail_aliases``,#13):top-80 之外的低频短名
+    (如裸"玄德" freq=6)进不了 LLM 候选,靠零成本子串规则归一到已确定的本名——不抬
+    ``max_names``(防 token 爆)、保守只合高置信(防错合)。LLM 整个失败(空表)时长尾也无锚可
+    依,兜底原样返空,关系图照画。
     """
     names = _top_names_by_frequency(spine, max_names)
     if len(names) <= 1:
@@ -202,7 +280,9 @@ def build_spine_name_map(
         )
         return {}
 
-    return _parse_groups(text, set(names))
+    name_map = _parse_groups(text, set(names))
+    # LLM 只看了高频前 max_names;长尾低频短名(玄德 freq=6)用零成本规则补归一(#13)。
+    return _fold_in_longtail_aliases(name_map, collect_spine_names(spine))
 
 
 __all__ = [

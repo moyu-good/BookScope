@@ -134,3 +134,75 @@ def test_build_name_map_llm_failure_returns_empty() -> None:
         spine=spine, llm_client=_Boom(), model="m", cache_enabled=False
     )
     assert m == {}  # 失败降级成不合并,关系图照画
+
+
+# ── _fold_in_longtail_aliases(#13:长尾低频别名兜底)────────────────────────────
+def test_fold_longtail_merges_low_freq_substring() -> None:
+    # LLM 已把高频"刘玄德"合进"刘备";裸"玄德"是长尾(排不进 LLM 候选),
+    # 应靠子串规则归到刘备——这是 #13 要修的核心病。
+    name_map = {"刘备": "刘备", "刘玄德": "刘备"}
+    all_names = ["刘备", "刘玄德", "玄德", "关羽"]
+    out = canon._fold_in_longtail_aliases(name_map, all_names)
+    assert out["玄德"] == "刘备"
+    assert "关羽" not in out  # 不沾任何已确定称呼,不误合
+
+
+def test_fold_longtail_unique_substring_merges() -> None:
+    # "云长"只被"关云长"这一组的称呼含 → 唯一命中,合进关羽。
+    name_map = {"关云长": "关羽", "关羽": "关羽", "赵云": "赵云"}
+    out = canon._fold_in_longtail_aliases(name_map, ["关云长", "关羽", "赵云", "云长"])
+    assert out["云长"] == "关羽"
+
+
+def test_fold_longtail_no_merge_on_ambiguity() -> None:
+    # "子龙"假设同时是两组称呼的真子串 → 歧义,谁都不合(宁漏不错)。
+    name_map = {"赵子龙": "赵云", "赵云": "赵云", "诸葛子龙X": "别人"}
+    out = canon._fold_in_longtail_aliases(
+        name_map, ["赵子龙", "赵云", "诸葛子龙X", "子龙"]
+    )
+    assert "子龙" not in out  # 两组都含"子龙",歧义即弃
+
+
+def test_fold_longtail_single_char_not_merged() -> None:
+    # 单字"操"⊂"曹操",但单字歧义太大,MIN_LEN=2 直接挡掉不合(保守防误中)。
+    name_map = {"曹操": "曹操", "孟德": "曹操"}
+    out = canon._fold_in_longtail_aliases(name_map, ["曹操", "孟德", "操"])
+    assert "操" not in out
+
+
+def test_fold_longtail_no_merge_different_people_same_surname() -> None:
+    # 马超 / 马腾 同姓不同人:谁都不是谁的子串,绝不能因都姓"马"而合。
+    name_map = {"马超": "马超", "马腾": "马腾"}
+    out = canon._fold_in_longtail_aliases(name_map, ["马超", "马腾"])
+    assert out.get("马超") == "马超" and out.get("马腾") == "马腾"
+
+
+def test_fold_longtail_empty_map_returns_empty() -> None:
+    # LLM 整个失败(空表)→ 长尾无锚可依,原样返空,不凭空造合并。
+    out = canon._fold_in_longtail_aliases({}, ["玄德", "刘备", "关羽"])
+    assert out == {}
+
+
+def test_fold_longtail_skips_too_long_name() -> None:
+    # 超过 MAX_LEN 的长尾全名不靠子串往别人身上并(只兜 2-3 字的碎裂)。
+    name_map = {"诸葛亮": "诸葛亮", "诸葛孔明": "诸葛亮"}
+    # "诸葛孔明"已在表里(是别名);构造一个 4 字未归一名验证不被规则乱合
+    out = canon._fold_in_longtail_aliases(name_map, ["诸葛亮", "诸葛孔明", "诸葛瞻"])
+    assert "诸葛瞻" not in out  # 4 字超 MAX_LEN,不合(且本就不该合,是另一个人)
+
+
+def test_build_name_map_folds_longtail_end_to_end() -> None:
+    # 端到端:章脉里"刘玄德"高频(进 LLM 合并)、"玄德"低频长尾;
+    # build 出的表两者都该指向刘备。
+    spine = [
+        {"chapter": i, "present": ["刘玄德", "关羽"]} for i in range(1, 10)
+    ] + [{"chapter": 99, "present": ["玄德"]}]  # 玄德只露一次=长尾
+    payload = json.dumps({"groups": [
+        {"canonical": "刘备", "aliases": ["刘玄德"]},
+    ]})
+    client = _FakeClient(payload)
+    m = canon.build_spine_name_map(
+        spine=spine, llm_client=client, model="m", cache_enabled=False
+    )
+    assert m["刘玄德"] == "刘备"  # LLM 合的
+    assert m["玄德"] == "刘备"  # 长尾兜底合的(#13)
