@@ -2172,19 +2172,31 @@ const NAV_GROUPS: NavGroup[] = [
   },
   // 1.6 公文组已解封（代码层不再藏）。注意:推到公开仓 = 正式对外亮出"公文"垂直,
   // 那是 NORTH_STAR 级、要作者拍板的事(task #16)——本地 commit 随便,push 等作者点头。
+  // 公文 12 功能按和"书"一样的意图标准分三组:读懂这份 / 抓重点办事 / 多份比对(卷宗+跨文件)。
   {
-    key: "redhead",
-    title: "公文",
+    key: "redhead_read",
+    title: "公文 · 读懂这份",
     modes: [
       { id: "redhead", label: "公文结构" },
-      { id: "redhead_actions", label: "办事清单" },
       { id: "redhead_plain", label: "大白话翻译" },
+      { id: "redhead_glossary", label: "名词解释" },
+      { id: "redhead_formatcheck", label: "规范性自检" },
+    ],
+  },
+  {
+    key: "redhead_act",
+    title: "公文 · 抓重点办事",
+    modes: [
+      { id: "redhead_actions", label: "办事清单" },
       { id: "redhead_relevance", label: "跟我相关" },
       { id: "redhead_hardfacts", label: "硬信息提取" },
       { id: "redhead_timeline", label: "关键时间轴" },
-      { id: "redhead_glossary", label: "名词解释" },
-      { id: "redhead_formatcheck", label: "规范性自检" },
-      // 跨文件层（卷宗 + 三视图）：
+    ],
+  },
+  {
+    key: "redhead_cross",
+    title: "公文 · 多份比对",
+    modes: [
       { id: "dossier", label: "卷宗" },
       { id: "redhead_depgraph", label: "依据链网" },
       { id: "redhead_policy", label: "政策演变" },
@@ -2210,6 +2222,10 @@ function genreHighlightGroups(genre: string | undefined | null): Set<string> | n
   }
   if (/(诗|poem|poetry|散文)/.test(g)) {
     return new Set(["read", "thought"]);
+  }
+  // 公文:只亮问&读 + 三个公文组,人物/情节/思想/质量这些"书"的维度收起。
+  if (/(公文|红头)/.test(g)) {
+    return new Set(["read", "redhead_read", "redhead_act", "redhead_cross"]);
   }
   // 认不出的题材:不强行偏向任何组,全显（等同没 genre）。
   return null;
