@@ -2949,13 +2949,22 @@ function CanvasHeader({
 // （OpenAI 兼容端点）；只有 Anthropic 走自己的 adapter（忽略 base_url）。
 // model.value="" 表示用该 provider 的后端默认值（仅 deepseek/anthropic 后端默认对得上时才
 // 能留空；其它家必须给确定模型名，否则会把 deepseek 的默认名发到别家端点上）。
-// 模型名按各厂商公开档列，BYOK 用户可随时改写——下面 select 留了"自定义"口子。
+//
+// coding plan（订阅制套餐）也是 BYOK：订阅后拿一个能直发的 key + 一个 OpenAI 兼容端点，
+// 跟普通按量 key 在 BookScope 看来没区别，所以当成厂商预设的一种加进来即可。详见
+// docs/design/WP-llm-plan-access-probe.md。Claude 订阅 / Cursor 这类只能官方 app 里用的
+// 接不了，一律不加。
+//
+// ⚠️ 模型名以各厂商官方最新公布为准 · 核对日期 2026-06-26。模型名滚动快，每家都留了
+// "自定义模型名"口子（下面 select 的「自定义…」），拿不准就自己填。
 interface ProviderPreset {
   id: string;
   label: string;
   backend: Provider;
   baseUrl: string;
   models: { value: string; label: string }[];
+  /** key 输入框下方的一句提示——coding plan 用来说明填哪种 key */
+  keyHint?: string;
   note?: string;
 }
 
@@ -2967,8 +2976,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     baseUrl: "",
     models: [
       { value: "", label: "deepseek-v4-flash · 默认最便宜" },
-      { value: "deepseek-v4", label: "deepseek-v4 · 更强" },
-      { value: "deepseek-reasoner", label: "deepseek-reasoner · 推理" },
+      { value: "deepseek-v4-pro", label: "deepseek-v4-pro · 更强" },
     ],
   },
   {
@@ -2977,9 +2985,9 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     backend: "deepseek",
     baseUrl: "https://open.bigmodel.cn/api/paas/v4",
     models: [
-      { value: "glm-4.6", label: "glm-4.6" },
-      { value: "glm-4.5", label: "glm-4.5" },
-      { value: "glm-4-flash", label: "glm-4-flash · 便宜" },
+      { value: "glm-5.2", label: "glm-5.2" },
+      { value: "glm-5.1", label: "glm-5.1" },
+      { value: "glm-4.7", label: "glm-4.7 · 便宜" },
     ],
   },
   {
@@ -2988,9 +2996,9 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     backend: "deepseek",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     models: [
-      { value: "qwen-max", label: "qwen-max" },
-      { value: "qwen-plus", label: "qwen-plus" },
-      { value: "qwen-turbo", label: "qwen-turbo · 便宜" },
+      { value: "qwen3.7-max", label: "qwen3.7-max" },
+      { value: "qwen3.7-plus", label: "qwen3.7-plus" },
+      { value: "qwen3.6-flash", label: "qwen3.6-flash · 便宜" },
     ],
   },
   {
@@ -2999,9 +3007,8 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     backend: "deepseek",
     baseUrl: "https://api.moonshot.cn/v1",
     models: [
-      { value: "kimi-k2-0905-preview", label: "kimi-k2" },
-      { value: "moonshot-v1-128k", label: "moonshot-v1-128k" },
-      { value: "moonshot-v1-32k", label: "moonshot-v1-32k" },
+      { value: "kimi-k2.6", label: "kimi-k2.6" },
+      { value: "kimi-k2.5", label: "kimi-k2.5" },
     ],
   },
   {
@@ -3009,10 +3016,43 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     label: "Anthropic Claude",
     backend: "anthropic",
     baseUrl: "",
+    keyHint:
+      "填 console.anthropic.com 的按量 API key（sk-ant-api…）。Claude 的 Pro/Max 订阅接不了——那是只许官方 app 用的 token。",
     models: [
-      { value: "", label: "claude-sonnet-4-6 · 默认" },
-      { value: "claude-opus-4-8", label: "claude-opus-4-8 · 最强" },
-      { value: "claude-haiku-4-5-20251001", label: "claude-haiku-4-5 · 便宜" },
+      { value: "", label: "claude-opus-4-8 · 默认最强" },
+      { value: "claude-sonnet-4-6", label: "claude-sonnet-4-6 · 均衡" },
+      { value: "claude-haiku-4-5", label: "claude-haiku-4-5 · 便宜" },
+      { value: "claude-fable-5", label: "claude-fable-5 · 顶配" },
+    ],
+  },
+  {
+    // 阿里云百炼 Coding Plan：一份订阅打包通义/Kimi/GLM/MiniMax，性价比最高的接入点。
+    // 走 OpenAI 兼容端点，正好命中现有 base_url + key + model 三件套。
+    id: "dashscope-coding",
+    label: "阿里云百炼 Coding Plan（一份订阅打包多家）",
+    backend: "deepseek",
+    baseUrl: "https://coding.dashscope.aliyuncs.com/v1",
+    keyHint:
+      "填百炼 console「Coding Plan 页面」的套餐专属 key（sk-sp… 开头，跟普通按量 key 不是同一个）。",
+    models: [
+      { value: "qwen3.7-plus", label: "qwen3.7-plus（通义）" },
+      { value: "kimi-k2.6", label: "kimi-k2.6（Kimi）" },
+      { value: "glm-5.2", label: "glm-5.2（GLM）" },
+      { value: "MiniMax-M2.5", label: "MiniMax-M2.5" },
+    ],
+  },
+  {
+    // 智谱 GLM Coding Plan：开放平台 key + OpenAI 兼容端点，「Claude Code 平替」定位。
+    id: "zhipu-coding",
+    label: "智谱 GLM Coding Plan（订阅）",
+    backend: "deepseek",
+    baseUrl: "https://api.z.ai/api/coding/paas/v4",
+    keyHint:
+      "填智谱开放平台（z.ai / bigmodel）订阅后建的 API key。端点以填表当天 z.ai 官方文档为准。",
+    models: [
+      { value: "glm-5.2", label: "glm-5.2" },
+      { value: "glm-5.1", label: "glm-5.1" },
+      { value: "glm-4.7", label: "glm-4.7 · 便宜" },
     ],
   },
   {
@@ -3021,8 +3061,8 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     backend: "deepseek",
     baseUrl: "https://api.openai.com/v1",
     models: [
-      { value: "gpt-4o", label: "gpt-4o" },
-      { value: "gpt-4o-mini", label: "gpt-4o-mini · 便宜" },
+      { value: "gpt-5.1", label: "gpt-5.1" },
+      { value: "gpt-5-mini", label: "gpt-5-mini · 便宜" },
       { value: "gpt-4.1", label: "gpt-4.1" },
     ],
   },
@@ -3032,9 +3072,8 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     backend: "deepseek",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
     models: [
-      { value: "gemini-2.5-pro", label: "gemini-2.5-pro" },
-      { value: "gemini-2.5-flash", label: "gemini-2.5-flash · 便宜" },
-      { value: "gemini-2.0-flash", label: "gemini-2.0-flash" },
+      { value: "gemini-3-pro", label: "gemini-3-pro" },
+      { value: "gemini-3-flash", label: "gemini-3-flash · 便宜" },
     ],
   },
   {
@@ -3043,8 +3082,8 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     backend: "deepseek",
     baseUrl: "https://api.x.ai/v1",
     models: [
+      { value: "grok-4.1", label: "grok-4.1" },
       { value: "grok-4", label: "grok-4" },
-      { value: "grok-3", label: "grok-3" },
     ],
   },
 ];
@@ -3120,17 +3159,24 @@ function ProviderConfig(props: {
         </select>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr] gap-3 items-center">
+      <div className="grid grid-cols-[auto_1fr] gap-3 items-start">
         <Label htmlFor="apikey">API Key</Label>
-        <input
-          id="apikey"
-          type="password"
-          autoComplete="off"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="粘贴你的 key（存在本地浏览器、刷新不丢）"
-          className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm"
-        />
+        <div>
+          <input
+            id="apikey"
+            type="password"
+            autoComplete="off"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="粘贴你的 key（存在本地浏览器、刷新不丢）"
+            className="w-full rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm"
+          />
+          {preset.keyHint && (
+            <p className="text-[11px] text-[var(--color-ink-muted)] mt-1 leading-relaxed">
+              {preset.keyHint}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-[auto_1fr] gap-3 items-start">
@@ -3183,7 +3229,9 @@ function ProviderConfig(props: {
 
       <p className="text-[11px] text-[var(--color-ink-muted)] leading-relaxed">
         BYOK——key 自带、直发你选的厂商，BookScope 不内置任何 key。除 Anthropic 外都走
-        OpenAI 兼容接口（选厂商即自动填好官方 Base URL）。
+        OpenAI 兼容接口（选厂商即自动填好官方 Base URL）。订阅制 coding plan（百炼 / 智谱）
+        也是这条路，填套餐专属 key 即可。模型名以各厂商官方为准（核对日期 2026-06-26），
+        滚动快就选「自定义」自己填。
         {isProxiedDeepseek && " 当前 Base URL 是自定义代理/私有部署。"}
       </p>
     </div>
