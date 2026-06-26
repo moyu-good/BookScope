@@ -1,6 +1,6 @@
 """BookScope — multi-dimensional book text analysis and visualization."""
 
-__version__ = "1.5.2"
+__version__ = "1.5.4"
 
 # 本地 .env 配置（BYOK key 等）——存在就把里面的变量灌进环境，不存在静默跳过。
 # CLI 脚本（probe / eval_retrieval / run_batch）和 FastAPI app 都经由 import
