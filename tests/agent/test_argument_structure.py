@@ -68,6 +68,49 @@ def test_empty_claims_returns_none(monkeypatch):
     assert _gen(_FakeClient('{"claims": []}')) is None
 
 
+def test_fiction_genre_gates_out_without_calling_llm(monkeypatch):
+    # 叙事题材：直接返 [] 优雅退场，绝不调 LLM（_invoke_client 被调到就炸）。
+    def _boom(*_a, **_k):
+        raise AssertionError("LLM 不该被调用——叙事题材应在门控处退场")
+
+    monkeypatch.setattr(ar, "_invoke_client", _boom)
+    out = ar.generate_argument_structure(
+        full_text="x", chunks=_CHUNKS, llm_client=_FakeClient("x"), model="m",
+        genre="fiction",
+    )
+    assert out == []  # [] 区别于失败的 None
+
+
+def test_theory_genre_runs_normally(monkeypatch):
+    final = json.dumps(
+        {"claims": [_cl(1, "制内市场是核心机制", 1, "制内市场是国家主导型政治经济的核心机制")]},
+        ensure_ascii=False,
+    )
+    _patch(monkeypatch)
+    out = ar.generate_argument_structure(
+        full_text="x", chunks=_CHUNKS, llm_client=_FakeClient(final), model="m",
+        genre="theory",
+    )
+    assert out is not None and len(out) == 1
+
+
+def test_genre_none_runs_as_before(monkeypatch):
+    # 向后兼容：端点没传 genre（None）时照旧跑，不被门控挡掉。
+    final = json.dumps(
+        {"claims": [_cl(1, "制内市场是核心机制", 1, "制内市场是国家主导型政治经济的核心机制")]},
+        ensure_ascii=False,
+    )
+    _patch(monkeypatch)
+    assert _gen(_FakeClient(final)) is not None
+
+
+def test_is_argument_genre_predicate():
+    assert ar.is_argument_genre("theory") is True
+    assert ar.is_argument_genre(None) is True
+    assert ar.is_argument_genre("fiction") is False
+    assert ar.is_argument_genre("") is False
+
+
 def test_llm_raises_returns_none(monkeypatch):
     _patch(monkeypatch, raises=RuntimeError("boom"))
     assert _gen(_FakeClient("{}")) is None

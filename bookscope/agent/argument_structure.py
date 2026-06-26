@@ -34,6 +34,19 @@ DEFAULT_ARGUMENT_MAX_TOKENS = 8000
 _MAX_ATTEMPTS = 2
 _MAX_CLAIMS = 30
 
+# 论点结构是理论书/论说文功能（抓论证主张）。叙事书（小说）没有"论证骨架"可梳理，
+# 在上面硬抽会编出怪东西，所以非论说类题材直接优雅退场、不跑 LLM。
+# genre 取值沿用 chapter_spine 的约定："theory" = 论说/理论，"fiction" = 叙事/小说。
+_ARGUMENT_GENRES = frozenset({"theory"})
+GENRE_SKIP_REASON = "这本是叙事/小说，没有论点结构可梳理。"
+
+
+def is_argument_genre(genre: str | None) -> bool:
+    """这个题材有没有"论点结构"可梳理。``None`` 视作论说类（向后兼容旧调用）。"""
+    if genre is None:
+        return True
+    return genre in _ARGUMENT_GENRES
+
 _SYSTEM_INSTRUCTION = (
     "你是 BookScope 的论点梳理助手。"
     "请梳理这本书的主要论点结构——作者主张了什么、靠什么撑。按论证推进顺序排，"
@@ -145,16 +158,23 @@ def generate_argument_structure(
     model: str,
     max_tokens: int = DEFAULT_ARGUMENT_MAX_TOKENS,
     session_id: str | None = None,
+    genre: str | None = None,
 ) -> list[dict[str, Any]] | None:
     """梳理书的论点结构；失败返 ``None``。
 
     每条 evidence 过 verify_citations 标 verified + 真章号纠偏。保留全部论点（含 evidence
     未命中的，标 verified=False 供用户判断 + 前端只在 verified 上盖钤印）。
 
+    题材门控：``genre`` 非论说类（小说/叙事）时直接返空列表 ``[]``（优雅退场，不跑 LLM）——
+    叙事书没有论证骨架可梳理，硬抽只会编。``genre=None`` 视作论说类（向后兼容，端点没传时照旧跑）。
+
     Returns:
-        ``[{order, claim, chapter, evidence, verified}, ...]`` 按 order 排；失败 ``None``。
+        ``[{order, claim, chapter, evidence, verified}, ...]`` 按 order 排；失败 ``None``；
+        题材不对 → ``[]``（区别于失败的 ``None``）。
     """
     _ = session_id
+    if not is_argument_genre(genre):
+        return []
     system = build_longctx_system(full_text, _SYSTEM_INSTRUCTION)
     messages = [{"role": "user", "content": "请梳理这本书的主要论点结构。"}]
     for attempt in range(1, _MAX_ATTEMPTS + 1):
@@ -193,6 +213,7 @@ def generate_argument_structure_exhaustive(
     max_tokens: int = DEFAULT_ARGUMENT_MAX_TOKENS,
     char_budget: int = 40000,
     max_workers: int | None = None,
+    genre: str | None = None,
 ) -> list[dict[str, Any]] | None:
     """穷尽化:分段→每段抽本段论点→按 claim 去重拼,覆盖全书(1.4)。
 
@@ -200,8 +221,13 @@ def generate_argument_structure_exhaustive(
     论点，跨段按 claim 去重拼起来。论点不像章节那样 disjoint——同一论点可能在相邻段都被抽到，
     所以按 claim 文本去重。合并后按章号重排再重编 order，最后一次性 ``_verify_claims``。
 
-    Returns: 同 ``generate_argument_structure``,但覆盖全书；空 → ``None``。
+    题材门控：``genre`` 非论说类（小说/叙事）时返空列表 ``[]``（优雅退场，不跑分段 LLM）。
+    ``genre=None`` 视作论说类（向后兼容，端点没传时照旧跑）。
+
+    Returns: 同 ``generate_argument_structure``,但覆盖全书；空 → ``None``；题材不对 → ``[]``。
     """
+    if not is_argument_genre(genre):
+        return []
     outs = run_segments(
         chunks=chunks,
         instruction=_SYSTEM_INSTRUCTION,
@@ -225,6 +251,8 @@ def generate_argument_structure_exhaustive(
 
 __all__ = [
     "DEFAULT_ARGUMENT_MAX_TOKENS",
+    "GENRE_SKIP_REASON",
     "generate_argument_structure",
     "generate_argument_structure_exhaustive",
+    "is_argument_genre",
 ]

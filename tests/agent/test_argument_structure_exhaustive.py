@@ -66,3 +66,24 @@ def test_drops_claimless_items(monkeypatch):
     cls = _gen(monkeypatch, [seg])
     assert cls is not None and len(cls) == 1
     assert cls[0]["claim"] == "制内市场是核心机制"
+
+
+def test_fiction_genre_gates_out_without_running_segments(monkeypatch):
+    # 叙事题材：返 [] 优雅退场，连 run_segments 都不进（进了就炸）。
+    def _boom(**_k):
+        raise AssertionError("run_segments 不该被调用——叙事题材应在门控处退场")
+
+    monkeypatch.setattr(ar, "run_segments", _boom)
+    out = ar.generate_argument_structure_exhaustive(
+        chunks=_CHUNKS, llm_client=object(), model="m", genre="fiction"
+    )
+    assert out == []  # [] 区别于失败的 None
+
+
+def test_theory_genre_runs_normally(monkeypatch):
+    seg = [_cl(1, "制内市场是核心机制", 1, "制内市场是国家主导型政治经济的核心机制")]
+    _patch_segments(monkeypatch, [seg])
+    out = ar.generate_argument_structure_exhaustive(
+        chunks=_CHUNKS, llm_client=object(), model="m", genre="theory"
+    )
+    assert out is not None and len(out) == 1
