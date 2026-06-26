@@ -30,7 +30,20 @@ interface DossierProps {
   onClear: () => void;
   /** 上传 / 删除后让书库重新拉 list */
   refreshTrigger?: number;
+  /** 选够 2 份后，从卷宗直接跳进某个跨文件视图（免得用户再回左栏找） */
+  onOpenView: (view: "redhead_depgraph" | "redhead_policy" | "redhead_level") => void;
 }
+
+// 选够 2 份后当场给的三个跨文件视图入口——卷宗选完一步进视图，不用回左栏找。
+const CROSS_VIEWS: {
+  view: "redhead_depgraph" | "redhead_policy" | "redhead_level";
+  label: string;
+  hint: string;
+}[] = [
+  { view: "redhead_depgraph", label: "依据链网", hint: "谁依据谁、谁落实谁，理成一张关系网" },
+  { view: "redhead_policy", label: "政策演变", hint: "按成文日期排，看一项政策怎么一步步变" },
+  { view: "redhead_level", label: "上下级一致性", hint: "上位和下位并排，挑出对不上的地方" },
+];
 
 type LoadState =
   | { kind: "loading" }
@@ -58,6 +71,7 @@ export function Dossier({
   onToggle,
   onClear,
   refreshTrigger,
+  onOpenView,
 }: DossierProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const selected = new Set(selectedIds);
@@ -128,13 +142,9 @@ export function Dossier({
         >
           本卷宗 · {count} 份公文
         </span>
-        {count < 2 ? (
+        {count < 2 && (
           <span className="text-xs text-[var(--color-ink-muted)]">
-            跨文件视图至少要选 2 份——勾上相关的几份（如一份上位规定 + 几份配套实施件）。
-          </span>
-        ) : (
-          <span className="text-xs text-[var(--color-ink-muted)]">
-            选好了——去左栏「依据链网」「政策演变」「上下级一致性」跑这一组。
+            跨文件视图至少要选 2 份。勾上相关的几份（如一份上位规定 + 几份配套实施件）。
           </span>
         )}
         {count > 0 && (
@@ -147,6 +157,45 @@ export function Dossier({
           </button>
         )}
       </div>
+
+      {/* 选够 2 份：当场给三个跨文件视图入口，点一下直接进，不用回左栏找 */}
+      {count >= 2 && (
+        <div className="mb-4">
+          <div className="text-xs text-[var(--color-ink-muted)] mb-2">
+            选好了，挑一个跨文件视图直接跑这一组：
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {CROSS_VIEWS.map((v) => (
+              <button
+                key={v.view}
+                type="button"
+                onClick={() => onOpenView(v.view)}
+                className="group text-left rounded-lg border px-3 py-2.5 transition-shadow hover:shadow-sm"
+                style={{
+                  borderColor: "color-mix(in oklch, var(--color-seal) 40%, transparent)",
+                  background: "var(--color-seal-soft)",
+                }}
+              >
+                <div
+                  className="text-sm font-semibold flex items-center gap-1 text-[var(--color-seal)]"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {v.label}
+                  <span
+                    className="transition-transform group-hover:translate-x-0.5"
+                    aria-hidden
+                  >
+                    →
+                  </span>
+                </div>
+                <div className="text-[11px] text-[var(--color-ink-muted)] mt-0.5 leading-snug">
+                  {v.hint}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 卷内文书：每份一行，勾选归卷 */}
       <ul className="space-y-1.5">

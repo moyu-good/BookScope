@@ -1943,7 +1943,7 @@ export function App() {
               <div className={mode === "redhead_plain" ? "" : "hidden"}>
                 <CanvasHeader
                   title="大白话翻译"
-                  subtitle="把一份红头文件的官话逐条翻成人话——「应当于三十日内予以办结」翻成「得在三十天内办完」。每条做成「官话 ↔ 白话」对照：上面摆原文，下面是大白话，背后原文核得到的盖「鉴」印。白话只忠实转述、绝不替你脑补原文没说的。适合党政公文 / 红头文件。"
+                  subtitle="公文有两种看不懂。一种是文绉绉的，「应当于三十日内予以办结」翻成「三十天内得办完」就完事。真正难的是第二种，看着懂其实没懂：「原则上同意」留了口子、「研究研究」约等于不办、「由相关部门认定」真规则在别人手里。这功能逐句翻成人话，碰到这类话还点破弦外之意。每句白话背后的原文核得到才盖「鉴」印，只忠实转述、不替你脑补。适合党政公文 / 红头文件。"
                 />
                 <RedheadPlainLanguage
                   sessionId={currentSession.session_id}
@@ -2053,6 +2053,7 @@ export function App() {
               onToggle={toggleDossier}
               onClear={clearDossier}
               refreshTrigger={shelfRefresh}
+              onOpenView={(v) => setMode(v)}
             />
           </div>
 
@@ -4451,10 +4452,10 @@ function CapabilityShowcase() {
         className="text-sm font-bold text-[var(--color-ink)] mb-1"
         style={{ fontFamily: "var(--font-display)" }}
       >
-        不是通用摘要——对每类文本极强特化
+        不做通用摘要，每类文本各有各的深读
       </p>
       <p className="text-sm text-[var(--color-ink-muted)] mb-4 leading-relaxed">
-        ↑ 上面挑一本，BookScope 自动认出类型、上对应的深读；每个结论都钉在原文。
+        从上面书架挑一本，它先认出是哪类文本，再给对应那套深读。每个结论都钉在原文，点开能核。
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 stagger">
         {TYPE_SHOWCASE.map((c) => (
