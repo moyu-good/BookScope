@@ -218,7 +218,7 @@ export function BookShelf({
           书柜
         </h2>
         <span className="text-xs text-[var(--color-ink-muted)]">
-          一架函套列成目录 · 每本两个门：「读」进阅读器 ·「进分析台」只跑分析
+          一架函套列成目录 · 每本两种用法：「读」沉浸读原文 ·「进分析台」AI 深读那套
         </span>
       </div>
       <ShelfBody

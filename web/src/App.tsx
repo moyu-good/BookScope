@@ -2792,8 +2792,22 @@ function Sidebar(props: {
             >
               {currentBook.book_title}
             </div>
-            <div className="text-[10.5px] text-[var(--color-ink-muted)] mt-0.5">
-              {currentBook.language}
+            <div className="text-[10.5px] text-[var(--color-ink-muted)] mt-1 flex items-center justify-center gap-1.5">
+              <span>{currentBook.language}</span>
+              {/* 题材可见化(#2):认出的类型亮出来,左栏就是据它显隐;没认出显未分类,不静默全显误导 */}
+              {genre ? (
+                <span
+                  className="px-1.5 py-px rounded-full"
+                  style={{
+                    background: "var(--color-seal-soft)",
+                    color: "var(--color-seal)",
+                  }}
+                >
+                  {genre}
+                </span>
+              ) : (
+                <span className="italic">未分类</span>
+              )}
             </div>
           </div>
         ) : (
@@ -4420,26 +4434,32 @@ function SettingsDrawer(props: {
   );
 }
 
-const CAPABILITIES = [
-  { t: "问书", d: "带原文证据答深问题——没出处的结论一概不输出" },
-  { t: "人物关系图", d: "谁和谁、什么关系，每条边都点得到原文" },
-  { t: "概念关系图", d: "理论书的概念怎么勾连，给学习者看脉络" },
-  { t: "时间线", d: "多线、倒叙也理清真实的时间先后" },
-  { t: "节奏曲线", d: "逐章看张力——哪几章松、哪几章是高潮" },
-  { t: "设定一致性", d: "扫全书前后矛盾，编出来的会被滤掉" },
-  { t: "每书出题", d: "替这本书拟几道值得问的题——不知道从哪问起时，照着点就行" },
+// 主页"大写特写"特化展示:按文本类型组织,每类亮它的招牌深读——这是 BookScope 的卖点
+// (不是通用摘要,选一本自动认出类型上对应深读)。WP-home-specialization。
+const TYPE_SHOWCASE: { type: string; sig: string }[] = [
+  { type: "公文 / 红头文件", sig: "利害与风向（机会·风险·含金量）· 依据链网 · 公文结构 · 大白话逐句" },
+  { type: "小说 / 网文", sig: "人物关系与演变 · 人物弧线 · 伏笔回收 · 节奏曲线" },
+  { type: "历史", sig: "时间线 · 人物关系 · 节奏曲线 · 母题追踪" },
+  { type: "理论 / 哲学 / 社科", sig: "论点结构 · 概念演进 · 概念关系图" },
+  { type: "论文 / 工具书 / 诗歌", sig: "按体裁各有侧重；问书 / 精读 / 时间线等通用深读各类都能用" },
 ];
 
 function CapabilityShowcase() {
   return (
     <section className="mt-10">
-      <p className="text-sm text-[var(--color-ink-muted)] mb-4 leading-relaxed">
-        ↑ 上面挑一本书，左栏就列出能对它做的事。选了书能做这些（都现读现答、结论钉在原文）：
+      <p
+        className="text-sm font-bold text-[var(--color-ink)] mb-1"
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        不是通用摘要——对每类文本极强特化
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 stagger">
-        {CAPABILITIES.map((c) => (
+      <p className="text-sm text-[var(--color-ink-muted)] mb-4 leading-relaxed">
+        ↑ 上面挑一本，BookScope 自动认出类型、上对应的深读；每个结论都钉在原文。
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 stagger">
+        {TYPE_SHOWCASE.map((c) => (
           <div
-            key={c.t}
+            key={c.type}
             className="rounded-lg border border-[var(--color-rule)] p-4"
             style={{
               background: "var(--color-paper-raised)",
@@ -4447,13 +4467,13 @@ function CapabilityShowcase() {
             }}
           >
             <div
-              className="text-sm font-bold text-[var(--color-ink)]"
+              className="text-sm font-bold text-[var(--color-ink)] mb-1"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              {c.t}
+              {c.type}
             </div>
-            <div className="text-xs text-[var(--color-ink-muted)] mt-1 leading-relaxed">
-              {c.d}
+            <div className="text-xs text-[var(--color-ink-muted)] leading-relaxed">
+              {c.sig}
             </div>
           </div>
         ))}
