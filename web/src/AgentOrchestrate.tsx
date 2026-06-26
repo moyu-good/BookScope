@@ -59,7 +59,7 @@ type OrchestrateEvent =
   | { type: "error"; message: string };
 
 // 编排菜单功能名 → 中文标签（给计划 / step 显示人话名，不露后端键名）。
-// 与 App.tsx 的 NAV_MODES 标签对齐。
+// 与 App.tsx 的 NAV_GROUPS 标签对齐。
 const FEATURE_LABEL: Record<string, string> = {
   character_graph: "关系图",
   character_flow: "叙事流",

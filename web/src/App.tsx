@@ -1321,6 +1321,11 @@ export function App() {
         }}
         currentBook={currentSession}
         hasBook={!!currentSession}
+        genre={
+          // genre hook：#10 给 session 带上 genre 后这里就有值；现在 SessionMetadata
+          // 还没这字段（类型里没有），所以防御性读，取不到就是 undefined → 全显。
+          (currentSession as { genre?: string } | null)?.genre
+        }
         open={sidebarOpen}
         onOpenSettings={() => {
           setSettingsOpen(true);
@@ -2062,45 +2067,117 @@ const WHOLE_BOOK_MODES = new Set<Mode>([
   "redhead_glossary", "redhead_formatcheck",
 ]);
 
-const NAV_MODES: { id: Mode; label: string }[] = [
-  { id: "ask", label: "问书" },
-  { id: "annotate", label: "精读" },
-  { id: "graph", label: "关系图" },
-  { id: "reltime", label: "关系演变" },
-  { id: "flow", label: "叙事流" },
-  { id: "chararc", label: "人物弧线" },
-  { id: "charvoice", label: "声口一致" },
-  { id: "foreshadow", label: "伏笔回收" },
-  { id: "subplot", label: "支线编织" },
-  { id: "timeline", label: "时间线" },
-  { id: "entity", label: "实体回溯" },
-  { id: "recap", label: "前情回顾" },
-  { id: "motif", label: "母题追踪" },
-  { id: "narrative", label: "叙事曲线" },
-  { id: "consistency", label: "一致性" },
-  { id: "argument", label: "论点结构" },
-  { id: "concept", label: "概念演进" },
-  { id: "technique", label: "写作手法" },
-  { id: "cards", label: "知识卡片" },
-  { id: "style", label: "文体体检" },
-  { id: "revision", label: "改稿清单" },
-  // 1.6 红头文件公文功能暂藏:引擎还在做透(头要素已修,跨文件锚定/条款补全未完),
+// 左栏功能按"用户想干啥"分五组，每组可折叠（WP-1.5.4）。
+// 之前 20 个功能平铺一长条，扫不出哪个干啥；现在按意图归堆。
+// 组里只放当前亮出来的功能；红头公文八件单独一组、整组暂藏（见末尾注释）。
+//
+// 注：WP-1.5.4 把"思想/理论"组列了"论点结构 / 概念演进 / 概念图"三项，
+// 但代码里只有 argument（论点结构）和 concept（概念演进）两个 mode，
+// 没有单独的"概念图" mode——所以这组只放这两项，没漏。
+interface NavGroup {
+  /** genre hook 用的稳定键；也作折叠状态的 key */
+  key: string;
+  title: string;
+  modes: { id: Mode; label: string }[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    key: "read",
+    title: "问 & 读",
+    modes: [
+      { id: "ask", label: "问书" },
+      { id: "annotate", label: "精读" },
+      { id: "recap", label: "前情回顾" },
+      { id: "entity", label: "实体回溯" },
+    ],
+  },
+  {
+    key: "character",
+    title: "人物",
+    modes: [
+      { id: "graph", label: "关系图" },
+      { id: "reltime", label: "关系演变" },
+      { id: "chararc", label: "人物弧线" },
+      { id: "charvoice", label: "声口一致" },
+    ],
+  },
+  {
+    key: "plot",
+    title: "情节脉络",
+    modes: [
+      { id: "narrative", label: "叙事曲线" },
+      { id: "flow", label: "叙事流" },
+      { id: "timeline", label: "时间线" },
+      { id: "subplot", label: "支线编织" },
+      { id: "foreshadow", label: "伏笔回收" },
+      { id: "motif", label: "母题追踪" },
+    ],
+  },
+  {
+    key: "thought",
+    title: "思想 · 理论",
+    modes: [
+      { id: "argument", label: "论点结构" },
+      { id: "concept", label: "概念演进" },
+    ],
+  },
+  {
+    key: "quality",
+    title: "质量 · 写作",
+    modes: [
+      { id: "consistency", label: "一致性" },
+      { id: "technique", label: "写作手法" },
+      { id: "style", label: "文体体检" },
+      { id: "revision", label: "改稿清单" },
+      { id: "cards", label: "知识卡片" },
+    ],
+  },
+  // 1.6 红头文件公文功能整组暂藏:引擎还在做透(头要素已修,跨文件锚定/条款补全未完),
   // 等单份+跨文件都 ship-quality 再亮出来单独发。代码留在仓里、用户点不到。
-  // 单份功能：
-  // { id: "redhead", label: "公文结构" },
-  // { id: "redhead_actions", label: "办事清单" },
-  // { id: "redhead_plain", label: "大白话翻译" },
-  // { id: "redhead_relevance", label: "跟我相关" },
-  // { id: "redhead_hardfacts", label: "硬信息提取" },
-  // { id: "redhead_timeline", label: "关键时间轴" },
-  // { id: "redhead_glossary", label: "名词解释" },
-  // { id: "redhead_formatcheck", label: "规范性自检" },
-  // 跨文件层（1.6 卷宗 + 三视图，同样暂藏）：
-  // { id: "dossier", label: "卷宗" },
-  // { id: "redhead_depgraph", label: "依据链网" },
-  // { id: "redhead_policy", label: "政策演变" },
-  // { id: "redhead_level", label: "上下级一致性" },
+  // 分组结构里留好位置,解禁时把这一项放进 NAV_GROUPS 即可:
+  // {
+  //   key: "redhead",
+  //   title: "公文",
+  //   modes: [
+  //     { id: "redhead", label: "公文结构" },
+  //     { id: "redhead_actions", label: "办事清单" },
+  //     { id: "redhead_plain", label: "大白话翻译" },
+  //     { id: "redhead_relevance", label: "跟我相关" },
+  //     { id: "redhead_hardfacts", label: "硬信息提取" },
+  //     { id: "redhead_timeline", label: "关键时间轴" },
+  //     { id: "redhead_glossary", label: "名词解释" },
+  //     { id: "redhead_formatcheck", label: "规范性自检" },
+  //     // 跨文件层（卷宗 + 三视图）：
+  //     { id: "dossier", label: "卷宗" },
+  //     { id: "redhead_depgraph", label: "依据链网" },
+  //     { id: "redhead_policy", label: "政策演变" },
+  //     { id: "redhead_level", label: "上下级一致性" },
+  //   ],
+  // },
 ];
+
+// 题材 → 高亮哪几组（genre hook，#10 给 session.genre 后接）。
+// 思路:不同题材关心的维度不一样——小说重人物/情节,理论书重思想/质量。
+// 命中的组高亮 + 默认展开;没命中的组不藏、只是默认折叠(用户仍可手动展开)。
+// **没有 genre 就返回 null = 全部组一视同仁、全显全展开**(向后兼容,现在没 genre 不能崩)。
+// 真正的题材分类数据由 #10 提供,这里只留"读 genre → 决定每组是否突出"的接线点。
+function genreHighlightGroups(genre: string | undefined | null): Set<string> | null {
+  if (!genre) return null;
+  const g = genre.toLowerCase();
+  // 题材关键词 → 该题材突出的组 key。未列到的题材落到 null（全显）。
+  if (/(小说|novel|fiction|网文|历史|架空|玄幻)/.test(g)) {
+    return new Set(["read", "character", "plot", "quality"]);
+  }
+  if (/(理论|论文|paper|哲学|philosophy|工具书|nonfiction|学术)/.test(g)) {
+    return new Set(["read", "thought", "quality"]);
+  }
+  if (/(诗|poem|poetry|散文)/.test(g)) {
+    return new Set(["read", "thought"]);
+  }
+  // 认不出的题材:不强行偏向任何组,全显（等同没 genre）。
+  return null;
+}
 
 // agent 编排菜单的功能名（后端 orchestrate FEATURE_MENU 的键）→ App 的 mode。
 // drill-into 用：点「点开看完整 X 视图」时据功能名跳进左栏那个功能的完整视图。
@@ -2466,10 +2543,41 @@ function Sidebar(props: {
   onMode: (m: Mode) => void;
   currentBook: SessionMetadata | null;
   hasBook: boolean;
+  /** #10 给 session 带上的题材；有值就按题材高亮可用组、没值全显（向后兼容） */
+  genre?: string | null;
   open: boolean;
   onOpenSettings: () => void;
 }) {
-  const { mode, onMode, currentBook, hasBook, open, onOpenSettings } = props;
+  const { mode, onMode, currentBook, hasBook, genre, open, onOpenSettings } =
+    props;
+
+  // 题材 → 突出哪几组。null = 不偏向任何组（没 genre / 认不出的题材都走这条，全显）。
+  const highlighted = genreHighlightGroups(genre);
+
+  // 折叠状态：记每组是否收起。默认——有 genre 时不突出的组默认收起；其余全展开。
+  // 用户手动点过的组用这个 Map 覆盖默认，换书（genre 变）时重置回默认。
+  const [collapsedOverride, setCollapsedOverride] = useState<
+    Record<string, boolean>
+  >({});
+  useEffect(() => {
+    // genre 变了（换书 / #10 填了题材）→ 清掉手动折叠，回到题材决定的默认展开态。
+    setCollapsedOverride({});
+  }, [genre]);
+
+  function defaultCollapsed(groupKey: string): boolean {
+    // 没 genre 或认不出 → 全展开；有 genre → 没被突出的组默认收起。
+    if (!highlighted) return false;
+    return !highlighted.has(groupKey);
+  }
+  function isCollapsed(groupKey: string): boolean {
+    return collapsedOverride[groupKey] ?? defaultCollapsed(groupKey);
+  }
+  function toggleGroup(groupKey: string): void {
+    setCollapsedOverride((prev) => ({
+      ...prev,
+      [groupKey]: !isCollapsed(groupKey),
+    }));
+  }
   return (
     <aside
       className={[
@@ -2554,46 +2662,94 @@ function Sidebar(props: {
         )}
       </div>
 
-      {/* 模式导航——图标 + 一个词，活动项朱砂左边线 + 淡底；功能说明在主区标题下 */}
+      {/* 模式导航——按意图分五组，每组一个可折叠小标题；组内图标 + 一个词。
+          活动项朱砂左边线 + 淡底；题材突出的组标题描朱、不突出的默认收起。 */}
       <nav className="flex-1 px-2.5 overflow-y-auto">
-        <ul className="space-y-0.5">
-          {NAV_MODES.map((m) => {
-            const active = mode === m.id;
-            return (
-              <li key={m.id}>
-                <button
-                  type="button"
-                  disabled={!hasBook}
-                  onClick={() => onMode(m.id)}
-                  className="w-full flex items-center gap-2.5 rounded-md pl-2.5 pr-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  style={
-                    active
-                      ? {
-                          background: "var(--color-seal-soft)",
-                          borderLeft: "2px solid var(--color-seal)",
-                          color: "var(--color-seal)",
-                        }
-                      : {
-                          borderLeft: "2px solid transparent",
-                          color: "var(--color-ink)",
-                        }
-                  }
+        {NAV_GROUPS.map((group) => {
+          const collapsed = isCollapsed(group.key);
+          // 题材命中这组就突出标题（描朱）；没 genre 时 highlighted 为 null、都不突出。
+          const featured = highlighted?.has(group.key) ?? false;
+          return (
+            <div key={group.key} className="mb-1.5">
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.key)}
+                className="w-full flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-md transition-colors"
+                style={{
+                  color: featured
+                    ? "var(--color-seal)"
+                    : "var(--color-ink-muted)",
+                }}
+                aria-expanded={!collapsed}
+              >
+                <span
+                  className="text-[11px] tracking-wider"
+                  style={{ fontWeight: featured ? 600 : 500 }}
                 >
-                  <NavIcon id={m.id} />
-                  <span
-                    className="text-[13.5px]"
-                    style={{
-                      fontFamily: "var(--font-display)",
-                      fontWeight: active ? 600 : 400,
-                    }}
-                  >
-                    {m.label}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                  {group.title}
+                </span>
+                {/* 折叠箭头：展开朝下、收起朝右 */}
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0 transition-transform"
+                  style={{
+                    transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+                  }}
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {!collapsed && (
+                <ul className="space-y-0.5 mt-0.5">
+                  {group.modes.map((m) => {
+                    const active = mode === m.id;
+                    return (
+                      <li key={m.id}>
+                        <button
+                          type="button"
+                          disabled={!hasBook}
+                          onClick={() => onMode(m.id)}
+                          className="w-full flex items-center gap-2.5 rounded-md pl-2.5 pr-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          style={
+                            active
+                              ? {
+                                  background: "var(--color-seal-soft)",
+                                  borderLeft: "2px solid var(--color-seal)",
+                                  color: "var(--color-seal)",
+                                }
+                              : {
+                                  borderLeft: "2px solid transparent",
+                                  color: "var(--color-ink)",
+                                }
+                          }
+                        >
+                          <NavIcon id={m.id} />
+                          <span
+                            className="text-[13.5px]"
+                            style={{
+                              fontFamily: "var(--font-display)",
+                              fontWeight: active ? 600 : 400,
+                            }}
+                          >
+                            {m.label}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       {/* 底部：书库 + 设置 一行 */}
