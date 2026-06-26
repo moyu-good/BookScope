@@ -2249,6 +2249,28 @@ function genreHighlightGroups(genre: string | undefined | null): Set<string> | n
   return null;
 }
 
+// 题材 → 哪几组可见（跨垂直硬隐藏，#18 左栏太多/区分难）。与 genreHighlightGroups（管展开/突出）
+// 分工:这个管"显不显"——公文藏掉书的组、书藏掉公文的组,直接砍掉跨垂直无关功能,左栏不再堆 8 组。
+// **没 genre / 认不出 → 返 null = 全显**(兜底:题材没测出不能把功能藏没)。
+function genreVisibleGroups(genre: string | undefined | null): Set<string> | null {
+  if (!genre) return null;
+  const g = genre.toLowerCase();
+  // 公文:只留「问 & 读」+ 三个公文组,书的人物/情节/思想/质量全藏。
+  if (/(公文|红头)/.test(g)) {
+    return new Set(["read", "redhead_read", "redhead_act", "redhead_cross"]);
+  }
+  // 书类(小说/历史/理论/论文/诗歌/工具书):只留「问 & 读」+ 书的组,公文三组全藏。
+  if (
+    /(小说|novel|fiction|网文|历史|架空|玄幻|理论|论文|paper|哲学|philosophy|工具书|nonfiction|学术|诗|poem|poetry|散文)/.test(
+      g,
+    )
+  ) {
+    return new Set(["read", "character", "plot", "thought", "quality"]);
+  }
+  // 其他 / 认不出:全显(兜底)。
+  return null;
+}
+
 // agent 编排菜单的功能名（后端 orchestrate FEATURE_MENU 的键）→ App 的 mode。
 // drill-into 用：点「点开看完整 X 视图」时据功能名跳进左栏那个功能的完整视图。
 const FEATURE_TO_MODE: Record<string, Mode> = {
@@ -2633,6 +2655,8 @@ function Sidebar(props: {
 
   // 题材 → 突出哪几组。null = 不偏向任何组（没 genre / 认不出的题材都走这条，全显）。
   const highlighted = genreHighlightGroups(genre);
+  // 题材 → 哪几组可见（跨垂直硬隐藏，#18）:公文藏书组、书藏公文组;null=全显(题材没测出兜底)。
+  const visible = genreVisibleGroups(genre);
 
   // 折叠状态：记每组是否收起。默认——有 genre 时不突出的组默认收起；其余全展开。
   // 用户手动点过的组用这个 Map 覆盖默认，换书（genre 变）时重置回默认。
@@ -2746,6 +2770,9 @@ function Sidebar(props: {
           活动项朱砂左边线 + 淡底；题材突出的组标题描朱、不突出的默认收起。 */}
       <nav className="flex-1 px-2.5 overflow-y-auto">
         {NAV_GROUPS.map((group) => {
+          // 跨垂直隐藏(#18):不在当前题材可见集里的组直接不渲染(公文藏书组 / 书藏公文组);
+          // visible 为 null(没 genre/认不出)时全渲染。
+          if (visible && !visible.has(group.key)) return null;
           const collapsed = isCollapsed(group.key);
           // 题材命中这组就突出标题（描朱）；没 genre 时 highlighted 为 null、都不突出。
           const featured = highlighted?.has(group.key) ?? false;
