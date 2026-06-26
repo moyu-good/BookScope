@@ -11,9 +11,18 @@
 // 几次只出一条；释义讲的是「这词什么意思」，不是「这句话什么意思」。独有维度 = 笺注（给难
 // 词夹注释义）。意象走古籍夹注 / 词条旁批，不是通用词典卡片、不套花鸟山水。
 //
+// 深度升级（WP-redhead-deep-reading-lenses，2026-06-26）：一条词条分三层呈现——
+//   1. 释义（explanation）= 词典义，墨色主体，跟原来一样。
+//   2. 语境含义（context_meaning）= 这词在**这份文件里**特指什么（证据层，跟着原句走）。
+//      紧贴释义后面、带「本文件指」朱砂小引，告诉你词典义之外它在这落到哪个具体所指。
+//   3. 政策意图（policy_intent）= 这术语绑的政策方向 / 信号（评估层·研判）。做成虚线降调
+//      的「研判·非核验」小注，跟释义/语境（核验态）视觉两样——借利害与风向「信号」那套
+//      研判语言：虚线框 + 降调底 + 虚线小签，绝不盖「鉴」印（研判不冒充事实）。
+//
 // evidence-first（全站一个规矩）：词出现的原句核过的盖「鉴」印；核不过的老实标「未在原文比
-// 对命中·仅供参考」、原句退空（不留假原句撑场）。scanned=false 或没挑到难词 → 优雅退场，
-// 不画空壳。
+// 对命中·仅供参考」、原句退空（不留假原句撑场）。语境含义跟着原句的核验态走；政策意图是研判、
+// 不盖鉴印、单独标研判；两层新字段为空就不渲染（模型没把握时后端已退空、不硬编）。
+// scanned=false 或没挑到难词 → 优雅退场，不画空壳。
 //
 // 设计语言（数字善本案头）：朱墨双色（朱 = var(--color-seal) 钤印/词头提行/书口线，墨 =
 // var(--color-ink) 词头与释义主体，淡墨 = var(--color-ink-muted) 原句夹注）、宋体
@@ -28,7 +37,9 @@ import { SealMark } from "./SealMark";
 
 interface GlossaryTerm {
   term: string; // 术语本身（逐字原文写法）
-  explanation: string; // 大白话释义
+  explanation: string; // 大白话释义（词典义）
+  context_meaning?: string; // 本文件语境特指义（证据层，可选/可空）；跟着原句的核验态走
+  policy_intent?: string; // 政策意图/方向（评估层·研判，可选/可空）；不盖鉴印、单独标研判
   chapter: number | null; // 这词所在条款/章节序号（核不到原句时为 null）
   evidence: string; // 这词出现的原句（核不过时退空）
   verified: boolean;
@@ -120,7 +131,7 @@ export function RedheadGlossary({
           名词解释
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          把一份红头文件里普通人看不懂的政策黑话挑出来、用人话讲清——「证照分离」「负面清单」「放管服」「一业一证」这类词，逐个释义。每个做成一条笺注：词头立起，下面是大白话讲解，背后原句核得到的盖「鉴」印。释义只讲这词什么意思，不替你脑补原文没说的。适合党政公文
+          把一份红头文件里普通人看不懂的政策黑话挑出来、用人话讲清——「证照分离」「负面清单」「放管服」「一业一证」这类词，逐个释义。每条笺注分三层：先讲这词<b>本身</b>什么意思，再点它在<b>这份文件里</b>特指什么（背后原句核得到的盖「鉴」印），最后研判它绑的<b>政策方向</b>（标「研判」、不冒充事实）。词典义之外，告诉你它在这具体指什么、透出什么风向。适合党政公文
           / 红头文件。
         </p>
         <button
@@ -224,6 +235,8 @@ export function RedheadGlossary({
           const verified = t.verified && hasText(t.evidence);
           const isOpen = !!openOrigin[i];
           const canOpenOrigin = hasText(t.evidence);
+          const hasContext = hasText(t.context_meaning); // 本文件语境特指义（证据层）
+          const hasIntent = hasText(t.policy_intent); // 政策意图（评估层·研判）
           return (
             <article
               key={i}
@@ -258,7 +271,7 @@ export function RedheadGlossary({
                   )}
                 </div>
 
-                {/* 人话释义——笺注主体，墨色、宋体、舒朗行距 */}
+                {/* 人话释义——笺注主体（词典义），墨色、宋体、舒朗行距 */}
                 <div className="flex items-start gap-2">
                   {verified && <SealMark size={18} title="原文已核验" />}
                   <p
@@ -268,6 +281,51 @@ export function RedheadGlossary({
                     {t.explanation || "（这条没给出释义）"}
                   </p>
                 </div>
+
+                {/* 本文件语境特指义（证据层）——紧贴释义，朱砂「本文件指」小引带出词典义之外
+                    这词在这具体所指什么。它跟着原句的核验态走，不另起鉴印（鉴印挂在词头那枚）。 */}
+                {hasContext && (
+                  <p
+                    className="mt-1.5 text-[14px] leading-7 text-[var(--color-ink)]"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    <span
+                      className="text-[11px] mr-1.5 align-top whitespace-nowrap"
+                      style={{ color: "var(--color-seal)" }}
+                    >
+                      本文件指
+                    </span>
+                    {t.context_meaning}
+                  </p>
+                )}
+
+                {/* 政策意图（评估层·研判）——虚线降调小注，借「信号」那套研判语言：虚线框 +
+                    凹底 + 「研判·非核验」虚线小签，跟核验态（释义/语境）视觉两样，绝不盖鉴印。 */}
+                {hasIntent && (
+                  <div
+                    className="mt-2.5 rounded px-2.5 py-2"
+                    style={{
+                      border: "1px dashed var(--color-rule)",
+                      background: "var(--color-paper-sunken)",
+                    }}
+                  >
+                    <span
+                      className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap mb-1"
+                      style={{
+                        border: "1px dashed var(--color-ink-muted)",
+                        opacity: 0.85,
+                      }}
+                    >
+                      政策意图 · 研判
+                    </span>
+                    <p
+                      className="text-[13px] leading-relaxed text-[var(--color-ink-muted)]"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      {t.policy_intent}
+                    </p>
+                  </div>
+                )}
 
                 {/* 核不过老实标一行，绝不假装释义有原句撑 */}
                 {!verified && (

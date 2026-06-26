@@ -4,12 +4,24 @@
 「双随机一公开」。普通人读到这些词卡住:不知道是啥、跟自己有什么关系。这功能把一份公文里
 **外行看不懂的术语**挑出来,每个用大白话讲清楚是什么意思,并锚回这个词在原文出现的那句。
 
+**深度升级(WP-redhead-deep-reading-lenses「名词解释」那行,2026-06-26)**:不止给词典定义,
+再加两层「读弦外」的功夫:
+
+- **语境含义(context_meaning,证据层)**:这词在**这份文件里**特指什么——不是泛泛词典义。
+  比如「平台」在一份公文里特指「网络交易平台经营者」,在另一份里特指「政务服务平台」;同一个
+  词典词,落到具体文件里所指往往收窄。这层照样锚原文(跟着术语出现的那句原文走、不另起证据),
+  讲解失败 / 核不过就退空,绝不编。
+- **政策意图(policy_intent,评估层·研判)**:这术语 / 简称绑的政策方向或信号(「放管服」=简政
+  放权改革方向、「包容审慎」=对新业态先松后管的姿态)。这是**推断**、直接撞 evidence-first,所以
+  **绝不当词典事实**:前端标研判、视觉区别于定义。没有可靠政策意图的词就不给(可选字段、留空),
+  绝不为了凑而硬编。
+
 **跟另两个公文功能的分工**:
 - 公文结构解读(doc_structure):把一份公文拆成头要素 + 逐条款的「结构」。
 - 大白话翻译(redhead_plain):逐条款把整句官话改写成人话(「一条 → 一句白话」)。
 - 名词解释(本模块):换个看法——不逐条翻整句,只把**散落在全文里的难词**挑出来逐个释义
   (「一个词 → 一条注解」)。同一个词在全文出现几次,只出一条;释义讲的是「这词什么意思」,
-  不是「这句话什么意思」。独有维度 = 笺注(给难词夹注释义)。
+  不是「这句话什么意思」。独有维度 = 笺注(给难词夹注释义 + 本文件语境特指义 + 政策意图研判)。
 
 三个功能共用同一份文脉(``get_or_build_doc_spine``):建一次,谁先点谁付精读的钱,后点的秒出。
 
@@ -24,7 +36,9 @@
 3. **释义锚回原句,过核验**:每个词的 evidence(**这词出现的逐字原句**,不是释义)再过一次
    ``verify_citations``——核得到 ``verified=True`` 盖「鉴」印。核的是「这词真在原文出现过、
    那句找得到」,不是核释义本身(释义是讲解、不该也核不到原文)。识别失败 / 核不过的词,
-   evidence 退空 + 标 ``verified=False``,绝不假装这词有原文撑。
+   evidence 退空 + 标 ``verified=False``,绝不假装这词有原文撑。**语境含义**跟着同一句原文走
+   (不另起证据,核不过原句时它也跟着失去原文撑、由前端按未核验呈现);**政策意图**是研判、
+   不进核验(评估层),前端单独标研判。
 
 铁律:**只 import ``doc_spine_cache`` 的缓存入口 + 现有 helper,一行不改 ``doc_spine`` /
 ``cross_doc`` / ``agent.py`` / ``schemas.py``**;端点该返的结构写在 ``glossary_from_spine``
@@ -55,20 +69,24 @@ from bookscope.agent.utils.json_parsing import (
 
 logger = logging.getLogger(__name__)
 
-GLOSSARY_SCHEMA_VERSION = "v1"
-"""名词解释记录结构版本——升级要让从文脉派生的这层重算(文脉缓存不受影响,只是释义层重跑)。"""
+GLOSSARY_SCHEMA_VERSION = "v2"
+"""名词解释记录结构版本——升级要让从文脉派生的这层重算(文脉缓存不受影响,只是释义层重跑)。
 
-DEFAULT_GLOSSARY_MAX_TOKENS = 1500
-"""难词识别单段输出的 max_tokens。一段挑十来个词、每个一句释义 + 原句,1500 留足 reasoning 头
-还够用(deepseek-v4-flash 把 reasoning_content 算进 max_tokens,见
-reference_reasoning_model_token_budget)。"""
+v2 = 每条在 ``explanation``(词典义)之外加 ``context_meaning``(本文件语境特指义,证据层、可选)
+和 ``policy_intent``(政策意图研判,评估层、可选)。向后兼容:老字段不动,新字段缺就退空串。"""
+
+DEFAULT_GLOSSARY_MAX_TOKENS = 1800
+"""难词识别单段输出的 max_tokens。一段挑十来个词、每个一句释义 + 原句,v2 再多两段(语境含义 +
+政策意图),输出比 v1 长些;从 1500 提到 1800 留足 reasoning 头还够用(deepseek-v4-flash 把
+reasoning_content 算进 max_tokens,见 reference_reasoning_model_token_budget)。"""
 
 _GLOSSARY_MAX_CHAPTERS = 8
 """难词识别分段的章节闸。比文脉条款维(3)宽:这里一段只挑词、不抽逐字段的密结构,输出条目轻,
 8 章一段也塞得下 1500;比全局默认(12)略收,避免词条多的密集公文段冲 max_tokens。"""
 
 # 分段识别难词的指令——喂这一段原文,让模型挑「外行看不懂、需要解释的术语」+ 给人话释义 +
-# 抠这词出现的原句当 evidence。死守:只挑真在这段出现的词、释义忠实不编、原句逐字抄。
+# 本文件语境特指义 + 政策意图研判 + 抠这词出现的原句当 evidence。
+# 死守:只挑真在这段出现的词、释义/语境义忠实不编、政策意图没把握就留空、原句逐字抄。
 _INSTR_GLOSSARY = (
     "你是帮普通人读懂党政机关公文(红头文件)的助手。公文里常有外行看不懂的政策术语和"
     "专有名词——比如「证照分离」「负面清单」「放管服」「一业一证」「双随机一公开」"
@@ -76,13 +94,23 @@ _INSTR_GLOSSARY = (
     "请从上面这段公文原文里,挑出**普通人看不懂、需要解释的术语 / 专有名词 / 政策简称**,"
     "每个给出:\n"
     "1. term:术语本身,**逐字抄原文里的写法**,别改写、别加书名号。\n"
-    "2. explanation:用大白话讲清这个词是什么意思,死守三条——(a) 只讲这个词本身的含义,"
-    "像在跟一个没听过这词的朋友解释;(b) 别编原文 / 常识里没有的东西;(c) 一两句话说完,"
-    "短句、口语化、说人话。\n"
-    "3. evidence:这个词**在上面原文里出现的那一整句**,逐字抄下来(连标点),别改写、别截半句。\n"
+    "2. explanation:用大白话讲清这个词**本身**是什么意思(泛义、词典义),死守三条——"
+    "(a) 只讲这个词本身的含义,像在跟一个没听过这词的朋友解释;(b) 别编原文 / 常识里没有的东西;"
+    "(c) 一两句话说完,短句、口语化、说人话。\n"
+    "3. context_meaning:这个词**在这份文件里特指什么**——不是泛泛词典义,是它落到本文这具体"
+    "语境里指的那个确定对象 / 确定范围。比如「平台」在一份文件里特指「网络交易平台经营者」、"
+    "在另一份里特指「政务服务系统」。死守:**只能从上面原文的实际用法里读出来**——原文怎么用、"
+    "它就特指什么,别拿文件外的常识硬套。如果原文用法跟词典义没差别、读不出更具体的所指,"
+    "就把这条**留空字符串**,别硬凑。\n"
+    "4. policy_intent:这个术语 / 简称背后绑的**政策方向或信号**(比如「放管服」=简政放权的改革"
+    "方向、「包容审慎」=对新业态先放松再监管的姿态、「负面清单」=清单外都放开的市场化方向)。"
+    "**这是你的研判推断、不是文件白纸黑字写的事实**,所以:(a) 只在你**确有把握**这个术语承载着"
+    "公认的政策方向时才写,一句话点出方向 / 姿态即可;(b) 拿不准、或这词就是个中性名词没什么政策"
+    "指向的,**一律留空字符串**——宁缺毋滥,绝不为了凑而编一个方向。\n"
+    "5. evidence:这个词**在上面原文里出现的那一整句**,逐字抄下来(连标点),别改写、别截半句。\n"
     "只挑外行真看不懂的:常见词(「通知」「会议」「单位」)、谁都懂的词,别挑。挑不出就返空数组。\n"
-    '只输出 JSON,形如 {"terms":[{"term":"","explanation":"","evidence":""}]},别加任何解释、'
-    "别加 markdown 围栏。"
+    '只输出 JSON,形如 {"terms":[{"term":"","explanation":"","context_meaning":"",'
+    '"policy_intent":"","evidence":""}]},别加任何解释、别加 markdown 围栏。'
 )
 
 _USER_MSG = "请按上面的要求,从这段公文里挑出难词并逐个释义。"
@@ -91,8 +119,11 @@ _USER_MSG = "请按上面的要求,从这段公文里挑出难词并逐个释义
 def _coerce_term(item: Any) -> dict[str, Any] | None:
     """把一条术语 dict 归一成该有的字段;term 为空 → 丢(没词面没法当词条)。
 
-    term / explanation / evidence 都 coerce 成字符串、strip;term 空就丢——一条名词解释至少
-    得有「哪个词」。释义 / evidence 缺退空串、抽不到不编。
+    term / explanation / context_meaning / policy_intent / evidence 都 coerce 成字符串、strip;
+    term 空就丢——一条名词解释至少得有「哪个词」。其余字段缺退空串、抽不到不编:
+
+    - ``context_meaning``(本文件语境特指义)、``policy_intent``(政策意图研判)是 v2 新增的
+      **可选**字段,模型读不出 / 没把握时会按 prompt 留空——这里照单收空串,**不替它编**。
     """
     if not isinstance(item, dict):
         return None
@@ -102,6 +133,8 @@ def _coerce_term(item: Any) -> dict[str, Any] | None:
     return {
         "term": term,
         "explanation": str(item.get("explanation", "")).strip(),
+        "context_meaning": str(item.get("context_meaning", "")).strip(),
+        "policy_intent": str(item.get("policy_intent", "")).strip(),
         "evidence": str(item.get("evidence", "")).strip(),
     }
 
@@ -215,12 +248,19 @@ def glossary_from_spine(
 
     Returns:
         ``{
-            "schema_version": "v1",
-            "terms": [{term(术语本身), explanation(人话释义),
+            "schema_version": "v2",
+            "terms": [{term(术语本身), explanation(词典义),
+                       context_meaning(本文件语境特指义,证据层、可选、可空),
+                       policy_intent(政策意图研判,评估层、可选、可空),
                        chapter(这词所在条款 / 章节序号), evidence(这词出现的原句),
                        verified, match_score}],
         }``。
         没挑出难词(或这份没正文)→ ``terms: []``。``terms`` 按全文先出现顺序排。
+
+        两层深度字段的证据契约:``context_meaning`` 是从原文用法读出的语境特指义,跟着术语那句
+        原文走——核不过(``verified=False``)时它跟着失去原文撑,由前端按未核验呈现(不盖鉴印);
+        ``policy_intent`` 是**研判**(评估层),不进核验、不盖鉴印,前端单独标研判。两者模型读不出
+        时都退空串(前端据此不渲染),绝不编。
     """
     spine = get_or_build_doc_spine(
         chunks=chunks,
@@ -281,6 +321,11 @@ def glossary_from_spine(
         out_terms.append({
             "term": t["term"],
             "explanation": t["explanation"],
+            # 语境特指义(证据层):跟术语那句原文同源,核不过时由 verified=False 标未核验,
+            # 值仍带出(它是读出的所指、不是逐字引文,前端按未核验呈现、不盖鉴印)。
+            "context_meaning": t["context_meaning"],
+            # 政策意图(评估层·研判):不进核验、不盖鉴印,前端单独标研判;空就不渲染。
+            "policy_intent": t["policy_intent"],
             "chapter": chapter,
             # 核不过(含 evidence 为空)就退空——不留一句核不到的假原句撑场。
             "evidence": t["evidence"] if verified else "",

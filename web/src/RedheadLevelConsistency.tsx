@@ -41,6 +41,10 @@ interface Conflict {
   deviation: string; // 走样 / 加码 / 漏落实
   upper: ClauseSide; // 上层级要求
   lower: ClauseSide; // 下层级落实
+  // 博弈姿态（研判口径，可选）：下位对上位是什么姿态——忠实落实 / 层层加码 / 打折扣 / 创新先行。
+  // deviation 看「哪类不一致（核验得出）」，posture 看「下位什么态度（研判）」，各看一面。
+  // 后端判不准就没这个字段（FE 据有无决定显不显），上下两栏原话是引发它的对照证据。
+  posture?: string | null;
 }
 
 interface LevelConsistencyResponse {
@@ -68,6 +72,24 @@ const DEVIATION_STYLE: Record<string, { fg: string; bg: string }> = {
 function deviationStyle(d: string): { fg: string; bg: string } {
   return (
     DEVIATION_STYLE[d] ?? {
+      fg: "var(--color-ink-muted)",
+      bg: "var(--color-seal-soft)",
+    }
+  );
+}
+
+// 博弈姿态四类各配克制的色（研判维，写死 hex；未知走墨色兜底）。和 deviation 标签分开看：
+// deviation 是核验得出的「哪类不一致」，posture 是研判「下位什么态度」。纯分类不打分。
+const POSTURE_STYLE: Record<string, { fg: string; bg: string }> = {
+  忠实落实: { fg: "#3a6378", bg: "rgba(58, 99, 120, 0.10)" },
+  层层加码: { fg: "#8a6b3f", bg: "rgba(138, 107, 63, 0.10)" },
+  打折扣: { fg: "#9a3a2e", bg: "rgba(154, 58, 46, 0.10)" },
+  创新先行: { fg: "#4f7a52", bg: "rgba(79, 122, 82, 0.10)" },
+};
+
+function postureStyle(p: string): { fg: string; bg: string } {
+  return (
+    POSTURE_STYLE[p] ?? {
       fg: "var(--color-ink-muted)",
       bg: "var(--color-seal-soft)",
     }
@@ -283,14 +305,30 @@ function ConflictCard({ conflict }: { conflict: Conflict }) {
             </p>
           )}
         </div>
-        {hasText(conflict.deviation) && (
-          <span
-            className="text-xs px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
-            style={{ color: st.fg, background: st.bg }}
-          >
-            {conflict.deviation}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* 博弈姿态小标（研判口径，区别于 deviation 这个核验得出的分类） */}
+          {hasText(conflict.posture) && (
+            <span
+              className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap inline-flex items-center gap-1"
+              style={{
+                color: postureStyle(conflict.posture ?? "").fg,
+                background: postureStyle(conflict.posture ?? "").bg,
+              }}
+              title="博弈姿态：下位对上位的态度（研判，非核验事实）"
+            >
+              <span className="opacity-70">研判</span>
+              {conflict.posture}
+            </span>
+          )}
+          {hasText(conflict.deviation) && (
+            <span
+              className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
+              style={{ color: st.fg, background: st.bg }}
+            >
+              {conflict.deviation}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* 两栏对照：上层级 / 下层级。中间一道朱砂勘缝线（手机端竖排，宽屏左右）。 */}

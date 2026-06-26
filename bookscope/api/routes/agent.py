@@ -79,7 +79,9 @@ from bookscope.agent.character_voice import generate_character_voice
 from bookscope.agent.claim_support import check_claim_support
 from bookscope.agent.cross_doc import cross_doc_relations_from_spines
 from bookscope.agent.cross_doc_views import (
+    attach_postures_to_edges,
     dependency_graph_from_cross_doc,
+    dependency_postures_from_spines,
     level_consistency_from_spines,
     policy_evolution_from_spines,
     policy_wording_diff_from_spines,
@@ -3111,6 +3113,7 @@ async def agent_redhead_doc_structure(
     return RedheadDocStructureResponse(
         head=head,
         clauses=clauses,
+        structure_read=spine.get("structure_read"),
         # 头要素永远出 8 条骨架,所以 scanned 看「有没有抽到真东西」:任一头要素有值 或 有条款。
         scanned=bool(clauses) or any(str(el.get("value", "")).strip() for el in head),
         book_session_id=request.book_session_id,
@@ -3143,6 +3146,13 @@ async def agent_redhead_dependency_graph(
         doc_spines=spines, llm_client=rec, model=model
     )
     graph = dependency_graph_from_cross_doc(cross)
+    # 博弈姿态(深6):给依据/落实边判忠实落实/层层加码/打折扣(独立 LLM pass,锚下位 vs 上位原文对照);
+    # attach 纯合并贴回边上(向后兼容,匹配不上的边不挂)。
+    if graph is not None:
+        postures = dependency_postures_from_spines(
+            cross_doc_result=cross, doc_spines=spines, llm_client=rec, model=model
+        )
+        graph = attach_postures_to_edges(graph, postures)
     return RedheadDependencyGraphResponse(
         nodes=(graph or {}).get("nodes", []),
         edges=(graph or {}).get("edges", []),

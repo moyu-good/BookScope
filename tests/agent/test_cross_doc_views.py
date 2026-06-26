@@ -858,3 +858,286 @@ def test_level_strips_code_fence(monkeypatch):
     out = _level(_DEVIATION)
     assert out is not None
     assert len(out) == 1
+
+
+# ── 上下级一致性·博弈姿态(posture)维 ───────────────────────────────────────
+
+
+def test_level_carries_posture_when_in_set(monkeypatch):
+    """冲突带 posture 且落进封闭集 → 挂上 posture(研判维),冲突结构其余照旧。"""
+    payload = json.dumps({"deviations": [{
+        "topic": "稳岗补贴标准", "detail": "省定500元市落成300元", "deviation": "走样",
+        "upper": "省发〔2024〕1号", "lower": "市发〔2024〕5号",
+        "upper_clause": 1, "lower_clause": 1, "posture": "打折扣",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _level(payload)
+    assert len(out) == 1
+    assert out[0]["posture"] == "打折扣"
+    # 现有结构一个不动(向后兼容)
+    assert out[0]["deviation"] == "走样"
+    assert "500元" in out[0]["upper"]["snippet"]
+
+
+def test_level_posture_加码(monkeypatch):
+    """加码姿态:落进封闭集 → 挂上。"""
+    payload = json.dumps({"deviations": [{
+        "topic": "补贴标准", "detail": "下位标准高于上位", "deviation": "加码",
+        "upper": "省发〔2024〕1号", "lower": "市发〔2024〕5号",
+        "upper_clause": 1, "lower_clause": 1, "posture": "层层加码",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _level(payload)
+    assert len(out) == 1
+    assert out[0]["posture"] == "层层加码"
+
+
+def test_level_invalid_posture_dropped_conflict_kept(monkeypatch):
+    """posture 落不进封闭集 → 不挂 posture,但冲突本身照常保留(posture 是可选维,不当 gate)。"""
+    payload = json.dumps({"deviations": [{
+        "topic": "补贴标准", "detail": "省定500元市落成300元", "deviation": "走样",
+        "upper": "省发〔2024〕1号", "lower": "市发〔2024〕5号",
+        "upper_clause": 1, "lower_clause": 1, "posture": "随便编个姿态",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _level(payload)
+    assert len(out) == 1               # 冲突没被 posture 拖掉
+    assert "posture" not in out[0]     # 编的姿态不挂
+
+
+def test_level_no_posture_field_backward_compat(monkeypatch):
+    """模型没给 posture(老形态)→ 冲突照常,没有 posture 键(向后兼容)。"""
+    _patch(monkeypatch, _DEVIATION)    # _DEVIATION 不带 posture
+    out = _level(_DEVIATION)
+    assert len(out) == 1
+    assert "posture" not in out[0]
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 视图一·加一层:依据链博弈姿态(posture)
+# ════════════════════════════════════════════════════════════════════════════
+#
+# posture 的 from/to 是「下位→上位」(依据 / 落实边方向)。_CROSS_DOC 里的依据 / 落实边:
+#   市发〔2024〕5号 --依据--> 省发〔2024〕1号
+#   县发〔2024〕9号 --落实--> 市发〔2024〕5号
+# 两端文件在 _SPINES 里都有已核 evidence(现取 from/to snippet 用)。
+
+
+def _posture(payload, *, cross=None, spines=None, **kw):
+    return cdv.dependency_postures_from_spines(
+        cross_doc_result=cross if cross is not None else _CROSS_DOC,
+        doc_spines=spines if spines is not None else _SPINES,
+        llm_client=_FakeClient(),
+        model="deepseek-v4-flash",
+        **kw,
+    )
+
+
+def test_posture_success_落实(monkeypatch):
+    """正路:忠实落实——对回真实依据边、两侧锚到各自已核原文、posture 落封闭集。"""
+    payload = json.dumps({"postures": [{
+        "from_doc": "市发〔2024〕5号", "to_doc": "省发〔2024〕1号",
+        "posture": "忠实落实", "from_clause": 1, "to_clause": 1,
+        "basis": "市照省的稳岗补贴口径落实",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _posture(payload)
+    assert out is not None
+    assert len(out) == 1
+    p = out[0]
+    assert p["posture"] == "忠实落实"
+    assert p["from_doc"] == "市发〔2024〕5号"
+    assert p["to_doc"] == "省发〔2024〕1号"
+    assert "300元" in p["from_snippet"]   # 下位(市)已核原文
+    assert "500元" in p["to_snippet"]     # 上位(省)已核原文
+    assert p["verified"] is True
+
+
+def test_posture_加码(monkeypatch):
+    """层层加码:落进封闭集、对回真实落实边 → 留。"""
+    payload = json.dumps({"postures": [{
+        "from_doc": "县发〔2024〕9号", "to_doc": "市发〔2024〕5号",
+        "posture": "层层加码", "from_clause": 1, "to_clause": 1,
+        "basis": "县把市的要求加严",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _posture(payload)
+    assert len(out) == 1
+    assert out[0]["posture"] == "层层加码"
+
+
+def test_posture_打折扣(monkeypatch):
+    """打折扣:落进封闭集 → 留。"""
+    payload = json.dumps({"postures": [{
+        "from_doc": "市发〔2024〕5号", "to_doc": "省发〔2024〕1号",
+        "posture": "打折扣", "from_clause": 1, "to_clause": 1,
+        "basis": "省定500元,市落成300元——打了折",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _posture(payload)
+    assert len(out) == 1
+    assert out[0]["posture"] == "打折扣"
+    assert all(x["posture"] in cdv.POSTURE_TYPES for x in out)
+
+
+def test_posture_invalid_dropped(monkeypatch):
+    """posture 落不进封闭集 → 丢这条(不替用户硬断姿态)。"""
+    payload = json.dumps({"postures": [
+        {"from_doc": "市发〔2024〕5号", "to_doc": "省发〔2024〕1号",
+         "posture": "忠实落实", "from_clause": 1, "to_clause": 1, "basis": "真"},
+        {"from_doc": "县发〔2024〕9号", "to_doc": "市发〔2024〕5号",
+         "posture": "瞎编的姿态", "from_clause": 1, "to_clause": 1, "basis": "编"},
+    ]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _posture(payload)
+    assert len(out) == 1
+    assert out[0]["posture"] == "忠实落实"
+
+
+def test_posture_no_evidence_dropped(monkeypatch):
+    """引发姿态的原文对照锚不到(某侧文件没已核证据)→ 丢这条(双向守卫,无据不出)。"""
+    spines = [
+        {"head": _head(num="甲发〔2024〕1号", org="某省政府", date="2024年1月1日"),
+         "clauses": [_clause(1, "上位有证据", evidence="省定每人500元。")]},
+        {"head": _head(num="乙发〔2024〕2号", org="某省某市政府", date="2024年3月1日"),
+         "clauses": [_clause(1, "下位没证据", evidence="")]},  # 留空待核
+    ]
+    cross = {
+        "relations": [{"from_doc": "乙发〔2024〕2号", "to_doc": "甲发〔2024〕1号",
+                       "kind": "依据", "chapter_anchor": 1, "note": "乙依据甲"}],
+        "docs": [{"字号": "甲发〔2024〕1号", "文种": "意见", "机关": "某省政府",
+                  "成文日期": "2024年1月1日"},
+                 {"字号": "乙发〔2024〕2号", "文种": "通知", "机关": "某省某市政府",
+                  "成文日期": "2024年3月1日"}],
+    }
+    payload = json.dumps({"postures": [{
+        "from_doc": "乙发〔2024〕2号", "to_doc": "甲发〔2024〕1号",
+        "posture": "打折扣", "from_clause": 1, "to_clause": 1, "basis": "x",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    assert _posture(payload, cross=cross, spines=spines) == []  # 下位锚不到原文,丢
+
+
+def test_posture_fabricated_edge_dropped(monkeypatch):
+    """posture 对不回真实的依据 / 落实边(LLM 编的边)→ 丢。"""
+    payload = json.dumps({"postures": [{
+        # 省→县 并不存在这条依据 / 落实边(_CROSS_DOC 里没有)
+        "from_doc": "省发〔2024〕1号", "to_doc": "县发〔2024〕9号",
+        "posture": "忠实落实", "from_clause": 1, "to_clause": 1, "basis": "编的边",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    assert _posture(payload) == []
+
+
+def test_posture_no_dep_edges_returns_none(monkeypatch):
+    """没有任何依据 / 落实边(只有废止 / 发文等)→ None,不调 LLM。"""
+    cross = {
+        "relations": [{"from_doc": "市发〔2024〕5号", "to_doc": "省发〔2024〕1号",
+                       "kind": "废止", "chapter_anchor": 1, "note": "市废省"}],
+        "docs": _CROSS_DOC["docs"],
+    }
+    # 不 patch:走到 LLM 就抛,说明在前面返了 None
+    assert cdv.dependency_postures_from_spines(
+        cross_doc_result=cross, doc_spines=_SPINES,
+        llm_client=_FakeClient(), model="m",
+    ) is None
+
+
+def test_posture_dedup_one_per_edge(monkeypatch):
+    """同一条边给了两个姿态 → 只留首个。"""
+    payload = json.dumps({"postures": [
+        {"from_doc": "市发〔2024〕5号", "to_doc": "省发〔2024〕1号",
+         "posture": "忠实落实", "from_clause": 1, "to_clause": 1, "basis": "首个"},
+        {"from_doc": "市发〔2024〕5号", "to_doc": "省发〔2024〕1号",
+         "posture": "打折扣", "from_clause": 1, "to_clause": 1, "basis": "重复"},
+    ]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _posture(payload)
+    assert len(out) == 1
+    assert out[0]["posture"] == "忠实落实"
+
+
+def test_posture_empty_array_returns_empty(monkeypatch):
+    """有依据 / 落实边但 LLM 一个姿态没判出 → [](区分'没判出'和'失败')。"""
+    _patch(monkeypatch, json.dumps({"postures": []}))
+    assert _posture('{"postures": []}') == []
+
+
+def test_posture_parse_failure_returns_none(monkeypatch):
+    _patch(monkeypatch, "这不是 JSON")
+    assert _posture("x") is None
+
+
+def test_posture_llm_raises_returns_none(monkeypatch):
+    _patch(monkeypatch, "{}", raises=RuntimeError("boom"))
+    assert _posture("x") is None
+
+
+def test_posture_salvages_truncated(monkeypatch):
+    """reasoning 吃 token 致 JSON 截断 → 抢救已闭合的姿态。"""
+    truncated = (
+        '{"postures": ['
+        '{"from_doc": "市发〔2024〕5号", "to_doc": "省发〔2024〕1号", '
+        '"posture": "忠实落实", "from_clause": 1, "to_clause": 1, "basis": "完整"},'
+        '{"from_doc": "县发〔2024〕9号", "to_doc": "市发〔2024〕5号", "post'  # 截断
+    )
+    _patch(monkeypatch, truncated)
+    out = _posture(truncated)
+    assert out is not None
+    assert len(out) == 1  # 完整那条留,截断那条丢
+    assert out[0]["from_doc"] == "市发〔2024〕5号"
+
+
+def test_posture_strips_code_fence(monkeypatch):
+    inner = json.dumps({"postures": [{
+        "from_doc": "市发〔2024〕5号", "to_doc": "省发〔2024〕1号",
+        "posture": "忠实落实", "from_clause": 1, "to_clause": 1, "basis": "x",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, "```json\n" + inner + "\n```")
+    out = _posture(inner)
+    assert out is not None
+    assert len(out) == 1
+
+
+# ── attach_postures_to_edges(纯合并,把姿态贴回星图边) ──────────────────────
+
+
+def test_attach_postures_to_matching_edge():
+    """姿态按 (source,target) 贴到匹配的星图边上;没匹配的边不挂。"""
+    graph = cdv.dependency_graph_from_cross_doc(_CROSS_DOC)
+    postures = [{
+        "from_doc": "市发〔2024〕5号", "to_doc": "省发〔2024〕1号",
+        "posture": "打折扣", "from_clause": 1, "to_clause": 1,
+        "from_snippet": "本市稳岗补贴按每人300元发放。",
+        "to_snippet": "对参保企业按每人500元发放稳岗补贴。",
+        "basis": "省500市300打了折",
+    }]
+    out = cdv.attach_postures_to_edges(graph, postures)
+    # 找那条被贴的依据边
+    hit = [e for e in out["edges"]
+           if e["source"] == "市发〔2024〕5号" and e["target"] == "省发〔2024〕1号"]
+    assert len(hit) == 1
+    assert hit[0]["posture"]["label"] == "打折扣"
+    assert "500元" in hit[0]["posture"]["to_snippet"]
+    # 其它边没有 posture 键(只贴匹配的)
+    others = [e for e in out["edges"]
+              if not (e["source"] == "市发〔2024〕5号" and e["target"] == "省发〔2024〕1号")]
+    assert all("posture" not in e for e in others)
+
+
+def test_attach_postures_none_graph_or_empty():
+    """graph 为 None / postures 空 → 原样返(没姿态可贴,不炸)。"""
+    assert cdv.attach_postures_to_edges(None, []) is None
+    g = cdv.dependency_graph_from_cross_doc(_CROSS_DOC)
+    same = cdv.attach_postures_to_edges(g, [])
+    assert same is g
+    assert all("posture" not in e for e in same["edges"])
+
+
+def test_posture_types_closed_set():
+    """封闭集就是这四类(忠实落实 / 层层加码 / 打折扣 / 创新先行)。"""
+    assert set(cdv.POSTURE_TYPES) == {"忠实落实", "层层加码", "打折扣", "创新先行"}
+    assert cdv.coerce_posture("打折扣") == "打折扣"
+    assert cdv.coerce_posture("瞎编") is None
+    assert cdv.coerce_posture("") is None
+    assert cdv.coerce_posture(None) is None

@@ -465,3 +465,195 @@ def test_coerce_clause_substance_layer_defaults():
                              "penalty": "罚款", "substance_reason": "有罚则"})
     assert ok2["substance"] == "真金白银"
     assert ok2["penalty"] == "罚款"
+
+
+# ── 看结构(结构即信号)层:doc 级 structure_read ─────────────────────────────────
+# WP §二「看结构」落到产品的判断层。权威刻度(据已抽文种+机关判效力层级+研判)+ 结构信号
+# (缺身份要素=存疑/排序=牵头/篇幅构成=性质)。评估层标研判、绝不盖鉴印,但锚已核要素。
+# 死守:法规 N/A 标过的要素**不报缺席信号**(不误报)。
+
+
+def test_structure_read_present_for_notice(monkeypatch):
+    """通知出 structure_read:权威刻度判「一般公文」+ 引到已抽文种/机关。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    sr = spine["structure_read"]
+    auth = sr["authority"]
+    assert auth["level"] == "一般公文"  # 通知=中性兜底
+    assert auth["rank"] == ds._AUTHORITY_RANK["一般公文"]
+    # 引到已抽的文种 + 发文机关(不是空说)
+    assert auth["doc_type"] == "通知"
+    assert auth["issuer"] == "市发展改革委"
+    assert auth["doc_type_evidence"]  # 带文种原文撑
+    # 文种 + 机关都核过 → verified_basis True
+    assert auth["verified_basis"] is True
+    # 有一句研判(分量/能管到谁)
+    assert auth["appraisal"]
+
+
+def test_structure_read_authority_levels(monkeypatch):
+    """不同文种判不同效力层级:令>地方性法规>指令性公文>一般公文>商洽函(纯件直测)。"""
+    # 令 = 公布令/法规(最高)
+    assert ds._classify_authority("令", "国务院") == "公布令/法规"
+    # 条例 + 人大常委会 = 地方性法规
+    assert ds._classify_authority(
+        "条例", "广州市人民代表大会常务委员会"
+    ) == "地方性法规"
+    # 命令/决定/批复 = 指令性公文
+    assert ds._classify_authority("命令", "某部") == "指令性公文"
+    assert ds._classify_authority("批复", "某委") == "指令性公文"
+    # 函 = 商洽函(最弱)
+    assert ds._classify_authority("函", "某局") == "商洽函"
+    # 通知/意见 = 一般公文(中性兜底)
+    assert ds._classify_authority("通知", "某委") == "一般公文"
+    assert ds._classify_authority("意见", "某府") == "一般公文"
+    # rank 排序:令 < 地方性法规 < 指令性 < 一般 < 函
+    assert (
+        ds._AUTHORITY_RANK["公布令/法规"]
+        < ds._AUTHORITY_RANK["地方性法规"]
+        < ds._AUTHORITY_RANK["指令性公文"]
+        < ds._AUTHORITY_RANK["一般公文"]
+        < ds._AUTHORITY_RANK["商洽函"]
+    )
+
+
+def test_structure_read_missing_identity_element_signal(monkeypatch):
+    """普通公文缺发文字号 → 报缺席信号(存疑/非正式),引到具体缺的要素。"""
+    # 头要素只给文种 + 机关,发文字号/成文日期都没抽到(空、非 N/A)
+    head = _head_payload([
+        {"field": "文种", "value": "通知", "evidence": "关于做好新能源补贴申报的通知"},
+        {"field": "发文机关", "value": "市发展改革委", "evidence": "市发展改革委文件"},
+    ])
+    spine = _run(monkeypatch, head_text=head, clause_text=_full_clauses())
+    missing = [s for s in spine["structure_read"]["signals"] if s["kind"] == "missing"]
+    elements = {s["element"] for s in missing}
+    assert "发文字号" in elements  # 普通公文缺身份要素 → 报存疑
+    assert "成文日期" in elements
+    for s in missing:
+        assert s["note"]  # 每条说清缺这项意味着什么
+
+
+def test_structure_read_regulation_na_not_reported_as_missing(monkeypatch):
+    """死守:法规本体 N/A 的发文字号/成文日期**绝不报缺席信号**(它本就没有,报=误报)。"""
+    head = _head_payload([
+        {"field": "文种", "value": "条例", "evidence": "制定本条例"},
+        {"field": "发文机关", "value": "广州市人民代表大会常务委员会",
+         "evidence": "广州市第十五届人民代表大会常务委员会第四十二次会议通过"},
+        {"field": "标题事由", "value": "广州市优化营商环境条例",
+         "evidence": "广州市优化营商环境条例"},
+        {"field": "成文日期", "value": "2020年10月28日",
+         "evidence": "2020年10月28日广州市第十五届人民代表大会常务委员会第四十二次会议通过"},
+    ])
+    chunks = [
+        {"chunk_id": "h0", "chapter": 0,
+         "text": "广州市优化营商环境条例 2020年10月28日广州市第十五届人民代表大会常务委员会"
+                 "第四十二次会议通过 第一条 为优化营商环境，制定本条例。"},
+    ]
+    spine = _run(
+        monkeypatch, head_text=head,
+        clause_text=_clause_payload([
+            {"chapter": 1, "matter": "立法目的", "instruction_type": "依据陈述",
+             "actor": "", "deadline": "", "basis_ref": "",
+             "evidence": "第一条 为优化营商环境，制定本条例。"},
+        ]),
+        chunks=chunks,
+    )
+    sr = spine["structure_read"]
+    # 层级判对:人大常委会通过的条例 = 地方性法规
+    assert sr["authority"]["level"] == "地方性法规"
+    # 发文字号是 N/A(法规本体无此项)→ 绝不出现在缺席信号里
+    missing = [s for s in sr["signals"] if s["kind"] == "missing"]
+    elements = {s["element"] for s in missing}
+    assert "发文字号" not in elements, "法规 N/A 的发文字号不该报缺席(误报)"
+
+
+def test_structure_read_ordering_signal_points_to_first_actor(monkeypatch):
+    """排序信号:第一个带责任主体的条款 = 牵头,引到具体条款 + 主体。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    ordering = [s for s in spine["structure_read"]["signals"] if s["kind"] == "ordering"]
+    # _full_clauses 第 1 条 actor=各县区发展改革局,第 2/3 条无 actor → 仅 1 条有 actor,
+    # 不足 2 条不报排序(避免单主体也喊"牵头")
+    assert ordering == []
+
+
+def test_structure_read_ordering_signal_when_multiple_actors(monkeypatch):
+    """两条以上带主体 → 报排序信号,点名排第一的为牵头。"""
+    clause = _clause_payload([
+        {"chapter": 1, "matter": "甲办", "instruction_type": "硬要求",
+         "actor": "市发改委", "deadline": "", "basis_ref": "",
+         "evidence": "各县区发展改革局应当于2024年6月30日前完成本辖区补贴申报材料的汇总上报。"},
+        {"chapter": 2, "matter": "乙配合", "instruction_type": "硬要求",
+         "actor": "市财政局", "deadline": "", "basis_ref": "",
+         "evidence": "鼓励各地结合实际探索更高效的申报方式，可以先行先试。"},
+    ])
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=clause)
+    ordering = [s for s in spine["structure_read"]["signals"] if s["kind"] == "ordering"]
+    assert len(ordering) == 1
+    assert "市发改委" in ordering[0]["note"]  # 排第一的主体被点名牵头
+    assert "第 1 条" in ordering[0]["element"]
+
+
+def test_structure_read_weight_signal_all_soft(monkeypatch):
+    """篇幅/构成信号:全软倡导、0 硬要求 → 倡导性文件(约束力弱)。"""
+    clause = _clause_payload([
+        {"chapter": 1, "matter": "鼓励一", "instruction_type": "软倡导",
+         "actor": "", "deadline": "", "basis_ref": "",
+         "evidence": "鼓励各地结合实际探索更高效的申报方式，可以先行先试。"},
+        {"chapter": 2, "matter": "鼓励二", "instruction_type": "软倡导",
+         "actor": "", "deadline": "", "basis_ref": "",
+         "evidence": "根据《省新能源发展意见》（省发〔2023〕12号），现就有关事项通知如下。"},
+    ])
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=clause)
+    weight = [s for s in spine["structure_read"]["signals"] if s["kind"] == "weight"]
+    assert len(weight) == 1
+    assert "倡导性" in weight[0]["note"]  # 全软倡导=倡导性文件
+
+
+def test_structure_read_weight_signal_mostly_hard(monkeypatch):
+    """硬要求占多数 → 动真格的指令件。
+
+    _full_clauses 是 1 硬要求 / 1 软倡导 / 1 依据陈述(硬要求不过半 → 不报 weight),所以这里
+    专门造一份全硬要求的来验"硬要求占多数"分支。
+    """
+    clause = _clause_payload([
+        {"chapter": 1, "matter": "甲", "instruction_type": "硬要求",
+         "actor": "", "deadline": "", "basis_ref": "",
+         "evidence": "各县区发展改革局应当于2024年6月30日前完成本辖区补贴申报材料的汇总上报。"},
+        {"chapter": 2, "matter": "乙", "instruction_type": "硬要求",
+         "actor": "", "deadline": "", "basis_ref": "",
+         "evidence": "鼓励各地结合实际探索更高效的申报方式，可以先行先试。"},
+    ])
+    spine2 = _run(monkeypatch, head_text=_full_head(), clause_text=clause)
+    weight = [s for s in spine2["structure_read"]["signals"] if s["kind"] == "weight"]
+    assert len(weight) == 1
+    assert "动真格" in weight[0]["note"]
+
+
+def test_structure_read_absent_when_no_doc_type(monkeypatch):
+    """文种都没抽到(判不了层级)→ 不挂 structure_read(向后兼容,不硬造)。"""
+    head = _head_payload([
+        {"field": "发文机关", "value": "某委", "evidence": "某委文件"},
+    ])
+    spine = _run(monkeypatch, head_text=head, clause_text=_full_clauses())
+    # 文种空 → structure_read 不出现(可选字段)
+    assert "structure_read" not in spine
+
+
+def test_structure_read_verified_basis_false_when_unverified(monkeypatch):
+    """权威刻度依据(文种/机关)没核过 → verified_basis=False(研判依据更薄,前端可据此弱化)。"""
+    # 文种 evidence 原文里没有 → 核不过
+    head = _head_payload([
+        {"field": "文种", "value": "通知", "evidence": "这句原文里压根没有这文种出处。"},
+        {"field": "发文机关", "value": "市发展改革委", "evidence": "市发展改革委文件"},
+    ])
+    spine = _run(monkeypatch, head_text=head, clause_text=_full_clauses())
+    assert spine["structure_read"]["authority"]["verified_basis"] is False
+
+
+def test_classify_authority_pure():
+    """_classify_authority 纯件:封闭集 + 兜底。"""
+    assert ds._classify_authority("令", "") == "公布令/法规"
+    assert ds._classify_authority("办法", "某部") == "部门规章/规范性文件"
+    assert ds._classify_authority("条例", "某省人民代表大会常务委员会") == "地方性法规"
+    assert ds._classify_authority("条例", "国务院") == "公布令/法规"  # 中央本级条例
+    assert ds._classify_authority("通知", "") == ds._DEFAULT_AUTHORITY_LEVEL
+    assert ds._classify_authority("", "") == ds._DEFAULT_AUTHORITY_LEVEL  # 空退兜底

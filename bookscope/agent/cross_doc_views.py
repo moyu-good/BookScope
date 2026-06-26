@@ -147,6 +147,35 @@ def _bigrams(text: str) -> list[str]:
     return list({e[i : i + 2] for i in range(len(e) - 1)})
 
 
+# ── 博弈姿态(posture)——下位相对上位的姿态(WP「读弦外·关系性质」那把镜头)──────────
+#
+# 依据链网的「依据 / 落实」边、上下级一致性的每处对照,字面之外还有一层:下位对上位**是什么
+# 姿态**——忠实落实、层层加码(加码加压)、打折扣(阳奉阴违 / 选择性落实)、还是创新先行。这是
+# WP-redhead-deep-reading-lenses「读弦外」层的「关系性质判读:谁落实谁 / 谁架空谁 / 地方打折扣
+# or 层层加码」,公共件,依据链网 + 上下级一致性两处共用一套封闭集(别各定一套 = 漂移之源)。
+#
+# 死守 evidence-first:posture 是**推断**(研判口径,FE 区别于核验事实显小标),但引发它的原文
+# 对照(下位某条 vs 上位某条)必须锚得到——对不上原文的 posture 不输出。落不进封闭集的退 None
+# (不替用户硬断一个姿态);它是新增**可选**维,现有边 / 冲突结构一个不动(向后兼容)。
+POSTURE_TYPES: tuple[str, ...] = (
+    "忠实落实",   # 下位照上位办,没走样没加码(正常落实)
+    "层层加码",   # 下位标准 / 力度超出上位(加码加压)
+    "打折扣",     # 下位选择性落实 / 阳奉阴违(架空上位)
+    "创新先行",   # 下位先行先试 / 因地制宜地往前走(不是照抄)
+)
+
+
+def coerce_posture(value: object) -> str | None:
+    """博弈姿态归一:落进 :data:`POSTURE_TYPES` 封闭集才留,落不进 / 空 → ``None``。
+
+    公共件,依据链网 + 上下级一致性两处共用。返 ``None`` 表示「这条没给出可信姿态」——调用方
+    据此不挂 ``posture`` 字段(它是新增可选维,缺省不破坏现有结构)。不替用户硬断一个姿态:
+    模型没填 / 填了封闭集外的词,宁可不标,也不瞎贴(evidence-first:无据不出)。
+    """
+    s = value.strip() if isinstance(value, str) else ""
+    return s if s in POSTURE_TYPES else None
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # 视图一:依据链关联网(空间维)——纯聚合,0 次 LLM
 # ════════════════════════════════════════════════════════════════════════════
@@ -263,6 +292,345 @@ def dependency_graph_from_cross_doc(
     )
     edges.sort(key=lambda e: (e["kind"] != "发文", e["source"], e["target"], e["kind"]))
     return {"nodes": nodes, "edges": edges}
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 视图一·加一层:依据链博弈姿态(posture)——读弦外·关系性质判读
+# ════════════════════════════════════════════════════════════════════════════
+#
+# WP-redhead-deep-reading-lenses「读弦外」:依据链网的「依据 / 落实」边,字面是「谁连谁」,
+# 字面之外还有**下位对上位是什么姿态**——忠实落实 / 层层加码 / 打折扣 / 创新先行。这层给依据 /
+# 落实边贴一个 posture 小标(研判口径),让用户看出地方对中央、下位对上位的真实姿态,不只看到
+# 一条「依据」线。
+#
+# 为什么单独一函数、为什么不进 ``dependency_graph_from_cross_doc``:那个函数是**纯聚合、0 次
+# LLM**(有 ``test_dep_graph_no_llm_call`` 焊死),posture 是要 LLM 读两边条款对照才判得出的推断,
+# 进去就破了「0 LLM」契约。照 ``policy_wording_diff_from_spines`` 紧挨 ``policy_evolution`` 的先例:
+# 独立函数、独立产出,星图聚合一行不动;接端点时把 posture 作为边上**新增可选**字段贴上去
+# (``attach_postures_to_edges`` 纯合并),缺省不破坏现有边结构(向后兼容)。
+#
+# evidence-first(立身之本):posture 是推断,但**引发它的原文对照必须锚得到**——下位那条 + 上位
+# 那条都要取到各自文脉里已核的 evidence(点开现取),任一侧锚不到就丢这条 posture(不替用户脑补
+# 关系性质)。posture 本身落进 ``POSTURE_TYPES`` 封闭集(落不进丢)。codebook 约束力阶梯进 system,
+# 统一「加码 / 打折扣」的判读口径(WP「共享资产:codebook 一次建多处用」)。
+
+DEFAULT_POSTURE_MAX_TOKENS = 16000
+"""一次 LLM 判依据链边博弈姿态的 max_tokens。同其它跨文件视图量级。
+
+posture 条数 ∝ 依据 / 落实边数(Phase 1 限 3-5 份,通常几条),加 reasoning 头(deepseek-v4-flash
+把 reasoning_content 算进 max_tokens,见 reference_reasoning_model_token_budget)。给 16000 够吐完;
+真撑爆靠 ``_parse_postures`` 截断抢救兜底。"""
+
+_MAX_POSTURES = 40
+_MAX_CLAUSE_BRIEF_PER_DOC = 8
+"""每份取前几条款(事项 + 已核原文)喂给 LLM 当对照素材——够判姿态又不撑爆 input。"""
+
+# 只给「依据 / 落实」边判姿态:这两类才是「下位接上位」的落实关系,谈得上忠实 / 加码 / 打折扣 /
+# 创新。废止 / 修改 / 上下级 / 发文不是落实姿态(废止是「这份没了」、发文是隶属),不判。
+_POSTURE_EDGE_KINDS: frozenset[str] = frozenset({"依据", "落实"})
+
+_POSTURE_INSTR = (
+    "下面 edges 是一摞党政机关公文里**已锚定**的「依据 / 落实」关系(每条:from 文件 → to 文件,"
+    "kind=依据 / 落实)。docs 给了每份文件的 id / 文种 / 发文机关,以及它每条款的 事项 和已核原文。\n"
+    "你的任务:对每条 edge,判断**下位文件相对上位文件是什么博弈姿态**——下位是忠实照办、还是"
+    "层层加码、打折扣、或创新先行。这是读「弦外之音」:同样一条「依据」线,下位可能老老实实落实,"
+    "也可能阳奉阴违打折扣、或擅自加码加压。\n"
+    "- 先认清谁上谁下:「依据」边 from 是下位(它依据 to 这个上位);「落实」边 from 是下位"
+    "(它为落实 to 而发)。两类里 **to 都是上位、from 都是下位**。\n"
+    "- posture 只能填以下之一(按上位 / 下位条款的实质对照判,套下面的措辞刻度;落不进就别给这条):\n"
+    "    · 忠实落实:下位照上位的要求办,标准 / 口径基本一致,没走样没加码。\n"
+    "    · 层层加码:下位标准 / 力度 / 门槛超出上位(擅自加重、加码加压)。\n"
+    "    · 打折扣:下位选择性落实 / 把上位要求做小做软(阳奉阴违、架空上位)。\n"
+    "    · 创新先行:下位先行先试 / 因地制宜往前走(不是照抄,是合理的本地创新)。\n"
+    "- from_clause / to_clause:你这条判断**主要依据下位 / 上位各自第几条款**"
+    "(整数条款序号——from_clause 是下位文件那条、to_clause 是上位文件那条;说不清留空 / 不填)。\n"
+    "- basis:一句话说清你凭两边条款的什么对照判成这个姿态的(锚措辞 / 数字 / 口径,别空说)。\n"
+    "硬规矩:\n"
+    "①只据 docs 给的条款实质判,不臆测清单外的事;判不出明确姿态的 edge 就别给(宁缺毋滥)。\n"
+    "②from_doc / to_doc 照抄 edges 里的 id,别改、别编。\n"
+    "③一条 edge 最多给一个姿态。\n"
+    "严格输出 JSON(别的话别说、别加 markdown 围栏):\n"
+    '{"postures":[{"from_doc":"","to_doc":"","posture":"忠实落实",'
+    '"from_clause":条款序号整数,"to_clause":条款序号整数,"basis":""}]}'
+)
+
+_USER_MSG_POSTURE = "请按上面的要求,逐条判依据 / 落实边的博弈姿态。"
+
+
+def _collect_posture_inputs(
+    doc_spines: list[dict[str, Any]],
+) -> tuple[
+    set[str],                     # 全部真实 anchor
+    dict[str, dict[int, str]],    # anchor → {条款序号: 已核 evidence}(现取 snippet 用)
+    dict[str, dict[str, Any]],    # anchor → 给 LLM 的紧凑文件画像(带条款事项 + 已核原文)
+]:
+    """从一摞文脉收 真实 anchor 集 + anchor→条款证据表 + anchor→紧凑画像(给 LLM 判姿态)。
+
+    锚 id 优先发文字号,没字号(地方法规)退标题(同 ``_doc_anchor``)。每份摘前几条款的
+    事项 + 已核原文当判姿态的素材——既给 LLM 看实质,又留着证据表供后面锚 snippet。
+    """
+    real_nums: set[str] = set()
+    ev_of: dict[str, dict[int, str]] = {}
+    profile_of: dict[str, dict[str, Any]] = {}
+
+    for spine in doc_spines:
+        if not isinstance(spine, dict):
+            continue
+        anchor = _doc_anchor(spine)
+        if not anchor or anchor in real_nums:
+            continue
+        real_nums.add(anchor)
+        ev_of[anchor] = _clause_evidence_map(spine)
+
+        clauses_brief: list[dict[str, Any]] = []
+        clauses = spine.get("clauses")
+        if isinstance(clauses, list):
+            for cl in clauses:
+                if not isinstance(cl, dict) or not isinstance(cl.get("chapter"), int):
+                    continue
+                matter = str(cl.get("matter", "")).strip()
+                snip = str(cl.get("evidence", "")).strip()
+                if not matter and not snip:
+                    continue
+                clauses_brief.append({
+                    "条款": cl["chapter"], "事项": matter, "原文": snip,
+                })
+                if len(clauses_brief) >= _MAX_CLAUSE_BRIEF_PER_DOC:
+                    break
+
+        profile_of[anchor] = {
+            "id": anchor,
+            "文种": _head_value(spine, _HEAD_DOC_TYPE_FIELD),
+            "发文机关": _head_value(spine, _HEAD_ORG_FIELD),
+            "条款": clauses_brief,
+        }
+    return real_nums, ev_of, profile_of
+
+
+def _relation_edges_for_posture(
+    cross_doc_result: dict[str, Any] | None, real_nums: set[str]
+) -> list[dict[str, Any]]:
+    """从文件间层挑出「依据 / 落实」边(两端都是真实 anchor),(from,to,kind) 去重。
+
+    只这两类边谈得上落实姿态;两端必须都在 ``real_nums``(防悬空)。返给 LLM 当判姿态的对象,
+    顺带回端点合并 posture 时按 (from,to) 对回去。
+    """
+    out: list[dict[str, Any]] = []
+    if not isinstance(cross_doc_result, dict):
+        return out
+    relations = cross_doc_result.get("relations")
+    if not isinstance(relations, list):
+        return out
+    seen: set[tuple[str, str, str]] = set()
+    for rel in relations:
+        if not isinstance(rel, dict):
+            continue
+        kind = str(rel.get("kind", "")).strip()
+        if kind not in _POSTURE_EDGE_KINDS:
+            continue
+        src = str(rel.get("from_doc", "")).strip()
+        tgt = str(rel.get("to_doc", "")).strip()
+        if not src or not tgt or src == tgt:
+            continue
+        if src not in real_nums or tgt not in real_nums:
+            continue
+        key = (src, tgt, kind)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"from_doc": src, "to_doc": tgt, "kind": kind})
+    return out
+
+
+def _parse_postures(text: str) -> list[dict[str, Any]] | None:
+    """解析 ``{"postures":[...]}``;三层兜底(直解析 / 切首个对象 / 截断抢救)。同 ``_parse_stages``。
+
+    空数组(没判出姿态)是合法结果返 ``[]``;彻底解析不出返 ``None``。
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    candidate = strip_code_fence(raw)
+    obj: Any = None
+    try:
+        obj = json.loads(candidate)
+    except json.JSONDecodeError:
+        sliced = extract_first_json_object(candidate)
+        if sliced is not None:
+            try:
+                obj = json.loads(sliced)
+            except json.JSONDecodeError:
+                obj = None
+    if isinstance(obj, dict) and isinstance(obj.get("postures"), list):
+        return obj["postures"]
+    salvaged = salvage_closed_objects(candidate, '"postures"')
+    if salvaged:
+        logger.warning(
+            "cross_doc_views[posture]: 主解析失败,从截断抢救到 %d 条姿态", len(salvaged)
+        )
+        return salvaged
+    return None
+
+
+def dependency_postures_from_spines(
+    *,
+    cross_doc_result: dict[str, Any] | None,
+    doc_spines: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_POSTURE_MAX_TOKENS,
+    cache_enabled: bool = True,
+) -> list[dict[str, Any]] | None:
+    """给依据链网的「依据 / 落实」边判**博弈姿态** → posture list。失败 / 无可判边 → ``None``。
+
+    依据链网(``dependency_graph_from_cross_doc``,纯聚合)往上加一层:依据 / 落实边字面是「谁连
+    谁」,这层读弦外——下位相对上位是 忠实落实 / 层层加码 / 打折扣 / 创新先行。一次 LLM 据两边条款
+    实质对照判,posture 落进 ``POSTURE_TYPES`` 封闭集。direction 类比:posture 是研判口径(推断)。
+
+    **evidence-first(立身之本)**:posture 是推断,但**引发它的原文对照必须锚得到**——下位那条
+    (from_snippet)+ 上位那条(to_snippet)都取各自文脉已核 evidence(点开现取);任一侧锚不到就丢
+    这条(不替用户脑补关系性质)。posture 落不进封闭集 → 丢。
+
+    **向后兼容**:独立函数、独立产出,``dependency_graph_from_cross_doc`` 的星图聚合一行不动;
+    端点用 ``attach_postures_to_edges`` 把 posture 作为边上**新增可选**字段贴上去。
+
+    Args:
+        cross_doc_result: ``cross_doc_relations_from_spines`` 的产出 ``{relations, docs}``。
+        doc_spines: 一摞文脉(取条款实质 + 已核证据)。
+        max_tokens / cache_enabled: 同其它跨文件视图。
+
+    Returns:
+        posture list,每条 ``{from_doc, to_doc, posture, from_clause, to_clause,
+        from_snippet, to_snippet, basis, verified}``——
+        - from_doc / to_doc 必须对回一条真实的「依据 / 落实」边(防 LLM 编 / 错配)。
+        - posture 落进 ``POSTURE_TYPES`` 封闭集(落不进丢)。
+        - from_snippet / to_snippet 取各自文脉那条款已核 evidence(指定了条款锚就取那条,否则取该
+          文件任一已核证据),**任一侧取不到就丢这条**(双向守卫,锚不到原文不输出)。
+        - 同一条边(from,to)只留一个姿态。
+        没有任何「依据 / 落实」边 / 一次推理失败 / 解析不出 / 候选全被守卫滤掉 → ``None`` / ``[]``。
+    """
+    if not isinstance(doc_spines, list):
+        return None
+    real_nums, ev_of, profile_of = _collect_posture_inputs(doc_spines)
+    edges = _relation_edges_for_posture(cross_doc_result, real_nums)
+    if not edges:
+        return None  # 没有依据 / 落实边:这层无从谈起(题材自适应,端点不挂 posture)
+    ref_map = _build_ref_map(doc_spines)
+
+    # 只把进了边的文件画像喂给 LLM(省 input),边照给。
+    edge_docs = {e["from_doc"] for e in edges} | {e["to_doc"] for e in edges}
+    digest = [profile_of[a] for a in sorted(edge_docs) if a in profile_of]
+    user_content = json.dumps({"edges": edges, "docs": digest}, ensure_ascii=False)
+    # codebook 约束力阶梯进 system,统一加码 / 打折扣的判读口径。
+    system = _POSTURE_INSTR + "\n" + codebook_block()
+    try:
+        resp = invoke_client_cached(
+            llm_client,
+            model=model,
+            system=system,
+            tools=[],
+            messages=[{"role": "user", "content": user_content}],
+            max_tokens=max_tokens,
+            cache_enabled=cache_enabled,
+        )
+        text = llm_client.extract_final_text(resp)
+    except Exception as exc:  # noqa: BLE001 — 调用失败降级返 None,不 break 端点
+        logger.warning(
+            "cross_doc_views[posture]: 姿态调用抛 %s: %s;返 None", type(exc).__name__, exc
+        )
+        return None
+
+    parsed = _parse_postures(text)
+    if parsed is None:
+        return None
+
+    # 真实边集合((from,to) → 有此边):posture 必须对回一条真实依据 / 落实边。
+    real_edge: set[tuple[str, str]] = {(e["from_doc"], e["to_doc"]) for e in edges}
+
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for p in parsed:
+        if not isinstance(p, dict):
+            continue
+        posture = coerce_posture(p.get("posture"))
+        if posture is None:
+            continue  # 落不进封闭集:丢(不替用户硬断姿态)
+        src = _resolve_doc_ref(str(p.get("from_doc", "")), real_nums, ref_map)
+        tgt = _resolve_doc_ref(str(p.get("to_doc", "")), real_nums, ref_map)
+        if not src or not tgt or (src, tgt) not in real_edge:
+            continue  # 对不回真实的依据 / 落实边:丢(防编 / 错配)
+        if (src, tgt) in seen:
+            continue  # 一条边只留一个姿态
+
+        from_clause = p.get("from_clause")
+        to_clause = p.get("to_clause")
+        from_snip = _level_snippet(ev_of.get(src, {}), from_clause)
+        to_snip = _level_snippet(ev_of.get(tgt, {}), to_clause)
+        if not from_snip or not to_snip:
+            continue  # 引发姿态的原文对照锚不到:丢(双向守卫,无据不出)
+
+        seen.add((src, tgt))
+        out.append({
+            "from_doc": src,
+            "to_doc": tgt,
+            "posture": posture,
+            "from_clause": _clause_or_none(from_clause),
+            "to_clause": _clause_or_none(to_clause),
+            "from_snippet": from_snip,
+            "to_snippet": to_snip,
+            "basis": str(p.get("basis", "")).strip(),
+            "verified": True,
+        })
+
+    out.sort(key=lambda x: (x["from_doc"], x["to_doc"]))
+    return out[:_MAX_POSTURES]  # 可空(没判出姿态 / 全被守卫滤掉)
+
+
+def attach_postures_to_edges(
+    graph: dict[str, Any] | None,
+    postures: list[dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    """把 ``dependency_postures_from_spines`` 的姿态贴回星图的「依据 / 落实」边上(纯合并,0 LLM)。
+
+    向后兼容的落地件:``dependency_graph_from_cross_doc`` 出的边一个不动,这里按 (source,target)
+    给匹配上的边**新增**一个可选 ``posture`` 子对象;没匹配的边不挂(缺省不破坏现有边结构)。
+    graph / postures 为空就原样返(没姿态可贴)。FE 据边上有没有 ``posture`` 决定显不显示小标。
+
+    贴上去的 ``posture`` 子对象::
+
+        {"label": 姿态(封闭集), "basis": 一句话依据,
+         "from_clause": int|None, "to_clause": int|None,
+         "from_snippet": 下位原话, "to_snippet": 上位原话}
+
+    注意 posture 的 from/to 是「下位→上位」(依据 / 落实边的方向),和星图边的 source/target 同向
+    (星图边也是 from_doc→to_doc),所以按 (source,target) 直接对得上。
+    """
+    if not isinstance(graph, dict) or not postures:
+        return graph
+    by_edge: dict[tuple[str, str], dict[str, Any]] = {}
+    for p in postures:
+        if not isinstance(p, dict):
+            continue
+        key = (str(p.get("from_doc", "")), str(p.get("to_doc", "")))
+        by_edge.setdefault(key, p)  # 一条边只取首个姿态
+    edges = graph.get("edges")
+    if not isinstance(edges, list):
+        return graph
+    for e in edges:
+        if not isinstance(e, dict):
+            continue
+        p = by_edge.get((str(e.get("source", "")), str(e.get("target", ""))))
+        if p is None:
+            continue
+        e["posture"] = {
+            "label": p.get("posture", ""),
+            "basis": p.get("basis", ""),
+            "from_clause": p.get("from_clause"),
+            "to_clause": p.get("to_clause"),
+            "from_snippet": p.get("from_snippet", ""),
+            "to_snippet": p.get("to_snippet", ""),
+        }
+    return graph
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -963,10 +1331,18 @@ _LEVEL_INSTR = (
     "(读者可能拿这个结论去办事 / 申诉,误报会害人)。\n"
     "topic 写涉及的事项;detail 用一句话说清下位哪里抵触了上位。\n"
     "upper_clause / lower_clause 写各自文件里涉及这条的**条款序号整数**(说不清留空 / 不填)。\n"
+    "- posture(博弈姿态,选填):这处对不上**反映下位对上位是什么姿态**——按上位 / 下位条款对照判,"
+    "只能填以下之一(套上面的措辞刻度;判不准就留空 / 不填,别硬猜):\n"
+    "    · 层层加码:下位标准 / 力度超出上位(擅自加重);\n"
+    "    · 打折扣:下位选择性落实 / 做小做软(阳奉阴违、架空上位);\n"
+    "    · 创新先行:下位先行先试 / 因地制宜(合理本地创新);\n"
+    "    · 忠实落实:下位照上位办、基本一致(这处既已判为对不上,一般不会是这个,除非细微差异)。\n"
+    "  posture 是对这处对不上「性质」的研判,和 deviation(哪类不一致)各看一面——可填可不填,"
+    "填错宁可不填。\n"
     "严格输出 JSON(别的话别说、别加 markdown 围栏):\n"
     '{"deviations":[{"topic":"涉及的事项","detail":"下位哪里抵触上位","deviation":"抵触",'
     '"upper":"上位文件 id","lower":"下位文件 id",'
-    '"upper_clause":条款序号整数,"lower_clause":条款序号整数}]}'
+    '"upper_clause":条款序号整数,"lower_clause":条款序号整数,"posture":"打折扣"}]}'
 )
 
 _USER_MSG_LEVEL = "请按上面的要求找出上下级对不上的地方。"
@@ -1104,7 +1480,7 @@ def level_consistency_from_spines(
             continue  # 任一侧坐实不了:丢(双向守卫,cry wolf 代价大)
 
         seen.add(key)
-        out.append({
+        conflict: dict[str, Any] = {
             "topic": topic,
             "detail": detail,
             "deviation": deviation,
@@ -1112,7 +1488,13 @@ def level_consistency_from_spines(
                       "snippet": up_snip, "verified": True},
             "lower": {"doc": lower, "clause": _clause_or_none(lo_clause),
                       "snippet": lo_snip, "verified": True},
-        })
+        }
+        # 博弈姿态(可选研判维):落进封闭集才挂(向后兼容,现有冲突结构不动);判不准 / 没填 → 不挂。
+        # 引发它的原文对照(upper / lower 两侧 snippet)已锚到位,posture 只是给这处对照贴个性质标。
+        posture = coerce_posture(c.get("posture"))
+        if posture is not None:
+            conflict["posture"] = posture
+        out.append(conflict)
 
     out.sort(key=lambda x: (x["upper"]["doc"], x["lower"]["doc"]))
     return out  # 可空(都一致 / 候选全被守卫滤掉)
@@ -1122,9 +1504,14 @@ __all__ = [
     "DEFAULT_LEVEL_MAX_TOKENS",
     "DEFAULT_POLICY_DIFF_MAX_TOKENS",
     "DEFAULT_POLICY_MAX_TOKENS",
+    "DEFAULT_POSTURE_MAX_TOKENS",
     "DEVIATION_TYPES",
     "POLICY_DIFF_DIRECTIONS",
+    "POSTURE_TYPES",
+    "attach_postures_to_edges",
+    "coerce_posture",
     "dependency_graph_from_cross_doc",
+    "dependency_postures_from_spines",
     "level_consistency_from_spines",
     "policy_evolution_from_spines",
     "policy_wording_diff_from_spines",

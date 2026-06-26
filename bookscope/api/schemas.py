@@ -839,6 +839,14 @@ class RedheadDocStructureRequest(BaseModel):
 class RedheadDocStructureResponse(BaseModel):
     """POST /api/agent/redhead/doc-structure 响应体（一份公文的文脉）。"""
 
+    structure_read: dict | None = Field(
+        default=None,
+        description=(
+            "看结构（结构即信号）研判，文种判不出时缺省。{authority:{level,rank,doc_type,issuer,"
+            "appraisal,verified_basis…}, signals:[{kind,element,note}]}。权威刻度据文种+机关判效力"
+            "层级，结构信号读缺席/排序/篇幅。评估层（研判，前端不盖鉴印）。"
+        ),
+    )
     head: list[dict] = Field(
         default_factory=list,
         description=(

@@ -50,9 +50,35 @@ interface Clause {
   match_score: number;
 }
 
+// 看结构（结构即信号）层 —— doc 级研判，与 head/clauses 并列（后端 structure_read）。
+// 它是**研判不是核验事实**：权威刻度的"分量"判断 + 结构信号都是推断，所以视觉上区别于盖
+// 「鉴」印的头要素——不盖印，标"研判"口径。后端文种判不出时整个字段缺省，FE 据此不渲染该带。
+interface StructureAuthority {
+  level: string; // 效力层级标签（封闭集：公布令/法规、地方性法规、指令性公文、一般公文、商洽函…）
+  rank: number; // 排序权重，越小效力越高
+  doc_type: string; // 引到的已抽文种
+  doc_type_evidence: string;
+  issuer: string; // 引到的已抽发文机关（可能空）
+  issuer_evidence: string;
+  appraisal: string; // 一句研判：多大分量 / 能管到谁 / 会否被上位覆盖（推断）
+  verified_basis: boolean; // 文种+机关是否都来自已核 head（false=研判依据更薄）
+}
+
+interface StructureSignal {
+  kind: string; // missing（缺身份要素=存疑）/ ordering（排序=牵头）/ weight（篇幅构成=性质）
+  element: string; // 指向的具体要素 / 条款（不空说）
+  note: string; // 这缺席 / 排序 / 篇幅暗示什么
+}
+
+interface StructureRead {
+  authority: StructureAuthority;
+  signals: StructureSignal[];
+}
+
 interface DocStructureResponse {
   head: HeadElement[];
   clauses: Clause[];
+  structure_read?: StructureRead; // 可选：后端文种判不出时缺省
   scanned: boolean;
   book_session_id: string;
   trace?: RunTrace;
@@ -88,6 +114,18 @@ function instructionStyle(type: string): { fg: string; bg: string } {
 // 一条头要素是否真有内容（value 非空白才算抽到了）。
 function hasValue(v: string): boolean {
   return v.trim().length > 0;
+}
+
+// 结构信号三类 → 一个短中文标签（缺席 / 排序 / 篇幅），渲染成研判带里的小角标。
+// 它们都是推断，不配核验色——统一走墨色/木褐这类研判色，绝不用盖印的朱砂。
+const SIGNAL_KIND_LABEL: Record<string, string> = {
+  missing: "缺席",
+  ordering: "排序",
+  weight: "篇幅",
+};
+
+function signalKindLabel(kind: string): string {
+  return SIGNAL_KIND_LABEL[kind] ?? "信号";
 }
 
 export function RedheadDocStructure({
@@ -232,6 +270,10 @@ export function RedheadDocStructure({
   // 版头意象：标题事由抽出来当版头大标题（公文版头正中那行），其余八项照常列在红线下。
   // 抽不到标题就不提，版头退成一道素净的红线 + 标签，绝不造假。
   const titleEl = head.find((h) => h.field === "标题事由" && hasValue(h.value));
+
+  // 看结构（结构即信号）研判：后端文种判得出才有；它是**研判不是核验事实**，所以下面这条
+  // "效力与结构"带视觉上区别于盖印的头要素——不盖鉴印、明标"研判"口径。
+  const structureRead = result.structure_read;
 
   // ---- 已抽到：头要素清单 + 逐条款 ----
   return (
@@ -378,6 +420,90 @@ export function RedheadDocStructure({
           );
         })}
       </div>
+
+      {/* ── 效力与结构研判带（看结构层）── */}
+      {/* 区别于盖「鉴」印的头要素：这是**研判不是核验事实**——浅木褐底 + 木褐边、明标"研判"，
+          绝不盖朱砂鉴印。权威刻度的"分量"判断引到已抽文种/机关；结构信号各引具体要素/条款。 */}
+      {structureRead && (
+        <div
+          className="mt-4 rounded-md px-3.5 py-3"
+          style={{
+            background: "rgba(138, 107, 63, 0.06)",
+            border: "1px solid rgba(138, 107, 63, 0.28)",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <span
+              className="text-xs font-bold"
+              style={{ color: "#8a6b3f", fontFamily: "var(--font-display)" }}
+            >
+              效力与结构
+            </span>
+            {/* "研判"角标——明说这是推断不是核验事实，不配鉴印 */}
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded"
+              style={{ color: "#8a6b3f", background: "rgba(138, 107, 63, 0.12)" }}
+            >
+              研判 · 非核验
+            </span>
+          </div>
+
+          {/* 权威刻度：层级标签 + 一句分量研判，引到已抽文种/机关 */}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span
+              className="text-sm font-bold text-[var(--color-ink)]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {structureRead.authority.level}
+            </span>
+            {structureRead.authority.doc_type && (
+              <span className="text-[11px] text-[var(--color-ink-muted)]">
+                据文种「{structureRead.authority.doc_type}」
+                {structureRead.authority.issuer
+                  ? ` + 发文机关「${structureRead.authority.issuer}」`
+                  : ""}
+                判
+              </span>
+            )}
+            {/* 研判依据是否落在已核要素上——薄了如实说，不蒙混 */}
+            {!structureRead.authority.verified_basis && (
+              <span className="text-[10px] text-[var(--color-ink-muted)] italic">
+                （文种/机关未在原文核实，依据较薄）
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-ink)]">
+            {structureRead.authority.appraisal}
+          </p>
+
+          {/* 结构信号：缺席/排序/篇幅，各引具体要素，标研判 */}
+          {structureRead.signals.length > 0 && (
+            <div className="mt-2.5 space-y-1.5">
+              {structureRead.signals.map((sig, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+                    style={{
+                      color: "#8a6b3f",
+                      background: "rgba(138, 107, 63, 0.12)",
+                    }}
+                  >
+                    {signalKindLabel(sig.kind)}
+                  </span>
+                  <p className="text-[12px] leading-relaxed text-[var(--color-ink)]">
+                    {sig.element && (
+                      <span className="text-[var(--color-ink-muted)]">
+                        {sig.element} ——{" "}
+                      </span>
+                    )}
+                    {sig.note}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── 逐条款：案牍批注意象 ── */}
       <div className="mt-6 mb-3 flex items-center gap-2.5">

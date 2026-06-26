@@ -35,12 +35,25 @@ interface GraphNode {
   成文日期: string;
 }
 
+// 博弈姿态（研判口径，区别于核验事实）：后端只在「依据 / 落实」边判得出时才挂，下位对上位
+// 是 忠实落实 / 层层加码 / 打折扣 / 创新先行。引发它的原文对照（下位 from_snippet vs 上位
+// to_snippet）后端已锚到位，label 本身是推断——FE 用「研判」小标 + 弧括号点出，不盖核验印。
+interface EdgePosture {
+  label: string; // 忠实落实 / 层层加码 / 打折扣 / 创新先行
+  basis: string;
+  from_clause: number | null;
+  to_clause: number | null;
+  from_snippet: string; // 下位那条原话（已核）
+  to_snippet: string; // 上位那条原话（已核）
+}
+
 interface GraphEdge {
   source: string;
   target: string;
   kind: string; // 依据 / 落实 / 废止 / 修改 / 上下级 / 发文
   chapter_anchor: number | null;
   note: string;
+  posture?: EdgePosture | null; // 可选研判维；后端没判出就没有这个字段
 }
 
 interface DependencyGraphResponse {
@@ -75,6 +88,24 @@ const EDGE_STYLE: Record<
 
 function edgeStyle(kind: string): { color: string; dash: string; label: string } {
   return EDGE_STYLE[kind] ?? { color: "#6b6359", dash: "3 3", label: kind || "关联" };
+}
+
+// 博弈姿态四类各配克制的色（数据语义，写死 hex；未知走墨色兜底）。研判维不打分、纯分类。
+// 忠实落实 = 中性墨青；层层加码 = 木褐（加压）；打折扣 = 朱砂（架空，最该警觉）；创新先行 = 暖绿。
+const POSTURE_STYLE: Record<string, { fg: string; bg: string }> = {
+  忠实落实: { fg: "#3a6378", bg: "rgba(58, 99, 120, 0.10)" },
+  层层加码: { fg: "#8a6b3f", bg: "rgba(138, 107, 63, 0.10)" },
+  打折扣: { fg: "#9a3a2e", bg: "rgba(154, 58, 46, 0.10)" },
+  创新先行: { fg: "#4f7a52", bg: "rgba(79, 122, 82, 0.10)" },
+};
+
+function postureStyle(label: string): { fg: string; bg: string } {
+  return (
+    POSTURE_STYLE[label] ?? {
+      fg: "var(--color-ink-muted)",
+      bg: "var(--color-seal-soft)",
+    }
+  );
 }
 
 function hasText(v: string | null | undefined): boolean {
@@ -428,6 +459,19 @@ export function RedheadDependencyGraph({
                     >
                       {st.label}
                     </text>
+                    {/* 博弈姿态小标（研判口径）：摆在关系牌下方，弧括号点出是「研判」非核验事实 */}
+                    {e.posture?.label && (
+                      <text
+                        x={cx / 2 + mx / 2}
+                        y={my + 17}
+                        textAnchor="middle"
+                        fontSize="9"
+                        fill={postureStyle(e.posture.label).fg}
+                        style={{ fontFamily: "var(--font-display)" }}
+                      >
+                        〈{e.posture.label}〉
+                      </text>
+                    )}
                   </g>
                 )}
               </g>
@@ -505,7 +549,12 @@ export function RedheadDependencyGraph({
 
       {/* 图例 + 提示 */}
       <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--color-ink-muted)]">
-        <span>点节点看牵连的关系 · 点边看依据原文</span>
+        <span>
+          点节点看牵连的关系 · 点边看依据原文
+          {edges.some((e) => e.posture?.label)
+            ? " · 〈…〉是博弈姿态（研判，点边看依据）"
+            : ""}
+        </span>
         <span className="flex items-center gap-3 flex-wrap">
           {usedEdgeKinds(edges).map((k) => {
             const s = edgeStyle(k);
@@ -597,6 +646,80 @@ function EdgeDetail({
           锚自 第 {edge.chapter_anchor} 条
         </p>
       )}
+      {edge.posture?.label && <PostureBlock posture={edge.posture} />}
+    </div>
+  );
+}
+
+// 博弈姿态明细块（研判口径）：下位对上位是什么姿态 + 凭什么判 + 引发它的上下位原文对照。
+// 视觉上和「核验事实」分开——明确标「研判」，不盖鉴印；两侧原话是后端已锚的对照证据。
+function PostureBlock({ posture }: { posture: EdgePosture }) {
+  const ps = postureStyle(posture.label);
+  return (
+    <div
+      className="mt-2.5 rounded p-2.5"
+      style={{ background: ps.bg, border: `0.5px solid ${ps.fg}` }}
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <span
+          className="text-[11px] px-1.5 py-0.5 rounded-full"
+          style={{ color: ps.fg, border: `0.5px solid ${ps.fg}` }}
+        >
+          研判·博弈姿态
+        </span>
+        <span
+          className="text-sm font-bold"
+          style={{ color: ps.fg, fontFamily: "var(--font-display)" }}
+        >
+          {posture.label}
+        </span>
+      </div>
+      {hasText(posture.basis) && (
+        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+          {posture.basis}
+        </p>
+      )}
+      {/* 引发姿态的上下位原文对照（后端已锚的证据，区别于上面的研判结论） */}
+      {(hasText(posture.from_snippet) || hasText(posture.to_snippet)) && (
+        <div className="mt-2 space-y-1.5">
+          {hasText(posture.to_snippet) && (
+            <PostureQuote rank="上位" snippet={posture.to_snippet} accent={ps.fg} />
+          )}
+          {hasText(posture.from_snippet) && (
+            <PostureQuote rank="下位" snippet={posture.from_snippet} accent={ps.fg} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostureQuote({
+  rank,
+  snippet,
+  accent,
+}: {
+  rank: "上位" | "下位";
+  snippet: string;
+  accent: string;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <span
+        className="text-[11px] px-1 py-0.5 rounded shrink-0 mt-0.5"
+        style={{ color: accent, border: `0.5px solid ${accent}`, fontFamily: "var(--font-display)" }}
+      >
+        {rank}
+      </span>
+      <p
+        className="text-[12.5px] leading-relaxed text-[var(--color-ink-muted)] border-l-2 pl-2"
+        style={{
+          borderColor: "color-mix(in oklch, var(--color-seal) 35%, transparent)",
+          fontFamily: "var(--font-display)",
+        }}
+      >
+        {snippet}
+      </p>
     </div>
   );
 }

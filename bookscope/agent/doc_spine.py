@@ -192,6 +192,46 @@ _INSTR_HEAD = (
     '{"field":"文种","value":"","evidence":""}]}'
 )
 
+# ── 看结构(结构即信号)维:doc 级 structure_read ────────────────────────────────
+# WP-redhead-deep-reading-lenses §二「看结构」那一层落到产品的判断层。这是**评估层**:
+# 权威刻度的"分量"研判 + 结构信号都是推断(标研判、绝不盖鉴印),但层级 / 缺席 / 排序是从
+# **已核的 head / clauses 事实**推的,每条引到具体要素——不另发 LLM,纯计算(deterministic),
+# 既省 token 又天然 evidence-first(算的都是已核事实,无脑补空间)。
+#
+# 效力层级刻度(WP §二:令 > 部委规章 > 地方性法规 > 通知/意见 > 函)。键是层级标签(封闭集),
+# 值是 (rank 排序权重越小越高, 一句"这层级什么分量"的研判模板)。判层级只看**已抽的文种 + 发文
+# 机关**两个已核事实,落不进就退「一般公文」(中性,不替用户拔高)。
+_AUTHORITY_LEVELS: tuple[str, ...] = (
+    "公布令/法规",   # 国务院令 / 主席令 / X令 + 条例/规定/办法等法规本体
+    "地方性法规",     # 人大常委会通过的地方条例
+    "部门规章/规范性文件",  # 部委发的规定/办法/细则(规章)
+    "指令性公文",     # 决定/命令/批复等下行硬指令
+    "一般公文",       # 通知/意见/通报等(中性兜底)
+    "商洽函",         # 函(平行,商洽询问,约束力最弱)
+)
+_AUTHORITY_RANK = {lv: i for i, lv in enumerate(_AUTHORITY_LEVELS)}
+
+# 层级 → "这层级多大分量、能管到谁、会否被上位覆盖"的一句研判(WP §二的产品落点)。
+# 这是**推断**——前端标研判口径,绝不盖鉴印;但它锚在已核的文种/机关上(由调用处引具体要素)。
+_AUTHORITY_APPRAISAL: dict[str, str] = {
+    "公布令/法规": "效力高、稳定性强——公布令 / 法规是上位规范，下位文件须服从它，"
+                   "一般不会被普通通知意见覆盖；改它要走立法 / 修订程序。",
+    "地方性法规": "在本行政区划内有法律效力，稳定性强——管得到本地各方，"
+                  "但要服从国家法律 / 行政法规这些上位规范，可能被上位法覆盖。",
+    "部门规章/规范性文件": "在本部门 / 本系统职权范围内有约束力——管得到本系统对象，"
+                          "但效力低于法律法规，可能被上位法或更高层级文件调整。",
+    "指令性公文": "下行硬指令、有明确约束力——直接管到收文的下级机关；"
+                  "但属一份具体公文，稳定性弱于法规，后续文件可调整或废止。",
+    "一般公文": "属常规行文(通知 / 意见 / 通报这类)，约束力看正文措辞而非文种本身——"
+                "能管到主送机关，但容易被后续同类或上位文件覆盖、更新。",
+    "商洽函": "平行商洽 / 询问，没有上下级强制力——是协商性质，对方可办可不办。",
+}
+_DEFAULT_AUTHORITY_LEVEL = "一般公文"
+
+# 普通公文的"身份要素"——缺了就存疑/非正式(WP §二缺席信号)。只对**非法规、非 N/A** 的公文报:
+# 法规本体天生没有发文字号/成文日期这些"发文"要素(已被 not_applicable 标过),报它们=误报。
+_IDENTITY_HEAD_FIELDS: tuple[str, str] = ("发文字号", "成文日期")
+
 # 文种 → 行文方向(上行/下行/平行)的先验。判 instruction_type 要先看这份公文是上行还是下行——
 # 同一句「请……」在「请示」(下级求上级批)和「命令」(上级号令下级)里约束力天差地别,光看措辞
 # 容易把上行文的请求误判成对下级的硬要求(研究笔记 004 §3.2 排第一的系统性误判)。
@@ -515,6 +555,147 @@ def _renumber_clauses(seg_outs: list[list[dict[str, Any]]]) -> list[dict[str, An
     return flat
 
 
+def _head_value(head: list[dict[str, Any]], field: str) -> dict[str, Any]:
+    """取某头要素整条(value/evidence/verified/not_applicable);没有返空骨架。看结构维用。"""
+    for el in head:
+        if el.get("field") == field:
+            return el
+    return {"value": "", "evidence": "", "verified": False, "not_applicable": False}
+
+
+def _classify_authority(doc_type: str, issuer: str) -> str:
+    """据**已抽的文种 + 发文机关**判效力层级,落进 :data:`_AUTHORITY_LEVELS` 封闭集。
+
+    只看两个已核事实(文种 / 机关),deterministic、无脑补:
+
+    - 「令」(公布令) → 公布令/法规;法规本体(条例/规定/办法…)默认归法规,机关是人大常委会的
+      细分到「地方性法规」、是部委的细分到「部门规章」。
+    - 下行硬指令文种(命令/决定/批复…)→ 指令性公文。
+    - 「函」→ 商洽函(平行,最弱)。
+    - 其余(通知/意见/通报…)或判不出 → 「一般公文」中性兜底,不替用户拔高也不打死。
+    """
+    dt = (doc_type or "").strip()
+    iss = (issuer or "").strip()
+    is_npc = "人民代表大会常务委员会" in iss or "人大常委会" in iss
+    if dt == "令":
+        return "公布令/法规"
+    if dt in _REGULATION_PROPER_TYPES:  # 条例/规定/办法/细则/准则/规则
+        if is_npc:
+            return "地方性法规"
+        # 国务院/中央本级公布的条例(无地方人大、无行政区划前缀)归公布令/法规;
+        # 部委发的规定/办法/细则按规章处理。条例本身多由立法机关定,默认法规。
+        if dt == "条例":
+            return "地方性法规" if is_npc else "公布令/法规"
+        return "部门规章/规范性文件"
+    if dt in _DOWNWARD_DOC_TYPES:  # 命令/决定/决议/批复…
+        return "指令性公文"
+    if dt in _PARALLEL_DOC_TYPES:  # 函
+        return "商洽函"
+    return _DEFAULT_AUTHORITY_LEVEL
+
+
+def _build_structure_read(
+    head: list[dict[str, Any]], clauses: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """看结构(结构即信号)维:从**已核的 head / clauses 事实**推 doc 级 structure_read。
+
+    WP-redhead-deep-reading-lenses §二落到产品的判断层。**评估层**——权威刻度的"分量"研判 +
+    结构信号都是推断(前端标研判口径、绝不盖鉴印),但全部锚在已抽要素上:层级引文种 / 机关、
+    缺席信号引具体缺的要素、排序信号引具体条款。不另发 LLM(纯计算),既省 token 又无脑补空间。
+
+    死守:
+
+    - **法规 N/A 的不报缺席信号**——法规本体天生没有发文字号 / 成文日期(已被 ``not_applicable``
+      标过),只对非 N/A 且真空的身份要素报"存疑/非正式"。这是不误报的命门。
+    - **层级只看已抽文种 / 机关**两个事实,落不进退「一般公文」(中性),不替用户断成高效力。
+    - 文种都没抽到(空)→ 返 None(没有可判层级的事实根基,不硬造一个 structure_read)。
+
+    Returns:
+        ``{
+            "authority": {level, rank, doc_type, doc_type_evidence, issuer,
+                          issuer_evidence, appraisal, verified_basis},
+            "signals": [{kind: "missing"|"ordering"|"weight", element, note}],
+        }``;文种空(判不了层级)返 None。
+    """
+    wenzhong = _head_value(head, "文种")
+    doc_type = str(wenzhong.get("value", "")).strip()
+    if not doc_type:  # 连文种都没抽到 → 没根基判层级,不硬造
+        return None
+
+    issuer_el = _head_value(head, "发文机关")
+    issuer = str(issuer_el.get("value", "")).strip()
+
+    level = _classify_authority(doc_type, issuer)
+    # verified_basis:层级研判的两个事实(文种 + 机关)是否都来自已核 head。
+    # 机关空时只凭文种判,verified_basis 看文种这一条核没核过(机关缺不算造假,只是依据更薄)。
+    basis_verified = bool(wenzhong.get("verified")) and (
+        not issuer or bool(issuer_el.get("verified"))
+    )
+    authority = {
+        "level": level,
+        "rank": _AUTHORITY_RANK.get(level, len(_AUTHORITY_LEVELS)),
+        "doc_type": doc_type,
+        "doc_type_evidence": str(wenzhong.get("evidence", "")).strip(),
+        "issuer": issuer,
+        "issuer_evidence": str(issuer_el.get("evidence", "")).strip(),
+        "appraisal": _AUTHORITY_APPRAISAL.get(
+            level, _AUTHORITY_APPRAISAL[_DEFAULT_AUTHORITY_LEVEL]
+        ),
+        "verified_basis": basis_verified,
+    }
+
+    signals: list[dict[str, str]] = []
+
+    # ① 缺席信号:普通公文缺身份要素(发文字号/成文日期)=存疑/非正式。
+    #    死守不误报:法规 N/A 标过的不算(法规本就没这些发文要素),只报非 N/A 且真空的。
+    for field in _IDENTITY_HEAD_FIELDS:
+        el = _head_value(head, field)
+        if el.get("not_applicable"):
+            continue  # 法规本体无此项 → 不是缺席信号
+        if not str(el.get("value", "")).strip():
+            signals.append({
+                "kind": "missing",
+                "element": field,
+                "note": f"缺「{field}」——正式红头文件该有这项，没有可能是非正式件 / 草稿 / "
+                        "扫描漏抽，这份文件的正式性存疑（建议回原件核对）。",
+            })
+
+    # ② 排序信号:第一条款的责任主体 = 牵头(WP §二"署名/排序谁在前=牵头")。
+    #    引到具体条款(第几条 + 谁),不空说;只在确有带 actor 的条款时报。
+    actor_clauses = [c for c in clauses if str(c.get("actor", "")).strip()]
+    if len(actor_clauses) >= 2:
+        first = actor_clauses[0]
+        signals.append({
+            "kind": "ordering",
+            "element": f"第 {first.get('chapter')} 条",
+            "note": f"排在最前、最先点名的责任主体是「{str(first.get('actor')).strip()}」——"
+                    "公文里排序常含主次，排第一的多为牵头方，后面的偏配合（仅供参考）。",
+        })
+
+    # ③ 篇幅/构成信号:指令类型构成暴露文件性质。全是软倡导=倡导性文件(没硬约束)、
+    #    硬要求占多数=动真格的指令件。引条款占比,不空说;只在有条款时报。
+    if clauses:
+        types = [str(c.get("instruction_type", "")).strip() for c in clauses]
+        hard = types.count("硬要求")
+        soft = types.count("软倡导")
+        total = len(clauses)
+        if hard == 0 and soft > 0:
+            signals.append({
+                "kind": "weight",
+                "element": f"{soft}/{total} 条软倡导、0 条硬要求",
+                "note": "全文没有一条「应当/必须/不得」式硬要求——这是一份倡导性文件，"
+                        "落实与否主要靠自觉，约束力弱。",
+            })
+        elif hard >= 1 and hard >= total - hard:
+            signals.append({
+                "kind": "weight",
+                "element": f"{hard}/{total} 条硬要求",
+                "note": "硬要求占了多数——这份文件动真格的成分高，多数条款有法定约束力、要执行。",
+            })
+
+    return {"authority": authority, "signals": signals}
+
+
 def _make_clause_continue_fn(
     *,
     llm_client: Any,
@@ -632,6 +813,14 @@ def build_doc_spine(
         (办事清单据此分「真要办 vs 做做样子」+ 按含金量排轻重缓急)、``substance_reason``、
         ``penalty``(不办的代价,无罚则留空——正好印证它是空头/软倡导)。这层只增不改原有字段,
         公文结构解读端点拿同一份 clauses、忽略新字段也照常工作。
+
+        **看结构(结构即信号)层**(向后兼容,新增可选 doc 级字段):返回多带一个
+        ``structure_read`` dict(与 head/clauses 并列),含 ``authority``(权威刻度:据已抽文种 +
+        发文机关判效力层级 + 一句"多大分量/能管到谁/会否被上位覆盖"的研判)+ ``signals``
+        (0~N 条结构信号:缺身份要素=存疑、排序=牵头、篇幅构成=文件性质)。这是**评估层**——
+        分量研判 + 信号是推断(前端标研判口径、绝不盖鉴印),但锚在已核要素上(引文种/机关/具体
+        缺的要素/具体条款),纯计算不另发 LLM。**法规 N/A 标过的要素不报缺席信号**(不误报)。
+        文种空(判不了层级)时不挂这个字段。head/clauses 一字不动。
     """
     # 头要素维优先用传入的完整原文(含公布头);没传退回 chunk 拼接(向后兼容)。
     head_full_text = full_text if (full_text and full_text.strip()) else "".join(
@@ -681,11 +870,18 @@ def build_doc_spine(
         _verify_clause_evidence(seg, chunks)
     clauses = _renumber_clauses(seg_outs)
 
-    return {
+    # 看结构(结构即信号)维:从已核的 head / clauses 推 doc 级 structure_read(权威刻度 + 结构
+    # 信号)。纯计算、不另发 LLM;文种空(判不了层级)返 None,此时不挂 structure_read(向后兼容)。
+    structure_read = _build_structure_read(head, clauses)
+
+    out: dict[str, Any] = {
         "schema_version": DOC_SPINE_SCHEMA_VERSION,
         "head": head,
         "clauses": clauses,
     }
+    if structure_read is not None:
+        out["structure_read"] = structure_read
+    return out
 
 
 __all__ = [
