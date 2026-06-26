@@ -1478,7 +1478,7 @@ export function App() {
                 <div className="mt-6 pt-5 border-t border-[var(--color-rule)]">
                   <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
                     这是只读演示，预置了一本《三国演义》的真实分析结果。想分析
-                    <strong>你自己的书</strong>（epub / txt / pdf）？{" "}
+                    <strong>你自己的书</strong>（epub / txt / pdf / docx / md）？{" "}
                     <a
                       href="https://github.com/moyu-good/BookScope"
                       target="_blank"
@@ -1493,7 +1493,7 @@ export function App() {
               ) : (
                 <div className="mt-6 pt-5 border-t border-[var(--color-rule)]">
                   <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-                    书架里没有？上传一本新的（epub / txt / pdf）：
+                    书架里没有？上传一本新的（epub / txt / pdf / docx / md）：
                   </p>
                   <UploadForm
                     file={file}
@@ -3423,7 +3423,7 @@ function UploadForm(props: {
         <input
           id="file"
           type="file"
-          accept=".epub,.txt,.pdf"
+          accept=".epub,.txt,.pdf,.docx,.md,.markdown"
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
             setFile(f);

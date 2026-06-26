@@ -69,8 +69,10 @@ logger = logging.getLogger(__name__)
 
 books_router = APIRouter(tags=["books"])
 
-_SUPPORTED_EXTENSIONS = {".epub", ".txt", ".pdf"}
-"""upload 支持的文件扩展名。其它格式直接 400 拒掉。"""
+_SUPPORTED_EXTENSIONS = {".epub", ".txt", ".pdf", ".docx", ".md", ".markdown"}
+"""upload 支持的文件扩展名,与 ingest.loader.load_text 的分发保持一致(它支持这 6 种)。
+其它格式直接 400 拒掉。公文常是 Word(.docx)、md/markdown 也常见——早先门只开 epub/txt/pdf,
+loader 扩了 docx/md 这里没同步、把它们挡门外了(本次补齐)。"""
 
 
 @books_router.post("/books/upload", response_model=BookUploadResponse)

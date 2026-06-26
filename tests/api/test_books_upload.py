@@ -5,7 +5,7 @@
 覆盖：
 
 - happy path：小样本 txt → 上传成功 → 返回 session_id
-- 文件格式不支持（.docx / .json）→ 400
+- 文件格式不支持（.rtf / .json；docx/md 已放开）→ 400
 - 文件空内容 → 400
 - 缺 api_key → Pydantic 422
 - api_key 长度不足 → 422
@@ -239,7 +239,8 @@ def test_upload_unsupported_extension_returns_400(
     _install_fake_extractor(monkeypatch, _FakeKGExtractor())
     _install_fake_client_builder(monkeypatch)
 
-    files = {"file": ("book.docx", io.BytesIO(b"whatever"), "application/msword")}
+    # .rtf 仍不支持(docx/md 已放开,见 _SUPPORTED_EXTENSIONS);拿它测 400。
+    files = {"file": ("book.rtf", io.BytesIO(b"whatever"), "application/rtf")}
     data = {
         "book_title": "X",
         "provider": "deepseek",

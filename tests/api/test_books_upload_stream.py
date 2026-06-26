@@ -317,7 +317,7 @@ def test_upload_stream_unsupported_extension_returns_400(
     _install_fake_client_builder(monkeypatch)
 
     files = {
-        "file": ("b.docx", io.BytesIO(b"x"), "application/msword"),
+        "file": ("b.rtf", io.BytesIO(b"x"), "application/rtf"),  # .rtf 仍不支持,测 400
     }
     data = {
         "book_title": "X",
