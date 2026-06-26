@@ -1528,6 +1528,13 @@ class SessionMetadata(BaseModel):
     session_id: str = Field(..., description="session 标识。")
     book_title: str = Field(..., description="书名。")
     language: str = Field(..., description="书籍语种。")
+    genre: str = Field(
+        default="",
+        description=(
+            "题材（封闭集：小说/历史/理论/论文/公文/诗歌/工具书/其他）。"
+            "懒检测——还没分过类时为空串，前端据此显隐题材专属功能（#7）。"
+        ),
+    )
     created_at: str = Field(
         ...,
         description="ISO-8601 UTC 时间戳；session 首次写入磁盘的时刻。",

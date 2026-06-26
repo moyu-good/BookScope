@@ -23,13 +23,16 @@
 
 from __future__ import annotations
 
+import logging
 import threading
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 
 if TYPE_CHECKING:
     from bookscope.api.session_storage import SessionStorage
+
+logger = logging.getLogger(__name__)
 
 
 class BookSessionNotFound(Exception):
@@ -221,6 +224,7 @@ class BookSessionStore:
                     "session_id": session_id,
                     "book_title": "",
                     "language": "unknown",
+                    "genre": "",
                     "created_at": "",
                     "last_accessed_at": "",
                 }
@@ -233,9 +237,86 @@ class BookSessionStore:
             "session_id": session_id,
             "book_title": book_text.title,
             "language": getattr(book_text, "language", "unknown"),
+            "genre": "",
             "created_at": "",
             "last_accessed_at": "",
         }
+
+    def ensure_genre(
+        self,
+        session_id: str,
+        *,
+        llm_client: Any,
+        model: str,
+    ) -> str:
+        """返回 session 的题材；没分过类就懒检测一次、缓存后返回（#10）。
+
+        查找顺序：内存 cache（挂在 assembler 上）→ storage 的 metadata.json →
+        都没有就跑一次 :func:`bookscope.agent.genre_detect.detect_genre`（一次
+        LLM 调用），把结果写回 storage 的 metadata.json + 缓存到内存。
+
+        检测输入：书名 + 目录章标题 + 开头一段原文（detect 内部各自截断）。
+        结果是封闭集里的一个词；检测失败退 ``其他``（detect_genre 自身兜底，
+        不抛错）。这里也整体兜异常——题材是锦上添花，挂了也不该让上层功能崩，
+        最坏退空串（前端按"未分类"处理）。
+
+        Args:
+            session_id: 目标 session。
+            llm_client: provider-agnostic 的 LLMClient（BYOK，端点已构造好）。
+            model: 模型名。
+
+        Returns:
+            封闭集里的题材词；拿不到时退空串。
+        """
+        # 局部 import 规避顶层循环依赖（genre_detect 不依赖本模块，但保持惯例）。
+        from bookscope.agent.genre_detect import detect_genre
+
+        try:
+            assembler = self.get(session_id)
+        except BookSessionNotFound:
+            return ""
+
+        # 1. 内存 cache（同进程内重复调用直接命中）
+        cached = getattr(assembler, "_genre_cache", None)
+        if isinstance(cached, str) and cached:
+            return cached
+
+        # 2. storage 的 metadata.json
+        if self._storage is not None and hasattr(self._storage, "read_metadata"):
+            try:
+                stored = self._storage.read_metadata(session_id).get("genre")  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001 — 读元数据失败不阻塞，往下跑检测
+                stored = None
+            if isinstance(stored, str) and stored:
+                assembler._genre_cache = stored  # noqa: SLF001
+                return stored
+
+        # 3. 都没有 → 跑一次检测
+        try:
+            book_text = assembler._book_text  # noqa: SLF001
+            title = str(getattr(book_text, "title", ""))
+            records = assembler._compute_chapter_records()  # noqa: SLF001
+            toc_titles = [r.title for r in records if r.title]
+            sample_text = records[0].full_text if records else book_text.raw_text
+            genre = detect_genre(
+                title=title,
+                toc_titles=toc_titles,
+                sample_text=sample_text or "",
+                llm_client=llm_client,
+                model=model,
+            )
+        except Exception as exc:  # noqa: BLE001 — 检测整体兜底
+            logger.warning("genre detect failed for %s: %s", session_id, exc)
+            return ""
+
+        # 写回 storage（best-effort）+ 内存缓存
+        if self._storage is not None and hasattr(self._storage, "set_genre"):
+            try:
+                self._storage.set_genre(session_id, genre)  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001 — 写回失败不阻塞返回
+                logger.debug("failed to persist genre for %s", session_id)
+        assembler._genre_cache = genre  # noqa: SLF001
+        return genre
 
     def clear(self) -> None:
         """只清空内存 cache（不清 storage）。单测 / 应用关闭时使用。

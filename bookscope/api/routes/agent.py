@@ -85,6 +85,7 @@ from bookscope.agent.cross_doc_views import (
 )
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
+from bookscope.agent.genre_detect import genre_to_argument_axis
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.orchestrate import orchestrate
@@ -1707,10 +1708,14 @@ async def agent_argument_structure(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
+    # #10 题材门控：先检测题材（懒检测 + 缓存到 session），再压到 theory/fiction 轴。
+    # 论点结构只对理论/论文跑，小说/历史等叙事题材在 exhaustive 内优雅退场（返 []）。
+    genre = store.ensure_genre(request.book_session_id, llm_client=rec, model=model)
     claims = generate_argument_structure_exhaustive(
         chunks=chunks,
         llm_client=rec,
         model=model,
+        genre=genre_to_argument_axis(genre or None),
     )
     return ArgumentStructureResponse(
         claims=claims or [],

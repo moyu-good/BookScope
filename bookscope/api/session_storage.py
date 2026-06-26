@@ -169,6 +169,11 @@ class JSONFileSessionStorage:
                 "created_at": created_at,
                 "last_accessed_at": now,
             }
+            # genre 是懒检测出来后写回的，重新 save（如重传同一本）时尽量复用旧值，
+            # 别把已分好的类冲掉——和 created_at 一样的"复用旧值"语义。
+            existing_genre = _read_genre_or_empty(session_dir / _METADATA_FILE)
+            if existing_genre:
+                metadata["genre"] = existing_genre
             # WP3 Phase A：upload 链路会把章节检测指标挂在 assembler 上
             # （books.py 的 ``assembler.chapter_detection_stats``）；有就随
             # 元数据落盘，没有（老路径 / 手工装配）就不写——读侧都按可缺
@@ -341,6 +346,25 @@ class JSONFileSessionStorage:
             )
         return data
 
+    def set_genre(self, session_id: str, genre: str) -> None:
+        """把懒检测出的题材写回 ``metadata.json``（只动 genre 字段）。
+
+        只读改写 metadata.json，不碰 chunks / kg / vector_index——题材检测是
+        upload 之后、首次需要时才跑的轻量补写。目录不存在 / metadata 坏掉时
+        静默返回（题材是锦上添花，不该让写回失败阻塞上层）。
+        """
+        session_dir = self._session_dir(session_id)
+        metadata_path = session_dir / _METADATA_FILE
+        with self._lock:
+            try:
+                metadata = _read_json(metadata_path)
+            except (FileNotFoundError, json.JSONDecodeError, OSError):
+                return
+            if not isinstance(metadata, dict):
+                return
+            metadata["genre"] = genre
+            _write_json(metadata_path, metadata)
+
     # ------------------------------------------------------------------
     # 内部工具
     # ------------------------------------------------------------------
@@ -397,6 +421,19 @@ def _read_created_at_or(metadata_path: Path, fallback: str) -> str:
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         pass
     return fallback
+
+
+def _read_genre_or_empty(metadata_path: Path) -> str:
+    """从旧 metadata.json 读 ``genre``；读不到 / 缺字段返回空串。"""
+    try:
+        with metadata_path.open("r", encoding="utf-8") as fp:
+            data = json.load(fp)
+        val = data.get("genre")
+        if isinstance(val, str) and val:
+            return val
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+    return ""
 
 
 __all__ = [

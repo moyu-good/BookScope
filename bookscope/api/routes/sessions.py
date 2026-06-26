@@ -220,6 +220,7 @@ def _dict_to_metadata(data: dict[str, str]) -> SessionMetadata:
         session_id=str(data.get("session_id", "")),
         book_title=str(data.get("book_title", "")),
         language=str(data.get("language", "unknown")),
+        genre=str(data.get("genre", "")),
         created_at=str(data.get("created_at", "")),
         last_accessed_at=str(data.get("last_accessed_at", "")),
     )
