@@ -39,6 +39,14 @@ interface CharacterGraphProps {
 
 const PAD = 46;
 
+// 默认只渲染戏份最重的前 N 个人物——三国 348 人全量力导向每帧 ~12 万对斥力会卡死。
+// 按 degree 取前 N，剩下的折成"还有 N 个次要人物"按钮，点开才全量。力学只算渲染的这些。
+const TOP_N = 70;
+
+// 颜色方案 A：节点一律墨色单色，大小=戏份（degree），不再按共现群组多色。
+// 夜空底是深色，真墨色（--color-ink）会糊进背景看不见，所以星子用偏暖的星白当"墨色"在夜空里的对应。
+const STAR_COLOR = "#d8cfb8";
+
 // 画布按节点数自适应——几百号人挤在小画布会糊成一团，节点多就把画布撑大（给力学更多铺开空间）。
 // 上限放到 2400:三国 348 人也铺得开;SVG 按容器宽缩放,逻辑空间大=结构(阵营/主次)散得开。
 function canvasSize(nodeCount: number): { w: number; h: number } {
@@ -52,12 +60,6 @@ const MIN_SEP = 30;
 // 缩放上下限:太小看不清字、太大一颗星占满屏。
 const K_MIN = 0.3;
 const K_MAX = 4;
-
-// 只有成员够多的社区才配叫"一方"——三国大网一碎会分出一堆单人小社区(华雄一方、丁奉一方),
-// 那不是阵营是噪声。门槛 4:至少四个人常同场才当一个群标进图例。
-const MIN_CAMP = 4;
-// 图例里最多列几个群代表,免得一排标签糊一脸。
-const MAX_CAMP = 5;
 
 // 视角:缩放比 k + 平移 tx/ty。边和节点都画进 translate(tx ty) scale(k) 的 <g> 里,整图能缩能拖。
 interface View {
@@ -94,15 +96,8 @@ const EDGE_COLOR: Record<RelKind, string> = {
 };
 const EDGE_KIND_LABEL: Record<RelKind, string> = { foe: "敌对", kin: "同盟 / 亲族", neutral: "一般" };
 
-// 阵营配色:社区发现分出的群各给一色(朱砂打头),超出调色板的归中性灰。
-const COMMUNITY_COLORS = [
-  "#B23A26", "#2E6E5E", "#3A5A8C", "#9A6A2E",
-  "#6E3A6E", "#4A7A3A", "#A23A5A", "#3A6E8C",
-];
-const communityColor = (id: number) => COMMUNITY_COLORS[id] ?? "#8A857A";
-
 // 社区发现(label propagation,按 strength 加权):把关系网分成几个群 ≈ 阵营。
-// 纯算法、不调 LLM;群只用来上色 + 布局聚拢,近似(三国大致分出魏蜀吴)。
+// 纯算法、不调 LLM;颜色方案 A 弃掉了按群上色,群现在只用来布局聚拢(同群往一处拉),近似(三国大致分出魏蜀吴)。
 function detectCommunities(nodes: string[], edges: GraphEdge[]): Map<string, number> {
   const adj = new Map<string, [string, number][]>();
   for (const n of nodes) adj.set(n, []);
@@ -167,6 +162,10 @@ export function CharacterGraph({
   const [unit, setUnit] = useState<"person" | "concept">("person");
   // 视角:缩放 + 平移。默认无缩放无平移,等节点冷却后 fit 一次铺满。
   const [view, setView] = useState<View>({ k: 1, tx: 0, ty: 0 });
+  // 默认只渲染戏份前 TOP_N 个;点"展开次要人物"才全量。次要人物多才显示这个开关。
+  const [expanded, setExpanded] = useState(false);
+  // 鼠标悬停的节点名——人多时只给主要角色标名,hover 任意一颗也临时显名。
+  const [hovered, setHovered] = useState<string | null>(null);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const simRef = useRef<Map<string, Node>>(new Map());
@@ -266,39 +265,50 @@ export function CharacterGraph({
     return d;
   }, [data]);
 
-  // 图例阵营代表:只收成员数 ≥ MIN_CAMP 的群(单人/极小群是网碎出来的噪声,不算阵营),
-  // 按群大小取前 MAX_CAMP 个,每个群挑戏份最重的人当代表名。communities 已按大小降序编号(id 0 最大)。
-  const campReps = useMemo(() => {
-    if (!data) return [] as { id: number; name: string }[];
-    const ids = [...communities.values()];
-    const numC = ids.length ? Math.max(...ids) + 1 : 0;
-    // 每个群多少人
-    const sizes = new Array<number>(numC).fill(0);
-    for (const cid of communities.values()) sizes[cid] += 1;
-    const reps: { id: number; name: string }[] = [];
-    for (let id = 0; id < numC && reps.length < MAX_CAMP; id++) {
-      if (sizes[id] < MIN_CAMP) continue; // 太小的群不进图例、不标"X一方"
-      let best: string | null = null;
-      let bestDeg = -1;
-      for (const nm of data.nodes) {
-        if ((communities.get(nm) ?? -1) !== id) continue;
-        const dg = degree.get(nm) ?? 0;
-        if (dg > bestDeg) {
-          bestDeg = dg;
-          best = nm;
-        }
-      }
-      if (best) reps.push({ id, name: best });
+  // 渲染子集:默认只取戏份(degree)前 TOP_N 个人物;点"展开"后才全量。
+  // 力学、画节点、画边都只认这个子集——三国 348 人挤进力导向每帧 ~12 万对斥力会卡死,
+  // 砍到 70 人后每帧只 ~2400 对,跑得动。剩下的折成按钮(hiddenCount)。
+  const rendered = useMemo(() => {
+    const empty = {
+      nodes: [] as string[],
+      nodeSet: new Set<string>(),
+      edges: [] as GraphEdge[],
+      hiddenCount: 0,
+    };
+    if (!data) return empty;
+    const all = data.nodes;
+    let keep: string[];
+    if (expanded || all.length <= TOP_N) {
+      keep = all;
+    } else {
+      // 按 degree 降序取前 TOP_N;degree 相同就按原顺序稳定(免得每次抖)。
+      keep = [...all]
+        .map((nm, i) => ({ nm, dg: degree.get(nm) ?? 0, i }))
+        .sort((a, b) => b.dg - a.dg || a.i - b.i)
+        .slice(0, TOP_N)
+        .map((x) => x.nm);
     }
-    return reps;
-  }, [data, communities, degree]);
+    const nodeSet = new Set(keep);
+    // 只留两端都在子集里的边——否则边会连到没画出来的人。
+    const edges = data.edges.filter((e) => nodeSet.has(e.source) && nodeSet.has(e.target));
+    return { nodes: keep, nodeSet, edges, hiddenCount: all.length - keep.length };
+  }, [data, expanded, degree]);
 
-  // 初始化节点（圆周）+ 启动动画模拟
+  // 初始化节点（圆周）+ 启动动画模拟。
+  // 依赖 rendered:换数据 或 展开/收起次要人物 都重排一次。展开时已有的节点保留原位(不抖),
+  // 新冒出来的次要人物按圆周补进来,再让力学收一次。
   useEffect(() => {
     if (!data) return;
+    const prev = simRef.current;
     const sim = new Map<string, Node>();
-    const n = Math.max(1, data.nodes.length);
-    data.nodes.forEach((name, i) => {
+    const names = rendered.nodes;
+    const n = Math.max(1, names.length);
+    names.forEach((name, i) => {
+      const existing = prev.get(name);
+      if (existing) {
+        sim.set(name, { ...existing, fixed: false });
+        return;
+      }
       const a = (2 * Math.PI * i) / n;
       sim.set(name, {
         x: W / 2 + Math.cos(a) * W * 0.28,
@@ -310,11 +320,17 @@ export function CharacterGraph({
     });
     simRef.current = sim;
     coolRef.current = 0;
-    fittedRef.current = false; // 新数据没 fit 过,等冷却后再 fit
-    setView({ k: 1, tx: 0, ty: 0 }); // 视角复位,免得拿上一批的缩放看新图
+    fittedRef.current = false; // 重排了没 fit 过,等冷却后再 fit
     setFrame((f) => f + 1); // 立刻按初始坐标画一帧——别等 rAF（后台标签页 / 省电模式 rAF 会被掐，否则图空白）
     startSim();
     return stopSim;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rendered]);
+
+  // 换数据(不只是展开/收起)时复位视角,免得拿上一批的缩放看新图。展开/收起不复位,保住用户当前视角。
+  useEffect(() => {
+    setExpanded(false);
+    setView({ k: 1, tx: 0, ty: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
@@ -347,12 +363,12 @@ export function CharacterGraph({
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  // 一帧物理：斥力(全对) + 弹簧(沿边，静止长由亲疏定) + 居中 + 阻尼
+  // 一帧物理：斥力(渲染子集两两) + 弹簧(沿边，静止长由亲疏定) + 阵营锚 + 阻尼。
+  // 只算 rendered 子集——默认 ≤TOP_N 人,斥力 O(n²) 才扛得住。
   function step(): number {
     const sim = simRef.current;
-    const cur = data;
-    if (!sim || !cur) return 0;
-    const names = cur.nodes;
+    if (!sim || !data) return 0;
+    const names = rendered.nodes;
     const fx = new Map<string, number>();
     const fy = new Map<string, number>();
     // 阵营锚点:前几大社区在画布上沿环分散,各自成员往自己阵营锚拉 → 阵营空间分开、不糊团。
@@ -395,7 +411,7 @@ export function CharacterGraph({
       }
     }
     // 弹簧（沿边，静止长 = restLen(strength)）
-    for (const e of cur.edges) {
+    for (const e of rendered.edges) {
       const a = sim.get(e.source);
       const b = sim.get(e.target);
       if (!a || !b) continue;
@@ -733,9 +749,11 @@ export function CharacterGraph({
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        {data.nodes.length} 个{noun}、{data.edges.length} 条关系。星图：每个{noun}是一颗星、戏份越重越亮，星色按共现群组近似上色；连线=关系（敌红亲绿、越粗越亲密）；滚轮缩放、空白处拖动平移、拖星子挪位、点连线看那一章的原文出处（点开现取）。
+        {data.nodes.length} 个{noun}、{data.edges.length} 条关系
+        {rendered.hiddenCount > 0 && `（先画戏份最重的 ${rendered.nodes.length} 个）`}
+        。星图：每个{noun}是一颗星、戏份越重星越大；连线=关系（敌红、亲绿、一般灰，越粗越亲密）；滚轮缩放、空白处拖动平移、拖星子挪位、点连线看那一章的原文出处（点开现取）。
       </p>
-      {/* 图例:关系类型 + 几个大群代表 */}
+      {/* 图例:只剩关系类型(颜色方案 A 弃掉了按群上色,节点统一墨色、大小=戏份) */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
         {(["foe", "kin", "neutral"] as RelKind[]).map((k) => (
           <span key={k} className="inline-flex items-center gap-1.5">
@@ -743,18 +761,35 @@ export function CharacterGraph({
             {EDGE_KIND_LABEL[k]}
           </span>
         ))}
-        {campReps.length > 0 && <span className="opacity-70">主要群组：</span>}
-        {campReps.map((c) => (
-          <span key={c.id} className="inline-flex items-center gap-1">
-            <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: communityColor(c.id) }} />
-            {c.name} 等
-          </span>
-        ))}
+        <span className="inline-flex items-center gap-1.5">
+          <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: STAR_COLOR }} />
+          星越大 = 戏份越重
+        </span>
       </div>
-      {campReps.length > 0 && (
-        <p className="text-[11px] text-[var(--color-ink-muted)] opacity-70 mb-2">
-          分群是按"谁和谁常同场"的共现聚类近似算的，不是剧情阵营的定论；只列了最大的几个群，单人小群不算群。
-        </p>
+      {rendered.hiddenCount > 0 && (
+        <div className="mb-2">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] transition-colors"
+          >
+            展开剩下 {rendered.hiddenCount} 个次要{noun}
+          </button>
+          <span className="ml-2 text-[11px] text-[var(--color-ink-muted)] opacity-70">
+            全量节点多，力学会慢一点。
+          </span>
+        </div>
+      )}
+      {expanded && data.nodes.length > TOP_N && (
+        <div className="mb-2">
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] transition-colors"
+          >
+            只看主要 {TOP_N} 个{noun}
+          </button>
+        </div>
       )}
 
       {!loading && (
@@ -777,14 +812,15 @@ export function CharacterGraph({
         <StarTwinkleStyle />
         {/* 缩放平移层:边和节点都在这个 <g> 里,整图能缩能拖。defs / style 留在外面。 */}
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
-        {/* 边：星座连线 */}
-        {data.edges.map((e, i) => {
+        {/* 边：星座连线。只画渲染子集里的边;selected 仍是 data.edges 里的原索引,保证证据查询对得上。 */}
+        {rendered.edges.map((e) => {
           const a = sim.get(e.source);
           const b = sim.get(e.target);
           if (!a || !b) return null;
-          const active = selected === i;
+          const origIdx = data.edges.indexOf(e); // 原数组索引(证据 effect / sel 都按它取)
+          const active = selected === origIdx;
           return (
-            <g key={`e-${i}`}>
+            <g key={`e-${origIdx}`}>
               <line
                 x1={a.x}
                 y1={a.y}
@@ -804,39 +840,44 @@ export function CharacterGraph({
                 stroke="transparent"
                 strokeWidth={14}
                 style={{ cursor: "pointer" }}
-                onClick={() => setSelected(i)}
+                onClick={() => setSelected(origIdx)}
               />
             </g>
           );
         })}
-        {/* 节点（按阵营上色；人多时只给主要角色标名，免得糊一脸） */}
-        {data.nodes.map((name) => {
+        {/* 节点（颜色方案 A:统一墨色星、大小=戏份;缩放够大 / hover / 戏份重才标名,免得人多糊一脸） */}
+        {rendered.nodes.map((name) => {
           const p = sim.get(name);
           if (!p) return null;
           const deg = degree.get(name) ?? 0;
           const r = 6 + Math.min(9, deg * 1.5);
-          const showLabel = data.nodes.length <= 60 || deg >= 4;
+          // 标名规则:节点少 / 戏份重(deg≥4) / 放大到一定程度 / 正悬停在它上面——任一满足就标。
+          // 人多时缩着看不糊,放大或 hover 任意一颗都看得见名字。
+          const showLabel =
+            rendered.nodes.length <= 60 || deg >= 4 || view.k >= 1.6 || hovered === name;
+          const dur = 2.4 + (deg % 4) * 0.7; // 错开闪烁,别齐刷刷
           return (
             <g
               key={`n-${name}`}
               style={{ cursor: unit === "person" && onSelectPerson ? "pointer" : "grab" }}
               onPointerDown={(ev) => onNodeDown(name, ev)}
+              onPointerEnter={() => setHovered(name)}
+              onPointerLeave={() => setHovered((h) => (h === name ? null : h))}
             >
               {unit === "person" && onSelectPerson && (
                 <title>{`点 ${name} 看他的关系演变（拖动可挪位）`}</title>
               )}
-              {(() => {
-                const color = communityColor(communities.get(name) ?? 0);
-                const dur = 2.4 + (deg % 4) * 0.7; // 错开闪烁,别齐刷刷
-                return <StarNode cx={p.x} cy={p.y} r={r} color={color} twinkleDur={dur} />;
-              })()}
+              {/* 加大点击 / hover 命中区:透明大圈,半径比星子大一截,小星子也好点中、好 hover。 */}
+              <circle cx={p.x} cy={p.y} r={Math.max(r + 12, 18)} fill="transparent" />
+              <StarNode cx={p.x} cy={p.y} r={r} color={STAR_COLOR} twinkleDur={dur} />
               {showLabel && (
                 <text
                   x={p.x}
                   y={p.y - r - 5}
                   textAnchor="middle"
-                  fontSize={12}
-                  fill="#e8e0cf"
+                  fontSize={hovered === name ? 13 : 12}
+                  fill="#f0e8d4"
+                  fontWeight={hovered === name ? 700 : 400}
                   style={{ fontFamily: "var(--font-display)", pointerEvents: "none" }}
                 >
                   {name}
