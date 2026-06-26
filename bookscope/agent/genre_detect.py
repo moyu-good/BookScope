@@ -37,6 +37,10 @@ FALLBACK_GENRE = "其他"
 # 论说类题材：有"论证骨架"可梳理，论点结构功能跑这两类。其余退场。
 _THEORY_GENRES = frozenset({"理论", "论文"})
 
+# 叙事类题材：有人物 / 情节 / 弧线可分析，人物弧线 / 声口 / 关系演变等叙事功能跑这两类。
+# 纯理论书 / 论文 / 公文 / 工具书上跑这些会把"引用对象"当角色硬抽，该退场。
+_NARRATIVE_GENRES = frozenset({"小说", "历史"})
+
 DEFAULT_GENRE_MAX_TOKENS = 64
 """分类只需吐两三个字的题材名，给小预算够了。"""
 
@@ -71,6 +75,19 @@ def is_theory_genre(genre: str | None) -> bool:
     if genre is None:
         return True
     return genre in _THEORY_GENRES
+
+
+def is_narrative_genre(genre: str | None) -> bool:
+    """这个题材算不算"叙事类"（小说 / 历史）。``None`` 视作叙事类（向后兼容）。
+
+    人物弧线 / 声口 / 关系演变等叙事专属功能据此门控：非叙事题材（理论 / 论文 /
+    公文 / 工具书 / 诗歌）返 ``False`` → 端点优雅退场，不在理论书上硬抽"人物关系"。
+    端点传 genre 时记得把空串归一成 ``None``（``genre or None``），空串 = 没检测出，
+    按向后兼容照旧跑。
+    """
+    if genre is None:
+        return True
+    return genre in _NARRATIVE_GENRES
 
 
 def genre_to_argument_axis(genre: str | None) -> str | None:
@@ -192,5 +209,6 @@ __all__ = [
     "GENRES",
     "detect_genre",
     "genre_to_argument_axis",
+    "is_narrative_genre",
     "is_theory_genre",
 ]

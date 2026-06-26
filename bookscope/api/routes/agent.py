@@ -85,7 +85,11 @@ from bookscope.agent.cross_doc_views import (
 )
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
-from bookscope.agent.genre_detect import genre_to_argument_axis
+from bookscope.agent.genre_detect import (
+    genre_to_argument_axis,
+    is_narrative_genre,
+    is_theory_genre,
+)
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.orchestrate import orchestrate
@@ -143,6 +147,8 @@ from bookscope.api.schemas import (
     EntityRecallResponse,
     ForeshadowArcsRequest,
     ForeshadowArcsResponse,
+    GenreDetectRequest,
+    GenreDetectResponse,
     GraphEdge,
     MotifTrackingRequest,
     MotifTrackingResponse,
@@ -1725,6 +1731,54 @@ async def agent_argument_structure(
     )
 
 
+@agent_router.post("/agent/detect-genre", response_model=GenreDetectResponse)
+async def agent_detect_genre(
+    request: GenreDetectRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> GenreDetectResponse:
+    """选书时主动测一次题材（懒检测 + 缓存），让前端 nav 按题材显隐。
+
+    一次轻 LLM 调用（书名 + 目录 + 开头一段，小预算），封闭集分类，结果缓存进 session
+    metadata——重复调用直接命中缓存不再花钱。测不出退空串（前端按"未分类"全显，向后兼容）。
+    检测本身永不抛错（``ensure_genre`` 整体兜底）；只有 session 不存在 / client 建不出来
+    才报 HTTP 错。
+    """
+    _resolve_assembler(store, request.book_session_id)  # 不存在 → 404
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    genre = store.ensure_genre(
+        request.book_session_id, llm_client=client, model=model
+    )
+    return GenreDetectResponse(
+        genre=genre, book_session_id=request.book_session_id
+    )
+
+
 @agent_router.post("/agent/style-issues", response_model=StyleIssuesResponse)
 async def agent_style_issues(
     request: StyleIssuesRequest,
@@ -2004,8 +2058,19 @@ async def agent_concept_evolution(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    # 概念演进要按章序串全书,整本单次大书截断——章脉一次全局排阶段(共享那份 spine,
-    # 不另建 theory-genre 以免分裂缓存;小说走 events 兜底,理论书 genre 是另一个议题)。
+    # #15 题材门控:概念演进是论说类功能(理论/论文)。叙事/小说里"概念"≈母题,该退场
+    # 引导去母题追踪,别硬抽假"概念演进"。genre or None 把空串(没检测出)归一成 None
+    # → 按向后兼容照旧跑。返 scanned=True + 空阶段(题材不适用 ≠ 失败)。
+    genre = store.ensure_genre(request.book_session_id, llm_client=rec, model=model)
+    if not is_theory_genre(genre or None):
+        return ConceptEvolutionResponse(
+            concept=request.concept,
+            stages=[],
+            scanned=True,
+            book_session_id=request.book_session_id,
+            trace=_run_trace(rec, full_text, _t0),
+        )
+    # 概念演进要按章序串全书,整本单次大书截断——章脉一次全局排阶段(共享那份 spine)。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
     stages = concept_evolution_from_spine(
         concept=request.concept, spine=spine, llm_client=rec, model=model, chunks=chunks
@@ -2189,6 +2254,16 @@ async def agent_study_cards(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
+    # #15 题材门控:知识卡片是论说/工具书功能。叙事(小说/历史)上出"知识点卡"怪,退场。
+    # genre 非空且确为叙事才退(空串=没检测出,照旧跑;理论/论文/工具书/公文都正常跑)。
+    genre = store.ensure_genre(request.book_session_id, llm_client=rec, model=model)
+    if genre and is_narrative_genre(genre):
+        return StudyCardsResponse(
+            cards=[],
+            scanned=True,
+            book_session_id=request.book_session_id,
+            trace=_run_trace(rec, full_text, _t0),
+        )
     cards = generate_study_cards(
         full_text=full_text,
         chunks=chunks,

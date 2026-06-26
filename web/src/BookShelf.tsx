@@ -22,6 +22,8 @@ export interface SessionMetadata {
   language: string;
   created_at: string;
   last_accessed_at: string;
+  /** 题材（#10/#14）：封闭集里的题材词，空串=未分类。左栏 nav 据此按题材显隐。 */
+  genre?: string;
 }
 
 export interface BookShelfProps {

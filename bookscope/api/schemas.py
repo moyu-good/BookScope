@@ -434,6 +434,33 @@ class SuggestQuestionsResponse(BaseModel):
     )
 
 
+class GenreDetectRequest(BaseModel):
+    """POST /api/agent/detect-genre 请求体（选书时主动测一次题材）。
+
+    一次轻 LLM 调用判书的题材，结果缓存进 session metadata，前端据此决定 nav 显隐
+    （小说藏"论点结构"、理论书藏"人物弧线"）。重复调用直接命中缓存不再花钱。BYOK。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(default="deepseek")
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class GenreDetectResponse(BaseModel):
+    """POST /api/agent/detect-genre 响应体。"""
+
+    genre: str = Field(
+        default="",
+        description=(
+            "封闭集 {小说/历史/理论/论文/公文/诗歌/工具书/其他} 里的题材词；"
+            "测不出退空串（前端按未分类全显）。"
+        ),
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+
+
 class PacingCurveRequest(BaseModel):
     """POST /api/agent/pacing-curve 请求体（节奏曲线可视化，exp-012 GO）。
 

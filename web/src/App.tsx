@@ -853,6 +853,45 @@ export function App() {
     };
   }, [currentSession]);
 
+  // 选书时主动测一次题材（#14）：左栏 nav 按题材显隐（小说收起"思想·理论"组、
+  // 理论书收起"人物"组）要 genre 先有值。以前 genre 只在用"论点结构"时才懒检测，
+  // nav 显隐对刚选的书是哑的（全显）；这里换书就测一次填进 currentSession.genre。
+  // 已分类的不重测（也不重复花钱，后端还有缓存兜一层）；没 apiKey 没法调 LLM，先不测。
+  useEffect(() => {
+    if (!currentSession || !apiKey) return;
+    if (currentSession.genre) return; // 已有题材 → 不重测
+    const sessionId = currentSession.session_id;
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetch("/api/agent/detect-genre", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_id: sessionId,
+            provider,
+            api_key: apiKey,
+            model: model.trim() || undefined,
+            // effectiveBaseUrl 同款逻辑内联（anthropic 忽略 base_url）。
+            base_url: provider === "anthropic" ? undefined : baseUrl.trim() || undefined,
+          }),
+        });
+        if (!resp.ok || cancelled) return;
+        const data = (await resp.json()) as { genre?: string };
+        const g = (data.genre ?? "").trim();
+        if (!g || cancelled) return;
+        setCurrentSession((prev) =>
+          prev && prev.session_id === sessionId ? { ...prev, genre: g } : prev,
+        );
+      } catch {
+        /* 测不出题材就全显，不打断分析 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSession, apiKey, provider, model, baseUrl]);
+
   // 书柜刷新触发器：上传成功后 + 删除成功后递增
   const [shelfRefresh, setShelfRefresh] = useState(0);
   // 上传成功后让书柜自动选中新书
@@ -1321,11 +1360,9 @@ export function App() {
         }}
         currentBook={currentSession}
         hasBook={!!currentSession}
-        genre={
-          // genre hook：#10 给 session 带上 genre 后这里就有值；现在 SessionMetadata
-          // 还没这字段（类型里没有），所以防御性读，取不到就是 undefined → 全显。
-          (currentSession as { genre?: string } | null)?.genre
-        }
+        // genre hook：#14 选书时主动测一次题材填进 currentSession.genre，nav 据此显隐；
+        // 没测出（空串/undefined）→ 全显（genreHighlightGroups 返 null）。
+        genre={currentSession?.genre}
         open={sidebarOpen}
         onOpenSettings={() => {
           setSettingsOpen(true);
