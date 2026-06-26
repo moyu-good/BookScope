@@ -166,7 +166,7 @@ export function RedheadTimeline({
         {loading && (
           <RunningProcess
             label="排出关键时间轴"
-            hint="整份公文喂进模型先拆出条款，再把带时间的要求挑出来排成时序——每个节点都回原文核验，约 1 分钟。"
+            hint="整份公文喂进模型先拆出条款，再把带时间的要求挑出来排成时序，每个节点都回原文核验，约 1 分钟。"
           />
         )}
       </div>

@@ -200,7 +200,7 @@ export function RedheadFormatCheck({
         {loading && (
           <RunningProcess
             label="对照国标逐项校对"
-            hint="拿这份公文的头要素，逐项对照 GB/T 9704 看齐没齐、文种对不对——同份公文已读过就秒出。"
+            hint="拿这份公文的头要素，逐项对照 GB/T 9704 看齐没齐、文种对不对。同份公文已读过就秒出。"
           />
         )}
       </div>

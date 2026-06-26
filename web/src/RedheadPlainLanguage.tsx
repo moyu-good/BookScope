@@ -196,8 +196,8 @@ export function RedheadPlainLanguage({
             label={modeVerb(mode)}
             hint={
               mode === "fulltext"
-                ? "整份公文喂进模型，按句一句句翻成人话——分段并发、每句回原文核验，约 1 分钟。"
-                : "整份公文喂进模型先拆出条款，再逐条把官话改写成人话——每条都回原文核验，约 1 分钟。"
+                ? "整份公文喂进模型，按句一句句翻成人话，分段并发、每句回原文核验，约 1 分钟。"
+                : "整份公文喂进模型先拆出条款，再逐条把官话改写成人话，每条都回原文核验，约 1 分钟。"
             }
           />
         )}
@@ -231,8 +231,8 @@ export function RedheadPlainLanguage({
         ) : (
           <p className="mt-3 text-sm text-[var(--color-ink-muted)] leading-relaxed">
             {shownMode === "fulltext"
-              ? "这份没顺出可逐句翻的正文——可能正文太短或格式太特殊。换一份规范公文，或换「逐条款」试试。"
-              : "没拆出可逐条翻的正文条款——这份可能偏叙述、不是分条式公文，或者格式太特殊。换一份规范公文，或换「全文逐句」试试。"}
+              ? "这份没顺出可逐句翻的正文，可能正文太短或格式太特殊。换一份规范公文，或换「逐条款」试试。"
+              : "没拆出可逐条翻的正文条款，这份可能偏叙述、不是分条式公文，或者格式太特殊。换一份规范公文，或换「全文逐句」试试。"}
           </p>
         )}
       </div>
@@ -453,7 +453,7 @@ function ModeToggle({
   disabled?: boolean;
 }) {
   const opts: { key: PlainMode; label: string; hint: string }[] = [
-    { key: "clauses", label: "逐条款", hint: "走文脉条款，一条一句白话——对照分条结构" },
+    { key: "clauses", label: "逐条款", hint: "走文脉条款，一条一句白话，对照分条结构" },
     { key: "fulltext", label: "全文逐句", hint: "整份按句顺下来，每句一对，一句不落" },
   ];
   return (

@@ -153,7 +153,7 @@ function substanceStyle(s: string): SubstanceStyle {
 
 // 含金量一句注脚（徽章 hover / 旁注，点破闭环 vs 开环）。
 const SUBSTANCE_HINT: Record<Substance, string> = {
-  真金白银: "有指令、主体、时限、考核——会兑现",
+  真金白银: "有指令、主体、时限、考核，会兑现",
   有条件兑现: "满足条件才落地，看后续配套",
   空头倡导: "只发号召、无问责，多半漂没",
 };

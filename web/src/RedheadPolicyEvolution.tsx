@@ -197,7 +197,7 @@ export function RedheadPolicyEvolution({
         {loading && (
           <RunningProcess
             label="读这卷宗排政策演变"
-            hint="卷宗里每份公文各建文脉，再按成文日期排出演变阶段——每阶段标改了什么、钉一句原话，约 1-2 分钟。"
+            hint="卷宗里每份公文各建文脉，再按成文日期排出演变阶段，每阶段标改了什么、钉一句原话，约 1-2 分钟。"
           />
         )}
       </div>
@@ -214,8 +214,8 @@ export function RedheadPolicyEvolution({
         ) : scanned ? (
           <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
             {ranWithTopic
-              ? "这卷宗里没排出这个主题的演变线——可能这几份文件没都谈到它，或者主题换个说法再试（比如把「补贴」换成原文里的准确叫法）。也可以清空主题、整卷宗排一遍看看。"
-              : "没排出政策演变——这卷宗里的公文可能不是同一项政策的不同阶段，或者彼此没有先后承继关系。挑一组同主题、有先后的公文（比如意见 + 实施办法 + 修订版），再试一次。"}
+              ? "这卷宗里没排出这个主题的演变线，可能这几份文件没都谈到它，或者主题换个说法再试（比如把「补贴」换成原文里的准确叫法）。也可以清空主题、整卷宗排一遍看看。"
+              : "没排出政策演变，这卷宗里的公文可能不是同一项政策的不同阶段，或者彼此没有先后承继关系。挑一组同主题、有先后的公文（比如意见 + 实施办法 + 修订版），再试一次。"}
           </p>
         ) : (
           <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">

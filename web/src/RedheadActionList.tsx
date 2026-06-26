@@ -260,7 +260,7 @@ export function RedheadActionList({
         {loading && (
           <RunningProcess
             label="读这份公文拆清单"
-            hint="整份公文喂进模型，逐条拆出要办的事——谁去做、到几号、凭哪条，每条回原文核验，约 1 分钟。"
+            hint="整份公文喂进模型，逐条拆出要办的事：谁去做、到几号、凭哪条，每条回原文核验，约 1 分钟。"
           />
         )}
       </div>

@@ -221,7 +221,7 @@ export function RedheadDocStructure({
         {loading && (
           <RunningProcess
             label="读这份公文出结构"
-            hint="整份公文喂进模型，先认头要素八项、再逐条拆正文——每一项都回原文核验，约 1 分钟。"
+            hint="整份公文喂进模型，先认头要素八项、再逐条拆正文，每一项都回原文核验，约 1 分钟。"
           />
         )}
       </div>

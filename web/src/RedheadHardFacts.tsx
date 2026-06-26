@@ -192,7 +192,7 @@ export function RedheadHardFacts({
         {loading && (
           <RunningProcess
             label="读这份公文捞硬信息"
-            hint="整份公文喂进模型，把时限 / 数字 / 范围 / 起止日 / 责任主体五类硬信息全捞出来——每条都回原文核验，约 1 分钟。"
+            hint="整份公文喂进模型，把时限 / 数字 / 范围 / 起止日 / 责任主体五类硬信息全捞出来，每条都回原文核验，约 1 分钟。"
           />
         )}
       </div>

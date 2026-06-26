@@ -155,7 +155,7 @@ export function RedheadGlossary({
         {loading && (
           <RunningProcess
             label="逐个挑词释义"
-            hint="整份公文喂进模型分段挑出外行看不懂的术语，再逐个用人话释义——每个都回原句核验，约 1 分钟。"
+            hint="整份公文喂进模型分段挑出外行看不懂的术语，再逐个用人话释义，每个都回原句核验，约 1 分钟。"
           />
         )}
       </div>

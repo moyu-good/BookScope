@@ -300,7 +300,7 @@ export function RedheadDependencyGraph({
         {loading && (
           <RunningProcess
             label="读这卷宗推关系网"
-            hint="卷宗里每份公文各建一份文脉，再一次性推出文件间的关系（依据 / 落实 / 废止 …）——每条关系都锚回真实字号，约 1-2 分钟。"
+            hint="卷宗里每份公文各建一份文脉，再一次性推出文件间的关系（依据 / 落实 / 废止 …），每条关系都锚回真实字号，约 1-2 分钟。"
           />
         )}
       </div>

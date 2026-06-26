@@ -331,7 +331,7 @@ export function AgentOrchestrate({
           </div>
           {plan.length === 0 ? (
             <p className="text-sm text-[var(--color-ink-muted)]">
-              没规划出可跑的分析——目标太泛或这本书不适用，换个更具体的目标再试。
+              没规划出可跑的分析，目标太泛或这本书不适用，换个更具体的目标再试。
             </p>
           ) : (
             <ol className="space-y-2">
@@ -366,7 +366,7 @@ export function AgentOrchestrate({
                       {p.why && (
                         <span className="text-[var(--color-ink-muted)]">
                           {" "}
-                          —— {p.why}
+                          ：{p.why}
                         </span>
                       )}
                     </span>
@@ -503,7 +503,7 @@ function orchestrateErrorCopy(error: ApiErrorLike): string {
     error.error_type === "ProviderSdkMissing" ||
     error.error_type === "ClientBuildFailed"
   ) {
-    return "连不上你选的 AI——去设置看看 key 填了没、厂商选对没。";
+    return "连不上你选的 AI，去设置看看 key 填了没、厂商选对没。";
   }
   // 其余（编排中途整体失败 / 网络 / 超时）统一兜底
   return (

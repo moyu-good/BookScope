@@ -196,7 +196,7 @@ export function RedheadLevelConsistency({
         {loading && (
           <RunningProcess
             label="并排勘对上下级"
-            hint="卷宗里每份公文各建文脉，按机关层级分出上下级，再逐条勘对要求对不对得上——两侧原话都核得到才算数，约 1-2 分钟。"
+            hint="卷宗里每份公文各建文脉，按机关层级分出上下级，再逐条勘对要求对不对得上，两侧原话都核得到才算数，约 1-2 分钟。"
           />
         )}
       </div>
