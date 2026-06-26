@@ -377,3 +377,91 @@ def test_clause_prompt_carries_direction_prior():
     assert "请示" in instr and "命令" in instr and "函" in instr
     # 点明上行文的措辞别误判成对下级硬要求
     assert "别判成对下级" in instr or "别判成对下级的硬要求" in instr
+
+
+# ── 1.6.1 办事清单含金量层:substance / penalty / substance_reason ────────────────
+def _clauses_with_substance() -> str:
+    """三条条款带含金量:第1条真金白银(有罚则)、第2条空头(纯倡导无罚则)、第3条依据陈述。"""
+    return _clause_payload([
+        {"chapter": 1, "matter": "县区局汇总上报补贴申报材料", "instruction_type": "硬要求",
+         "actor": "各县区发展改革局", "deadline": "2024年6月30日前", "basis_ref": "",
+         "substance": "真金白银", "substance_reason": "「应当…6月30日前…」有硬约束+时限+主体",
+         "penalty": "逾期未报予以通报",
+         "evidence": "各县区发展改革局应当于2024年6月30日前完成本辖区补贴申报材料的汇总上报。"},
+        {"chapter": 2, "matter": "鼓励探索更高效申报方式", "instruction_type": "软倡导",
+         "actor": "", "deadline": "", "basis_ref": "",
+         "substance": "空头倡导",
+         "substance_reason": "「鼓励…可以先行先试」纯倡导无数字无时限无罚则",
+         "penalty": "",
+         "evidence": "鼓励各地结合实际探索更高效的申报方式，可以先行先试。"},
+        {"chapter": 3, "matter": "陈述行文依据", "instruction_type": "依据陈述",
+         "actor": "", "deadline": "", "basis_ref": "省发〔2023〕12号",
+         "substance": "有条件兑现", "substance_reason": "", "penalty": "",
+         "evidence": "根据《省新能源发展意见》（省发〔2023〕12号），现就有关事项通知如下。"},
+    ])
+
+
+def test_clause_substance_fields_present_and_closed_set(monkeypatch):
+    """每条条款带 substance(落三档封闭集)+ substance_reason + penalty。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_clauses_with_substance())
+    by_ch = {c["chapter"]: c for c in spine["clauses"]}
+    for c in spine["clauses"]:
+        for k in ("substance", "substance_reason", "penalty"):
+            assert k in c, f"条款缺字段 {k}"
+        assert c["substance"] in ds.SUBSTANCE_LEVELS
+    assert by_ch[1]["substance"] == "真金白银"
+    assert by_ch[2]["substance"] == "空头倡导"
+    assert by_ch[3]["substance"] == "有条件兑现"
+
+
+def test_clause_penalty_kept_when_present_blank_when_absent(monkeypatch):
+    """有罚则的条款留住代价;纯倡导的 penalty 空——绝不替它编代价(空正好印证是空头)。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_clauses_with_substance())
+    by_ch = {c["chapter"]: c for c in spine["clauses"]}
+    assert by_ch[1]["penalty"] == "逾期未报予以通报"  # 真金白银条留住罚则
+    assert by_ch[2]["penalty"] == ""  # 空头条没罚则,留空不编
+
+
+def test_clause_unknown_substance_falls_back(monkeypatch):
+    """模型给个不在三档里的含金量 → 退「有条件兑现」(中性兜底)。"""
+    clause = _clause_payload([
+        {"chapter": 1, "matter": "x", "instruction_type": "硬要求",
+         "substance": "9分超硬核", "substance_reason": "", "penalty": "",
+         "actor": "", "deadline": "", "basis_ref": "",
+         "evidence": "各县区发展改革局应当于2024年6月30日前完成本辖区补贴申报材料的汇总上报。"},
+    ])
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=clause)
+    assert spine["clauses"][0]["substance"] == "有条件兑现"
+
+
+def test_clause_substance_defaults_when_absent_backward_compat(monkeypatch):
+    """老格式条款(没 substance 字段,如旧缓存重抽)→ substance 退中性档、penalty 空,向后兼容。"""
+    # _full_clauses() 是不带 substance 的老格式
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    for c in spine["clauses"]:
+        assert c["substance"] == "有条件兑现"  # 缺字段退中性兜底
+        assert c["penalty"] == ""
+        assert c["substance_reason"] == ""
+
+
+def test_clause_prompt_carries_codebook_and_substance():
+    """条款维 prompt 拼进了 codebook(开环/闭环判据)+ 问含金量 + 不办的代价。"""
+    instr = ds._INSTR_CLAUSE
+    assert "含金量" in instr and "真金白银" in instr and "空头倡导" in instr
+    assert "不办的代价" in instr or "不办会怎样" in instr
+    # codebook 的约束力阶梯 marker 进来了
+    assert "约束力阶梯" in instr
+
+
+def test_coerce_clause_substance_layer_defaults():
+    """_coerce_clause 纯件:缺 substance/penalty → substance 退中性、penalty/reason 空。"""
+    ok = ds._coerce_clause({"chapter": 1, "matter": "x"})
+    assert ok is not None
+    assert ok["substance"] == "有条件兑现"
+    assert ok["penalty"] == ""
+    assert ok["substance_reason"] == ""
+    # 给了合法 substance 就留住
+    ok2 = ds._coerce_clause({"chapter": 2, "matter": "y", "substance": "真金白银",
+                             "penalty": "罚款", "substance_reason": "有罚则"})
+    assert ok2["substance"] == "真金白银"
+    assert ok2["penalty"] == "罚款"

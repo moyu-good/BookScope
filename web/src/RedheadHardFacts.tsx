@@ -34,6 +34,10 @@ interface HardFact {
   evidence: string;
   verified: boolean;
   match_score: number;
+  // 1.6.1 约束力层：一个数是有罚则兜底的硬门槛（硬指标），还是「力争 / 参考」的软目标（参考值）。
+  // 后端封闭集兜底（缺省退「参考值」），老缓存可能没这两个字段 → 前端兜成可选、缺了不画标。
+  binding?: string; // 硬指标 / 参考值
+  binding_reason?: string; // 凭哪个词判的（锚原文）
 }
 
 interface HardFactsResponse {
@@ -72,6 +76,18 @@ const KIND_HINT: Record<string, string> = {
 // 一条硬信息是否真有值（value 非空白才算抽到了——后端已保证，前端再兜一道）。
 function hasValue(v: string): boolean {
   return v.trim().length > 0;
+}
+
+// 约束力小签：硬指标（有罚则兜底的硬门槛，朱砂实签提醒分量）vs 参考值（软目标，淡墨虚签）。
+// 只在后端给了合法 binding 时画；老缓存没这字段就不画（向后兼容、不误导）。
+const BINDING_STYLE: Record<string, { fg: string; bg: string; label: string }> = {
+  硬指标: { fg: "#9a3a2e", bg: "rgba(154, 58, 46, 0.10)", label: "硬指标" },
+  参考值: { fg: "var(--color-ink-muted)", bg: "var(--color-seal-soft)", label: "参考值" },
+};
+
+function bindingStyle(binding?: string) {
+  if (!binding) return null;
+  return BINDING_STYLE[binding] ?? null;
 }
 
 // 按 kind 把 facts 分组，按 KIND_ORDER 排栏，空类不出栏。
@@ -321,6 +337,20 @@ export function RedheadHardFacts({
                       >
                         {f.value}
                       </span>
+                      {/* 约束力小签：硬指标 = 有罚则兜底的硬门槛、参考值 = 软目标。鼠标悬停看判据 */}
+                      {(() => {
+                        const bs = bindingStyle(f.binding);
+                        if (!bs) return null;
+                        return (
+                          <span
+                            className="text-[11px] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+                            style={{ color: bs.fg, background: bs.bg }}
+                            title={f.binding_reason || undefined}
+                          >
+                            {bs.label}
+                          </span>
+                        );
+                      })()}
                       {verifiedOrigin ? (
                         <SealMark size={16} title="原文已核验" />
                       ) : (

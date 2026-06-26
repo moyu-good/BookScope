@@ -34,6 +34,10 @@ interface TimelineNode {
   evidence: string; // 撑这个时间的原文逐字片段
   verified: boolean;
   match_score: number;
+  // 1.6.1 约束力层：这个时间点是真咬人的死线（逾期有罚则）还是软目标（力争性、无硬后果）。
+  // 后端封闭集兜底（缺省退「软目标」），老缓存可能没这两个字段 → 前端兜成可选、缺了不画标。
+  deadline_type?: string; // 真deadline / 软目标
+  deadline_reason?: string; // 凭哪个词判的（锚原文）
 }
 
 interface TimelineResponse {
@@ -53,6 +57,18 @@ interface RedheadTimelineProps {
 
 function hasText(v: string): boolean {
   return !!v && v.trim().length > 0;
+}
+
+// 时点性质小签：真deadline = 逾期咬人的死线（朱砂实签）、软目标 = 力争性时点（淡墨虚签）。
+// 只在后端给了合法 deadline_type 时画；老缓存没这字段就不画（向后兼容、不吓唬用户）。
+const DEADLINE_STYLE: Record<string, { fg: string; bg: string; label: string }> = {
+  真deadline: { fg: "#9a3a2e", bg: "rgba(154, 58, 46, 0.10)", label: "真死线" },
+  软目标: { fg: "var(--color-ink-muted)", bg: "var(--color-seal-soft)", label: "软目标" },
+};
+
+function deadlineStyle(t?: string) {
+  if (!t) return null;
+  return DEADLINE_STYLE[t] ?? null;
 }
 
 export function RedheadTimeline({
@@ -308,9 +324,9 @@ export function RedheadTimeline({
                   )}
                 </div>
 
-                {/* 右栏：事项——墨色宋体主体 + 元信息（第几条）+ 原文（默认收起） */}
+                {/* 右栏：事项——墨色宋体主体 + 时点性质签 + 元信息（第几条）+ 原文（默认收起） */}
                 <div className="flex-1 min-w-0 pl-3 pb-1">
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-2 flex-wrap">
                     {verified && <SealMark size={17} title="原文已核验" />}
                     <p
                       className="text-[15px] leading-7 text-[var(--color-ink)]"
@@ -318,6 +334,20 @@ export function RedheadTimeline({
                     >
                       {n.what || "（这个时间点没说要发生啥）"}
                     </p>
+                    {/* 时点性质签：真死线（逾期咬人）vs 软目标。鼠标悬停看判据 */}
+                    {(() => {
+                      const ds = deadlineStyle(n.deadline_type);
+                      if (!ds) return null;
+                      return (
+                        <span
+                          className="self-center text-[11px] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+                          style={{ color: ds.fg, background: ds.bg }}
+                          title={n.deadline_reason || undefined}
+                        >
+                          {ds.label}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* 元信息：来自第几条——有才显示 */}

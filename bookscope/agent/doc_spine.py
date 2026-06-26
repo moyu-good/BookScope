@@ -42,6 +42,11 @@ from bookscope.agent._internal.exhaustive import (
 from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
+from bookscope.agent.redhead_codebook import (
+    SUBSTANCE_LEVELS,
+    codebook_block,
+    coerce_substance,
+)
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
     salvage_closed_objects,
@@ -225,15 +230,32 @@ _INSTR_CLAUSE = (
     "4. 时限(deadline):什么时候前完成/生效/管到哪天;**抽到才填,抽不到留空,绝不编**。\n"
     "5. 依据引用(basis_ref):这一条引了哪份上位文件——抽出被引文件的**字号或标题**;没引留空。\n"
     "6. evidence:这一条里最能代表上面判定的一句原文逐字片段(原样摘录、不改写)。\n"
+    "7. 含金量(substance):这条是真要办还是做做样子——用下面措辞刻度里的开环/闭环判,"
+    "**只能填「真金白银」「有条件兑现」「空头倡导」之一**:有硬约束词 + 数字 / 时限 / 责任主体 / "
+    "罚则齐全的闭环条款 → 真金白银;纯倡导词(鼓励/支持/探索)、无数字无时限无主体无罚则的开环号召 "
+    "→ 空头倡导;介于两者(有指令有主体但缺数字/时限/罚则之一)→ 有条件兑现。信息告知 / 依据陈述"
+    "这类本不要求办事的,也退「有条件兑现」(中性)。\n"
+    "8. 含金量理由(substance_reason):凭原文里**哪些 marker** 判成这档(点出约束词/数字/时限/"
+    "主体/罚则的有无,锚原文,别空说);判不出留空。\n"
+    "9. 不办的代价(penalty):这条**不办会怎样**——原文里写了罚则/问责/考核/通报/追责的,"
+    "摘出那个后果(如「予以通报问责」「纳入年度考核」「逾期不予受理」);**原文没写代价就留空**,"
+    "绝不替它编一个后果(没罚则=空,正好印证它是空头/软倡导)。\n"
     "严格输出 JSON(别的话别说、别加 markdown 围栏):\n"
     '{"clauses":[{"chapter":条款序号整数,"matter":"","instruction_type":"信息告知",'
-    '"actor":"","deadline":"","basis_ref":"","evidence":""}]}'
+    '"actor":"","deadline":"","basis_ref":"","evidence":"","substance":"有条件兑现",'
+    '"substance_reason":"","penalty":""}]}'
+    "\n\n" + codebook_block()
 )
 
 _USER_MSG = "请按上面的要求抽结构。"
 
-# 条款维除 chapter/evidence 外要保留的字段(都是字符串)。
-_CLAUSE_STR_FIELDS = ("matter", "instruction_type", "actor", "deadline", "basis_ref")
+# 条款维除 chapter/evidence/substance 外要保留的字段(都是字符串)。substance 走封闭集归一,
+# 单列出来不混进字符串组。substance_reason / penalty 是 1.6.1 加的含金量层字段(向后兼容,
+# 抽不到留空)——penalty 留空正好印证这条没罚则(空头/软倡导)。
+_CLAUSE_STR_FIELDS = (
+    "matter", "instruction_type", "actor", "deadline", "basis_ref",
+    "substance_reason", "penalty",
+)
 
 
 def _coerce_doc_type(value: Any) -> str:
@@ -251,7 +273,9 @@ def _coerce_instruction_type(value: Any) -> str:
 def _coerce_clause(item: Any) -> dict[str, Any] | None:
     """把一条条款 dict 归一成该有的字段;chapter(条款序号)缺/非整数 → 丢(没序号摆不进文脉)。
 
-    指令类型走封闭集归一(带原文撑的标签,不是分数);其余字段是字符串,缺退空串、抽不到不编。
+    指令类型 + 含金量走封闭集归一(带原文撑的标签,不是分数);其余字段是字符串,缺退空串、抽不到
+    不编。``substance`` / ``substance_reason`` / ``penalty`` 是 1.6.1 含金量层(向后兼容):老缓存
+    没这几个字段时,substance 退「有条件兑现」(中性)、reason/penalty 退空串,绝不替它编代价。
     """
     if not isinstance(item, dict):
         return None
@@ -261,6 +285,7 @@ def _coerce_clause(item: Any) -> dict[str, Any] | None:
     out: dict[str, Any] = {
         "chapter": ch,
         "evidence": str(item.get("evidence", "")).strip(),
+        "substance": coerce_substance(item.get("substance")),
     }
     for field in _CLAUSE_STR_FIELDS:
         v = item.get(field)
@@ -596,9 +621,17 @@ def build_doc_spine(
             "schema_version": "v1",
             "head": [{field, value, evidence, verified, match_score}],
             "clauses": [{chapter, matter, instruction_type, actor, deadline, basis_ref,
-                         evidence, verified, match_score}],
+                         evidence, verified, match_score,
+                         substance(真金白银/有条件兑现/空头倡导),  # 1.6.1 含金量层
+                         substance_reason,                          # 凭哪些 marker 判的(锚原文)
+                         penalty}],                                  # 不办的代价(无罚则=空)
         }``。
         头要素维抽不到的要素出一条空待核记录(verified=False),绝不编。条款维空 → ``clauses: []``。
+
+        **1.6.1 给「办事清单」加的含金量层**(向后兼容,纯增字段):每条条款多带 ``substance``
+        (办事清单据此分「真要办 vs 做做样子」+ 按含金量排轻重缓急)、``substance_reason``、
+        ``penalty``(不办的代价,无罚则留空——正好印证它是空头/软倡导)。这层只增不改原有字段,
+        公文结构解读端点拿同一份 clauses、忽略新字段也照常工作。
     """
     # 头要素维优先用传入的完整原文(含公布头);没传退回 chunk 拼接(向后兼容)。
     head_full_text = full_text if (full_text and full_text.strip()) else "".join(
@@ -659,5 +692,6 @@ __all__ = [
     "DOC_SPINE_SCHEMA_VERSION",
     "DOC_TYPES",
     "INSTRUCTION_TYPES",
+    "SUBSTANCE_LEVELS",
     "build_doc_spine",
 ]

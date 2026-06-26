@@ -82,6 +82,7 @@ from bookscope.agent.cross_doc_views import (
     dependency_graph_from_cross_doc,
     level_consistency_from_spines,
     policy_evolution_from_spines,
+    policy_wording_diff_from_spines,
 )
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
@@ -169,6 +170,7 @@ from bookscope.api.schemas import (
     RedheadGlossaryResponse,
     RedheadHardFactsResponse,
     RedheadLevelConsistencyResponse,
+    RedheadPlainLanguageRequest,
     RedheadPlainLanguageResponse,
     RedheadPolicyEvolutionRequest,
     RedheadPolicyEvolutionResponse,
@@ -3173,8 +3175,13 @@ async def agent_redhead_policy_evolution(
     stages = policy_evolution_from_spines(
         doc_spines=spines, llm_client=rec, model=model, topic=request.topic
     )
+    # 措辞 diff(逐字比):政策的新闻在 delta 里(鼓励→应当=升格、严格→合理=松绑),与阶段并列。
+    wording_diffs = policy_wording_diff_from_spines(
+        doc_spines=spines, llm_client=rec, model=model, topic=request.topic
+    )
     return RedheadPolicyEvolutionResponse(
         stages=stages or [],
+        wording_diffs=wording_diffs or [],
         scanned=stages is not None,
         trace=_run_trace(rec, "", _t0),
     )
@@ -3216,10 +3223,11 @@ async def agent_redhead_level_consistency(
     response_model=RedheadPlainLanguageResponse,
 )
 async def agent_redhead_plain_language(
-    request: RedheadDocStructureRequest,
+    request: RedheadPlainLanguageRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadPlainLanguageResponse:
-    """大白话翻译:把公文体逐条款翻成人话,每句白话锚回原条款(核原文不核白话)。"""
+    """大白话翻译:公文体翻人话,核原文不核白话。mode=clauses 逐条款摘译 / fulltext 整篇逐句(#22);
+    命中措辞刻度的条目带 nuance 点弦外之意(如"原则上"→有口子),弦外只在原文真有该词时才点。"""
     assembler = _resolve_assembler(store, request.book_session_id)
     client = _build_params_client_or_raise(request)
     model = request.model or default_model_for(request.provider)
@@ -3227,10 +3235,11 @@ async def agent_redhead_plain_language(
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
     result = plain_language_from_spine(
-        chunks=chunks, llm_client=rec, model=model, full_text=full_text
+        chunks=chunks, llm_client=rec, model=model, full_text=full_text, mode=request.mode
     )
     items = result.get("items") or []
     return RedheadPlainLanguageResponse(
+        mode=result.get("mode", request.mode),
         items=items,
         scanned=bool(items),
         book_session_id=request.book_session_id,

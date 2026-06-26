@@ -322,6 +322,303 @@ def test_policy_strips_code_fence(monkeypatch):
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# 视图二·加一层:政策措辞 diff(逐字比)
+# ════════════════════════════════════════════════════════════════════════════
+#
+# diff 的 before/after 必须逐字命中各自文件已核 evidence 池。_SPINES 里可用逐字原文:
+#   省发〔2024〕1号 / 条款1:对参保企业按每人500元发放稳岗补贴。
+#   省发〔2024〕1号 / 条款2:各市可结合实际制定具体实施细则。
+#   市发〔2024〕5号 / 条款1:本市稳岗补贴按每人300元发放。
+#   市发〔2024〕5号 / 条款2:补贴申报截止2024年6月30日。
+
+
+def _diff(payload, *, spines=None, topic=None, **kw):
+    return cdv.policy_wording_diff_from_spines(
+        doc_spines=spines if spines is not None else _SPINES,
+        llm_client=_FakeClient(),
+        model="deepseek-v4-flash",
+        topic=topic,
+        **kw,
+    )
+
+
+def test_diff_success_verbatim(monkeypatch):
+    """正路:before/after 都逐字命中各自文件已核证据 → 留;direction/来源都对。"""
+    payload = json.dumps({"diffs": [{
+        "topic_point": "补贴标准的约束力",
+        "before": "对参保企业按每人500元发放稳岗补贴。",
+        "before_doc": "省发〔2024〕1号",
+        "after": "本市稳岗补贴按每人300元发放。",
+        "after_doc": "市发〔2024〕5号",
+        "direction": "收紧",
+        "basis": "补贴从每人500元降到300元,标准收窄",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _diff(payload, topic="补贴标准")
+    assert out is not None
+    assert len(out) == 1
+    d = out[0]
+    assert d["direction"] == "收紧"
+    assert d["before_doc"] == "省发〔2024〕1号"
+    assert d["after_doc"] == "市发〔2024〕5号"
+    assert "500元" in d["before"]
+    assert "300元" in d["after"]
+    assert d["verified"] is True
+
+
+def test_diff_升格_direction(monkeypatch):
+    """升格(约束力升):before/after 逐字命中 → 留,direction=升格。"""
+    payload = json.dumps({"diffs": [{
+        "topic_point": "细则制定的约束力",
+        "before": "各市可结合实际制定具体实施细则。",   # 省·条款2(倡导「可」)
+        "before_doc": "省发〔2024〕1号",
+        "after": "本市稳岗补贴按每人300元发放。",        # 市·条款1(确定执行)
+        "after_doc": "市发〔2024〕5号",
+        "direction": "升格",
+        "basis": "从『可制定』变成明确执行,约束力上升",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _diff(payload)
+    assert len(out) == 1
+    assert out[0]["direction"] == "升格"
+
+
+def test_diff_松绑_direction(monkeypatch):
+    """松绑(约束力降):逐字命中 → 留,direction=松绑。"""
+    payload = json.dumps({"diffs": [{
+        "topic_point": "申报口径",
+        "before": "本市稳岗补贴按每人300元发放。",
+        "before_doc": "市发〔2024〕5号",
+        "after": "各市可结合实际制定具体实施细则。",
+        "after_doc": "省发〔2024〕1号",
+        "direction": "松绑",
+        "basis": "从硬标准变成『可结合实际』,放宽了",
+    }]}, ensure_ascii=False)
+    # 注意:松绑这条 after 的成文日期(省1月)早于 before(市3月),只验 direction 落进封闭集 +
+    # 逐字命中即可——日期序排序不影响留存。
+    _patch(monkeypatch, payload)
+    out = _diff(payload)
+    assert len(out) == 1
+    assert out[0]["direction"] == "松绑"
+
+
+def test_diff_wording_mismatch_dropped(monkeypatch):
+    """before/after 措辞对不上原文(LLM 改写/编的)→ 整条丢(立身之本)。"""
+    payload = json.dumps({"diffs": [
+        {  # before 是编的(原文里没有「鼓励企业稳岗」这句)
+            "topic_point": "瞎编的提法",
+            "before": "鼓励企业积极稳岗就业。",
+            "before_doc": "省发〔2024〕1号",
+            "after": "本市稳岗补贴按每人300元发放。",
+            "after_doc": "市发〔2024〕5号",
+            "direction": "升格",
+            "basis": "编的",
+        },
+        {  # after 改写了原文(「每人300元」→「人均300元」,逐字对不上)
+            "topic_point": "改写的措辞",
+            "before": "对参保企业按每人500元发放稳岗补贴。",
+            "before_doc": "省发〔2024〕1号",
+            "after": "本市稳岗补贴按人均300元发放。",   # 改了字
+            "after_doc": "市发〔2024〕5号",
+            "direction": "收紧",
+            "basis": "改写的",
+        },
+    ]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    assert _diff(payload) == []  # 两条措辞都对不上原文,全丢
+
+
+def test_diff_paraphrase_not_enough(monkeypatch):
+    """转述命中(n-gram 过阈值但非逐字)对 diff 不够——措辞变没变靠逐字,转述说明被改写,丢。"""
+    payload = json.dumps({"diffs": [{
+        "topic_point": "补贴标准",
+        # 把原文「对参保企业按每人500元发放稳岗补贴。」删几个字 + 调序,n-gram 还高但非逐字子串
+        "before": "参保企业每人500元发放稳岗补贴",
+        "before_doc": "省发〔2024〕1号",
+        "after": "本市稳岗补贴按每人300元发放。",
+        "after_doc": "市发〔2024〕5号",
+        "direction": "收紧",
+        "basis": "降标准",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    assert _diff(payload) == []  # before 是转述非逐字,丢
+
+
+def test_diff_新增_only_after(monkeypatch):
+    """新增:旧版无此提法,只核 after 逐字命中(before 允许空)。"""
+    payload = json.dumps({"diffs": [{
+        "topic_point": "申报截止时间",
+        "before": "",
+        "before_doc": "",
+        "after": "补贴申报截止2024年6月30日。",   # 市·条款2,逐字
+        "after_doc": "市发〔2024〕5号",
+        "direction": "新增",
+        "basis": "旧版没有申报截止,新版加上了",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _diff(payload)
+    assert len(out) == 1
+    assert out[0]["direction"] == "新增"
+    assert "6月30日" in out[0]["after"]
+    assert out[0]["before"] == ""
+
+
+def test_diff_删除_only_before(monkeypatch):
+    """删除:新版删掉此提法,只核 before 逐字命中(after 允许空)。"""
+    payload = json.dumps({"diffs": [{
+        "topic_point": "细则授权",
+        "before": "各市可结合实际制定具体实施细则。",   # 省·条款2,逐字
+        "before_doc": "省发〔2024〕1号",
+        "after": "",
+        "after_doc": "",
+        "direction": "删除",
+        "basis": "下一版删去了授权各市自定细则的提法",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _diff(payload)
+    assert len(out) == 1
+    assert out[0]["direction"] == "删除"
+    assert "实施细则" in out[0]["before"]
+    assert out[0]["after"] == ""
+
+
+def test_diff_新增_missing_after_dropped(monkeypatch):
+    """新增但 after 措辞也对不上原文 → 丢(唯一该核的那侧坐实不了)。"""
+    payload = json.dumps({"diffs": [{
+        "topic_point": "编的新增",
+        "before": "",
+        "before_doc": "",
+        "after": "新增了一项原文里没有的提法。",   # 编的
+        "after_doc": "市发〔2024〕5号",
+        "direction": "新增",
+        "basis": "编的",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    assert _diff(payload) == []
+
+
+def test_diff_direction_closed_set(monkeypatch):
+    """direction 落不进封闭集 → 丢(不自造方向)。"""
+    payload = json.dumps({"diffs": [
+        {"topic_point": "a", "before": "对参保企业按每人500元发放稳岗补贴。",
+         "before_doc": "省发〔2024〕1号", "after": "本市稳岗补贴按每人300元发放。",
+         "after_doc": "市发〔2024〕5号", "direction": "收紧", "basis": "x"},
+        {"topic_point": "b", "before": "各市可结合实际制定具体实施细则。",
+         "before_doc": "省发〔2024〕1号", "after": "本市稳岗补贴按每人300元发放。",
+         "after_doc": "市发〔2024〕5号", "direction": "微调了一下", "basis": "自造"},
+    ]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _diff(payload)
+    assert len(out) == 1
+    assert all(x["direction"] in cdv.POLICY_DIFF_DIRECTIONS for x in out)
+
+
+def test_diff_fabricated_doc_dropped(monkeypatch):
+    """before_doc / after_doc 不是真实 anchor(LLM 编的字号)→ 丢。"""
+    payload = json.dumps({"diffs": [{
+        "topic_point": "编字号",
+        "before": "对参保企业按每人500元发放稳岗补贴。",
+        "before_doc": "国发〔2099〕99号",   # 编的
+        "after": "本市稳岗补贴按每人300元发放。",
+        "after_doc": "市发〔2024〕5号",
+        "direction": "收紧",
+        "basis": "x",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    assert _diff(payload) == []
+
+
+def test_diff_same_doc_change_dropped(monkeypatch):
+    """改了措辞类(非新增/删除)before/after 来自同一文件 → 不算跨文件演变,丢。"""
+    payload = json.dumps({"diffs": [{
+        "topic_point": "同文件内",
+        "before": "对参保企业按每人500元发放稳岗补贴。",
+        "before_doc": "省发〔2024〕1号",
+        "after": "各市可结合实际制定具体实施细则。",
+        "after_doc": "省发〔2024〕1号",   # 同一份
+        "direction": "转向",
+        "basis": "x",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    assert _diff(payload) == []
+
+
+def test_diff_dedup(monkeypatch):
+    """同 (topic_point, before, after) 重复 → 只留一条。"""
+    one = {
+        "topic_point": "补贴标准",
+        "before": "对参保企业按每人500元发放稳岗补贴。",
+        "before_doc": "省发〔2024〕1号",
+        "after": "本市稳岗补贴按每人300元发放。",
+        "after_doc": "市发〔2024〕5号",
+        "direction": "收紧",
+        "basis": "x",
+    }
+    payload = json.dumps({"diffs": [one, dict(one, basis="重复")]}, ensure_ascii=False)
+    _patch(monkeypatch, payload)
+    out = _diff(payload)
+    assert len(out) == 1
+
+
+def test_diff_empty_array_returns_empty(monkeypatch):
+    """这摞文件没措辞变化(LLM 返空数组)→ [](区分'没变化'和'失败')。"""
+    _patch(monkeypatch, json.dumps({"diffs": []}))
+    assert _diff('{"diffs": []}') == []
+
+
+def test_diff_parse_failure_returns_none(monkeypatch):
+    _patch(monkeypatch, "这不是 JSON")
+    assert _diff("x") is None
+
+
+def test_diff_llm_raises_returns_none(monkeypatch):
+    _patch(monkeypatch, "{}", raises=RuntimeError("boom"))
+    assert _diff("x") is None
+
+
+def test_diff_fewer_than_two_docs_returns_none(monkeypatch):
+    """少于两份有 anchor 的文件 → 跨文件比无从谈起 → None,不调 LLM。"""
+    spines = [{"head": _head(num="省发〔2024〕1号", org="某省", date="2024年1月1日"),
+               "clauses": [_clause(1, "x", evidence="原文一句。")]}]
+    # 不 patch:走到 LLM 就抛 AttributeError,说明在前面返了 None
+    assert cdv.policy_wording_diff_from_spines(
+        doc_spines=spines, llm_client=_FakeClient(), model="m",
+    ) is None
+
+
+def test_diff_salvages_truncated(monkeypatch):
+    """reasoning 吃 token 致 JSON 截断 → 抢救已闭合的 diff。"""
+    truncated = (
+        '{"diffs": ['
+        '{"topic_point": "补贴标准", '
+        '"before": "对参保企业按每人500元发放稳岗补贴。", "before_doc": "省发〔2024〕1号", '
+        '"after": "本市稳岗补贴按每人300元发放。", "after_doc": "市发〔2024〕5号", '
+        '"direction": "收紧", "basis": "降标准"},'
+        '{"topic_point": "截", "before": "补贴申报截'  # 截断
+    )
+    _patch(monkeypatch, truncated)
+    out = _diff(truncated)
+    assert out is not None
+    assert len(out) == 1  # 完整那条留,截断那条丢
+    assert out[0]["topic_point"] == "补贴标准"
+
+
+def test_diff_strips_code_fence(monkeypatch):
+    inner = json.dumps({"diffs": [{
+        "topic_point": "补贴标准",
+        "before": "对参保企业按每人500元发放稳岗补贴。",
+        "before_doc": "省发〔2024〕1号",
+        "after": "本市稳岗补贴按每人300元发放。",
+        "after_doc": "市发〔2024〕5号",
+        "direction": "收紧", "basis": "x",
+    }]}, ensure_ascii=False)
+    _patch(monkeypatch, "```json\n" + inner + "\n```")
+    out = _diff(inner)
+    assert out is not None
+    assert len(out) == 1
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # 视图三:上下级一致性核查
 # ════════════════════════════════════════════════════════════════════════════
 

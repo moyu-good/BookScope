@@ -41,6 +41,7 @@ from bookscope.agent._internal.doc_spine_cache import get_or_build_doc_spine
 from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
+from bookscope.agent.redhead_codebook import codebook_block
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
     salvage_closed_objects,
@@ -55,7 +56,20 @@ TIMELINE_SCHEMA_VERSION = "v1"
 DEFAULT_TIMELINE_MAX_TOKENS = 1500
 """一次全局推理抽时间节点的 max_tokens。一份公文的时间节点通常十几个以内,每个就几句,
 1500 留足 reasoning 头(deepseek-v4-flash 把 reasoning_content 算进 max_tokens,见
-reference_reasoning_model_token_budget)。节点多被截断时靠 salvage_closed_objects 抢救。"""
+reference_reasoning_model_token_budget)。节点多被截断时靠 salvage_closed_objects 抢救。
+
+加约束力层(1.6.1)后每个节点多 deadline_type / deadline_reason 两个短字段——量很小,1500
+仍够;真被截断 ``salvage_closed_objects`` 照样兜底。"""
+
+# 时间点性质(deadline_type)两档(封闭集,1.6.1 加的判断层)——这个时间点是真咬人的死线
+# (逾期有罚则/考核),还是没硬后果的软目标 / 倡导性时点。判据走 codebook 的开环/闭环:
+# 绑硬约束词 + 逾期有罚则/考核兜底 = 真deadline;阶段性「力争X前达到」「逐步」这类 = 软目标。
+DEADLINE_TYPES: tuple[str, ...] = (
+    "真deadline",  # 逾期有罚则/考核/失权的死线(限X前办结,逾期不予受理 / 通报问责)
+    "软目标",      # 倡导性 / 力争性 / 阶段性时点,逾期无硬后果(力争X前达到、逐步推进)
+)
+_DEFAULT_DEADLINE_TYPE = "软目标"
+"""时间点性质落不进两档的兜底——退「软目标」(最保守,不替一个时点拔高成真死线吓唬用户)。"""
 
 # 一次全局推理的指令——不喂全文,只喂逐条款的紧凑清单(序号 / 事项 / 时限 / 原文),要模型
 # 把**带时间的要求**挑出来排成时序。死守:只抽原文真有时间的、绝不编日期、锚回真实条款。
@@ -78,8 +92,17 @@ _INSTR_TIMELINE = (
     "- what:到这个时间点要发生 / 完成什么事,一句话(如「市场主体须完成存量登记」)。\n"
     "- chapter:这个时间节点来自第几条条款(整数序号)。\n"
     "- evidence:撑这个时间的那句原文逐字片段(原样摘录)。\n"
+    "- deadline_type:这个时间点是**真咬人的死线**还是**软目标**——**只能填「真deadline」或"
+    "「软目标」**。用下面的措辞刻度判:这条绑了硬约束词(应当/必须/限X前办结)、逾期有罚则 / "
+    "考核 / 失权(如「逾期不予受理」「未按期完成予以问责」)兜底的 → 「真deadline」;只是"
+    "阶段性 / 力争性 / 倡导性的时点(「力争2025年底前达到」「逐步」「条件成熟时」)、逾期没硬后果"
+    "的 → 「软目标」。判不准退「软目标」。\n"
+    "- deadline_reason:凭原文里**哪个词**判成这档(点出绑的约束词 / 有无逾期罚则,锚原文,"
+    "别空说);判不出留空。\n"
     "严格输出 JSON(别的话别说、别加 markdown 围栏),按时间先后排(说不准先后就按条款序号排):\n"
-    '{"nodes":[{"when":"","what":"","chapter":条款序号整数,"evidence":""}]}'
+    '{"nodes":[{"when":"","what":"","chapter":条款序号整数,"evidence":"",'
+    '"deadline_type":"软目标","deadline_reason":""}]}'
+    "\n\n" + codebook_block()
 )
 
 _USER_MSG = "请按上面的要求抽关键时间轴。"
@@ -98,15 +121,26 @@ def _compact_clauses(clauses: list[dict[str, Any]]) -> str:
         matter = str(c.get("matter", "")).strip()
         deadline = str(c.get("deadline", "")).strip()
         evidence = str(c.get("evidence", "")).strip()
+        # 文脉条款维(1.6.1)已抽了不办的代价(penalty)——把它显式摆出来,是判这个时间点
+        # 是真死线还是软目标最直接的 marker:有罚则=真咬人,没罚则多半是软目标。
+        penalty = str(c.get("penalty", "")).strip()
         parts = [f"第{ch}条"]
         if matter:
             parts.append(f"事项:{matter}")
         if deadline:
             parts.append(f"时限:{deadline}")
+        if penalty:
+            parts.append(f"不办的代价:{penalty}")
         if evidence:
             parts.append(f"原文:{evidence}")
         lines.append(" | ".join(parts))
     return "\n".join(lines)
+
+
+def _coerce_deadline_type(value: Any) -> str:
+    """时间点性质归一:必须落进两档封闭集,落不进退「软目标」(最保守,不替时点拔高成真死线)。"""
+    s = value.strip() if isinstance(value, str) else ""
+    return s if s in DEADLINE_TYPES else _DEFAULT_DEADLINE_TYPE
 
 
 def _coerce_node(item: Any) -> dict[str, Any] | None:
@@ -114,6 +148,8 @@ def _coerce_node(item: Any) -> dict[str, Any] | None:
 
     chapter 缺 / 非整数 → 置 None(节点仍保留,只是锚不回具体条款);when / what / evidence
     coerce 成字符串。绝不在这里补日期——抽不到就是空,真伪靠 verify 那道闸。
+    ``deadline_type`` / ``deadline_reason`` 是 1.6.1 约束力层(向后兼容):缺时 deadline_type
+    退「软目标」(最保守)、reason 退空串,绝不替一个时点拔高成真死线吓唬用户。
     """
     if not isinstance(item, dict):
         return None
@@ -129,6 +165,8 @@ def _coerce_node(item: Any) -> dict[str, Any] | None:
         "what": str(item.get("what", "")).strip(),
         "chapter": chapter,
         "evidence": evidence,
+        "deadline_type": _coerce_deadline_type(item.get("deadline_type")),
+        "deadline_reason": str(item.get("deadline_reason", "")).strip(),
     }
 
 
@@ -215,10 +253,15 @@ def timeline_from_spine(
                        what(到这个点要发生啥),
                        chapter(来源条款序号,可能 None),
                        evidence(撑这个时间的原文逐字片段),
+                       deadline_type(真deadline/软目标),  # 1.6.1 约束力层
+                       deadline_reason,                    # 凭哪个词判的(锚原文)
                        verified, match_score}],
         }``。
         条款空(这份没拆出可逐条的正文)/ 没抽到任何带时间的要求 → ``nodes: []``。
         ``nodes`` 按时间先后排(模型排好的顺序,排不准退按条款序号)。
+
+        **1.6.1 约束力层**(向后兼容,纯增字段):每个节点多带 ``deadline_type``(真 deadline vs
+        软目标——前端据此标出哪些时点逾期真咬人)、``deadline_reason``。
     """
     spine = get_or_build_doc_spine(
         chunks=chunks,
@@ -265,6 +308,9 @@ def timeline_from_spine(
             "what": node["what"],
             "chapter": node["chapter"],
             "evidence": node["evidence"],
+            # 1.6.1 约束力层:真deadline vs 软目标(_coerce_node 已落封闭集 / 兜底)。
+            "deadline_type": node["deadline_type"],
+            "deadline_reason": node["deadline_reason"],
             "verified": False,
             "match_score": 0.0,
         })
@@ -286,6 +332,7 @@ def timeline_from_spine(
 
 
 __all__ = [
+    "DEADLINE_TYPES",
     "DEFAULT_TIMELINE_MAX_TOKENS",
     "TIMELINE_SCHEMA_VERSION",
     "timeline_from_spine",

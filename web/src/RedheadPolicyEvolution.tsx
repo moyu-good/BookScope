@@ -34,11 +34,40 @@ interface PolicyStage {
   verified: boolean;
 }
 
+// 措辞 diff（逐字比）——政策的新闻藏在措辞变化的 delta 里：鼓励→应当（升格）、
+// 严格→合理（松绑）、某提法删了（转向）。before/after 是后端逐字核过的原话（对不上的丢），
+// direction 是研判口径（套约束力阶梯判方向）。后端新增字段，老后端没有则为空、不渲染这层。
+interface PolicyDiff {
+  topic_point: string; // 这条 diff 针对的同一件事 / 同一提法
+  before: string; // 旧措辞（逐字原话；「新增」时为空）
+  before_doc: string; // 旧措辞来自哪份文件
+  after: string; // 新措辞（逐字原话；「删除」时为空）
+  after_doc: string; // 新措辞来自哪份文件
+  direction: string; // 升格 / 松绑 / 收紧 / 转向 / 新增 / 删除
+  basis: string; // 凭措辞里哪个词判的方向
+  verified: boolean;
+}
+
 interface PolicyEvolutionResponse {
   stages: PolicyStage[];
+  wording_diffs?: PolicyDiff[]; // 措辞 diff 层（后端新增；老后端无此字段）
   scanned: boolean;
   trace?: RunTrace;
 }
+
+// 方向标签的朱墨配色：升格 / 收紧 = 实心朱印（要紧的方向，动真格 / 加严）；
+// 松绑 = 朱描边（放宽）；转向 / 新增 / 删除 = 墨描边（中性事实）。不堆色，朱墨两系。
+const DIRECTION_STYLE: Record<
+  string,
+  { fill: boolean; tone: "seal" | "ink"; hint: string }
+> = {
+  升格: { fill: true, tone: "seal", hint: "约束力升：要动真格了" },
+  收紧: { fill: true, tone: "seal", hint: "门槛 / 标准收窄" },
+  松绑: { fill: false, tone: "seal", hint: "约束力降：放宽了" },
+  转向: { fill: false, tone: "ink", hint: "提法换了方向 / 口径" },
+  新增: { fill: false, tone: "ink", hint: "旧版没有、新版加上" },
+  删除: { fill: false, tone: "ink", hint: "旧版有、新版删掉" },
+};
 
 interface RedheadPolicyEvolutionProps {
   bookSessionIds: string[];
@@ -109,8 +138,13 @@ export function RedheadPolicyEvolution({
   }
 
   const stages = result?.stages ?? [];
+  const diffs = useMemo(
+    () => (result?.wording_diffs ?? []).filter((d) => d.verified),
+    [result],
+  );
   const scanned = !!result && result.scanned;
-  const gotSomething = scanned && stages.length > 0;
+  // 排出了阶段、或抓到了措辞 diff，都算「有料」——diff 层独立，可能阶段没排出但 diff 有
+  const gotSomething = scanned && (stages.length > 0 || diffs.length > 0);
   const verifiedCount = useMemo(
     () => stages.filter((s) => s.verified && hasText(s.snippet)).length,
     [stages],
@@ -197,17 +231,32 @@ export function RedheadPolicyEvolution({
     <div className="pt-4">
       <ViewHeader title="政策演变" loading={loading} onReload={load} />
 
-      {/* 题署：编年 · 几个阶段 · 原文核验几个 */}
+      {/* 题署：编年 · 几个阶段 · 原文核验几个 · 措辞变化几处 */}
       <div className="mb-4 flex items-center gap-2 flex-wrap">
-        <span
-          className="inline-block text-xs px-2 py-0.5 rounded-full"
-          style={{ color: "var(--color-seal)", border: "0.5px solid var(--color-seal)" }}
-        >
-          政策编年 · {stages.length} 个阶段
-        </span>
-        <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
-          原文核验 {verifiedCount}/{stages.length}
-        </span>
+        {stages.length > 0 && (
+          <>
+            <span
+              className="inline-block text-xs px-2 py-0.5 rounded-full"
+              style={{
+                color: "var(--color-seal)",
+                border: "0.5px solid var(--color-seal)",
+              }}
+            >
+              政策编年 · {stages.length} 个阶段
+            </span>
+            <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
+              原文核验 {verifiedCount}/{stages.length}
+            </span>
+          </>
+        )}
+        {diffs.length > 0 && (
+          <span
+            className="inline-block text-xs px-2 py-0.5 rounded-full"
+            style={{ color: "var(--color-seal)", border: "0.5px solid var(--color-seal)" }}
+          >
+            措辞变化 · {diffs.length} 处
+          </span>
+        )}
         {ranWithTopic && hasText(topic) && (
           <span className="text-xs text-[var(--color-ink-muted)]">
             主题 ·{" "}
@@ -217,6 +266,7 @@ export function RedheadPolicyEvolution({
       </div>
 
       {/* ── 政策编年：竖直朱砂纪年轴 + 每阶段年轮墨钉 ── */}
+      {stages.length > 0 && (
       <div className="relative pl-1">
         <div
           aria-hidden
@@ -342,13 +392,175 @@ export function RedheadPolicyEvolution({
           })}
         </ol>
       </div>
+      )}
+
+      {/* ── 措辞 diff（逐字比）：政策的新闻在 delta 里 ── */}
+      {diffs.length > 0 && (
+        <div className={stages.length > 0 ? "mt-7" : ""}>
+          <div className="flex items-baseline gap-2 mb-1">
+            <h4
+              className="text-sm font-bold text-[var(--color-ink)] flex items-center gap-2"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              <span
+                className="h-3.5 w-[3px] rounded-full bg-[var(--color-seal)]"
+                aria-hidden="true"
+              />
+              措辞变化
+            </h4>
+            <span className="text-xs text-[var(--color-ink-muted)]">
+              逐字比，新闻在改了的词里
+            </span>
+          </div>
+          <p className="text-xs text-[var(--color-ink-muted)] mb-3 leading-relaxed">
+            同一件事跨文件措辞变了的地方——旧措辞、新措辞逐字摆出来。方向（升格 / 松绑 /
+            收紧…）是按约束力阶梯研判的口径；两边的原话都从原文逐字锚出来、核过才留。
+          </p>
+          <ul className="space-y-3">
+            {diffs.map((d, i) => (
+              <DiffCard key={i} diff={d} />
+            ))}
+          </ul>
+        </div>
+      )}
 
       {!loading && (
         <RunStats
           trace={trace}
-          note={`政策编年 ${stages.length} 个阶段 · 原文核验 ${verifiedCount}`}
+          note={
+            `政策编年 ${stages.length} 个阶段 · 原文核验 ${verifiedCount}` +
+            (diffs.length > 0 ? ` · 措辞变化 ${diffs.length} 处` : "")
+          }
         />
       )}
+    </div>
+  );
+}
+
+// 一条措辞 diff：topic_point + 方向印 + 旧措辞 →(朱砂) 新措辞（逐字、盖鉴印）+ basis。
+function DiffCard({ diff }: { diff: PolicyDiff }) {
+  const ds = DIRECTION_STYLE[diff.direction] ?? {
+    fill: false,
+    tone: "ink" as const,
+    hint: "",
+  };
+  const hasBefore = hasText(diff.before);
+  const hasAfter = hasText(diff.after);
+  return (
+    <li
+      className="rounded border p-3"
+      style={{
+        borderColor: "var(--color-rule)",
+        background: "var(--color-paper)",
+      }}
+    >
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <DirectionBadge direction={diff.direction} style={ds} />
+        {hasText(diff.topic_point) && (
+          <span
+            className="text-[13px] font-bold text-[var(--color-ink)]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {diff.topic_point}
+          </span>
+        )}
+      </div>
+
+      {/* 旧措辞 → 新措辞：逐字原话，各盖鉴印 + 标来自哪份 */}
+      <div className="space-y-1.5">
+        {hasBefore && (
+          <WordingLine
+            tag="旧"
+            text={diff.before}
+            doc={diff.before_doc}
+            tone="muted"
+          />
+        )}
+        {hasAfter && (
+          <WordingLine
+            tag="新"
+            text={diff.after}
+            doc={diff.after_doc}
+            tone="ink"
+          />
+        )}
+      </div>
+
+      {hasText(diff.basis) && (
+        <p className="mt-2 text-xs text-[var(--color-ink-muted)] leading-relaxed">
+          {diff.basis}
+        </p>
+      )}
+    </li>
+  );
+}
+
+function DirectionBadge({
+  direction,
+  style,
+}: {
+  direction: string;
+  style: { fill: boolean; tone: "seal" | "ink"; hint: string };
+}) {
+  const accent =
+    style.tone === "seal" ? "var(--color-seal)" : "var(--color-ink)";
+  return (
+    <span
+      title={style.hint || undefined}
+      className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded font-bold shrink-0"
+      style={{
+        fontFamily: "var(--font-display)",
+        color: style.fill ? "var(--color-paper)" : accent,
+        background: style.fill ? accent : "transparent",
+        border: `0.5px solid ${accent}`,
+      }}
+    >
+      {direction}
+    </span>
+  );
+}
+
+function WordingLine({
+  tag,
+  text,
+  doc,
+  tone,
+}: {
+  tag: string;
+  text: string;
+  doc: string;
+  tone: "muted" | "ink";
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <span
+        className="text-[10px] mt-1 px-1 rounded shrink-0 leading-tight"
+        style={{
+          color: "var(--color-ink-muted)",
+          border: "0.5px solid var(--color-rule)",
+          fontFamily: "var(--font-display)",
+        }}
+      >
+        {tag}
+      </span>
+      <SealMark size={15} title="原文逐字已核验" className="mt-0.5" />
+      <div className="min-w-0">
+        <span
+          className="text-[13.5px] leading-relaxed"
+          style={{
+            fontFamily: "var(--font-display)",
+            color:
+              tone === "ink" ? "var(--color-ink)" : "var(--color-ink-muted)",
+          }}
+        >
+          {text}
+        </span>
+        {hasText(doc) && (
+          <span className="ml-2 text-[11px] text-[var(--color-ink-muted)] tabular-nums break-all">
+            — {doc}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

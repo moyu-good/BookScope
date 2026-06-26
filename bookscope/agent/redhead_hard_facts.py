@@ -45,6 +45,7 @@ from bookscope.agent._internal.doc_spine_cache import get_or_build_doc_spine
 from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
+from bookscope.agent.redhead_codebook import codebook_block
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
     salvage_closed_objects,
@@ -80,6 +81,16 @@ HARD_FACT_KINDS: tuple[str, ...] = (
     "责任主体",  # 由X部门负责 / X单位牵头落实 —— 谁来办、谁牵头
 )
 
+# 约束力(binding)两档(封闭集,1.6.1 加的判断层)——一个数是有罚则兜底的硬门槛,还是
+# 「力争/参考」的软目标。判据走 codebook 的约束力阶梯 + 开环/闭环:绑硬约束词(应当/不得/
+# 限X前)且有考核罚则的数 = 硬指标;带「力争/原则上/参考/不低于…(纯倡导)」的 = 参考值。
+BINDINGS: tuple[str, ...] = (
+    "硬指标",  # 有罚则/考核兜底、必须达到的硬门槛(应当达XX% / 限X前办结,逾期问责)
+    "参考值",  # 倡导性、力争性、参考性的软目标(力争达XX% / 原则上不超 / 参考标准)
+)
+_DEFAULT_BINDING = "参考值"
+"""约束力落不进两档的兜底——退「参考值」(最保守,不替一个数拔高成硬指标误导用户)。"""
+
 # 一次扫全份抽硬信息的指令。死守:只抽原文真有的、kind 落五类、value 锚 evidence、绝不编数字/日期。
 _INSTR_HARD_FACTS = (
     "你在给一份党政机关公文(红头文件)做**硬信息提取**——把读者真正要照着办、必须记住的"
@@ -98,12 +109,20 @@ _INSTR_HARD_FACTS = (
     '3. ``context``:这条出自哪条 / 管的什么事,一句话点明它的语境(如「项目审批时限」'
     '「企业研发投入占比目标」),让读者知道这个数 / 日期是管啥的。\n'
     '4. ``evidence``:原文里**撑这条的逐字片段**(原样摘录、不改写)。\n'
+    '5. ``binding``:这个数的**约束力**——**只能填「硬指标」或「参考值」**。看它绑的措辞'
+    "(用下面的约束力阶梯判):有「应当/必须/不得/限X前」这类硬约束词、且有考核/罚则/问责兜底、"
+    "逾期或未达有代价的 → 「硬指标」(必须达到的硬门槛);带「力争/原则上/参考/倡导」这类软措辞、"
+    "或纯方向性目标、没罚则没人盯的 → 「参考值」(软目标,达不到也没硬后果)。判不准退「参考值」。\n"
+    '6. ``binding_reason``:凭原文里**哪个词**判成这档(点出绑的约束词 / 有无罚则考核,锚原文,'
+    "别空说);判不出留空。\n"
     "死守三条:\n"
     "①只抽原文**真有**的硬信息;原文没写的数 / 日期 / 范围 / 主体,一个都别编、别猜、别推算。\n"
     "②``value`` 必须能在 ``evidence`` 里找到出处;``evidence`` 找不到的那条别抽。\n"
     "③同一条硬信息只汇一次,别因为它在多处出现就重复列。\n"
     "严格输出 JSON(别的话别说、别加 markdown 围栏),形如:\n"
-    '{"facts":[{"kind":"时限","value":"","context":"","evidence":""}]}'
+    '{"facts":[{"kind":"时限","value":"","context":"","evidence":"",'
+    '"binding":"参考值","binding_reason":""}]}'
+    "\n\n" + codebook_block()
 )
 
 _USER_MSG = "请按上面的要求把这份公文的硬信息提取成速查表。"
@@ -115,11 +134,19 @@ def _coerce_kind(value: Any) -> str:
     return s if s in HARD_FACT_KINDS else ""
 
 
+def _coerce_binding(value: Any) -> str:
+    """约束力归一:必须落进两档封闭集,落不进退「参考值」(最保守,不替一个数拔高成硬指标)。"""
+    s = value.strip() if isinstance(value, str) else ""
+    return s if s in BINDINGS else _DEFAULT_BINDING
+
+
 def _coerce_fact(item: Any) -> dict[str, Any] | None:
     """把一条硬信息 dict 归一;kind 落不进五类 或 value 空 → 丢(没类别 / 没值的不进表)。
 
     value 是这条硬信息本身,空了这条没意义(读者拿不到那个数 / 日期);kind 落不进五类说明
     模型自造了一类,丢。evidence / context 缺退空串(evidence 空会在核验那步标待核)。
+    ``binding`` / ``binding_reason`` 是 1.6.1 约束力层(向后兼容):缺时 binding 退「参考值」
+    (最保守)、reason 退空串,绝不替一个数拔高成硬指标。
     """
     if not isinstance(item, dict):
         return None
@@ -133,6 +160,8 @@ def _coerce_fact(item: Any) -> dict[str, Any] | None:
         "value": value,
         "context": str(item.get("context", "")).strip(),
         "evidence": str(item.get("evidence", "")).strip(),
+        "binding": _coerce_binding(item.get("binding")),
+        "binding_reason": str(item.get("binding_reason", "")).strip(),
     }
 
 
@@ -228,11 +257,16 @@ def hard_facts_from_spine(
     Returns:
         ``{
             "schema_version": "v1",
-            "facts": [{kind(五类之一), value, context, evidence, verified, match_score}],
+            "facts": [{kind(五类之一), value, context, evidence, verified, match_score,
+                       binding(硬指标/参考值),  # 1.6.1 约束力层
+                       binding_reason}],         # 凭哪个词判的(锚原文)
         }``。
         ``facts`` 按 ``HARD_FACT_KINDS`` 的类别顺序(时限→数字指标→适用范围→生效废止→责任主体)
         排,同类内保抽取顺序——前端按 kind 分组成速查要目时直接顺着排。没抽到任何硬信息 →
         ``facts: []``(前端优雅退场,不画空表)。
+
+        **1.6.1 约束力层**(向后兼容,纯增字段):每条多带 ``binding``(硬指标 vs 参考值——
+        前端据此把有罚则兜底的硬门槛和「力争/参考」软目标分开标)、``binding_reason``。
     """
     # 触发/复用文脉缓存:同份公文这步命中缓存秒出,跟结构解读 / 大白话共用整份精读。
     # 文脉本身不在这拆字段(硬信息要横切五类,得对全份再跑专门抽取),但走这个入口能复用那份
@@ -297,6 +331,7 @@ def hard_facts_from_spine(
 
 
 __all__ = [
+    "BINDINGS",
     "DEFAULT_HARD_FACTS_MAX_TOKENS",
     "HARD_FACTS_SCHEMA_VERSION",
     "HARD_FACT_KINDS",

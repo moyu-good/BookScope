@@ -38,6 +38,11 @@ interface Clause {
   evidence: string;
   verified: boolean;
   match_score: number;
+  // 1.6.1 含金量层：这条真要办还是做做样子（钱学森开环/闭环判）+ 不办的代价。
+  // 后端封闭集兜底（缺省退「有条件兑现」），老缓存可能没这几个字段 → 前端兜成可选、缺了不画含金量标。
+  substance?: string; // 真金白银 / 有条件兑现 / 空头倡导
+  substance_reason?: string; // 凭哪些 marker 判的（锚原文）
+  penalty?: string; // 不办的代价（无罚则 = 空）
 }
 
 interface DocStructureResponse {
@@ -87,11 +92,37 @@ function typeRank(type: string): number {
   return TYPE_ORDER[type] ?? 99;
 }
 
-function hasText(v: string): boolean {
+// 1.6.1 含金量：真金白银 > 有条件兑现 > 空头倡导 = 轻重缓急的排序权重（与后端 SUBSTANCE_LEVELS 一致）。
+const SUBSTANCE_ORDER: Record<string, number> = {
+  真金白银: 0,
+  有条件兑现: 1,
+  空头倡导: 2,
+};
+
+// 排序时缺 substance（老缓存）排到「有条件兑现」档（中性），不沉底也不拔高。
+function substanceRank(substance?: string): number {
+  if (!substance) return SUBSTANCE_ORDER["有条件兑现"];
+  return SUBSTANCE_ORDER[substance] ?? SUBSTANCE_ORDER["有条件兑现"];
+}
+
+// 含金量小签：真金白银（朱砂实签，真要办、值得马上动）/ 有条件兑现（木褐，看落实）/
+// 空头倡导（淡墨虚签，做做样子、别太当真）。只在后端给了合法 substance 时画。
+const SUBSTANCE_STYLE: Record<string, { fg: string; bg: string }> = {
+  真金白银: { fg: "#9a3a2e", bg: "rgba(154, 58, 46, 0.12)" },
+  有条件兑现: { fg: "#8a6b3f", bg: "rgba(138, 107, 63, 0.10)" },
+  空头倡导: { fg: "var(--color-ink-muted)", bg: "var(--color-seal-soft)" },
+};
+
+function substanceStyle(substance?: string) {
+  if (!substance) return null;
+  return SUBSTANCE_STYLE[substance] ?? null;
+}
+
+function hasText(v: string | undefined): boolean {
   return !!v && v.trim().length > 0;
 }
 
-type FilterKind = "all" | "hard" | "deadline";
+type FilterKind = "all" | "substance" | "hard" | "deadline";
 
 export function RedheadActionList({
   sessionId,
@@ -142,27 +173,42 @@ export function RedheadActionList({
     }
   }
 
-  // 排序后的条款（硬要求排前），带上原始下标作为勾选态 key + React key。
+  // 排序后的条款，带上原始下标作为勾选态 key + React key。
+  // 1.6.1：先按含金量排（真金白银在前 = 轻重缓急），同档内再按指令类型（硬要求在前）。
+  // 老缓存没 substance → 都落「有条件兑现」档，等价于退回纯按指令类型排（向后兼容）。
   const sorted = useMemo(() => {
     const clauses = result?.clauses ?? [];
     return clauses
       .map((c, idx) => ({ c, idx }))
-      .sort((a, b) => typeRank(a.c.instruction_type) - typeRank(b.c.instruction_type));
+      .sort((a, b) => {
+        const bySubstance = substanceRank(a.c.substance) - substanceRank(b.c.substance);
+        if (bySubstance !== 0) return bySubstance;
+        return typeRank(a.c.instruction_type) - typeRank(b.c.instruction_type);
+      });
   }, [result]);
 
-  // 汇总数字：总数 / 硬要求 / 软倡导 / 有时限
+  // 汇总数字：总数 / 真金白银 / 硬要求 / 有时限。真金白银是 1.6.1 加的——一眼看「真要办」几条。
   const summary = useMemo(() => {
     const clauses = result?.clauses ?? [];
     return {
       total: clauses.length,
+      realMoney: clauses.filter((c) => c.substance === "真金白银").length,
       hard: clauses.filter((c) => c.instruction_type === "硬要求").length,
-      soft: clauses.filter((c) => c.instruction_type === "软倡导").length,
       timed: clauses.filter((c) => hasText(c.deadline)).length,
     };
   }, [result]);
 
+  // 后端到底给没给含金量（老缓存没有）——有才显示真金白银汇总卡 + 筛子 + 每条的含金量标。
+  const hasSubstance = useMemo(
+    () => (result?.clauses ?? []).some((c) => !!c.substance),
+    [result],
+  );
+
   // 按筛子过滤
   const shown = useMemo(() => {
+    if (filter === "substance") {
+      return sorted.filter((x) => x.c.substance === "真金白银");
+    }
     if (filter === "hard") {
       return sorted.filter((x) => x.c.instruction_type === "硬要求");
     }
@@ -191,7 +237,7 @@ export function RedheadActionList({
           办事清单
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          把一份红头文件拆成一张能勾的待办清单——每条说清做什么、谁去做、到几号、凭哪份上位文件，硬要求排最前，每条钉在原文。读完一份公文，照着这张表挨条办就行。适合党政公文 / 红头文件。
+          把一份红头文件拆成一张能勾的待办清单——每条说清做什么、谁去做、到几号、凭哪份上位文件，还标出这条是真金白银要办还是做做样子的空头、不办有什么代价，真金白银排最前，每条钉在原文。读完一份公文，照着这张表挨条办就行。适合党政公文 / 红头文件。
         </p>
         <button
           type="button"
@@ -274,11 +320,15 @@ export function RedheadActionList({
         </button>
       </div>
 
-      {/* ── 汇总卡：四个数字 ── */}
+      {/* ── 汇总卡：四个数字。有含金量时第二张是「真金白银」（真要办几条），没有就退回「硬要求」 ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <SummaryCard label="指令总数" value={summary.total} />
-        <SummaryCard label="硬要求" value={summary.hard} accent="#9a3a2e" />
-        <SummaryCard label="软倡导" value={summary.soft} accent="#4f7a52" />
+        {hasSubstance ? (
+          <SummaryCard label="真金白银" value={summary.realMoney} accent="#9a3a2e" />
+        ) : (
+          <SummaryCard label="硬要求" value={summary.hard} accent="#9a3a2e" />
+        )}
+        <SummaryCard label="硬要求" value={summary.hard} accent="#4f7a52" />
         <SummaryCard label="有时限" value={summary.timed} accent="#8a6b3f" />
       </div>
 
@@ -289,6 +339,13 @@ export function RedheadActionList({
           onClick={() => setFilter("all")}
           label="全部"
         />
+        {hasSubstance && (
+          <FilterTab
+            active={filter === "substance"}
+            onClick={() => setFilter("substance")}
+            label="只看真金白银"
+          />
+        )}
         <FilterTab
           active={filter === "hard"}
           onClick={() => setFilter("hard")}
@@ -343,7 +400,7 @@ export function RedheadActionList({
                   </label>
 
                   <div className="flex-1 min-w-0">
-                    {/* 标题行：做什么 + 指令类型彩标 */}
+                    {/* 标题行：做什么 + 含金量标（真要办 vs 做做样子）+ 指令类型彩标 */}
                     <div className="flex items-start justify-between gap-2">
                       <p
                         className={[
@@ -355,14 +412,30 @@ export function RedheadActionList({
                       >
                         {c.matter || "（这条没给主体事项）"}
                       </p>
-                      {c.instruction_type && (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
-                          style={{ color: st.fg, background: st.bg }}
-                        >
-                          {c.instruction_type}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* 含金量标：真金白银 = 真要办、空头倡导 = 做做样子。鼠标悬停看判据 */}
+                        {(() => {
+                          const sub = substanceStyle(c.substance);
+                          if (!sub || !c.substance) return null;
+                          return (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
+                              style={{ color: sub.fg, background: sub.bg }}
+                              title={c.substance_reason || undefined}
+                            >
+                              {c.substance}
+                            </span>
+                          );
+                        })()}
+                        {c.instruction_type && (
+                          <span
+                            className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ color: st.fg, background: st.bg }}
+                          >
+                            {c.instruction_type}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* 元信息：谁 / 何时 / 依据——有才显示，空的不占位 */}
@@ -397,6 +470,15 @@ export function RedheadActionList({
                       </div>
                     )}
 
+                    {/* 不办的代价：原文写了罚则/问责才显示——这是「真要办」的硬凭据。
+                        没罚则不画（空头条没这行，正好与含金量标互证）。 */}
+                    {hasText(c.penalty) && (
+                      <p className="mt-1.5 text-xs leading-relaxed">
+                        <span style={{ color: "#9a3a2e" }}>不办的代价 · </span>
+                        <span className="text-[var(--color-ink)]">{c.penalty}</span>
+                      </p>
+                    )}
+
                     {/* 原文：核过盖印；核不过老实标待核 */}
                     {showOrigin ? (
                       <div className="mt-2 flex items-start gap-2">
@@ -426,7 +508,11 @@ export function RedheadActionList({
       {!loading && (
         <RunStats
           trace={trace}
-          note={`指令 ${summary.total} 条 · 硬要求 ${summary.hard} · 有时限 ${summary.timed}`}
+          note={
+            hasSubstance
+              ? `指令 ${summary.total} 条 · 真金白银 ${summary.realMoney} · 硬要求 ${summary.hard} · 有时限 ${summary.timed}`
+              : `指令 ${summary.total} 条 · 硬要求 ${summary.hard} · 有时限 ${summary.timed}`
+          }
         />
       )}
     </div>

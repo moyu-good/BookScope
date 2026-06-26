@@ -932,6 +932,14 @@ class RedheadPolicyEvolutionResponse(BaseModel):
             "空 + scanned=true = 主题不在这摞文件。"
         ),
     )
+    wording_diffs: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "措辞 diff（逐字比）：每条 {topic_point, before, before_doc, after, after_doc, "
+            "direction(升格/松绑/收紧/转向/新增/删除), basis, verified}。before/after 原文逐字"
+            "（只认逐字命中、转述丢）；direction 是方向研判。新闻在 delta 里,不在新增的话里。"
+        ),
+    )
     scanned: bool = Field(
         default=False,
         description="是否成功排演变。false=失败/没有可锚的真实文件；true+空=主题不在这摞文件。",
@@ -966,14 +974,28 @@ class RedheadLevelConsistencyResponse(BaseModel):
     )
 
 
+class RedheadPlainLanguageRequest(RedheadDocStructureRequest):
+    """POST /api/agent/redhead/plain-language 请求体。比单份解读多一个翻译模式。"""
+
+    mode: Literal["clauses", "fulltext"] = Field(
+        default="clauses",
+        description="clauses=逐条款摘译(默认);fulltext=整篇逐句翻译(#22,通篇官话→白话)。",
+    )
+
+
 class RedheadPlainLanguageResponse(BaseModel):
     """POST /api/agent/redhead/plain-language 响应体（大白话翻译）。"""
 
+    mode: str = Field(
+        default="clauses",
+        description="clauses=逐条款摘译 / fulltext=整篇逐句。前端按它选 item 形态。",
+    )
     items: list[dict] = Field(
         default_factory=list,
         description=(
-            "逐条款白话，每条 {chapter, matter(原公文体), plain(大白话), evidence(原文), "
-            "verified, match_score}。白话是原文转述，核的是原文不是白话。"
+            "白话条目。clauses 每条 {chapter, matter, plain, evidence, verified, match_score};"
+            "fulltext 每条 {seq, original, plain, evidence, verified, match_score}。两模式都可带"
+            "可选 nuance=[{marker, meaning}]（命中措辞刻度才点弦外之意）。核的是原文不是白话。"
         ),
     )
     scanned: bool = Field(default=False, description="false=失败，前端提示重试。")
@@ -1032,8 +1054,9 @@ class RedheadStakesResponse(BaseModel):
         default_factory=list,
         description=(
             "机会（可争取的红利）。每条 {what, why（对这角色为何是机会）, action（可采取的动作）, "
-            "substance（真金白银/有条件兑现/空头倡导）, substance_reason（凭哪些 marker 判，锚原文）, "
-            "horizon（近/远/无期）, evidence, verified, match_score}。证据层，按 substance 排序。"
+            "substance（真金白银/有条件兑现/空头倡导）, "
+            "substance_reason（凭哪些 marker 判，锚原文）, horizon（近/远/无期）, "
+            "evidence, verified, match_score}。证据层，按 substance 排序。"
         ),
     )
     risks: list[dict] = Field(
@@ -1046,8 +1069,9 @@ class RedheadStakesResponse(BaseModel):
     signals: list[dict] = Field(
         default_factory=list,
         description=(
-            "信号（弦外之音/政策风向）。每条 {direction（研判出的方向）, basis（引发它的原文片段列表）, "
-            "confidence（高/中/低）}。评估层——标研判、绝不盖鉴印；无原文基础的信号一条都不出。"
+            "信号（弦外之音/政策风向）。每条 {direction（研判出的方向）, "
+            "basis（引发它的原文片段列表）, confidence（高/中/低）}。"
+            "评估层——标研判、绝不盖鉴印；无原文基础的信号一条都不出。"
         ),
     )
     recommendation: str = Field(
