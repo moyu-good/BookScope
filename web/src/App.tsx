@@ -2170,28 +2170,27 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "cards", label: "知识卡片" },
     ],
   },
-  // 1.6 红头文件公文功能整组暂藏:引擎还在做透(头要素已修,跨文件锚定/条款补全未完),
-  // 等单份+跨文件都 ship-quality 再亮出来单独发。代码留在仓里、用户点不到。
-  // 分组结构里留好位置,解禁时把这一项放进 NAV_GROUPS 即可:
-  // {
-  //   key: "redhead",
-  //   title: "公文",
-  //   modes: [
-  //     { id: "redhead", label: "公文结构" },
-  //     { id: "redhead_actions", label: "办事清单" },
-  //     { id: "redhead_plain", label: "大白话翻译" },
-  //     { id: "redhead_relevance", label: "跟我相关" },
-  //     { id: "redhead_hardfacts", label: "硬信息提取" },
-  //     { id: "redhead_timeline", label: "关键时间轴" },
-  //     { id: "redhead_glossary", label: "名词解释" },
-  //     { id: "redhead_formatcheck", label: "规范性自检" },
-  //     // 跨文件层（卷宗 + 三视图）：
-  //     { id: "dossier", label: "卷宗" },
-  //     { id: "redhead_depgraph", label: "依据链网" },
-  //     { id: "redhead_policy", label: "政策演变" },
-  //     { id: "redhead_level", label: "上下级一致性" },
-  //   ],
-  // },
+  // 1.6 公文组已解封（代码层不再藏）。注意:推到公开仓 = 正式对外亮出"公文"垂直,
+  // 那是 NORTH_STAR 级、要作者拍板的事(task #16)——本地 commit 随便,push 等作者点头。
+  {
+    key: "redhead",
+    title: "公文",
+    modes: [
+      { id: "redhead", label: "公文结构" },
+      { id: "redhead_actions", label: "办事清单" },
+      { id: "redhead_plain", label: "大白话翻译" },
+      { id: "redhead_relevance", label: "跟我相关" },
+      { id: "redhead_hardfacts", label: "硬信息提取" },
+      { id: "redhead_timeline", label: "关键时间轴" },
+      { id: "redhead_glossary", label: "名词解释" },
+      { id: "redhead_formatcheck", label: "规范性自检" },
+      // 跨文件层（卷宗 + 三视图）：
+      { id: "dossier", label: "卷宗" },
+      { id: "redhead_depgraph", label: "依据链网" },
+      { id: "redhead_policy", label: "政策演变" },
+      { id: "redhead_level", label: "上下级一致性" },
+    ],
+  },
 ];
 
 // 题材 → 高亮哪几组（genre hook，#10 给 session.genre 后接）。
