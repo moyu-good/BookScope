@@ -1456,7 +1456,7 @@ export function App() {
             <section>
               <CanvasHeader
                 title="选一本书"
-                subtitle="从书库挑一本，或上传新的——选定后左栏会列出能对它做的事。"
+                subtitle="从书库挑一本，或上传新的。选定后左栏会列出能对它做的事。"
               />
               <Onboarding type="first_visit" triggered />
               <BookShelf
@@ -1519,7 +1519,7 @@ export function App() {
               <div className={mode === "ask" ? "" : "hidden"}>
                 <CanvasHeader
                   title="问书"
-                  subtitle={`在读《${currentSession.book_title}》——带原文证据答深问题，没出处的结论一概不给。`}
+                  subtitle={`在读《${currentSession.book_title}》，带原文证据答深问题，没出处的结论一概不给。`}
                 />
                 <Onboarding type="first_upload" triggered={hasUploaded} />
                 {/* 随便问 ↔ 给目标：前者走原问答（不动）；后者让 agent 自己编排该跑哪几个分析 */}
@@ -1631,7 +1631,7 @@ export function App() {
               <div className={mode === "graph" ? "" : "hidden"}>
                 <CanvasHeader
                   title="关系图"
-                  subtitle="谁和谁、什么关系——切换人物 / 概念两种单位，每条边点得到原文。"
+                  subtitle="谁和谁、什么关系，切人物 / 概念两种单位看，每条边都点得到原文。"
                 />
                 <CharacterGraph
                   sessionId={currentSession.session_id}
@@ -1645,7 +1645,7 @@ export function App() {
               <div className={mode === "reltime" ? "" : "hidden"}>
                 <CanvasHeader
                   title="关系演变"
-                  subtitle="给关系网加一根时间轴——拖到第几章看那一刻谁和谁多亲近，或选一对人看关系怎么一章章走到这一步，每个转折钉在原文。"
+                  subtitle="给关系网加一根时间轴：拖到第几章看那一刻谁和谁多亲近，或选一对人看关系怎么一章章走到这一步，每个转折钉在原文。"
                 />
                 <RelationshipTimeline
                   sessionId={currentSession.session_id}
@@ -1659,7 +1659,7 @@ export function App() {
               <div className={mode === "flow" ? "" : "hidden"}>
                 <CanvasHeader
                   title="叙事流"
-                  subtitle="每人一条横线穿过全书——同章同场聚成束、退场线止。一眼看见谁何时入场、哪几章是群戏，点束看原文。"
+                  subtitle="每人一条横线穿过全书：同章同场聚成束、退场线止。一眼看见谁何时入场、哪几章是群戏，点束看原文。"
                 />
                 <CharacterFlow
                   sessionId={currentSession.session_id}
@@ -1673,7 +1673,7 @@ export function App() {
               <div className={mode === "chararc" ? "" : "hidden"}>
                 <CanvasHeader
                   title="人物弧线"
-                  subtitle="给主要角色画两条曲线——戏份密度看谁何时主导这本书，处境升降看谁过得顺不顺。渐变写成平滑爬升、硬扳写成直角拐弯，点起伏点看原文。"
+                  subtitle="给主要角色画两条曲线：戏份密度看谁何时主导这本书，处境升降看谁过得顺不顺。渐变写成平滑爬升、硬扳写成直角拐弯，点起伏点看原文。"
                 />
                 <CharacterArc
                   sessionId={currentSession.session_id}
@@ -1687,7 +1687,7 @@ export function App() {
               <div className={mode === "charvoice" ? "" : "hidden"}>
                 <CanvasHeader
                   title="声口一致"
-                  subtitle="给一个角色归拢他全书的对白，刻画说话的腔调，再标出哪几句「不像他说的」——合理的剧情驱动口吻变化不报，每条挂原文，你自己判断。"
+                  subtitle="给一个角色归拢他全书的对白，刻画说话的腔调，再标出哪几句「不像他说的」。合理的剧情驱动口吻变化不报，每条挂原文，你自己判断。"
                 />
                 <CharacterVoice
                   sessionId={currentSession.session_id}
@@ -1703,7 +1703,7 @@ export function App() {
                 <CanvasHeader
                   title="伏笔回收"
                   feature="foreshadow"
-                  subtitle="每条伏笔从埋点章拱到回收点章画一道弧——埋了没回收的画成灰虚线悬空，一眼挑出没填的坑，点弧看两端原文。"
+                  subtitle="每条伏笔从埋点章拱到回收点章画一道弧，埋了没回收的画成灰虚线悬空，一眼挑出没填的坑，点弧看两端原文。"
                 />
                 <ForeshadowArcs
                   sessionId={currentSession.session_id}
@@ -1718,7 +1718,7 @@ export function App() {
                 <CanvasHeader
                   title="支线编织"
                   feature="subplot"
-                  subtitle="每条情节支线一条横向泳道——活跃段亮、休眠段灰断，两条线同章交汇画连接节点。一眼看见哪条支线断更太久、哪几章是多线交汇的高潮，点活跃段 / 交汇看原文。"
+                  subtitle="每条情节支线一条横向泳道：活跃段亮、休眠段灰断，两条线同章交汇画连接节点。一眼看见哪条支线断更太久、哪几章是多线交汇的高潮，点活跃段 / 交汇看原文。"
                 />
                 <SubplotWeave
                   sessionId={currentSession.session_id}
@@ -1748,7 +1748,7 @@ export function App() {
                 <CanvasHeader
                   title="实体回溯"
                   feature="entity"
-                  subtitle="输一个人 / 物 / 地点 / 概念，回溯它在全书每次出现——在做什么、在哪章、带原文。"
+                  subtitle="输一个人 / 物 / 地点 / 概念，回溯它在全书每次出现：在做什么、在哪章，带原文。"
                 />
                 <EntityRecall
                   sessionId={currentSession.session_id}
@@ -1764,7 +1764,7 @@ export function App() {
                 <CanvasHeader
                   title="前情回顾"
                   feature="recap"
-                  subtitle="读到第几章告诉我，回顾到此为止的前情——后文绝不剧透（模型根本看不到后文）。"
+                  subtitle="读到第几章告诉我，回顾到此为止的前情，后文绝不剧透（模型根本看不到后文）。"
                 />
                 <Recap
                   sessionId={currentSession.session_id}
@@ -1779,7 +1779,7 @@ export function App() {
                 <CanvasHeader
                   title="母题追踪"
                   feature="motif"
-                  subtitle="输一个主题/母题，看它在全书哪些地方复现——每处怎么体现、在哪章，带原文。"
+                  subtitle="输一个主题 / 母题，看它在全书哪些地方复现：每处怎么体现、在哪章，带原文。"
                 />
                 <MotifTracking
                   sessionId={currentSession.session_id}
@@ -1810,7 +1810,7 @@ export function App() {
                 <CanvasHeader
                   title="设定一致性"
                   feature="consistency"
-                  subtitle="扫全书前后矛盾——每条两处对照原文，编出来的会被滤掉。"
+                  subtitle="扫全书前后矛盾，每条两处对照原文，编出来的会被滤掉。"
                 />
                 <ConsistencyScan
                   sessionId={currentSession.session_id}
@@ -1825,7 +1825,7 @@ export function App() {
                 <CanvasHeader
                   title="论点结构"
                   feature="argument"
-                  subtitle="拆这本书的论证骨架——作者主张了什么、靠什么撑，每条钉在原文。"
+                  subtitle="拆这本书的论证骨架：作者主张了什么、靠什么撑，每条钉在原文。"
                 />
                 <ArgumentStructure
                   sessionId={currentSession.session_id}
@@ -1840,7 +1840,7 @@ export function App() {
                 <CanvasHeader
                   title="概念演进"
                   feature="concept"
-                  subtitle="输一个概念，看它在全书怎么一步步发展——每阶段在哪章、被怎么用/深化，带原文。"
+                  subtitle="输一个概念，看它在全书怎么一步步发展：每阶段在哪章、被怎么用 / 深化，带原文。"
                 />
                 <ConceptEvolution
                   sessionId={currentSession.session_id}
@@ -1856,7 +1856,7 @@ export function App() {
                 <CanvasHeader
                   title="写作手法"
                   feature="technique"
-                  subtitle="看作者怎么写——论证 / 结构 / 铺陈 / 用语的手法，每条配原文例子，学手艺。"
+                  subtitle="看作者怎么写：论证、结构、铺陈、用语的手法，每条配原文例子，学手艺。"
                 />
                 <WritingTechnique
                   sessionId={currentSession.session_id}
@@ -1871,7 +1871,7 @@ export function App() {
                 <CanvasHeader
                   title="知识卡片"
                   feature="cards"
-                  subtitle="据书出知识点卡——每张一道启发自测题，先自己想，再翻看解释和原文。"
+                  subtitle="据书出知识点卡，每张一道启发自测题，先自己想，再翻看解释和原文。"
                 />
                 <StudyCards
                   sessionId={currentSession.session_id}
@@ -1886,7 +1886,7 @@ export function App() {
                 <CanvasHeader
                   title="文体体检"
                   feature="style"
-                  subtitle="扫用词重复 / 视角越界 / 支线失踪——保守只报清楚的，每条钉原文，编的滤掉。"
+                  subtitle="扫用词重复、视角越界、支线失踪，保守只报清楚的，每条钉原文，编的滤掉。"
                 />
                 <StyleIssues
                   sessionId={currentSession.session_id}
@@ -1900,7 +1900,7 @@ export function App() {
               <div className={mode === "revision" ? "" : "hidden"}>
                 <CanvasHeader
                   title="改稿清单"
-                  subtitle="把扫出的矛盾 / 断伏笔 / 塌节奏 / 文体毛病攒成一份带原文的修改清单——逐条勾「待改 / 已改 / 不改」，改完一键导出带走。核不过原文的发现不进清单。"
+                  subtitle="把扫出的矛盾、断伏笔、塌节奏、文体毛病攒成一份带原文的修改清单，逐条勾「待改 / 已改 / 不改」，改完导出带走。核不过原文的发现不进清单。"
                 />
                 <RevisionList
                   sessionId={currentSession.session_id}
@@ -1915,7 +1915,7 @@ export function App() {
               <div className={mode === "redhead" ? "" : "hidden"}>
                 <CanvasHeader
                   title="公文结构解读"
-                  subtitle="把一份红头文件拆开看——先列发文字号、发文机关、成文日期等八项头要素，对照公文格式标准看缺没缺；再把正文逐条排开：这条管什么事、是硬要求还是软倡导、谁去做、什么期限、依据哪份上位文件，每条钉在原文。适合党政公文 / 红头文件。"
+                  subtitle="把一份红头文件拆开看：先列发文字号、发文机关、成文日期等八项头要素，对照公文格式标准看缺没缺；再把正文逐条排开，标清这条管什么事、是硬要求还是软倡导、谁去做、什么期限、依据哪份上位文件，每条钉在原文。适合党政公文 / 红头文件。"
                 />
                 <RedheadDocStructure
                   sessionId={currentSession.session_id}
@@ -1929,7 +1929,7 @@ export function App() {
               <div className={mode === "redhead_actions" ? "" : "hidden"}>
                 <CanvasHeader
                   title="办事清单"
-                  subtitle="把一份红头文件拆成一张能勾的待办清单——每条说清做什么、谁去做、到几号、凭哪份上位文件，硬要求排最前，每条钉在原文。读完一份公文，照着这张表挨条办就行。适合党政公文 / 红头文件。"
+                  subtitle="把一份红头文件拆成一张能勾的待办清单：每条说清做什么、谁去做、到几号、凭哪份上位文件，硬要求排最前，每条钉在原文。读完一份公文照着挨条办就行。适合党政公文 / 红头文件。"
                 />
                 <RedheadActionList
                   sessionId={currentSession.session_id}
@@ -1957,7 +1957,7 @@ export function App() {
               <div className={mode === "redhead_relevance" ? "" : "hidden"}>
                 <CanvasHeader
                   title="跟我相关"
-                  subtitle="说一句你是谁、什么处境，把一份红头文件里跟你直接相关的条款挑出来——这条管不管你、要你做什么、到几号、不办会怎样，每条钉在原文。适合党政公文 / 红头文件。"
+                  subtitle="说一句你是谁、什么处境，把一份红头文件里跟你直接相关的条款挑出来：这条管不管你、要你做什么、到几号、不办会怎样，每条钉在原文。适合党政公文 / 红头文件。"
                 />
                 <RedheadRelevance
                   sessionId={currentSession.session_id}
@@ -1971,7 +1971,7 @@ export function App() {
               <div className={mode === "redhead_stakes" ? "" : "hidden"}>
                 <CanvasHeader
                   title="利害与风向"
-                  subtitle="说一句你是谁，把这份公文藏着的机会（可争取的红利）、风险（暴露面 / 代价）挑出来，每条标含金量（真金白银 / 有条件 / 空头倡导）、钉原文；再研判它透出的政策风向——弦外之音，标研判、不当核实的事实。适合党政公文 / 红头文件。"
+                  subtitle="说一句你是谁，把这份公文藏着的机会（可争取的红利）和风险（暴露面 / 代价）挑出来，每条标含金量（真金白银 / 有条件 / 空头倡导）、钉原文；再研判它透出的政策风向（弦外之音），标研判、不当成核实的事实。适合党政公文 / 红头文件。"
                 />
                 <RedheadStakes
                   sessionId={currentSession.session_id}
@@ -1985,7 +1985,7 @@ export function App() {
               <div className={mode === "redhead_hardfacts" ? "" : "hidden"}>
                 <CanvasHeader
                   title="硬信息提取"
-                  subtitle="把一份红头文件里所有钉死的硬信息抠出来——金额、比例、期限、门槛、数量、适用范围，逐条列清并标出处，省得自己在长文里翻。适合党政公文 / 红头文件。"
+                  subtitle="把一份红头文件里所有钉死的硬信息抠出来：金额、比例、期限、门槛、数量、适用范围，逐条列清并标出处，省得自己在长文里翻。适合党政公文 / 红头文件。"
                 />
                 <RedheadHardFacts
                   sessionId={currentSession.session_id}
@@ -1999,7 +1999,7 @@ export function App() {
               <div className={mode === "redhead_timeline" ? "" : "hidden"}>
                 <CanvasHeader
                   title="关键时间轴"
-                  subtitle="把一份红头文件里所有跟时间有关的点排成一条线——什么时候起施行、几号前要办完、哪天截止、分几个阶段，按先后摆开，每个时间点钉在原文。适合党政公文 / 红头文件。"
+                  subtitle="把一份红头文件里所有跟时间有关的点排成一条线：什么时候起施行、几号前要办完、哪天截止、分几个阶段，按先后摆开，每个时间点钉在原文。适合党政公文 / 红头文件。"
                 />
                 <RedheadTimeline
                   sessionId={currentSession.session_id}
@@ -2013,7 +2013,7 @@ export function App() {
               <div className={mode === "redhead_glossary" ? "" : "hidden"}>
                 <CanvasHeader
                   title="名词解释"
-                  subtitle="把一份红头文件里的专有名词、简称、术语挑出来逐个解释——这个词在这份文件里指什么、依哪份上位文件定义的，每条钉在原文，看不懂的词不用再去别处查。适合党政公文 / 红头文件。"
+                  subtitle="把一份红头文件里的专有名词、简称、术语挑出来逐个解释：这个词在这份文件里指什么、依哪份上位文件定义的，每条钉在原文，看不懂的词不用再去别处查。适合党政公文 / 红头文件。"
                 />
                 <RedheadGlossary
                   sessionId={currentSession.session_id}
@@ -2027,7 +2027,7 @@ export function App() {
               <div className={mode === "redhead_formatcheck" ? "" : "hidden"}>
                 <CanvasHeader
                   title="规范性自检"
-                  subtitle="拿一份红头文件对照公文格式标准逐项核——发文字号、发文机关署名、成文日期、印章这些要素齐不齐、写得规不规范，缺的、不合规的列出来，每条说清依的哪条标准。适合党政公文 / 红头文件。"
+                  subtitle="拿一份红头文件对照公文格式标准逐项核：发文字号、发文机关署名、成文日期、印章这些要素齐不齐、规不规范，缺的、不合规的列出来，每条说清依的哪条标准。适合党政公文 / 红头文件。"
                 />
                 <RedheadFormatCheck
                   sessionId={currentSession.session_id}
@@ -2046,7 +2046,7 @@ export function App() {
           <div className={mode === "dossier" ? "" : "hidden"}>
             <CanvasHeader
               title="卷宗"
-              subtitle="从书库已上传的文档里多选一组、归成一份卷宗——三个跨文件视图（依据链网 / 政策演变 / 上下级一致性）都跑这一组。挑相关的几份（如一份上位规定 + 几份配套实施件），至少 2 份。选中状态本机保存，刷新不丢。"
+              subtitle="从书库已上传的文档里多选一组、归成一份卷宗：三个跨文件视图（依据链网 / 政策演变 / 上下级一致性）都跑这一组。挑相关的几份（如一份上位规定 + 几份配套实施件），至少 2 份。选中状态本机保存，刷新不丢。"
             />
             <Dossier
               selectedIds={dossierIds}
@@ -2060,7 +2060,7 @@ export function App() {
           <div className={mode === "redhead_depgraph" ? "" : "hidden"}>
             <CanvasHeader
               title="依据链网"
-              subtitle="把一卷宗里好几份公文的关系画成一张有向网——谁依据谁、谁落实谁、新文件废了哪份旧的、机关之间谁管谁。文件按层级依据分层排，关系全从原文锚出来。先去「卷宗」选一组（≥2 份）。适合一组相关的党政公文 / 红头文件。"
+              subtitle="把一卷宗里好几份公文的关系画成一张有向网：谁依据谁、谁落实谁、新文件废了哪份旧的、机关之间谁管谁。文件按层级依据分层排，关系全从原文锚出来。先去「卷宗」选一组（≥2 份）。适合一组相关的党政公文 / 红头文件。"
             />
             <RedheadDependencyGraph
               bookSessionIds={dossierIds}
@@ -2074,7 +2074,7 @@ export function App() {
           <div className={mode === "redhead_policy" ? "" : "hidden"}>
             <CanvasHeader
               title="政策演变"
-              subtitle="把一卷宗里好几份公文按成文日期排成一条线——哪份先出、改了什么、再哪份接着改，看一项政策怎么一步步演变到现在，每阶段钉一句原话。可只盯一个主题排。先去「卷宗」选一组（≥2 份）。适合一组同主题、有先后的党政公文。"
+              subtitle="把一卷宗里好几份公文按成文日期排成一条线：哪份先出、改了什么、再哪份接着改，看一项政策怎么一步步演变到现在，每阶段钉一句原话。可只盯一个主题排。先去「卷宗」选一组（≥2 份）。适合一组同主题、有先后的党政公文。"
             />
             <RedheadPolicyEvolution
               bookSessionIds={dossierIds}
@@ -2088,7 +2088,7 @@ export function App() {
           <div className={mode === "redhead_level" ? "" : "hidden"}>
             <CanvasHeader
               title="上下级一致性"
-              subtitle="把卷宗里上位文件和下位文件并排勘对，挑出对不上的地方——走样 / 加码 / 漏落实，每处上下两栏对照、各钉原话。需要卷宗里有明确上下级关系的公文（上位规定 + 下位实施件）。先去「卷宗」选一组（≥2 份）。"
+              subtitle="把卷宗里上位文件和下位文件并排勘对，挑出对不上的地方：走样、加码、漏落实，每处上下两栏对照、各钉原话。需要卷宗里有明确上下级关系的公文（上位规定 + 下位实施件）。先去「卷宗」选一组（≥2 份）。"
             />
             <RedheadLevelConsistency
               bookSessionIds={dossierIds}
