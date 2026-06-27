@@ -21,7 +21,7 @@ npm run dev
 
 ## 工作流
 
-1. **LLM 配置**：选 provider（默认 minimax MiniMax-M2.x），填 API key；可选 model 与 base_url
+1. **LLM 配置**：选 provider（默认 DeepSeek，最便宜档），填 API key；可选 model 与 base_url
 2. **上传书籍**：选 epub/txt/pdf，填书名，点"上传并抽取 KG"——**这一步真跑 `MinimalKGExtractor`，大书可能几分钟**
 3. **问书**：session 建好后下方出现问答区；输入问题，agent 会在真书上做多轮 tool use 后给出带 citation 的答案
 
@@ -60,4 +60,3 @@ npm run build
 - `../docs/architecture-decisions/004-upload-endpoint-strategy.md`
 - `../docs/architecture-decisions/005-book-session-persistence.md`
 - `../docs/architecture-decisions/006-local-ml-api-only.md`
-- `../docs/internal/STATE.md`
