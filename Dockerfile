@@ -13,26 +13,31 @@ COPY web/tsconfig.node.json ./
 COPY web/index.html ./
 COPY web/src ./src
 COPY web/public ./public
-RUN npm install --no-audit --no-fund && npm run build
+# npm 换淘宝源：国内服务器走 npm 默认源慢。
+RUN npm install --no-audit --no-fund --registry=https://registry.npmmirror.com && npm run build
 
 
 # ── stage 2: 运行时 ──────────────────────────────────────────────
-# python:3.14-slim 带 3.14（pyproject 写死 >=3.14），绕开"服务器系统能否装 3.14"的坑。
-FROM python:3.14-slim AS runtime
+# python:3.12-slim：faiss-cpu 没有 3.14 预编译 wheel，4G 服务器从源码编译会 OOM
+# （这是首次部署卡死一小时的根因）；3.12 有 wheel，pip 秒装。pyproject 要求 >=3.12。
+FROM python:3.12-slim AS runtime
 
 # 系统依赖：build-essential 给 faiss-cpu/numpy 编译兜底；libgomp1 是
 # FAISS/OpenBLAS 运行时必需（slim 镜像默认没有，缺了 import faiss 就崩）。
 # git：部分包可能从 git 装；curl：healthcheck 用。
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# apt 换清华源：国内服务器（腾讯云）走默认 Debian 源很慢，换源省一大半时间。
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends \
         build-essential libgomp1 git curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # 先装依赖（利用层缓存：只 pyproject 变才重装）
+# pip 换清华源：国内服务器走 PyPI 默认源慢，且 faiss-cpu wheel 体积大。
 COPY pyproject.toml ./
 COPY bookscope/__init__.py bookscope/__init__.py
-RUN pip install --no-cache-dir ".[docx]"
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple ".[docx]"
 # 注：限流用自写 AbuseGuardMiddleware（零依赖），不装 slowapi——其装饰器与
 # 新版 fastapi 对 File/Form 端点签名解析不兼容。
 
