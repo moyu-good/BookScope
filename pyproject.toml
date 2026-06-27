@@ -10,7 +10,7 @@ name = "bookscope"
 dynamic = ["version"]
 description = "Multi-dimensional book text analysis and visualization"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "streamlit>=1.32.0",
     "plotly>=5.20.0",
