@@ -4,14 +4,15 @@
 # 非 demo 模式（base="/"）构建，产物 web/dist 同源托管。
 FROM node:22-slim AS web
 WORKDIR /app/web
-# 先拷清单，利用层缓存
-COPY web/package.json web/package.json
-COPY web/vite.config.ts web/vite.config.ts
-COPY web/tsconfig.json web/tsconfig.json
-COPY web/tsconfig.node.json web/tsconfig.node.json
-COPY web/index.html web/index.html
-COPY web/src web/src
-COPY web/public web/public
+# 先拷清单，利用层缓存（WORKDIR 已是 /app/web，目标用 ./ 拷进当前目录，
+# 别写 web/xxx —— 那会解析成 /app/web/web/xxx 多一层，npm install 找不到 package.json）
+COPY web/package.json ./
+COPY web/vite.config.ts ./
+COPY web/tsconfig.json ./
+COPY web/tsconfig.node.json ./
+COPY web/index.html ./
+COPY web/src ./src
+COPY web/public ./public
 RUN npm install --no-audit --no-fund && npm run build
 
 
