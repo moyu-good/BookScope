@@ -1,0 +1,47 @@
+# BookScope 一键部署：FastAPI 后端（同源托管前端）+ Cloudflare Tunnel。
+#
+# 两种隧道模式（二选一）：
+#   1. 临时域名（先验证）：留空 TUNNEL_TOKEN，tunnel 服务跑快速隧道，
+#      拿一个 *.trycloudflare.com 临时 URL。重启会变，不适合长期用。
+#   2. 自有域名（正式）：在 Cloudflare Zero Trust 建命名隧道、拿 TOKEN 填进
+#      .env 的 TUNNEL_TOKEN，并配 Public Hostname → bookscope.top → http://api:8000。
+#      免备案（域名走 Cloudflare，不直连国内 IP 443），HTTPS 自动。
+#
+# 用法：
+#   cp .env.example .env   # 填 TUNNEL_TOKEN（可空）
+#   docker compose up -d --build
+#   docker compose logs tunnel   # 看临时 URL / 隧道状态
+
+services:
+  api:
+    build: .
+    container_name: bookscope-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"   # 只对本机 + 隧道暴露；不直接对公网开
+    volumes:
+      - ./data:/app/data         # session 存档 + 缓存 SQLite 持久化
+    env_file:
+      - .env
+    environment:
+      # 可在此覆盖限流 / 上传上限等运营参数
+      - BOOKSCOPE_MAX_UPLOAD_MB=${BOOKSCOPE_MAX_UPLOAD_MB:-50}
+      - BOOKSCOPE_CORS_ORIGINS=${BOOKSCOPE_CORS_ORIGINS:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: bookscope-tunnel
+    restart: unless-stopped
+    depends_on:
+      - api
+    command: ${TUNNEL_CMD:-tunnel --url http://api:8000}
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:-}
+    # 命名隧道：在 .env 设 TUNNEL_TOKEN 后，改用 `tunnel run --token $TUNNEL_TOKEN`
+    # （可在 .env 里把 TUNNEL_CMD 覆盖成 `tunnel run --token <你的TOKEN>`）。
