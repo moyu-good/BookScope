@@ -340,11 +340,12 @@ def test_llm_exception_returns_empty(monkeypatch):
 
 # ── 纯件:封闭集归一 ──────────────────────────────────────────────────────────
 def test_coerce_substance_pure():
+    # 归一件已统一到 redhead_codebook(单一真相源),stakes 经 import 暴露同一公开件。
     for lv in rs.SUBSTANCE_LEVELS:
-        assert rs._coerce_substance(lv) == lv
-    assert rs._coerce_substance("空头支票") == "有条件兑现"  # 落不进退兜底
-    assert rs._coerce_substance(123) == "有条件兑现"
-    assert rs._coerce_substance("  真金白银  ") == "真金白银"  # 去空白
+        assert rs.coerce_substance(lv) == lv
+    assert rs.coerce_substance("空头支票") == "有条件兑现"  # 落不进退兜底
+    assert rs.coerce_substance(123) == "有条件兑现"
+    assert rs.coerce_substance("  真金白银  ") == "真金白银"  # 去空白
 
 
 def test_coerce_confidence_pure():

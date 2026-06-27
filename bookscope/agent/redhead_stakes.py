@@ -53,6 +53,12 @@ from typing import Any
 from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
+from bookscope.agent.redhead_codebook import (
+    SUBSTANCE_LEVELS,
+    codebook_block,
+    coerce_substance,
+    substance_rank,
+)
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
     strip_code_fence,
@@ -72,16 +78,9 @@ DEFAULT_STAKES_MAX_TOKENS = 3000
 后会先吐一大段 reasoning,预算太小会被吃光导致 content 空、``finish_reason=length``、三段全抽空。
 3000 装得下三段研判还给 reasoning 留头;真被截断也有 ``extract_first_json_object`` 兜底。"""
 
-# 含金量三档(封闭集)。落不进退「有条件兑现」(中性兜底,不替用户拔高成真金白银也不打成空头)。
-# 顺序就是轻重缓急的排序权重(真金白银 > 有条件兑现 > 空头倡导)。
-SUBSTANCE_LEVELS: tuple[str, ...] = (
-    "真金白银",    # 闭环:硬约束词 + 数字 + 时限 + 责任主体 + 配套(考核/罚则/资金),会兑现
-    "有条件兑现",  # 半闭环:有指令有主体但缺数字/时限/罚则之一,看落实
-    "空头倡导",    # 开环:纯号召(鼓励/支持/探索)、无数字无时限无主体无罚则,易漂没
-)
-_DEFAULT_SUBSTANCE = "有条件兑现"
-"""substance 落不进三档的兜底——退「有条件兑现」(最中性,不替用户断成真金白银/空头)。"""
-_SUBSTANCE_RANK = {lv: i for i, lv in enumerate(SUBSTANCE_LEVELS)}
+# 含金量三档 / 归一 / 排序权重统一取自 redhead_codebook(单一真相源,见 codebook 文档)——
+# 本模块不各定一套,免得 codebook 演进时 stakes 漂移(原本地重抄已删)。
+# codebook_block() 渲染的措辞刻度判据(约束力阶梯/留口子/搁置/含金量 rubric)拼进 system prompt。
 
 # 时效三档(封闭集)。落不进退「无期」(开环号召的典型时效——不了了之)。
 HORIZONS: tuple[str, ...] = ("近", "远", "无期")
@@ -111,15 +110,8 @@ _INSTR_STAKES = (
     "  - evidence:原文里**撑这条的逐字片段**(原样摘录、不改写)。\n"
     "\n"
     "【含金量(substance)——机会和风险每条都必须评】"
-    "公文条款分轻重缓急:有的真金白银会兑现,有的是空头支票(倡导性,十年二十年甚至永远不兑现)。"
-    "判据是看这条有没有**把控制回路闭上**:\n"
-    "  · 真金白银(闭环):有硬约束词(应当/必须/不得)+ 具体数字(金额/比例/门槛)+ 明确时限"
-    "(X日前)+ 明确责任主体(X部门负责)+ 配套(考核/问责/罚则/财政资金)。指令有人执行、有时限、"
-    "不办有代价,一定兑现。\n"
-    "  · 空头倡导(开环):只有倡导词(鼓励/支持/探索/推动/逐步/适时)+ 无数字 + 无时限或"
-    "「条件成熟时/逐步」+ 无明确责任主体(有关方面/各地)+ 无罚则无资金。只发号召、没人盯、没期限,"
-    "自然衰减、漂没。\n"
-    "  · 有条件兑现(半闭环):介于两者之间(有指令有主体,但缺数字/时限/罚则之一),看后续落实。\n"
+    "公文条款分轻重缓急:有的真金白银会兑现,有的是空头支票。判据(开环/闭环)见下文「公文措辞刻度」"
+    "块,按那把尺判,不要自己另定一套。\n"
     "  每条机会/风险再给:\n"
     "  - substance:只能填「真金白银」「有条件兑现」「空头倡导」之一。\n"
     "  - substance_reason:凭原文里**哪些 marker** 判成这档(点出约束词/数字/时限/主体/罚则的"
@@ -150,12 +142,6 @@ _INSTR_STAKES = (
 _USER_MSG = "请按上面的要求,研判这份公文对该角色的机会、风险、信号,并评含金量,输出 JSON。"
 
 
-def _coerce_substance(value: Any) -> str:
-    """含金量归一:必须落进三档封闭集,落不进退「有条件兑现」(中性兜底)。"""
-    s = value.strip() if isinstance(value, str) else ""
-    return s if s in SUBSTANCE_LEVELS else _DEFAULT_SUBSTANCE
-
-
 def _coerce_horizon(value: Any) -> str:
     """时效归一:必须落进三档封闭集,落不进退「无期」。"""
     s = value.strip() if isinstance(value, str) else ""
@@ -183,7 +169,7 @@ def _coerce_opportunity(item: Any) -> dict[str, Any] | None:
         "what": what,
         "why": str(item.get("why", "")).strip(),
         "action": str(item.get("action", "")).strip(),
-        "substance": _coerce_substance(item.get("substance")),
+        "substance": coerce_substance(item.get("substance")),
         "substance_reason": str(item.get("substance_reason", "")).strip(),
         "horizon": _coerce_horizon(item.get("horizon")),
         "evidence": evidence,
@@ -201,7 +187,7 @@ def _coerce_risk(item: Any) -> dict[str, Any] | None:
     return {
         "what": what,
         "cost": str(item.get("cost", "")).strip(),
-        "substance": _coerce_substance(item.get("substance")),
+        "substance": coerce_substance(item.get("substance")),
         "substance_reason": str(item.get("substance_reason", "")).strip(),
         "horizon": _coerce_horizon(item.get("horizon")),
         "evidence": evidence,
@@ -403,7 +389,8 @@ def stakes_from_doc(
         }
 
     # 角色拼进指令尾段(变化段,落在 book 之后,不破前缀缓存:同份公文不同角色共用前缀)。
-    instruction = _INSTR_STAKES + f"\n\n用户身份:{role}"
+    # codebook_block() 是固定判据块,拼在固定指令之后、变化 role 之前——仍是稳定前缀。
+    instruction = _INSTR_STAKES + "\n\n" + codebook_block() + f"\n\n用户身份:{role}"
     system = build_longctx_system(source_text, instruction)
 
     parsed: dict[str, list[dict[str, Any]]] = {
@@ -438,8 +425,8 @@ def stakes_from_doc(
     risks = _verify_evidence_items(parsed["risks"], evidence_map)
 
     # 按含金量排序(真金白银 > 有条件兑现 > 空头倡导)= 轻重缓急,同档保抽取顺序(stable sort)。
-    opportunities.sort(key=lambda it: _SUBSTANCE_RANK.get(it["substance"], len(SUBSTANCE_LEVELS)))
-    risks.sort(key=lambda it: _SUBSTANCE_RANK.get(it["substance"], len(SUBSTANCE_LEVELS)))
+    opportunities.sort(key=lambda it: substance_rank(it["substance"]))
+    risks.sort(key=lambda it: substance_rank(it["substance"]))
 
     # 信号:评估层,不盖 verified,但 basis 必须可核——无原文基础的信号丢。
     signals = _filter_signals_by_basis(parsed["signals"], evidence_map)
