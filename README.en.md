@@ -5,7 +5,7 @@
 <h1 align="center">BookScope · 书鉴</h1>
 
 <p align="center">
-  A tool for people who read long books. Every "the book says…" the AI gives you is checked word-by-word against the source; only matches are shown, each stamped with a 「鉴」(verify) seal. It also draws the whole book — through a reader's eye, not a dashboard.
+  A tool for people who read long books and official documents. Every "the book says…" the AI gives you is checked word-by-word against the source; only matches are shown, each stamped with a 「鉴」(verify) seal. It also draws the whole book — through a reader's eye, not a dashboard.
 </p>
 
 <p align="center">
@@ -29,6 +29,8 @@
 ## What it is
 
 Drop a long book (epub / txt / pdf) into your browser and ask it open questions. It also maps the whole book: who relates to whom, the rise and fall of tension chapter by chapter, the timeline, foreshadowing, where subplots cross, and whether the book contradicts itself.
+
+It also reads Chinese government documents (red-header official documents, 红头文件). Drop one in and it recognizes the genre, switching to a document-reading toolkit: it turns officialese into plain language (spelling out what "in principle agreed" or "we'll study it" really mean), picks out the clauses that concern you, works out each clause's deadlines and thresholds, and can lay several documents side by side to see which cites which and how a policy evolved. Same rule as books: every claim is anchored to the source, verified ones get the 「鉴」seal, inferences are marked as judgement rather than fact.
 
 It runs locally on your own AI account. The book text goes straight to the provider you pick (DeepSeek by default); there's no server in between, so nothing here ever touches your book or your key.
 
