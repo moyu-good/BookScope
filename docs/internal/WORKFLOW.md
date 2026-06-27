@@ -4,6 +4,24 @@
 
 ---
 
+## ⚠️ 当前状态注记（2026-06-27）
+
+本手册是项目早期「CEO + AI 团队 24/7 自主循环」蓝图，**部分设想未落地**，与现状有以下不符，读时以本节为准。手册不再当工作基准维护，保留作历史与方法论素材。
+
+- **支撑文件不存在**：手册反复指向的 `DEPUTY_MANAGER.md` / `AUTOLOOP.md` / `STATE.md` / `FLAGS.md`，以及 `build-log/` / `dogfood-notes/` / `research-notes/` / `experiments/` / `reflections/` 五个目录**均不存在**（实际只剩 `case-study/`）。所以「每 30 分钟一轮、读 STATE.md 决策、更新 STATE.md」这套自主循环从未真正跑起来。真在用的工作流见记忆 `feedback-workflow-design-dev-review-feedback`（设计→开发→审查→反馈，给最好意见非顺从）。
+
+- **代际叙事过时**：手册按 r1=当前主线、r0=冻结叙事；实际已推进到 r2 协议（OpenAI function calling，`bookscope/agent/loop_r2.py`，见 `docs/ARCHITECTURE.md`）。
+
+- **测试基线**：手册说「以《明朝那些事儿》为唯一基线」；实际四本公开测试书（明朝 / 安史 / 制内市场 / 亏成首富）+ 公文（见 `NORTH_STAR.md`）。
+
+- **成本红线（与硬规矩冲突）**：第十二节「成本不设红线、可选最强模型」与项目硬规矩正面冲突——见记忆 `bookscope-dev-sensibility`：默认 DeepSeek 最便宜档（`deepseek-v4-flash`）、禁 GPU。**以 dev-sensibility 为准**。
+
+- **agent 团队配置表（第五节）是设想**：列的 architect / code-reviewer / security-reviewer / tdd-guide / 研究员 / `/codex` / `/council` / `/retro` / `/checkpoint` 等角色型 skill 当前不在用，非现状。
+
+- **仍有效的方法论内核**：问题三层分级（零层日常 / 一层工程穷举 / 二层论文汲取）、论文汲取五步法 + 研究笔记强制末三字段、自试是地面真相、方向漂移是最大敌人——这些与项目 evidence-first 调性同源，仍可作方法论 skill 素材（skill 排在 roadmap 回来之后）。
+
+---
+
 ## 一、项目目的（写在最前）
 
 三个目的按优先级排列，互为支撑，缺一不可。
@@ -246,6 +264,8 @@
 - 作者手动写入 `FLAGS.md` 的条目
 
 **成本不设红线**：作者明确 BookScope 不计较 LLM 成本，追求高效稳定的开发。AI 为保证质量可选用最强模型（Claude Sonnet / Opus / DeepSeek-R1 / GLM-4 级），无需为省钱降级。
+
+> ⚠️ 此条已过时、与硬规矩冲突，见本文件顶部注记。现状以 `bookscope-dev-sensibility` 为准：默认 DeepSeek 最便宜档（`deepseek-v4-flash`）、禁 GPU。
 
 ### 自动化反向风险与防线
 
