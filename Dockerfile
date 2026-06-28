@@ -55,7 +55,7 @@ RUN set -eux; \
       dir=$(dirname "$pkg"); name=$(basename "$pkg"); ok=0; \
       for m in $MIRRORS; do \
         if curl -fsSL "$m/$pkg.zip" -o /tmp/$name.zip; then \
-          unzip -q /tmp/$name.zip -d /usr/local/nltk_data/$dir && rm /tmp/$name.zip && ok=1 && break; \
+          python -c "import zipfile; zipfile.ZipFile('/tmp/$name.zip').extractall('/usr/local/nltk_data/$dir')" && rm /tmp/$name.zip && ok=1 && break; \
         fi; \
       done; \
       [ "$ok" = "1" ] || { echo "NLTK 语料下载失败: $pkg"; exit 1; }; \
