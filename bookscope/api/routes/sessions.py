@@ -166,11 +166,12 @@ async def get_book_chapter(
 @sessions_router.delete(
     "/sessions/{session_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
 )
 async def delete_session(
     session_id: str,
     store: BookSessionStore = Depends(get_book_session_store),
-) -> None:
+):
     """删除 session（内存 + storage 两处都删）。
 
     成功 → 204 No Content。
