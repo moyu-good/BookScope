@@ -36,6 +36,7 @@ WORKDIR /app
 # 先装依赖（利用层缓存：只 pyproject 变才重装）
 # pip 换清华源：国内服务器走 PyPI 默认源慢，且 faiss-cpu wheel 体积大。
 COPY pyproject.toml ./
+COPY README.md ./
 COPY bookscope/__init__.py bookscope/__init__.py
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple ".[docx]"
 # 注：限流用自写 AbuseGuardMiddleware（零依赖），不装 slowapi——其装饰器与
