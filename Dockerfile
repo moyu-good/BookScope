@@ -42,8 +42,24 @@ RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple ".[do
 # 注：限流用自写 AbuseGuardMiddleware（零依赖），不装 slowapi——其装饰器与
 # 新版 fastapi 对 File/Form 端点签名解析不兼容。
 
-# 下 NLTK / TextBlob 语料（nrclex 4.x 运行时需要）
-RUN python -m textblob.download_corpora
+# 下 NLTK 语料（nrclex/textblob 运行时需要）。
+# 默认 NLTK 源是 raw.githubusercontent.com，国内服务器拉要 20+ 分钟；换 ghproxy 镜像几十秒。
+# 下 nrclex/textblob 实际用到的最小集：punkt 分词 + perceptron tagger 词性 + wordnet/brown 兜底。
+# （punkt_tab / tagger_eng 是 nltk>=3.9 的新名，新旧都下保险；不装 conll2000/movie_reviews——nrclex 用不到。）
+ENV NLTK_DATA=/usr/local/nltk_data
+RUN set -eux; \
+    mkdir -p /usr/local/nltk_data/tokenizers /usr/local/nltk_data/taggers /usr/local/nltk_data/corpora; \
+    NLTK_PKGS="tokenizers/punkt tokenizers/punkt_tab taggers/averaged_perceptron_tagger taggers/averaged_perceptron_tagger_eng corpora/wordnet corpora/brown"; \
+    MIRRORS="https://gh-proxy.com/https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages https://ghproxy.net/https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages"; \
+    for pkg in $NLTK_PKGS; do \
+      dir=$(dirname "$pkg"); name=$(basename "$pkg"); ok=0; \
+      for m in $MIRRORS; do \
+        if curl -fsSL "$m/$pkg.zip" -o /tmp/$name.zip; then \
+          unzip -q /tmp/$name.zip -d /usr/local/nltk_data/$dir && rm /tmp/$name.zip && ok=1 && break; \
+        fi; \
+      done; \
+      [ "$ok" = "1" ] || { echo "NLTK 语料下载失败: $pkg"; exit 1; }; \
+    done
 
 # 拷业务代码
 COPY bookscope bookscope
