@@ -1672,6 +1672,13 @@ class HealthResponse(BaseModel):
         default="r1-agent-loop",
         description="代际标识；恒为 r1-agent-loop。",
     )
+    deployment_mode: Literal["local", "hosted"] = Field(
+        default="local",
+        description=(
+            "部署形态：local（本地克隆版,无账号）/ hosted（公网托管版,有账号）。"
+            "前端据此决定是否显示登录 / 账号入口。"
+        ),
+    )
 
 
 class BookUploadResponse(BaseModel):

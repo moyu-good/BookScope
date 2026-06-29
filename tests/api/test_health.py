@@ -56,3 +56,19 @@ def test_health_version_matches_package_version(client: TestClient) -> None:
     """version 字段必须等于 bookscope.__version__（对外 API 版本不许漂移）。"""
     body = client.get("/api/health").json()
     assert body["version"] == __version__
+
+
+def test_health_deployment_mode_defaults_local(client: TestClient) -> None:
+    """默认（未设 env）部署形态是 local——前端据此不显示登录入口。"""
+    body = client.get("/api/health").json()
+    assert body["deployment_mode"] == "local"
+
+
+def test_health_deployment_mode_hosted(monkeypatch, tmp_path) -> None:
+    """设了 BOOKSCOPE_DEPLOYMENT_MODE=hosted 时,health 如实回 hosted。"""
+    monkeypatch.setenv("BOOKSCOPE_DEPLOYMENT_MODE", "hosted")
+    monkeypatch.setenv("BOOKSCOPE_RATELIMIT_DISABLED", "1")
+    with TestClient(create_app()) as c:
+        body = c.get("/api/health").json()
+    assert body["deployment_mode"] == "hosted"
+    get_book_session_store().clear()

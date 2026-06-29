@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from bookscope import __version__
+from bookscope.api.deployment import deployment_mode
 from bookscope.api.schemas import HealthResponse
 
 health_router = APIRouter(tags=["health"])
@@ -23,7 +24,12 @@ async def health() -> HealthResponse:
     当前只做静态字段回显；若未来要加实际连通性检查（例如探活向量索引、
     默认 provider 连通性），也在本函数里分支聚合。
     """
-    return HealthResponse(status="ok", version=__version__, generation="r1-agent-loop")
+    return HealthResponse(
+        status="ok",
+        version=__version__,
+        generation="r1-agent-loop",
+        deployment_mode=deployment_mode(),
+    )
 
 
 __all__ = ["health_router"]
