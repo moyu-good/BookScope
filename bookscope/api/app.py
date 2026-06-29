@@ -26,6 +26,7 @@ from starlette.responses import FileResponse
 
 from bookscope import __version__
 from bookscope.api.book_sessions import get_book_session_store
+from bookscope.api.deployment import deployment_mode
 from bookscope.api.middleware import AbuseGuardMiddleware
 from bookscope.api.routes import (
     agent_router,
@@ -40,7 +41,11 @@ logger = logging.getLogger("bookscope.api")
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """应用 lifespan hook：启动时打印一行日志，关闭时清空 session 存储。"""
-    logger.info("BookScope r1-agent-loop API starting (version=%s)", app.version)
+    logger.info(
+        "BookScope r1-agent-loop API starting (version=%s, deployment_mode=%s)",
+        app.version,
+        deployment_mode(),
+    )
     try:
         yield
     finally:
