@@ -84,6 +84,72 @@ def test_all_closed_set_words_pass_through(monkeypatch):
         assert _detect(_FakeClient(g)) == g
 
 
+# ── 1.7 会议题材 ─────────────────────────────────────────────────────────────
+
+
+def test_meeting_in_closed_set():
+    # 会议进了封闭集（1.7），且不是论说 / 不是叙事 → 论点结构 / 人物弧线都对它退场。
+    assert "会议" in gd.GENRES
+    assert gd.is_theory_genre("会议") is False
+    assert gd.is_narrative_genre("会议") is False
+    assert gd.genre_to_argument_axis("会议") == "fiction"
+
+
+def _detect_text(client, *, title, toc, sample):  # noqa: ANN001
+    return gd.detect_genre(
+        title=title, toc_titles=toc, sample_text=sample,
+        llm_client=client, model="m",
+    )
+
+
+def test_meeting_sample_detected_as_meeting(monkeypatch):
+    # 会议记录样本 → 模型判会议（mock 注入），抠出封闭集词会议。
+    _patch(monkeypatch)
+    out = _detect_text(
+        _FakeClient("会议"),
+        title="星图开源项目 第14次周会",
+        toc=[],
+        sample="参会：PM-A（主持）、Eng-B、Eng-C。\nPM-A：咱们开始啊，今天主要四件事……",
+    )
+    assert out == "会议"
+
+
+def test_redhead_not_confused_with_meeting(monkeypatch):
+    # 公文样本 → 判公文,不串成会议（会议 vs 公文 要分得开）。
+    _patch(monkeypatch)
+    out = _detect_text(
+        _FakeClient("公文"),
+        title="国务院关于推进某项工作的通知",
+        toc=[],
+        sample="国发〔2026〕1号\n各省、自治区、直辖市人民政府：\n现将有关事项通知如下：一、……",
+    )
+    assert out == "公文"
+
+
+def test_normal_book_keeps_its_genre(monkeypatch):
+    # 加了会议后,普通书的题材判定不受影响（小说还是小说）。
+    _patch(monkeypatch)
+    out = _detect_text(
+        _FakeClient("小说"),
+        title="某本网络小说",
+        toc=["第一章 开端", "第二章 风波"],
+        sample="他握紧了剑，眼神冷峻，江湖的恩怨从这一刻才真正开始。",
+    )
+    assert out == "小说"
+
+
+def test_meeting_word_embedded_in_reply(monkeypatch):
+    # 模型多嘴解释一通,文本里含「会议」也能抠出。
+    _patch(monkeypatch)
+    out = _detect_text(
+        _FakeClient("这看起来是一份会议记录"),
+        title="第14次周会逐字稿",
+        toc=[],
+        sample="主持人：PM-A 记录人：Eng-C",
+    )
+    assert out == "会议"
+
+
 def test_genre_to_argument_axis():
     assert gd.genre_to_argument_axis("理论") == "theory"
     assert gd.genre_to_argument_axis("论文") == "theory"

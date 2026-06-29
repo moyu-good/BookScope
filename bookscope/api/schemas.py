@@ -454,7 +454,7 @@ class GenreDetectResponse(BaseModel):
     genre: str = Field(
         default="",
         description=(
-            "封闭集 {小说/历史/理论/论文/公文/诗歌/工具书/其他} 里的题材词；"
+            "封闭集 {小说/历史/理论/论文/公文/会议/诗歌/工具书/其他} 里的题材词；"
             "测不出退空串（前端按未分类全显）。"
         ),
     )
@@ -1793,7 +1793,7 @@ class SessionMetadata(BaseModel):
     genre: str = Field(
         default="",
         description=(
-            "题材（封闭集：小说/历史/理论/论文/公文/诗歌/工具书/其他）。"
+            "题材（封闭集：小说/历史/理论/论文/公文/会议/诗歌/工具书/其他）。"
             "懒检测——还没分过类时为空串，前端据此显隐题材专属功能（#7）。"
         ),
     )

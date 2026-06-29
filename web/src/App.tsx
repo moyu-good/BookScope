@@ -2104,7 +2104,7 @@ export function App() {
               </div>
 
               {/* 1.7 会议·行动项台账（单份文档，跟单份公文功能同一层 currentSession 守卫内）。
-                  会议题材还没进 genre_detect，这是手动入口——任何文档都能点进来试。 */}
+                  genre=会议 时这组自动显示 + 突出；其余题材下仍留作手动入口，任何文档都能点进来试。 */}
               <div className={mode === "meeting_ledger" ? "" : "hidden"}>
                 <CanvasHeader
                   title="行动项台账"
@@ -2358,9 +2358,9 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "redhead_level", label: "上下级一致性" },
     ],
   },
-  // 1.7 会议垂直·首炮。会议题材还没进后端 genre_detect，所以这组不靠题材门控——
-  // genreVisibleGroups 里把 "meeting" 加进了每个分支，任何已上传的文档都能点进来试
-  // （会议题材自动识别是另一个后端任务）。
+  // 1.7 会议垂直·首炮。会议题材已进后端 genre_detect：genre=会议 时这组自动显示 +
+  // 突出（见 genreVisibleGroups / genreHighlightGroups 的会议分支）。其余题材（书 / 公文）
+  // 仍把 "meeting" 放行，留一个手动入口，任何已上传的文档都能点进来试。
   {
     key: "meeting",
     title: "会议 · 行动项",
@@ -2393,6 +2393,10 @@ function genreHighlightGroups(genre: string | undefined | null): Set<string> | n
   if (/(公文|红头)/.test(g)) {
     return new Set(["read", "redhead_read", "redhead_act", "redhead_cross"]);
   }
+  // 会议(1.7):只亮问&读 + 会议组,书 / 公文的维度收起。
+  if (/(会议|纪要|meeting)/.test(g)) {
+    return new Set(["read", "meeting"]);
+  }
   // 认不出的题材:不强行偏向任何组,全显（等同没 genre）。
   return null;
 }
@@ -2403,8 +2407,12 @@ function genreHighlightGroups(genre: string | undefined | null): Set<string> | n
 function genreVisibleGroups(genre: string | undefined | null): Set<string> | null {
   if (!genre) return null;
   const g = genre.toLowerCase();
-  // 会议组(1.7)不靠题材门控:会议还没进 genre_detect,任何题材下都留着这个手动入口。
-  // 所以每个分支都带上 "meeting"——书 / 公文的门控一字不动,只多放行这一组。
+  // 会议(1.7)已进 genre_detect:genre=会议 时只留「问 & 读」+ 会议组,书 / 公文的组全藏。
+  if (/(会议|纪要|meeting)/.test(g)) {
+    return new Set(["read", "meeting"]);
+  }
+  // 书 / 公文题材下,会议组仍作为手动入口放行(genre 没测准成会议时还能点进来试)——
+  // 所以下面两个分支都带上 "meeting",书 / 公文自己的门控一字不动。
   // 公文:只留「问 & 读」+ 三个公文组,书的人物/情节/思想/质量全藏。
   if (/(公文|红头)/.test(g)) {
     return new Set([
