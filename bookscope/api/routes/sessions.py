@@ -28,6 +28,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.api.book_sessions import BookSessionNotFound, BookSessionStore
 from bookscope.api.dependencies import get_book_session_store
+from bookscope.api.deployment import (
+    forget_ownership,
+    owned_session_ids,
+    require_user,
+    user_owns_session,
+)
 from bookscope.api.schemas import (
     BookTocResponse,
     ChapterTextResponse,
@@ -45,15 +51,21 @@ sessions_router = APIRouter(tags=["sessions"])
 @sessions_router.get("/sessions", response_model=SessionListResponse)
 async def list_sessions(
     store: BookSessionStore = Depends(get_book_session_store),
+    user=Depends(require_user),
 ) -> SessionListResponse:
-    """列出全部 session 的元数据。
+    """列出 session 的元数据。
 
     空列表也是合法返回（200 OK + ``{"sessions": []}``）。
     单个 session 的 metadata 读失败（比如磁盘文件损坏）会被静默跳过——
     一条坏数据不应该让整个列表挂掉。
+
+    hosted 模式只列当前用户自己的书（隔离）；local 模式列全部、行为不变。
     """
+    owned = owned_session_ids(user)  # hosted:本人 session 集;local:None=不过滤
     metadatas: list[SessionMetadata] = []
     for session_id in store.list_sessions():
+        if owned is not None and session_id not in owned:
+            continue
         try:
             meta_dict = store.get_metadata(session_id)
         except (BookSessionNotFound, SessionStorageCorrupted) as exc:
@@ -74,12 +86,16 @@ async def list_sessions(
 async def get_session(
     session_id: str,
     store: BookSessionStore = Depends(get_book_session_store),
+    user=Depends(require_user),
 ) -> SessionMetadata:
     """获取单个 session 的元数据。
 
-    session 不存在 → 404 + envelope。
+    session 不存在 → 404 + envelope。hosted 模式下不是你的也 404（当不存在,
+    不泄露存在性）。
     """
     if not store.has(session_id):
+        _raise_not_found(session_id)
+    if not user_owns_session(user, session_id):
         _raise_not_found(session_id)
 
     try:
@@ -107,13 +123,17 @@ async def get_session(
 async def get_book_toc(
     session_id: str,
     store: BookSessionStore = Depends(get_book_session_store),
+    user=Depends(require_user),
 ) -> BookTocResponse:
     """精读阅读器的目录：章号 + 标题 + 字数，不带正文（目录要小、要秒回）。
 
     纯数据、不调 LLM。章节由已修根的 ``detect_chapters`` 现场解析
     （脏书边界见 WP-robust-chapter-detection）；章号是标准化序号、不保证
     等于真回数。空书 → ``total_chapters=0`` + 空列表（不是错误）。
+    hosted 模式下不是你的书 → 404。
     """
+    if not user_owns_session(user, session_id):
+        _raise_not_found(session_id)
     assembler = _resolve_assembler(store, session_id)
     records = assembler._compute_chapter_records()  # noqa: SLF001 — 同 agent 路由既有取数惯例
     title = str(getattr(assembler._book_text, "title", ""))  # noqa: SLF001
@@ -136,11 +156,15 @@ async def get_book_chapter(
     session_id: str,
     chapter: int,
     store: BookSessionStore = Depends(get_book_session_store),
+    user=Depends(require_user),
 ) -> ChapterTextResponse:
     """单章正文，阅读器读到哪取哪。纯数据、不调 LLM。
 
     章号不存在 / 越界 → 404（ChapterNotFound），FE 兜底"这章取不到"。
+    hosted 模式下不是你的书 → 404。
     """
+    if not user_owns_session(user, session_id):
+        _raise_not_found(session_id)
     assembler = _resolve_assembler(store, session_id)
     records = assembler._compute_chapter_records()  # noqa: SLF001
     for r in records:
@@ -171,15 +195,21 @@ async def get_book_chapter(
 async def delete_session(
     session_id: str,
     store: BookSessionStore = Depends(get_book_session_store),
+    user=Depends(require_user),
 ):
     """删除 session（内存 + storage 两处都删）。
 
     成功 → 204 No Content。
     session 不存在 → 404 + envelope（与 GET 行为对齐，不静默成功）。
+    hosted 模式下不是你的 → 404（删不动别人的）；删自己的会连带删归属记录。
     """
     if not store.has(session_id):
         _raise_not_found(session_id)
+    if not user_owns_session(user, session_id):
+        _raise_not_found(session_id)
     store.delete(session_id)
+    # hosted:连带删归属记录(彻底删除权);local no-op。
+    forget_ownership(user, session_id)
     return None
 
 

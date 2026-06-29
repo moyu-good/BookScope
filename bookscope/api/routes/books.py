@@ -60,6 +60,7 @@ from bookscope.api.dependencies import (
     default_model_for,
     get_book_session_store,
 )
+from bookscope.api.deployment import record_ownership, require_user
 from bookscope.api.schemas import BookUploadResponse
 from bookscope.ingest.book_chunker import ChapterDetectionStats, chunk_book_with_stats
 from bookscope.ingest.loader import EmptyTextError, load_text, normalize_book_title
@@ -96,6 +97,7 @@ async def upload_book(
         ),
     ),
     store: BookSessionStore = Depends(get_book_session_store),
+    user=Depends(require_user),
 ) -> BookUploadResponse:
     """上传一本书并完成 ingest + KG 抽取 + 装配 + 持久化。
 
@@ -165,6 +167,8 @@ async def upload_book(
     assembler.chapter_detection_stats = chapter_stats.to_dict()
     session_id = uuid.uuid4().hex[:16]
     store.register(session_id, assembler)
+    # hosted:把这本书记到当前用户名下(local 是 no-op)。
+    record_ownership(user, session_id, book_text.title)
 
     return BookUploadResponse(
         session_id=session_id,
@@ -197,6 +201,7 @@ async def upload_book_stream(
         ),
     ),
     store: BookSessionStore = Depends(get_book_session_store),
+    user=Depends(require_user),
 ) -> StreamingResponse:
     """同 ``/books/upload``，但以 SSE 流推送 KG ingest 进度事件。
 
@@ -313,6 +318,8 @@ async def upload_book_stream(
         # 同 sync upload：章节检测指标随 register 落进 session 元数据
         assembler.chapter_detection_stats = chapter_stats.to_dict()
         store.register(session_id, assembler)
+        # hosted:把这本书记到当前用户名下(local 是 no-op)。
+        record_ownership(user, session_id, book_text.title)
         resp = BookUploadResponse(
             session_id=session_id,
             book_title=book_text.title,

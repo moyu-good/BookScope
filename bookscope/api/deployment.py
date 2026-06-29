@@ -21,7 +21,7 @@ import os
 import threading
 from typing import TYPE_CHECKING, Literal
 
-from fastapi import Request
+from fastapi import HTTPException, Request, status
 
 if TYPE_CHECKING:
     from bookscope.store.accounts import AccountsStore, User
@@ -119,11 +119,67 @@ def get_current_user(request: Request) -> User | None:
     return resolve_user_from_token(request.headers.get("authorization"))
 
 
+# ---- 文档归属:热路径端点的统一守卫(Phase 1c) ----
+#
+# 全用 is_hosted() 短路:local 模式这几个 helper 要么旁路、要么恒"放行 / 不过滤",
+# 现有 books / sessions 端点行为逐字节不变。只有 hosted 才真按 owner 隔离。
+
+
+def require_user(request: Request) -> User | None:
+    """FastAPI 依赖:解析当前用户。hosted 没登录 → 401;local → 永远 None、不拦。
+
+    给热路径端点(上传 / 书库列表 / 单本读写)统一挂。local 模式它就是个返 None
+    的旁路,现有行为一字不变。
+    """
+    current = resolve_user_from_token(request.headers.get("authorization"))
+    if is_hosted() and current is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="需要登录"
+        )
+    return current
+
+
+def record_ownership(user: User | None, doc_id: str, title: str) -> None:
+    """记一份文档归属。hosted + 已登录才记;local / 没登录 = no-op。"""
+    if is_hosted() and user is not None:
+        get_accounts_store().add_document(
+            owner_user_id=user.id, doc_id=doc_id, title=title
+        )
+
+
+def forget_ownership(user: User | None, doc_id: str) -> None:
+    """删一份文档归属(删 session 时连带,对应 ADR-011 删除权)。
+    hosted + 已登录才删;local / 没登录 = no-op。"""
+    if is_hosted() and user is not None:
+        get_accounts_store().delete_document(owner_user_id=user.id, doc_id=doc_id)
+
+
+def owned_session_ids(user: User | None) -> set[str] | None:
+    """这个用户拥有的 session_id 集。local 返 ``None``(表示"别过滤、全都给")。"""
+    if not is_hosted() or user is None:
+        return None
+    return {doc.id for doc in get_accounts_store().list_documents(user.id)}
+
+
+def user_owns_session(user: User | None, session_id: str) -> bool:
+    """hosted 下这个用户是否拥有该 session;local 恒 ``True``(本地版不隔离)。"""
+    if not is_hosted():
+        return True
+    if user is None:
+        return False
+    return get_accounts_store().owns(owner_user_id=user.id, doc_id=session_id)
+
+
 __all__ = [
     "DeploymentMode",
     "deployment_mode",
     "get_accounts_store",
     "get_current_user",
+    "forget_ownership",
     "is_hosted",
+    "owned_session_ids",
+    "record_ownership",
+    "require_user",
     "resolve_user_from_token",
+    "user_owns_session",
 ]
