@@ -129,16 +129,18 @@ def test_delete_account_requires_login(hosted_client):
 
 
 def test_forgot_password_sends_email_for_existing(hosted_client):
+    # 先注册(它的验证邮件走默认发送器,不算),再装捕获器只抓 forgot 那封。
+    hosted_client.post(
+        "/api/auth/register", json={"email": "f@b.com", "password": "pw123456"}
+    )
     cap = mailer.CapturingEmailSender()
     mailer.set_email_sender(cap)
     try:
-        hosted_client.post(
-            "/api/auth/register", json={"email": "f@b.com", "password": "pw123456"}
-        )
         r = hosted_client.post("/api/auth/forgot-password", json={"email": "f@b.com"})
         assert r.status_code == 200
         assert len(cap.sent) == 1
         assert cap.sent[0]["to"] == "f@b.com"
+        assert "重置" in cap.sent[0]["subject"]
     finally:
         mailer.set_email_sender(None)
 
@@ -200,4 +202,45 @@ def test_reset_password_short_password_422(hosted_client):
         "/api/auth/reset-password", json={"token": token, "new_password": "short"}
     )
     assert r.status_code == 422
+
+
+# ---- Phase 2c:邮箱验证 ----
+
+
+def test_register_unverified_and_sends_verify_email(hosted_client):
+    cap = mailer.CapturingEmailSender()
+    mailer.set_email_sender(cap)
+    try:
+        r = hosted_client.post(
+            "/api/auth/register", json={"email": "v@b.com", "password": "pw123456"}
+        )
+        assert r.status_code == 201
+        assert r.json()["user"]["email_verified"] is False
+        assert any(m["to"] == "v@b.com" for m in cap.sent)  # 注册即发验证邮件
+    finally:
+        mailer.set_email_sender(None)
+
+
+def test_verify_email_marks_verified(hosted_client):
+    reg = hosted_client.post(
+        "/api/auth/register", json={"email": "v2@b.com", "password": "pw123456"}
+    )
+    token = auth.issue_email_verify_token(reg.json()["user"]["id"])
+    r = hosted_client.post("/api/auth/verify-email", json={"token": token})
+    assert r.status_code == 200
+    assert r.json()["email_verified"] is True
+    # 登录后 /auth/me 也反映已验证
+    login = hosted_client.post(
+        "/api/auth/login", json={"email": "v2@b.com", "password": "pw123456"}
+    )
+    me = hosted_client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {login.json()['token']}"},
+    )
+    assert me.json()["email_verified"] is True
+
+
+def test_verify_email_bad_token_400(hosted_client):
+    r = hosted_client.post("/api/auth/verify-email", json={"token": "garbage"})
+    assert r.status_code == 400
     deployment._reset_accounts_store()

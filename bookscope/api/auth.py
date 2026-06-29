@@ -20,10 +20,13 @@ from itsdangerous import BadData, URLSafeTimedSerializer
 
 _SALT = "bookscope-auth-v1"
 _RESET_SALT = "bookscope-pwd-reset-v1"
+_EMAIL_VERIFY_SALT = "bookscope-email-verify-v1"
 # 会话令牌 14 天:够长省得老登录,够短压住被盗令牌窗口。
 _MAX_AGE_SECONDS = 14 * 24 * 3600
 # 找回密码令牌 1 小时:短命、一次性,降低被盗 / 转发风险。
 _RESET_MAX_AGE_SECONDS = 3600
+# 邮箱验证令牌 7 天:够用户慢慢点,不用太短。
+_EMAIL_VERIFY_MAX_AGE_SECONDS = 7 * 24 * 3600
 
 
 class AuthSecretMissingError(RuntimeError):
@@ -81,6 +84,18 @@ def verify_reset_token(
     return _read_uid(token, salt=_RESET_SALT, max_age=max_age)
 
 
+def issue_email_verify_token(user_id: str) -> str:
+    """签发邮箱验证令牌(独立 salt + 7 天时限)。"""
+    return _serializer(_EMAIL_VERIFY_SALT).dumps({"uid": user_id})
+
+
+def read_email_verify_token(
+    token: str, *, max_age: int = _EMAIL_VERIFY_MAX_AGE_SECONDS
+) -> str | None:
+    """验邮箱验证令牌,过则返 user_id,否则 ``None``。"""
+    return _read_uid(token, salt=_EMAIL_VERIFY_SALT, max_age=max_age)
+
+
 def bearer_token_from_header(authorization: str | None) -> str | None:
     """从 ``Authorization`` 头里抠出 Bearer 令牌;没有 / 格式不对返 ``None``。"""
     if not authorization:
@@ -94,8 +109,10 @@ def bearer_token_from_header(authorization: str | None) -> str | None:
 __all__ = [
     "AuthSecretMissingError",
     "bearer_token_from_header",
+    "issue_email_verify_token",
     "issue_reset_token",
     "issue_token",
+    "read_email_verify_token",
     "verify_reset_token",
     "verify_token",
 ]

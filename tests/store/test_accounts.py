@@ -181,3 +181,20 @@ def test_persists_to_real_file(tmp_path):
     assert s2.get_user_by_email("persist@x.com") is not None
     assert len(s2.list_documents(u.id)) == 1
     s2.close()
+
+
+# ---- 邮箱验证(Phase 2c) ----
+
+def test_email_verified_defaults_false_then_marks(store: AccountsStore):
+    u = store.create_user(email="ev@x.com", password="pw123456")
+    assert u.email_verified is False
+    assert store.get_user_by_id(u.id).email_verified is False
+    assert store.mark_email_verified(u.id) is True
+    assert store.get_user_by_id(u.id).email_verified is True
+    assert store.get_user_by_email("ev@x.com").email_verified is True
+    # 凭据校验路径也带出 email_verified
+    assert store.verify_credentials(email="ev@x.com", password="pw123456").email_verified is True
+
+
+def test_mark_email_verified_missing_user(store: AccountsStore):
+    assert store.mark_email_verified("no-such-id") is False

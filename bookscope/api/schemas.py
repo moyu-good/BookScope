@@ -1850,6 +1850,7 @@ class UserPublic(BaseModel):
     id: str
     email: str
     phone: str | None = None
+    email_verified: bool = False
     created_at: str
 
 
@@ -1877,6 +1878,12 @@ class ResetPasswordRequest(BaseModel):
     )
 
 
+class VerifyEmailRequest(BaseModel):
+    """POST /api/auth/verify-email 请求体(只 hosted)。"""
+
+    token: str = Field(..., min_length=1, description="邮箱验证令牌(邮件里的)。")
+
+
 __all__ = [
     "AuthResponse",
     "ForgotPasswordRequest",
@@ -1884,6 +1891,7 @@ __all__ = [
     "RegisterRequest",
     "ResetPasswordRequest",
     "UserPublic",
+    "VerifyEmailRequest",
     "AgentAskRequest",
     "AgentAskResponse",
     "AnnotationsRequest",

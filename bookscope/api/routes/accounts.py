@@ -14,7 +14,13 @@ import os
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from bookscope.api.auth import issue_reset_token, issue_token, verify_reset_token
+from bookscope.api.auth import (
+    issue_email_verify_token,
+    issue_reset_token,
+    issue_token,
+    read_email_verify_token,
+    verify_reset_token,
+)
 from bookscope.api.dependencies import get_book_session_store
 from bookscope.api.deployment import (
     get_accounts_store,
@@ -29,6 +35,7 @@ from bookscope.api.schemas import (
     RegisterRequest,
     ResetPasswordRequest,
     UserPublic,
+    VerifyEmailRequest,
 )
 from bookscope.store.accounts import DuplicateEmailError, User
 
@@ -42,8 +49,28 @@ def _to_public(user: User) -> UserPublic:
         id=user.id,
         email=user.email,
         phone=user.phone,
+        email_verified=user.email_verified,
         created_at=user.created_at,
     )
+
+
+def _send_verify_email(user: User) -> None:
+    """给账号发邮箱验证邮件(best-effort,失败不阻断注册)。"""
+    token = issue_email_verify_token(user.id)
+    public_url = os.environ.get("BOOKSCOPE_PUBLIC_URL", "").strip().rstrip("/")
+    link = f"{public_url}/?verify_email={token}" if public_url else f"verify_email={token}"
+    try:
+        send_email(
+            to=user.email,
+            subject="书鉴 · 验证邮箱",
+            body=(
+                "欢迎用书鉴。点这个链接验证邮箱(7 天内有效):\n"
+                f"{link}\n\n"
+                "没注册过书鉴就忽略这封邮件。"
+            ),
+        )
+    except Exception:  # noqa: BLE001 — 发信失败不阻断注册
+        logger.warning("发送验证邮件失败 to=%s", user.email)
 
 
 @accounts_router.post(
@@ -62,6 +89,7 @@ async def register(req: RegisterRequest) -> AuthResponse:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="邮箱已注册"
         ) from exc
+    _send_verify_email(user)
     return AuthResponse(token=issue_token(user.id), user=_to_public(user))
 
 
@@ -152,6 +180,25 @@ async def reset_password(req: ResetPasswordRequest) -> AuthResponse:
             detail="链接无效或已过期,重新申请一次",
         )
     return AuthResponse(token=issue_token(user.id), user=_to_public(user))
+
+
+@accounts_router.post("/auth/verify-email", response_model=UserPublic)
+async def verify_email(req: VerifyEmailRequest) -> UserPublic:
+    """凭验证令牌把邮箱标为已验证。令牌坏 / 过期 / 人已注销 → 400。"""
+    user_id = read_email_verify_token(req.token)
+    acc = get_accounts_store()
+    if user_id is None or not acc.mark_email_verified(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="验证链接无效或已过期,重新申请验证",
+        )
+    user = acc.get_user_by_id(user_id)
+    if user is None:  # 理论到不了
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="验证链接无效或已过期,重新申请验证",
+        )
+    return _to_public(user)
 
 
 __all__ = ["accounts_router"]

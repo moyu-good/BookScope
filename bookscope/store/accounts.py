@@ -47,6 +47,7 @@ class User(BaseModel):
     id: str
     email: str
     phone: str | None = None
+    email_verified: bool = False
     created_at: str
 
 
@@ -79,6 +80,7 @@ def _row_to_user(row: sqlite3.Row | None) -> User | None:
         id=row["id"],
         email=row["email"],
         phone=row["phone"],
+        email_verified=bool(row["email_verified"]),
         created_at=row["created_at"],
     )
 
@@ -121,7 +123,8 @@ class AccountsStore:
                     email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
                     phone         TEXT,
                     password_hash TEXT NOT NULL,
-                    created_at    TEXT NOT NULL
+                    created_at    TEXT NOT NULL,
+                    email_verified INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE TABLE IF NOT EXISTS documents (
                     id            TEXT PRIMARY KEY,
@@ -134,6 +137,17 @@ class AccountsStore:
                     ON documents(owner_user_id);
                 """
             )
+        self._migrate_add_email_verified()
+
+    def _migrate_add_email_verified(self) -> None:
+        """老库(Phase 2c 之前建的)补 ``email_verified`` 列;新库 CREATE 已含,no-op。"""
+        with self._lock, self._conn:
+            cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(users)")}
+            if "email_verified" not in cols:
+                self._conn.execute(
+                    "ALTER TABLE users ADD COLUMN "
+                    "email_verified INTEGER NOT NULL DEFAULT 0"
+                )
 
     # ---- 账号 ----
 
@@ -158,11 +172,17 @@ class AccountsStore:
                 )
         except sqlite3.IntegrityError as exc:
             raise DuplicateEmailError(f"邮箱已注册:{email_norm}") from exc
-        return User(id=uid, email=email_norm, phone=phone, created_at=now)
+        return User(
+            id=uid,
+            email=email_norm,
+            phone=phone,
+            email_verified=False,
+            created_at=now,
+        )
 
     def get_user_by_email(self, email: str) -> User | None:
         row = self._conn.execute(
-            "SELECT id, email, phone, created_at FROM users "
+            "SELECT id, email, phone, email_verified, created_at FROM users "
             "WHERE email = ? COLLATE NOCASE",
             (email.strip(),),
         ).fetchone()
@@ -170,7 +190,7 @@ class AccountsStore:
 
     def get_user_by_id(self, user_id: str) -> User | None:
         row = self._conn.execute(
-            "SELECT id, email, phone, created_at FROM users WHERE id = ?",
+            "SELECT id, email, phone, email_verified, created_at FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
         return _row_to_user(row)
@@ -182,8 +202,8 @@ class AccountsStore:
         verify 抵消时序差。
         """
         row = self._conn.execute(
-            "SELECT id, email, phone, password_hash, created_at FROM users "
-            "WHERE email = ? COLLATE NOCASE",
+            "SELECT id, email, phone, email_verified, password_hash, created_at "
+            "FROM users WHERE email = ? COLLATE NOCASE",
             (email.strip(),),
         ).fetchone()
         if row is None:
@@ -191,12 +211,7 @@ class AccountsStore:
             return None
         if not verify_password(row["password_hash"], password):
             return None
-        return User(
-            id=row["id"],
-            email=row["email"],
-            phone=row["phone"],
-            created_at=row["created_at"],
-        )
+        return _row_to_user(row)
 
     def set_password(self, user_id: str, new_password: str) -> bool:
         """改密码(找回密码 / 改密用)。改到返 ``True``,没这人返 ``False``。"""
@@ -207,6 +222,14 @@ class AccountsStore:
             cur = self._conn.execute(
                 "UPDATE users SET password_hash = ? WHERE id = ?",
                 (pw_hash, user_id),
+            )
+        return cur.rowcount > 0
+
+    def mark_email_verified(self, user_id: str) -> bool:
+        """把邮箱标记为已验证。标到返 ``True``,没这人返 ``False``。"""
+        with self._lock, self._conn:
+            cur = self._conn.execute(
+                "UPDATE users SET email_verified = 1 WHERE id = ?", (user_id,)
             )
         return cur.rowcount > 0
 
