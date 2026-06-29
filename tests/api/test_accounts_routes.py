@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from bookscope.api import deployment
+from bookscope.api import auth, deployment, mailer
 from bookscope.api.app import create_app
 
 
@@ -123,4 +123,81 @@ def test_delete_account(hosted_client):
 
 def test_delete_account_requires_login(hosted_client):
     assert hosted_client.delete("/api/auth/me").status_code == 401
+
+
+# ---- Phase 2b:找回密码 ----
+
+
+def test_forgot_password_sends_email_for_existing(hosted_client):
+    cap = mailer.CapturingEmailSender()
+    mailer.set_email_sender(cap)
+    try:
+        hosted_client.post(
+            "/api/auth/register", json={"email": "f@b.com", "password": "pw123456"}
+        )
+        r = hosted_client.post("/api/auth/forgot-password", json={"email": "f@b.com"})
+        assert r.status_code == 200
+        assert len(cap.sent) == 1
+        assert cap.sent[0]["to"] == "f@b.com"
+    finally:
+        mailer.set_email_sender(None)
+
+
+def test_forgot_password_unknown_email_200_no_send(hosted_client):
+    cap = mailer.CapturingEmailSender()
+    mailer.set_email_sender(cap)
+    try:
+        # 不存在的邮箱也返 200(防枚举),但不真发。
+        r = hosted_client.post(
+            "/api/auth/forgot-password", json={"email": "ghost@b.com"}
+        )
+        assert r.status_code == 200
+        assert cap.sent == []
+    finally:
+        mailer.set_email_sender(None)
+
+
+def test_reset_password_changes_password(hosted_client):
+    reg = hosted_client.post(
+        "/api/auth/register", json={"email": "r@b.com", "password": "oldpass12"}
+    )
+    token = auth.issue_reset_token(reg.json()["user"]["id"])
+    r = hosted_client.post(
+        "/api/auth/reset-password",
+        json={"token": token, "new_password": "newpass34"},
+    )
+    assert r.status_code == 200
+    assert r.json()["token"]  # 重置成功直接给会话令牌
+    # 旧密码不行,新密码行
+    assert (
+        hosted_client.post(
+            "/api/auth/login", json={"email": "r@b.com", "password": "oldpass12"}
+        ).status_code
+        == 401
+    )
+    assert (
+        hosted_client.post(
+            "/api/auth/login", json={"email": "r@b.com", "password": "newpass34"}
+        ).status_code
+        == 200
+    )
+
+
+def test_reset_password_bad_token_400(hosted_client):
+    r = hosted_client.post(
+        "/api/auth/reset-password",
+        json={"token": "garbage", "new_password": "newpass34"},
+    )
+    assert r.status_code == 400
+
+
+def test_reset_password_short_password_422(hosted_client):
+    reg = hosted_client.post(
+        "/api/auth/register", json={"email": "r2@b.com", "password": "oldpass12"}
+    )
+    token = auth.issue_reset_token(reg.json()["user"]["id"])
+    r = hosted_client.post(
+        "/api/auth/reset-password", json={"token": token, "new_password": "short"}
+    )
+    assert r.status_code == 422
     deployment._reset_accounts_store()

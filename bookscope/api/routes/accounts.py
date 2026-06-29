@@ -9,22 +9,30 @@ key 不经过这里:登录只换鉴权令牌,API key 永远留浏览器、按请
 
 from __future__ import annotations
 
+import logging
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from bookscope.api.auth import issue_token
+from bookscope.api.auth import issue_reset_token, issue_token, verify_reset_token
 from bookscope.api.dependencies import get_book_session_store
 from bookscope.api.deployment import (
     get_accounts_store,
     get_current_user,
     require_user,
 )
+from bookscope.api.mailer import send_email
 from bookscope.api.schemas import (
     AuthResponse,
+    ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     UserPublic,
 )
 from bookscope.store.accounts import DuplicateEmailError, User
+
+logger = logging.getLogger(__name__)
 
 accounts_router = APIRouter(tags=["auth"])
 
@@ -99,6 +107,51 @@ async def delete_account(
         store.delete(doc.id)
     acc.delete_user(current.id)
     return None
+
+
+@accounts_router.post("/auth/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest) -> dict:
+    """发找回密码邮件。无论邮箱在不在都返 200(防邮箱枚举);在才真发。
+
+    发信失败(SMTP 挂)也吞掉、照返 200——不向客户端泄露这个邮箱到底在不在。
+    """
+    user = get_accounts_store().get_user_by_email(req.email)
+    if user is not None:
+        token = issue_reset_token(user.id)
+        public_url = os.environ.get("BOOKSCOPE_PUBLIC_URL", "").strip().rstrip("/")
+        link = f"{public_url}/?reset_token={token}" if public_url else f"reset_token={token}"
+        try:
+            send_email(
+                to=user.email,
+                subject="书鉴 · 重置密码",
+                body=(
+                    "你(或冒用你邮箱的人)申请重置书鉴账号密码。\n\n"
+                    f"打开这个链接重置(1 小时内有效):\n{link}\n\n"
+                    "不是你本人操作,忽略这封邮件即可,密码不会变。"
+                ),
+            )
+        except Exception:  # noqa: BLE001 — 发信失败不向客户端泄露邮箱存在性
+            logger.warning("发送找回密码邮件失败 to=%s", user.email)
+    return {"ok": True}
+
+
+@accounts_router.post("/auth/reset-password", response_model=AuthResponse)
+async def reset_password(req: ResetPasswordRequest) -> AuthResponse:
+    """凭找回密码令牌设新密码。令牌坏 / 过期 / 人已注销 → 400;成功直接签发新会话令牌。"""
+    user_id = verify_reset_token(req.token)
+    acc = get_accounts_store()
+    if user_id is None or not acc.set_password(user_id, req.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="链接无效或已过期,重新申请一次",
+        )
+    user = acc.get_user_by_id(user_id)
+    if user is None:  # 理论到不了(set_password 刚成功),收口类型
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="链接无效或已过期,重新申请一次",
+        )
+    return AuthResponse(token=issue_token(user.id), user=_to_public(user))
 
 
 __all__ = ["accounts_router"]

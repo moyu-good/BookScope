@@ -198,6 +198,18 @@ class AccountsStore:
             created_at=row["created_at"],
         )
 
+    def set_password(self, user_id: str, new_password: str) -> bool:
+        """改密码(找回密码 / 改密用)。改到返 ``True``,没这人返 ``False``。"""
+        if not new_password:
+            raise ValueError("password 不能为空")
+        pw_hash = hash_password(new_password)
+        with self._lock, self._conn:
+            cur = self._conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (pw_hash, user_id),
+            )
+        return cur.rowcount > 0
+
     def delete_user(self, user_id: str) -> bool:
         """彻底删账号,连带删它名下所有文档归属(ON DELETE CASCADE)。
 

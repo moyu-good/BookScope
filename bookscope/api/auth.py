@@ -19,43 +19,66 @@ import os
 from itsdangerous import BadData, URLSafeTimedSerializer
 
 _SALT = "bookscope-auth-v1"
-# 令牌时限 14 天:够长省得老登录,够短压住被盗令牌能用的窗口。
+_RESET_SALT = "bookscope-pwd-reset-v1"
+# 会话令牌 14 天:够长省得老登录,够短压住被盗令牌窗口。
 _MAX_AGE_SECONDS = 14 * 24 * 3600
+# 找回密码令牌 1 小时:短命、一次性,降低被盗 / 转发风险。
+_RESET_MAX_AGE_SECONDS = 3600
 
 
 class AuthSecretMissingError(RuntimeError):
     """hosted 模式没设 ``BOOKSCOPE_AUTH_SECRET``。"""
 
 
-def _serializer() -> URLSafeTimedSerializer:
+def _serializer(salt: str = _SALT) -> URLSafeTimedSerializer:
     secret = os.environ.get("BOOKSCOPE_AUTH_SECRET", "").strip()
     if not secret:
         raise AuthSecretMissingError(
             "hosted 模式必须设 BOOKSCOPE_AUTH_SECRET(令牌签名密钥)"
         )
-    return URLSafeTimedSerializer(secret, salt=_SALT)
+    return URLSafeTimedSerializer(secret, salt=salt)
 
 
-def issue_token(user_id: str) -> str:
-    """给已登录用户签发令牌。"""
-    return _serializer().dumps({"uid": user_id})
+def _read_uid(token: str, *, salt: str, max_age: int) -> str | None:
+    """验签 + 验时限 + 取 uid。签坏 / 被改 / 过期 / 格式不对都返 ``None``。
 
-
-def verify_token(token: str, *, max_age: int = _MAX_AGE_SECONDS) -> str | None:
-    """验签 + 验时限。过则返 user_id;签坏 / 被改 / 过期 / 格式不对都返 ``None``。
-
-    密钥缺失是误配、不是"令牌不对",照样抛 :class:`AuthSecretMissingError`。
+    不同 salt 的令牌互不通用(会话令牌验不过找回密码,反之亦然)——令牌按用途绑死。
     """
     if not token:
         return None
     try:
-        data = _serializer().loads(token, max_age=max_age)
+        data = _serializer(salt).loads(token, max_age=max_age)
     except BadData:
         return None
     if not isinstance(data, dict):
         return None
     uid = data.get("uid")
     return uid if isinstance(uid, str) and uid else None
+
+
+def issue_token(user_id: str) -> str:
+    """给已登录用户签发会话令牌。"""
+    return _serializer().dumps({"uid": user_id})
+
+
+def verify_token(token: str, *, max_age: int = _MAX_AGE_SECONDS) -> str | None:
+    """验会话令牌,过则返 user_id,否则 ``None``。
+
+    密钥缺失是误配、不是"令牌不对",照样抛 :class:`AuthSecretMissingError`。
+    """
+    return _read_uid(token, salt=_SALT, max_age=max_age)
+
+
+def issue_reset_token(user_id: str) -> str:
+    """签发找回密码令牌(独立 salt + 1 小时时限,跟会话令牌互不通用)。"""
+    return _serializer(_RESET_SALT).dumps({"uid": user_id})
+
+
+def verify_reset_token(
+    token: str, *, max_age: int = _RESET_MAX_AGE_SECONDS
+) -> str | None:
+    """验找回密码令牌,过则返 user_id,否则 ``None``。"""
+    return _read_uid(token, salt=_RESET_SALT, max_age=max_age)
 
 
 def bearer_token_from_header(authorization: str | None) -> str | None:
@@ -71,6 +94,8 @@ def bearer_token_from_header(authorization: str | None) -> str | None:
 __all__ = [
     "AuthSecretMissingError",
     "bearer_token_from_header",
+    "issue_reset_token",
     "issue_token",
+    "verify_reset_token",
     "verify_token",
 ]

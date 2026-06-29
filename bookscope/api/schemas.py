@@ -1862,10 +1862,27 @@ class AuthResponse(BaseModel):
     user: UserPublic
 
 
+class ForgotPasswordRequest(BaseModel):
+    """POST /api/auth/forgot-password 请求体(只 hosted)。"""
+
+    email: str = Field(..., min_length=3, max_length=254, description="账号邮箱。")
+
+
+class ResetPasswordRequest(BaseModel):
+    """POST /api/auth/reset-password 请求体(只 hosted)。"""
+
+    token: str = Field(..., min_length=1, description="找回密码令牌(邮件里的)。")
+    new_password: str = Field(
+        ..., min_length=8, max_length=128, description="新密码,至少 8 位。"
+    )
+
+
 __all__ = [
     "AuthResponse",
+    "ForgotPasswordRequest",
     "LoginRequest",
     "RegisterRequest",
+    "ResetPasswordRequest",
     "UserPublic",
     "AgentAskRequest",
     "AgentAskResponse",
