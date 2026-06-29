@@ -28,7 +28,7 @@ import time
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from bookscope.agent import (
@@ -125,6 +125,11 @@ from bookscope.api.dependencies import (
     get_book_session_store,
     get_conversation_store,
 )
+from bookscope.api.deployment import (
+    is_hosted,
+    resolve_user_from_token,
+    user_owns_session,
+)
 from bookscope.api.schemas import (
     AgentAskRequest,
     AgentAskResponse,
@@ -206,7 +211,55 @@ from bookscope.api.schemas import (
 
 logger = logging.getLogger(__name__)
 
-agent_router = APIRouter(tags=["agent"])
+
+async def _verify_session_ownership(request: Request) -> None:
+    """agent_router 级归属守卫(1.6.2 Phase 1c-2)。
+
+    一处覆盖所有吃 session 的 agent 端点:hosted 下校请求 body 里的
+    ``book_session_id``(单本)/ ``book_session_ids``(跨文件)归属——不是本人的
+    当不存在(404),没登录 401。local 旁路,逐字节不变。
+
+    body 读法:Starlette 把首次读到的 body 缓存进 ``request._body``,故这里
+    ``await request.json()`` 之后,端点自己的 Pydantic 解析仍读得到同一份 body,
+    不会"吃掉"请求体。非 JSON / 空 body(理论上 agent 端点都是 JSON)直接放行。
+
+    守卫在端点函数(含 LLM 调用)之前跑,归属不过直接 404 / 401,绝不进 agent loop。
+    """
+    if not is_hosted():
+        return
+    user = resolve_user_from_token(request.headers.get("authorization"))
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="需要登录"
+        )
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001 — 非 JSON / 空 body:没 session 可校,放行
+        return
+    if not isinstance(body, dict):
+        return
+    to_check: list[str] = []
+    sid = body.get("book_session_id")
+    if isinstance(sid, str) and sid:
+        to_check.append(sid)
+    sids = body.get("book_session_ids")
+    if isinstance(sids, list):
+        to_check.extend(s for s in sids if isinstance(s, str) and s)
+    for session_id in to_check:
+        if not user_owns_session(user, session_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "error_type": "BookSessionNotFound",
+                    "message": f"book session {session_id!r} not found.",
+                    "details": {"session_id": session_id},
+                },
+            )
+
+
+agent_router = APIRouter(
+    tags=["agent"], dependencies=[Depends(_verify_session_ownership)]
+)
 
 
 @agent_router.post("/agent/ask", response_model=AgentAskResponse)

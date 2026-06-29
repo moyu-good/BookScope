@@ -9,10 +9,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
@@ -24,6 +26,7 @@ from bookscope.api.dependencies import (
 from bookscope.api.dependencies import (
     reset_book_session_store_for_tests,
 )
+from bookscope.api.routes.agent import _verify_session_ownership
 from bookscope.api.session_storage import JSONFileSessionStorage
 from bookscope.models.schemas import (
     BookKnowledgeGraph,
@@ -165,3 +168,104 @@ def test_helpers_local_bypass(monkeypatch):
     # record / forget 在 local 是 no-op,不碰账号库、不抛
     deployment.record_ownership(None, "x", "t")
     deployment.forget_ownership(None, "x")
+
+
+# ---- Phase 1c-2:agent 端点 router 级归属守卫 ----
+
+
+class _FakeReq:
+    """喂给 _verify_session_ownership 的最小 request 替身。"""
+
+    def __init__(self, headers: dict | None = None, body: object | None = None):
+        self.headers = headers or {}
+        self._body = body
+
+    async def json(self):
+        if self._body is None:
+            raise ValueError("no json body")
+        return self._body
+
+
+def test_verify_ownership_local_bypass(monkeypatch):
+    monkeypatch.delenv("BOOKSCOPE_DEPLOYMENT_MODE", raising=False)
+    # local:谁的 session、有无令牌都不抛(旁路)
+    asyncio.run(
+        _verify_session_ownership(_FakeReq(body={"book_session_id": "whoever"}))
+    )
+
+
+def _hosted_env_only(monkeypatch, tmp_path):
+    monkeypatch.setenv("BOOKSCOPE_DEPLOYMENT_MODE", "hosted")
+    monkeypatch.setenv("BOOKSCOPE_AUTH_SECRET", "s")
+    monkeypatch.setenv("BOOKSCOPE_ACCOUNTS_DB", str(tmp_path / "a.db"))
+    deployment._reset_accounts_store()
+
+
+def test_verify_ownership_hosted_no_user_401(monkeypatch, tmp_path):
+    _hosted_env_only(monkeypatch, tmp_path)
+    with pytest.raises(HTTPException) as ei:
+        asyncio.run(
+            _verify_session_ownership(_FakeReq(body={"book_session_id": "x"}))
+        )
+    assert ei.value.status_code == 401
+
+
+def test_verify_ownership_hosted_single_and_plural(monkeypatch, tmp_path):
+    _hosted_env_only(monkeypatch, tmp_path)
+    acc = deployment.get_accounts_store()
+    a = acc.create_user(email="a@x.com", password="pw123456")
+    acc.add_document(owner_user_id=a.id, doc_id="a-sess", title="A")
+    acc.add_document(owner_user_id=a.id, doc_id="a-sess2", title="A2")
+    hdr = {"authorization": f"Bearer {auth.issue_token(a.id)}"}
+
+    # 拥有 → 不抛
+    asyncio.run(
+        _verify_session_ownership(_FakeReq(headers=hdr, body={"book_session_id": "a-sess"}))
+    )
+    # 不拥有 → 404
+    with pytest.raises(HTTPException) as ei:
+        asyncio.run(
+            _verify_session_ownership(_FakeReq(headers=hdr, body={"book_session_id": "nope"}))
+        )
+    assert ei.value.status_code == 404
+    # 跨文件复数:有一个不拥有就 404
+    with pytest.raises(HTTPException) as ei2:
+        asyncio.run(
+            _verify_session_ownership(
+                _FakeReq(headers=hdr, body={"book_session_ids": ["a-sess", "nope"]})
+            )
+        )
+    assert ei2.value.status_code == 404
+    # 复数全拥有 → 不抛
+    asyncio.run(
+        _verify_session_ownership(
+            _FakeReq(headers=hdr, body={"book_session_ids": ["a-sess", "a-sess2"]})
+        )
+    )
+
+
+def test_agent_endpoint_guard_blocks_before_llm(hosted):
+    # 守卫在 agent loop 之前拦:负路径(404/401)绝不进 LLM,故可安全测。
+    client, store = hosted
+    acc = deployment.get_accounts_store()
+    a = acc.create_user(email="a@x.com", password="pw123456")
+    b = acc.create_user(email="b@x.com", password="pw123456")
+    store.register("a-sess", _build_assembler("A 的书"))
+    store.register("b-sess", _build_assembler("B 的书"))
+    acc.add_document(owner_user_id=a.id, doc_id="a-sess", title="A 的书")
+    acc.add_document(owner_user_id=b.id, doc_id="b-sess", title="B 的书")
+    ta = auth.issue_token(a.id)
+    body = {
+        "question": "谁是主角",
+        "book_session_id": "b-sess",
+        "api_key": "testkey-123456",
+    }
+    # A 拿 B 的 session 问 → 守卫 404(没进 LLM)
+    assert client.post("/api/agent/ask", json=body, headers=_hdr(ta)).status_code == 404
+    # 没令牌 → 401
+    assert (
+        client.post(
+            "/api/agent/ask", json={**body, "book_session_id": "a-sess"}
+        ).status_code
+        == 401
+    )
