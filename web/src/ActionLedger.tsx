@@ -66,12 +66,27 @@ interface ActionItem {
   match_score: number;
 }
 
+// 议而未决「为何悬着」四档：未拍板（讨论了没人拍）/ 没人接（提议没人认领）/
+// 待外部（卡在会场外，等上级或别的部门）/ 待下次（已约下次会再议）。
+type OpenIssueReason = "未拍板" | "没人接" | "待外部" | "待下次";
+
+interface OpenIssue {
+  chapter: number; // 序号
+  issue: string; // 悬着的议题
+  raised_by: string; // 谁提的（空 = 没点明，绝不替它编人）
+  why_open: OpenIssueReason | string; // 为何悬着（四档之一）
+  background: string; // 卡在哪 / 争论的点
+  evidence: string;
+  verified: boolean;
+  match_score: number;
+}
+
 interface LedgerResponse {
   form: Form | string;
   head: HeadElement[];
   decisions: Decision[];
   action_items: ActionItem[];
-  open_issues: unknown[]; // 首炮恒空，schema 占位
+  open_issues: OpenIssue[]; // 议而未决（讨论了没结论的黑洞）
   owner: string | null; // 回显请求的 owner（我的行动项时）
   scanned: boolean;
   book_session_id: string;
@@ -145,6 +160,55 @@ const SUBSTANCE_HINT: Record<Substance, string> = {
   空头表态: "只表了个态、回头弄，没人接没时限，多半漂没",
 };
 
+// 「为何悬着」徽章样式：会场内能立刻追的（未拍板 / 没人接）描朱砂、催一催就有下文；
+// 已经有去向的（待外部 / 待下次）用中性墨，相对没那么急。fallback 走墨色避免未知值炸掉。
+interface ReasonStyle {
+  fg: string;
+  bg: string;
+  border: string;
+}
+
+const OPEN_ISSUE_REASON_STYLE: Record<OpenIssueReason, ReasonStyle> = {
+  未拍板: {
+    fg: "#9a3a2e",
+    bg: "rgba(154, 58, 46, 0.1)",
+    border: "rgba(154, 58, 46, 0.5)",
+  },
+  没人接: {
+    fg: "#9a3a2e",
+    bg: "rgba(154, 58, 46, 0.1)",
+    border: "rgba(154, 58, 46, 0.5)",
+  },
+  待外部: {
+    fg: "var(--color-ink)",
+    bg: "rgba(58, 99, 120, 0.08)",
+    border: "rgba(58, 99, 120, 0.35)",
+  },
+  待下次: {
+    fg: "var(--color-ink-muted)",
+    bg: "rgba(0, 0, 0, 0.03)",
+    border: "var(--color-rule)",
+  },
+};
+
+function reasonStyle(r: string): ReasonStyle {
+  return (
+    OPEN_ISSUE_REASON_STYLE[r as OpenIssueReason] ?? {
+      fg: "var(--color-ink-muted)",
+      bg: "var(--color-seal-soft)",
+      border: "var(--color-rule)",
+    }
+  );
+}
+
+// 「为何悬着」一句注脚（徽章悬停），点破这议题卡在哪、下一步该谁动。
+const OPEN_ISSUE_REASON_HINT: Record<OpenIssueReason, string> = {
+  未拍板: "讨论了没人拍板，要找人定下来",
+  没人接: "提议本身没问题，但没人认领去推",
+  待外部: "卡在会场外，等上级或别的部门先动",
+  待下次: "明确推到下次会再议，已有去向",
+};
+
 function hasText(v: string | undefined | null): boolean {
   return !!v && v.trim().length > 0;
 }
@@ -165,6 +229,26 @@ function SubstanceBadge({ substance }: { substance: string }) {
       }}
     >
       {substance}
+    </span>
+  );
+}
+
+// 「为何悬着」徽章——会场内能追的描朱砂、有去向的描淡。
+function ReasonBadge({ reason }: { reason: string }) {
+  const st = reasonStyle(reason);
+  return (
+    <span
+      className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+      title={OPEN_ISSUE_REASON_HINT[reason as OpenIssueReason] ?? ""}
+      style={{
+        color: st.fg,
+        background: st.bg,
+        border: `0.5px solid ${st.border}`,
+        fontWeight: 600,
+        fontFamily: "var(--font-display)",
+      }}
+    >
+      {reason}
     </span>
   );
 }
@@ -252,6 +336,8 @@ export function ActionLedger({
   const head = result?.head ?? [];
   const decisions = result?.decisions ?? [];
   const actionItems = result?.action_items ?? [];
+  // 我的行动项（传了 owner）只看行动项，议而未决是整场会的、不按身份筛——只在台账模式显示。
+  const openIssues = result?.owner ? [] : (result?.open_issues ?? []);
   const scanned = !!result && result.scanned;
   const filteredOwner = result?.owner ?? null; // 后端回显的筛选身份
   // 头要素里抽到值的那些（N/A 和待核都不算「抽到了」）。
@@ -261,7 +347,10 @@ export function ActionLedger({
   );
   const gotSomething =
     scanned &&
-    (actionItems.length > 0 || decisions.length > 0 || headFilled.length > 0);
+    (actionItems.length > 0 ||
+      decisions.length > 0 ||
+      openIssues.length > 0 ||
+      headFilled.length > 0);
 
   const looseCount = useMemo(
     () => actionItems.filter((a) => a.loose_end).length,
@@ -275,6 +364,7 @@ export function ActionLedger({
     () => actionItems.filter((a) => a.verified && hasText(a.evidence)).length,
     [actionItems],
   );
+  const openCount = openIssues.length;
 
   // ---- 标题行 ----
   const header = (
@@ -344,13 +434,13 @@ export function ActionLedger({
       <div className="pt-4">
         {header}
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          一份会议记录精读一次，把这场会派下去的活全列成一张能勾的台账：每条说清做什么、谁负责、几号前办完、落实哪条决议，还标含金量（真金白银还是空头表态）、钉原文。没人接、没定时限的活排最前，那是开完会最容易没下文的黑洞。逐字稿、纪要都能读。
+          一份会议记录精读一次，把这场会派下去的活全列成一张能勾的台账：每条说清做什么、谁负责、几号前办完、落实哪条决议，还标含金量（真金白银还是空头表态）、钉原文。没人接、没定时限的活排最前，那是开完会最容易没下文的黑洞。台账下面再单列一份悬而未决：提了却没拍板、没人接、要等外部或留到下次的议题，散会最容易被忘掉的就是这些。逐字稿、纪要都能读。
         </p>
         {ownerBar}
         {loading && (
           <RunningProcess
             label="精读这份会议记录"
-            hint="整份记录喂进模型，从发言流水里淘出定了什么、谁要去做什么，每条回原文核验，约 1 分钟。"
+            hint="整份记录喂进模型，从发言流水里淘出定了什么、谁要去做什么、哪些还悬着没定，每条回原文核验，约 1 分钟。"
           />
         )}
       </div>
@@ -370,7 +460,7 @@ export function ActionLedger({
             {filteredOwner
               ? `这场会没派到「${filteredOwner}」头上的活——换个名字，或留空看整场台账。`
               : scanned
-                ? "读过了，但没淘出能钉在原文的决议或行动项——这份可能是偏务虚的讨论、没拍下具体的活，或者不是会议记录。换一份会议记录，或稍后重试。"
+                ? "读过了，但没淘出能钉在原文的决议、行动项或悬而未决——这份可能是偏务虚的讨论、没拍下具体的活，或者不是会议记录。换一份会议记录，或稍后重试。"
                 : "没读出可梳理的内容——这份可能不是会议记录，或格式太特殊。换一份逐字稿 / 纪要，或稍后重试。"}
           </p>
         )}
@@ -416,6 +506,11 @@ export function ActionLedger({
         {decisions.length > 0 && (
           <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
             决议 {decisions.length}
+          </span>
+        )}
+        {openCount > 0 && (
+          <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
+            悬而未决 {openCount}
           </span>
         )}
         {realMoneyCount > 0 && (
@@ -471,7 +566,7 @@ export function ActionLedger({
 
       {/* ── 行动项台账：谁·做什么·何时·落实哪条决议；落空的置顶 ── */}
       {actionItems.length > 0 && (
-        <section className="mb-2">
+        <section className="mb-6">
           <SectionHead
             title={filteredOwner ? "我的行动项" : "行动项台账"}
             sub="没人接 / 没时限的排最前"
@@ -495,12 +590,38 @@ export function ActionLedger({
         </section>
       )}
 
+      {/* ── 悬而未决：讨论了没拍板 / 没人接 / 等外部 / 留下次的议题（会议最大的黑洞） ── */}
+      {openIssues.length > 0 && (
+        <section className="mb-2">
+          <SectionHead
+            title="悬而未决"
+            sub="提了却没定论的议题，散会最容易没下文"
+            count={openIssues.length}
+          />
+          <div className="space-y-3">
+            {openIssues.map((o) => (
+              <OpenIssueCard
+                key={`o${o.chapter}`}
+                item={o}
+                open={!!openEvidence[`o${o.chapter}`]}
+                onToggle={() =>
+                  setOpenEvidence((cur) => ({
+                    ...cur,
+                    [`o${o.chapter}`]: !cur[`o${o.chapter}`],
+                  }))
+                }
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {!loading && (
         <RunStats
           trace={trace}
           note={`行动项 ${actionItems.length} · 决议 ${decisions.length}${
-            looseCount > 0 ? ` · 落空 ${looseCount}` : ""
-          }`}
+            openCount > 0 ? ` · 悬而未决 ${openCount}` : ""
+          }${looseCount > 0 ? ` · 落空 ${looseCount}` : ""}`}
         />
       )}
     </div>
@@ -745,7 +866,75 @@ function ActionCard({
   );
 }
 
-// ---- 原文脚（决议 / 行动项共用）：核过盖印 + 可展开；核不过老实标待核 ----
+// ---- 议而未决卡片：议题 + 谁提的 + 为何悬着 + 背景 + 原文 ----
+// 卡片描朱砂虚边提醒这是悬着的黑洞（同落空行动项的视觉语言）；左脊跟着「为何悬着」的轻重。
+function OpenIssueCard({
+  item,
+  open,
+  onToggle,
+}: {
+  item: OpenIssue;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const st = reasonStyle(item.why_open);
+  const verifiedOrigin = item.verified && hasText(item.evidence);
+  const canOpen = hasText(item.evidence);
+  return (
+    <article
+      className="relative rounded border bg-white p-3 pl-4"
+      style={{
+        borderColor: "rgba(154, 58, 46, 0.4)",
+        borderStyle: "dashed",
+      }}
+    >
+      {/* 为何悬着脊：会场内能追的朱砂重、有去向的淡 */}
+      <span
+        className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full"
+        style={{ background: st.fg, opacity: 0.55 }}
+        aria-hidden="true"
+      />
+      {/* 议题行 + 为何悬着徽章 */}
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[15px] font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
+          <span
+            className="text-[11px] mr-1.5 align-top text-[var(--color-ink-muted)] tabular-nums"
+            aria-hidden="true"
+          >
+            {item.chapter}
+          </span>
+          {hasText(item.issue) ? item.issue : "（这条没说清悬的是什么）"}
+        </p>
+        <ReasonBadge reason={item.why_open} />
+      </div>
+
+      {/* 谁提的：抽到了显示，空了不替它编人 */}
+      {hasText(item.raised_by) && (
+        <p className="mt-2 text-[13px] text-[var(--color-ink)]">
+          <span className="text-[var(--color-ink-muted)]">谁提的</span>{" "}
+          {item.raised_by}
+        </p>
+      )}
+
+      {hasText(item.background) && (
+        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-ink-muted)]">
+          <span className="text-[var(--color-ink)]">卡在哪</span> ·{" "}
+          {item.background}
+        </p>
+      )}
+
+      <EvidenceFoot
+        verifiedOrigin={verifiedOrigin}
+        canOpen={canOpen}
+        open={open}
+        onToggle={onToggle}
+        evidence={item.evidence}
+      />
+    </article>
+  );
+}
+
+// ---- 原文脚（决议 / 行动项 / 议而未决共用）：核过盖印 + 可展开；核不过老实标待核 ----
 function EvidenceFoot({
   verifiedOrigin,
   canOpen,

@@ -12,7 +12,10 @@
 - **action_items(行动项维,首炮主角)**:谁要去做什么——task / owner / due / from_decision /
   source / 含金量 / loose_end / evidence。``loose_end``(owner 空或 due 空)**由 BE 纯计算**,
   不让模型打分。
-- **open_issues(议而未决维)**:**首炮恒空 ``[]``**,schema 先占位,第二炮再填。
+- **open_issues(议而未决维,第二炮主角)**:会上提了但没拍板 / 没派给人 / 没定论的议题——
+  issue / raised_by / why_open(为何悬着:未拍板 | 没人接 | 待外部 | 待下次)/ background /
+  evidence。这是会议最容易漏掉的黑洞:讨论了没结论、提议没人接、要等外部或下次再议的。
+  跟决议(已拍板)、行动项(已派人)互斥——三类同段抽出来,各管各的。
 
 **跟公文最大的不同就一句**:公文逐条抽条款(条款本身就是要读的内容),会议要先从发言流水里
 淘出结论项(发言轮是证据来源不是抽取单元)。同一台 map-reduce 引擎,prompt 让模型抽的东西
@@ -24,7 +27,9 @@
 - 结论项维走底层 ``exhaustive.run_segments``(分段 + 并发 + 截断兜底)+ 自接两步:逐段证据
   核验(只核不覆盖序号)+ 跨段全局重排序号——照 ``doc_spine`` 的做法(不能套
   ``mapreduce_per_chapter``,理由同公文条款维:那台机器会拿命中 chunk 的真章号覆盖记录序号,
-  把同议程段的多条结论项压成一个号)。决议、行动项各自重排,行动项的 ``from_decision`` 跟着改。
+  把同议程段的多条结论项压成一个号)。决议、行动项、议而未决三类各自重排,行动项的
+  ``from_decision`` 跟着改。**议而未决跟决议 / 行动项同一趟抽**(一次 LLM 调用同时吐三类),
+  不另起一趟——同段里「定了 / 派了 / 还悬着」本就该一起判,分开抽反而割裂上下文、翻倍成本。
 - 头要素维一次抽取整份,每要素 evidence 过 ``verify_citations``,
   照搬 ``doc_spine._build_head_elements``。
 - 含金量开环/闭环判直接 import ``redhead_codebook``(``coerce_substance``),**叶子档名换会议版
@@ -76,6 +81,32 @@ _DEFAULT_MEETING_SUBSTANCE = "有条件兑现"
 # 版,但训练里公文/会议措辞接近),或老缓存里存的是公文档名——都归一到会议版,免得被当未知值
 # 退兜底。键是「会被误输出的别名」,值是会议版正名。
 _MEETING_SUBSTANCE_ALIASES: dict[str, str] = {"空头倡导": "空头表态"}
+
+# 议而未决「为何悬着」四档(封闭集)。一条议题悬着只会是这四种原因之一,把它定成封闭集是因为
+# 这四类对应不同的跟进动作(未拍板=要追个决定 / 没人接=要派个人 / 待外部=要等别人先动 /
+# 待下次=已约下次会),前端能据此分组提示。落不进四档退「未拍板」(最常见、最该追的那种)。
+MEETING_OPEN_ISSUE_REASONS: tuple[str, ...] = ("未拍板", "没人接", "待外部", "待下次")
+_DEFAULT_OPEN_ISSUE_REASON = "未拍板"
+
+# 模型可能吐的「为何悬着」近义说法 → 归一到四档正名(同含金量别名的纪律)。模型不一定用
+# prompt 里给的词,这里把常见同义说法收一下,免得当未知值退兜底。
+_OPEN_ISSUE_REASON_ALIASES: dict[str, str] = {
+    "没定": "未拍板",
+    "未决": "未拍板",
+    "没拍板": "未拍板",
+    "议而未决": "未拍板",
+    "没人认领": "没人接",
+    "无人认领": "没人接",
+    "没人负责": "没人接",
+    "等外部": "待外部",
+    "等上面": "待外部",
+    "待上级": "待外部",
+    "等其他部门": "待外部",
+    "下次再议": "待下次",
+    "下次会上定": "待下次",
+    "会后再议": "待下次",
+    "待下次会议": "待下次",
+}
 
 DEFAULT_MEETING_SPINE_MAX_TOKENS = 8000
 """结论项维单段输出与头要素维一次抽取的 max_tokens。
@@ -183,22 +214,28 @@ def _meeting_codebook_block() -> str:
 
 
 _INSTR_CONCLUSIONS = (
-    "你在给一份会议记录做**结论项精读**。只针对下面这段原文,抽出这段里**真正定下来的事**和"
-    "**谁要去做的事**。\n"
+    "你在给一份会议记录做**结论项精读**。只针对下面这段原文,抽出这段里**真正定下来的事**、"
+    "**谁要去做的事**、以及**讨论了却悬着没结论的事**。\n"
     "【最重要:抽的是结果,不是过程】\n"
     "会议记录大部分是发言流水——谁说了什么、寒暄、跑题、重复、口水话。"
-    "**这些发言本身不是要抽的单元,它们是证据来源。** 你要从一段发言里淘出三五条干货:\n"
+    "**这些发言本身不是要抽的单元,它们是证据来源。** 你要从一段发言里淘出三类干货:\n"
     "- 定了什么(decision)——这段会议**拍板下来**的事。\n"
     "- 谁要去做什么(action_item)——这段会议派下去 / 有人认领的**具体任务**。\n"
+    "- 悬着没定的事(open_issue)——这段会议**提了、讨论了,但没拍板、没派人、没结论**的议题。\n"
     "**绝不要**把「某某说了某某」逐条列成流水账。一段几百轮发言可能只对应两三条决议、"
-    "三五个行动项,这是正常的——宁可少而准,别把讨论过程当成结论凑数。\n"
+    "三五个行动项、一两条悬而未决,这是正常的——宁可少而准,别把讨论过程当成结论凑数。\n"
+    "【三类怎么分:同一件事只进一类,别重复抽】\n"
+    "判断一件事的归属,看它最后到了哪一步:\n"
+    "- **拍板了 → decision**(有明确的「就这么定」「同意」「通过」,或定了方案)。\n"
+    "- **派给人了 → action_item**(有人接了具体任务,哪怕没拍大方向也算——任务本身落到人了)。\n"
+    "- **既没拍板也没派人,还悬着 → open_issue**"
+    "(议而不决、和稀泥、提议没人接、「再议」「下次定」)。\n"
+    "一件事拍了板又派了人,就拆成 decision + action_item(各进各类);只悬着的别硬塞进决议。\n"
     "【会议结论埋着、不写明,靠上下文判,别只看字面】\n"
     "会议里一个决定常常没有标志词,是「那就这么定吧」「行,先这样」「我看可以,下周执行」这种。\n"
-    "更要小心的是**很多事根本没拍板**:议而不决、和稀泥、「这个再议」「下次会上定」——"
-    "这些是「悬着的事」,**不是决议、不是行动项**,这一炮先不抽它们(别抽出来就好),"
-    "但**绝不能把没定的说成定了**。\n"
     "判断一件事到底定没定,看有没有:明确的拍板语(「就这么定」「同意」「通过」)、或有人接了"
-    "具体任务带了时间。只是「大家讨论了一下」「有人提议」但没人拍板的,不算决议。\n"
+    "具体任务带了时间。只是「大家讨论了一下」「有人提议」但没人拍板的,**不算决议、不算行动项,"
+    "它正是 open_issue**。\n"
     "【抽 decisions(决议),每条给】:\n"
     "1. 序号(chapter):整数,本段内从 1 顺排(跨段全局序号由系统重排,你只管本段)。\n"
     "2. decision:定了什么,一句话中性陈述。**只写真定下来的**,别把「提议」「讨论」写成「决定」。\n"
@@ -227,6 +264,22 @@ _INSTR_CONCLUSIONS = (
     "「回头弄一下」=空头表态;介于两者=有条件兑现。\n"
     "8. substance_reason:凭哪些 marker 判(点出 owner/due/验收的有无,锚原文);判不出留空。\n"
     "9. evidence:交代这个任务那句**逐字原文**,**务必摘足够长、带上下文的整句**。\n"
+    "【抽 open_issues(议而未决),每条给】:\n"
+    "这是会议最容易漏的黑洞——讨论了一通,结果悬在半空:没拍板、没人接、要等外部、留到下次。"
+    "**它必须是原文里真提过、真讨论过的议题,绝不是你推测「应该再讨论」的事。**\n"
+    "1. 序号(chapter):整数,本段内从 1 顺排(与决议 / 行动项各自独立编号,系统分别重排)。\n"
+    "2. issue:悬着的是什么议题,一句话中性陈述(「鉴权方案选 A 还是 B 没定」「预算谁出没说清」)。\n"
+    "3. raised_by:谁提的 / 谁抛出来的。锚到参会的人;**没点明谁提的就留空,绝不替它编一个人**"
+    "(同行动项 owner 的纪律——抽不到是信号,不是缺陷)。\n"
+    "4. why_open:为何悬着,**只能填「未拍板」「没人接」「待外部」「待下次」之一**:\n"
+    "    · 未拍板——讨论了但没人拍板拿主意(「再研究研究」「这个先放放」「原则上同意」式的没定)。\n"
+    "    · 没人接——提议本身没问题,但没人认领去推(「谁来弄一下?」没人应)。\n"
+    "    · 待外部——卡在会场外:等上级 / 等别的部门 / 等外部条件"
+    "(「得看上面意思」「等 X 部门先动」)。\n"
+    "    · 待下次——明确推到下次会 / 会后再议(「下次会上定」「会后单独聊」)。\n"
+    "    判不准就填「未拍板」(最常见、最该追)。\n"
+    "5. background:这议题为什么悬着 / 卡在哪 / 争论的点是什么,一句话;抽不到留空。\n"
+    "6. evidence:把这议题摆出来或卡住那句**逐字原文**,**务必摘足够长、带上下文的整句**。\n"
     "【证据要摘长(这一条最重要,违反会让系统锚错地方)】\n"
     "会议里同一个人会反复说话,「同意」「好的」「可以」这种短句在一份记录里到处都是。"
     "如果 evidence 只摘「同意」两个字,系统没法判断这是哪一轮说的,会锚到最先出现的那个"
@@ -235,12 +288,15 @@ _INSTR_CONCLUSIONS = (
     "「Eng-B:接口我来写,下周一前给你们出个初版,你们先接着调」整句。"
     "摘得越长越独特,系统越锚得准。逐字稿就连说话人标记一起摘(「张三:……」)。\n"
     "【抽不到就留空,绝不编】\n"
-    "owner 没人接→留空;due 没说→留空;background 没讲→留空。空着是诚实,编一个是错误。\n"
+    "owner 没人接→留空;due 没说→留空;raised_by 没点明→留空;background 没讲→留空。"
+    "空着是诚实,编一个是错误。\n"
     "严格输出 JSON(别的话别说、别加 markdown 围栏),形如:\n"
     '{"decisions":[{"chapter":1,"decision":"","decided_by":"","background":"",'
     '"substance":"有条件兑现","substance_reason":"","evidence":""}],'
     '"action_items":[{"chapter":1,"task":"","owner":"","due":"","from_decision":null,'
-    '"source":"","substance":"有条件兑现","substance_reason":"","evidence":""}]}'
+    '"source":"","substance":"有条件兑现","substance_reason":"","evidence":""}],'
+    '"open_issues":[{"chapter":1,"issue":"","raised_by":"","why_open":"未拍板",'
+    '"background":"","evidence":""}]}'
     "\n\n" + _meeting_codebook_block()
 )
 
@@ -250,6 +306,8 @@ _USER_MSG = "请按上面的要求抽结构。"
 _DECISION_STR_FIELDS = ("decision", "decided_by", "background", "substance_reason")
 # 行动项维除 chapter/evidence/substance/from_decision/loose_end 外要保留的字符串字段。
 _ACTION_STR_FIELDS = ("task", "owner", "due", "source", "substance_reason")
+# 议而未决维除 chapter/evidence/why_open 外要保留的字符串字段。raised_by 空是信号(同 owner)。
+_OPEN_ISSUE_STR_FIELDS = ("issue", "raised_by", "background")
 
 
 def _coerce_form(value: Any) -> str:
@@ -317,6 +375,35 @@ def _coerce_action(item: Any) -> dict[str, Any] | None:
     return out
 
 
+def _coerce_open_issue_reason(value: Any) -> str:
+    """「为何悬着」归一:落进四档,常见近义说法先归一,落不进退「未拍板」(最常见、最该追)。"""
+    s = value.strip() if isinstance(value, str) else ""
+    s = _OPEN_ISSUE_REASON_ALIASES.get(s, s)
+    return s if s in MEETING_OPEN_ISSUE_REASONS else _DEFAULT_OPEN_ISSUE_REASON
+
+
+def _coerce_open_issue(item: Any) -> dict[str, Any] | None:
+    """把一条议而未决 dict 归一;chapter(本段序号)缺/非整数 → 丢(没序号摆不进会脉)。
+
+    ``why_open`` 走四档封闭集归一;其余字段是字符串,缺退空串、抽不到不编
+    (raised_by 空是信号——没点明谁提的,绝不替它编一个人)。
+    """
+    if not isinstance(item, dict):
+        return None
+    ch = item.get("chapter")
+    if not isinstance(ch, int):
+        return None
+    out: dict[str, Any] = {
+        "chapter": ch,
+        "evidence": str(item.get("evidence", "")).strip(),
+        "why_open": _coerce_open_issue_reason(item.get("why_open")),
+    }
+    for field in _OPEN_ISSUE_STR_FIELDS:
+        v = item.get(field)
+        out[field] = v.strip() if isinstance(v, str) else ""
+    return out
+
+
 def _make_conclusions_parser():  # noqa: ANN202 — 返回闭包 parse_fn 喂 run_segments
     """造结论项维的 parse_fn:strip 围栏 → loads → 抠首个 obj → 截断抢救 → 归一去重。
 
@@ -343,6 +430,13 @@ def _make_conclusions_parser():  # noqa: ANN202 — 返回闭包 parse_fn 喂 ru
                 continue
             seen_act.add(a["chapter"])
             out.append({"_kind": "action", **a})
+        seen_oi: set[int] = set()
+        for it in obj.get("open_issues") or []:
+            oi = _coerce_open_issue(it)
+            if oi is None or oi["chapter"] in seen_oi:
+                continue
+            seen_oi.add(oi["chapter"])
+            out.append({"_kind": "open_issue", **oi})
         return out
 
     def _parse(text: str) -> list[dict[str, Any]] | None:
@@ -364,13 +458,16 @@ def _make_conclusions_parser():  # noqa: ANN202 — 返回闭包 parse_fn 喂 ru
             items = _coerce_list(obj)
             if items:
                 return items
-        # 截断抢救:decisions / action_items 任一抢救到就拼起来。
+        # 截断抢救:decisions / action_items / open_issues 任一抢救到就拼起来。
         salvaged_dec = salvage_closed_objects(candidate, '"decisions"') or []
         salvaged_act = salvage_closed_objects(candidate, '"action_items"') or []
-        if salvaged_dec or salvaged_act:
-            items = _coerce_list(
-                {"decisions": salvaged_dec, "action_items": salvaged_act}
-            )
+        salvaged_oi = salvage_closed_objects(candidate, '"open_issues"') or []
+        if salvaged_dec or salvaged_act or salvaged_oi:
+            items = _coerce_list({
+                "decisions": salvaged_dec,
+                "action_items": salvaged_act,
+                "open_issues": salvaged_oi,
+            })
             if items:
                 logger.warning(
                     "meeting_spine[conclusions]: 主解析失败,从截断抢救到 %d 条", len(items)
@@ -563,31 +660,38 @@ def _infer_segment_prior(
 
 
 def _renumber(seg_outs: list[list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
-    """跨段把结论项拍平 + 分两类各自全局重排序号,行动项的 from_decision 跟着改。
+    """跨段把结论项拍平 + 分三类各自全局重排序号,行动项的 from_decision 跟着改。
 
     同 ``doc_spine._renumber_clauses`` 的纪律:每段都从「第 1 条」起自己数(map 引擎按段独立抽),
     跨段会撞号。会议结论项是单文件里一条线、天然有序,合并就是**按段序拼接**(段按议程顺序排 →
     拼出来就是会议进程顺序)再全局顺排序号——不靠模型自报的段内号去重。
 
-    决议、行动项**各自独立编号**(decisions 1…M、action_items 1…N)。行动项的 ``from_decision``
-    在段内指的是**本段决议序号**,全局重排后要映射成全局决议序号——这里逐段建「本段决议序号 →
-    全局决议序号」映射,改 action 的 from_decision(跨段对不上 / null 的置 None,绝不瞎指)。
+    决议、行动项、议而未决**各自独立编号**(decisions 1…M、action_items 1…N、open_issues 1…K)。
+    行动项的 ``from_decision`` 在段内指的是**本段决议序号**,全局重排后要映射成全局决议序号——
+    这里逐段建「本段决议序号 → 全局决议序号」映射,改 action 的 from_decision(跨段对不上 /
+    null 的置 None,绝不瞎指)。议而未决不挂 from_decision(它本就没拍板,无决议可落)。
 
     去重只去**整条 evidence 完全相同**的(同一结论项被相邻段都抽到);序号不同但内容不同的全保留。
     """
     decisions_flat: list[dict[str, Any]] = []
     actions_flat: list[dict[str, Any]] = []
+    open_issues_flat: list[dict[str, Any]] = []
     seen_dec_ev: set[str] = set()
     seen_act_ev: set[str] = set()
+    seen_oi_ev: set[str] = set()
 
     for seg in seg_outs:
-        # 段内分两类,各按模型自报序号排稳(map 引擎不保证段内已排序)。
+        # 段内分三类,各按模型自报序号排稳(map 引擎不保证段内已排序)。
         seg_dec = sorted(
             (r for r in seg if r.get("_kind") == "decision"),
             key=lambda c: c["chapter"] if isinstance(c.get("chapter"), int) else 0,
         )
         seg_act = sorted(
             (r for r in seg if r.get("_kind") == "action"),
+            key=lambda c: c["chapter"] if isinstance(c.get("chapter"), int) else 0,
+        )
+        seg_oi = sorted(
+            (r for r in seg if r.get("_kind") == "open_issue"),
             key=lambda c: c["chapter"] if isinstance(c.get("chapter"), int) else 0,
         )
         # 本段决议:边收边记「本段序号 → 这条决议在 decisions_flat 里的全局序号」。
@@ -611,6 +715,14 @@ def _renumber(seg_outs: list[list[dict[str, Any]]]) -> dict[str, list[dict[str, 
             fd = act.get("from_decision")
             act["from_decision"] = local_to_global.get(fd) if isinstance(fd, int) else None
             actions_flat.append(act)
+        # 本段议而未决:按段序拼接(不挂 from_decision,它本就没拍板)。
+        for oi in seg_oi:
+            ev = str(oi.get("evidence", "")).strip()
+            if ev and ev in seen_oi_ev:
+                continue
+            if ev:
+                seen_oi_ev.add(ev)
+            open_issues_flat.append(oi)
 
     # 全局顺排序号(各自 1 起),去掉 _kind 内部标记,行动项纯计算 loose_end。
     decisions: list[dict[str, Any]] = []
@@ -627,8 +739,17 @@ def _renumber(seg_outs: list[list[dict[str, Any]]]) -> dict[str, list[dict[str, 
             act.get("due", "")
         ).strip()
         actions.append(act)
+    open_issues: list[dict[str, Any]] = []
+    for i, oi in enumerate(open_issues_flat, start=1):
+        oi.pop("_kind", None)
+        oi["chapter"] = i
+        open_issues.append(oi)
 
-    return {"decisions": decisions, "action_items": actions}
+    return {
+        "decisions": decisions,
+        "action_items": actions,
+        "open_issues": open_issues,
+    }
 
 
 def _make_conclusions_continue_fn(
@@ -710,13 +831,14 @@ def action_ledger_from_meeting(
     max_workers: int | None = None,
     cache_enabled: bool = True,
 ) -> dict[str, Any]:
-    """一份会议记录精读一次,出带证据的「会脉」行动项台账(head + decisions + action_items)。
+    """一份会议记录精读一次,出带证据的「会脉」(head + decisions + action_items + open_issues)。
 
     照 ``doc_spine.build_doc_spine`` 的套路,结论项维**不能整套照搬** ``mapreduce_per_chapter``:
 
     - **结论项维**走底层 ``run_segments``(分段 + 并发 + 截断兜底)+ 自接两步:逐段证据核验
       (``_verify_conclusion_evidence``,只核不动序号 + 会议议程段弱先验消歧)、跨段全局重排序号
-      (``_renumber``,决议/行动项各自 1…N、行动项 from_decision 跟着改)。为什么不套
+      (``_renumber``,决议 / 行动项 / 议而未决各自 1…N、行动项 from_decision 跟着改)。一趟 LLM
+      调用同时吐三类(decision / action_item / open_issue),不另起一趟。为什么不套
       ``mapreduce_per_chapter``:同公文条款维——它合并前会拿命中 chunk 的真章号覆盖记录序号,把
       同议程段的多条结论项压成一个号、去重后塌成个位数。截断丢条款靠 ``run_segments`` 自带的
       拆小重抽 + 结论项版续抽(``_make_conclusions_continue_fn``)两道兜底。
@@ -751,14 +873,18 @@ def action_ledger_from_meeting(
                            substance_reason, evidence, verified, match_score}],
             "action_items": [{chapter, task, owner, due, from_decision, source, substance,
                               substance_reason, loose_end, evidence, verified, match_score}],
-            "open_issues": [],   # 首炮恒空,schema 占位(第二炮再填)
+            "open_issues": [{chapter, issue, raised_by, why_open, background, evidence,
+                             verified, match_score}],
         }``。
         头要素抽不到的要素出一条空待核记录(verified=False),绝不编。结论项空 → 对应列 ``[]``。
         ``action_items`` 按「先 loose_end 置顶、再按含金量(真金白银→空头表态)、再按序号」排——
         台账把没人接/没时限的黑洞捞到最前。传了 ``owner`` 时只含命中该身份的行动项(我的行动项)。
+        ``open_issues`` 按「为何悬着」轻重缓急排(未拍板 / 没人接最该追,排前;待外部 / 待下次排后),
+        ``raised_by`` 抽不到留空、绝不编人(同 action_item 的 owner 空逻辑)。
 
         **loose_end 由 BE 纯计算**(owner 空 or due 空),不让模型打分(``feedback_viz_algorithm_rigor``
         不许拍分的纪律)。**含金量复用公文开环/闭环三档**,叶子档名是会议版「空头表态」。
+        **议而未决跟决议(已拍板) / 行动项(已派人)互斥**:它是讨论了却没结论的黑洞。
     """
     # 头要素维优先用传入的完整原文;没传退回 chunk 拼接(向后兼容)。
     head_full_text = full_text if (full_text and full_text.strip()) else "".join(
@@ -802,12 +928,20 @@ def action_ledger_from_meeting(
     renumbered = _renumber(seg_outs)
     decisions = renumbered["decisions"]
     action_items = renumbered["action_items"]
+    open_issues = renumbered["open_issues"]
 
     # 台账排序:① loose_end 置顶(黑洞捞取)② 含金量轻重缓急 ③ 序号。
     action_items.sort(key=lambda a: (
         0 if a.get("loose_end") else 1,
         _substance_rank(a.get("substance")),
         a["chapter"] if isinstance(a.get("chapter"), int) else 1_000_000,
+    ))
+
+    # 议而未决排序:按「为何悬着」的轻重缓急(未拍板/没人接是最该追的黑洞,排前;待外部/待下次
+    # 已有去向、相对没那么急,排后),再按序号稳定。同台账「把黑洞捞到最前」的逻辑。
+    open_issues.sort(key=lambda o: (
+        _open_issue_reason_rank(o.get("why_open")),
+        o["chapter"] if isinstance(o.get("chapter"), int) else 1_000_000,
     ))
 
     # 「我的行动项」:传了 owner 就只留 owner 命中这个身份的(纯字符串包含,任一方向都算)。
@@ -825,7 +959,7 @@ def action_ledger_from_meeting(
         "head": head,
         "decisions": decisions,
         "action_items": action_items,
-        "open_issues": [],  # 首炮恒空,schema 占位
+        "open_issues": open_issues,
     }
 
 
@@ -839,8 +973,23 @@ def _substance_rank(level: Any) -> int:
     )
 
 
+def _open_issue_reason_rank(reason: Any) -> int:
+    """议而未决排序权重:未拍板=0 < 没人接=1 < 待外部=2 < 待下次=3,未知排最后。
+
+    顺序就是 ``MEETING_OPEN_ISSUE_REASONS`` 的次序——未拍板 / 没人接是会场内能立刻追的黑洞,
+    待外部 / 待下次已经有去向,相对没那么急,排后。
+    """
+    s = reason if isinstance(reason, str) else ""
+    return (
+        MEETING_OPEN_ISSUE_REASONS.index(s)
+        if s in MEETING_OPEN_ISSUE_REASONS
+        else len(MEETING_OPEN_ISSUE_REASONS)
+    )
+
+
 __all__ = [
     "MEETING_FORMS",
+    "MEETING_OPEN_ISSUE_REASONS",
     "MEETING_SPINE_SCHEMA_VERSION",
     "MEETING_SUBSTANCE_LEVELS",
     "action_ledger_from_meeting",

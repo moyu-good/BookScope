@@ -10,6 +10,8 @@
 - evidence 锚原文过核验(逐字命中=verified,编的=待核)。
 - from_decision 段内序号 → 全局序号映射;台账排序(loose_end 置顶 → 含金量 → 序号)。
 - 我的行动项:传 owner 只返该身份的;parse 兜底 / 异常退空。
+- **议而未决(第二炮)**:抽出来 + 字段齐 + why_open 四档判 + 别名归一 + raised_by 空不编人 +
+  evidence 核验 + 按为何悬着排序 + 截断抢救。
 """
 
 from __future__ import annotations
@@ -27,12 +29,14 @@ _EV_AUTH = "Eng-B:接口我来写,下周一前给你们出个初版,你们先接
 _EV_PERF = "PM-A:性能这个先记着,回头安排个人专门看看。"
 # 决议拍板句。
 _EV_DECIDE = "PM-A:好,那鉴权就定了,用 token + 刷新方案。"
+# 议而未决:讨论了没拍板的议题(数据库选型),raised_by 抽得到、why_open=未拍板。
+_EV_OPEN = "Eng-C:数据库到底用 PG 还是 Mongo,我俩没聊拢,这个再研究研究下次定吧。"
 
-_FULL_TEXT = "\n".join([_HEAD_LINE, _EV_DECIDE, _EV_AUTH, _EV_PERF])
+_FULL_TEXT = "\n".join([_HEAD_LINE, _EV_DECIDE, _EV_AUTH, _EV_PERF, _EV_OPEN])
 
 _CHUNKS = [
     {"chunk_id": "h0", "chapter": 0, "text": _HEAD_LINE},
-    {"chunk_id": "c1", "chapter": 1, "text": _EV_DECIDE + _EV_AUTH + _EV_PERF},
+    {"chunk_id": "c1", "chapter": 1, "text": _EV_DECIDE + _EV_AUTH + _EV_PERF + _EV_OPEN},
 ]
 
 
@@ -54,9 +58,10 @@ def _head_payload(form: str = "逐字稿") -> str:
 
 
 def _conclusions_payload() -> str:
-    """结论项一次抽两类:1 条决议 + 2 条行动项(1 闭环 1 开环)。
+    """结论项一次抽三类:1 条决议 + 2 条行动项(1 闭环 1 开环)+ 1 条议而未决。
 
     行动项 1(鉴权)挂 from_decision=1(本段决议序号);行动项 2(性能)owner 空、from_decision=null。
+    议而未决(数据库选型)why_open=未拍板、raised_by 抽到。
     """
     return json.dumps({
         "decisions": [
@@ -71,6 +76,10 @@ def _conclusions_payload() -> str:
             {"chapter": 2, "task": "看性能优化", "owner": "", "due": "",
              "from_decision": None, "source": "PM-A", "substance": "空头表态",
              "substance_reason": "「回头安排个人」无 owner 无 due", "evidence": _EV_PERF},
+        ],
+        "open_issues": [
+            {"chapter": 1, "issue": "数据库选 PG 还是 Mongo 没定", "raised_by": "Eng-C",
+             "why_open": "未拍板", "background": "两人没聊拢,留到下次", "evidence": _EV_OPEN},
         ],
     }, ensure_ascii=False)
 
@@ -115,9 +124,9 @@ def test_ledger_overall_shape(monkeypatch):
     out = _run(monkeypatch)
     assert out["schema_version"] == ms.MEETING_SPINE_SCHEMA_VERSION
     assert out["form"] in ms.MEETING_FORMS
-    assert out["open_issues"] == []  # 首炮恒空
     assert len(out["decisions"]) == 1
     assert len(out["action_items"]) == 2
+    assert len(out["open_issues"]) == 1  # 第二炮:议而未决抽出来了
     # head 固定 6 条骨架,没抽到的也出一条
     assert len(out["head"]) == 6
 
@@ -323,6 +332,116 @@ def test_fabricated_evidence_marked_pending(monkeypatch):
     assert out["action_items"][0]["verified"] is False
 
 
+# ── 议而未决(第二炮)──────────────────────────────────────────────────────
+def test_open_issue_fields_complete(monkeypatch):
+    """议而未决每条字段齐全(含 BE 附的 verified/match_score)。"""
+    out = _run(monkeypatch)
+    assert len(out["open_issues"]) == 1
+    for o in out["open_issues"]:
+        for k in ("chapter", "issue", "raised_by", "why_open", "background",
+                  "evidence", "verified", "match_score"):
+            assert k in o, f"议而未决缺字段 {k}"
+        assert o["why_open"] in ms.MEETING_OPEN_ISSUE_REASONS
+
+
+def test_open_issue_extracted_content(monkeypatch):
+    """议而未决抽到的内容对:议题/谁提的/为何悬着。"""
+    out = _run(monkeypatch)
+    oi = out["open_issues"][0]
+    assert oi["chapter"] == 1  # 全局重排 1 起
+    assert "数据库" in oi["issue"]
+    assert oi["raised_by"] == "Eng-C"
+    assert oi["why_open"] == "未拍板"
+
+
+def test_open_issue_evidence_verified(monkeypatch):
+    """议而未决的 evidence 逐字命中原文 → verified=True(同决议/行动项一套核验)。"""
+    out = _run(monkeypatch)
+    assert out["open_issues"][0]["verified"] is True
+
+
+def test_open_issue_fabricated_evidence_pending(monkeypatch):
+    """编的 evidence 原文里没有 → verified=False 标待核(绝不假装核过)。"""
+    canned = json.dumps({"decisions": [], "action_items": [], "open_issues": [
+        {"chapter": 1, "issue": "X", "raised_by": "", "why_open": "未拍板",
+         "background": "", "evidence": "原文根本没有这句话编的。"},
+    ]}, ensure_ascii=False)
+    out = _run(monkeypatch, conclusions_canned=canned)
+    assert out["open_issues"][0]["verified"] is False
+
+
+def test_open_issue_raised_by_kept_blank(monkeypatch):
+    """没点明谁提的就留空,绝不替它编一个人(同 owner 空逻辑)。"""
+    canned = json.dumps({"decisions": [], "action_items": [], "open_issues": [
+        {"chapter": 1, "issue": "预算谁出没说清", "raised_by": "", "why_open": "未拍板",
+         "background": "", "evidence": _EV_OPEN},
+    ]}, ensure_ascii=False)
+    out = _run(monkeypatch, conclusions_canned=canned)
+    assert out["open_issues"][0]["raised_by"] == ""
+
+
+def test_open_issue_reason_alias_normalized(monkeypatch):
+    """模型吐近义说法(如「下次会上定」)→ 归一到四档正名(待下次)。"""
+    canned = json.dumps({"decisions": [], "action_items": [], "open_issues": [
+        {"chapter": 1, "issue": "X", "raised_by": "", "why_open": "下次会上定",
+         "background": "", "evidence": _EV_OPEN},
+    ]}, ensure_ascii=False)
+    out = _run(monkeypatch, conclusions_canned=canned)
+    assert out["open_issues"][0]["why_open"] == "待下次"
+
+
+def test_open_issue_reason_unknown_falls_back(monkeypatch):
+    """落不进四档 → 退「未拍板」(最常见、最该追)。"""
+    canned = json.dumps({"decisions": [], "action_items": [], "open_issues": [
+        {"chapter": 1, "issue": "X", "raised_by": "", "why_open": "瞎填的原因",
+         "background": "", "evidence": _EV_OPEN},
+    ]}, ensure_ascii=False)
+    out = _run(monkeypatch, conclusions_canned=canned)
+    assert out["open_issues"][0]["why_open"] == "未拍板"
+
+
+def test_open_issue_sorted_by_reason(monkeypatch):
+    """议而未决排序:未拍板/没人接(会场内能追的黑洞)排前,待外部/待下次排后。"""
+    canned = json.dumps({"decisions": [], "action_items": [], "open_issues": [
+        {"chapter": 1, "issue": "待下次的", "raised_by": "", "why_open": "待下次",
+         "background": "", "evidence": _EV_DECIDE},
+        {"chapter": 2, "issue": "未拍板的", "raised_by": "", "why_open": "未拍板",
+         "background": "", "evidence": _EV_PERF},
+    ]}, ensure_ascii=False)
+    out = _run(monkeypatch, conclusions_canned=canned)
+    issues = [o["issue"] for o in out["open_issues"]]
+    assert issues.index("未拍板的") < issues.index("待下次的")
+
+
+def test_coerce_open_issue_reason_pure():
+    for r in ms.MEETING_OPEN_ISSUE_REASONS:
+        assert ms._coerce_open_issue_reason(r) == r
+    assert ms._coerce_open_issue_reason("下次会上定") == "待下次"  # 别名
+    assert ms._coerce_open_issue_reason("没人认领") == "没人接"  # 别名
+    assert ms._coerce_open_issue_reason("瞎填") == "未拍板"
+    assert ms._coerce_open_issue_reason(None) == "未拍板"
+    assert ms._coerce_open_issue_reason("  待外部 ") == "待外部"  # 去空白
+
+
+def test_coerce_open_issue_drops_no_chapter():
+    """没序号 → 丢(摆不进会脉)。"""
+    assert ms._coerce_open_issue({"issue": "X", "raised_by": "Y"}) is None
+    assert ms._coerce_open_issue({"chapter": "一", "issue": "X"}) is None
+
+
+def test_open_issue_salvaged_on_truncation(monkeypatch):
+    """主解析失败时,从截断抢救也能捞回议而未决(同决议/行动项的截断兜底)。"""
+    # 故意造个被截断的 JSON:open_issues 数组开着、最后一条对象闭合,主 loads 会失败。
+    broken = (
+        '{"decisions":[],"action_items":[],"open_issues":['
+        '{"chapter":1,"issue":"数据库选型没定","raised_by":"Eng-C",'
+        '"why_open":"未拍板","background":"","evidence":"' + _EV_OPEN + '"}'
+    )  # 缺结尾的 ]} → 截断态
+    out = _run(monkeypatch, conclusions_canned=broken)
+    assert len(out["open_issues"]) == 1
+    assert out["open_issues"][0]["raised_by"] == "Eng-C"
+
+
 # ── prompt 接 codebook + 会议叶子档名 ───────────────────────────────────────
 def test_prompt_carries_meeting_codebook():
     instr = ms._INSTR_CONCLUSIONS
@@ -330,6 +449,15 @@ def test_prompt_carries_meeting_codebook():
     assert "空头倡导" not in instr  # 不漏公文档名进 prompt
     assert "拍板语" in instr  # 会议措辞刻度进来了
     assert "证据要摘长" in instr  # 锚错防护强调
+
+
+def test_prompt_carries_open_issue_codebook():
+    """prompt 把议而未决该抽什么 + 四档「为何悬着」都交代了。"""
+    instr = ms._INSTR_CONCLUSIONS
+    assert "open_issue" in instr  # 第三类抽取键
+    assert "议而未决" in instr
+    for reason in ms.MEETING_OPEN_ISSUE_REASONS:
+        assert reason in instr, f"prompt 漏了为何悬着档:{reason}"
 
 
 # ── parse / 异常兜底 ─────────────────────────────────────────────────────────
@@ -340,10 +468,11 @@ def test_strips_code_fence(monkeypatch):
 
 
 def test_unparseable_conclusions_empty(monkeypatch):
-    """结论项解析不出 → 决议/行动项空,但 head 仍在(读过这份)。"""
+    """结论项解析不出 → 决议/行动项/议而未决全空,但 head 仍在(读过这份)。"""
     out = _run(monkeypatch, conclusions_canned="这根本不是 JSON")
     assert out["action_items"] == []
     assert out["decisions"] == []
+    assert out["open_issues"] == []
 
 
 def test_llm_exception_returns_skeleton(monkeypatch):
@@ -358,6 +487,7 @@ def test_llm_exception_returns_skeleton(monkeypatch):
     )
     assert out["action_items"] == []
     assert out["decisions"] == []
+    assert out["open_issues"] == []
     assert len(out["head"]) == 6  # 骨架还在
     assert all(el["verified"] is False for el in out["head"])
 
