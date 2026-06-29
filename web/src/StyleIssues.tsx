@@ -92,7 +92,7 @@ export function StyleIssues({
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed pr-4">
-          扫用词重复 / 视角越界 / 支线失踪——保守只报清楚的，每条钉原文，编的会被滤掉。
+          扫用词重复 / 视角越界 / 支线失踪，保守只报清楚的，每条钉原文，编的会被滤掉。
         </p>
         <button
           type="button"
@@ -120,7 +120,7 @@ export function StyleIssues({
 
       {scanned && issues && issues.length === 0 && (
         <p className="text-sm text-[var(--color-ink)]">
-          没扫出明显的文体毛病——用词、视角、支线都还稳。
+          没扫出明显的文体毛病，用词、视角、支线都还稳。
         </p>
       )}
 

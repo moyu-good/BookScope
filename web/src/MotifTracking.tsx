@@ -103,7 +103,7 @@ export function MotifTracking({
   return (
     <div className="pt-4">
       <p className="text-sm text-[var(--color-ink-muted)] mb-3 leading-relaxed">
-        输一个主题/母题，看它在全书哪些地方复现——每处怎么体现、在哪章，带原文。
+        输一个主题/母题，看它在全书哪些地方复现，每处怎么体现、在哪章，带原文。
       </p>
 
       <form
@@ -146,7 +146,7 @@ export function MotifTracking({
 
       {scanned && occurrences && occurrences.length === 0 && queried && (
         <p className="text-sm text-[var(--color-ink)]">
-          全书没追踪到「{queried}」的复现——可能书里没这个母题，或换个说法再试。
+          全书没追踪到「{queried}」的复现，可能书里没这个母题，或换个说法再试。
         </p>
       )}
 

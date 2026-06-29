@@ -92,7 +92,7 @@ export function StudyCards({
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed pr-4">
-          据书出知识点卡——每张一道启发自测题，先自己想，再翻看解释和原文。
+          据书出知识点卡，每张一道启发自测题，先自己想，再翻看解释和原文。
         </p>
         <button
           type="button"

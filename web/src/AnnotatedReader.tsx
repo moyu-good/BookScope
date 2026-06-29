@@ -189,7 +189,7 @@ export function AnnotatedReader({
     return (
       <div className="pt-4">
         <p className="text-sm text-[var(--color-ink-muted)] mb-4 leading-relaxed">
-          读这本书的原文，读到某处行间浮一条带原文证据的批注——这里埋了伏笔、这句和别章矛盾、这是某母题的又一次复现。
+          读这本书的原文，读到某处行间浮一条带原文证据的批注，这里埋了伏笔、这句和别章矛盾、这是某母题的又一次复现。
           点记号看支撑它的原文。先选要哪几层（默认只开伏笔 + 矛盾，免得糊一脸）。
         </p>
 
@@ -231,7 +231,7 @@ export function AnnotatedReader({
         {loading && (
           <RunningProcess
             label="读全书贴精读批注"
-            hint="按选中的层通读全书、把已有分析的结论挂回原文行间——每条都回原文核验，多选几层会更久。"
+            hint="按选中的层通读全书、把已有分析的结论挂回原文行间，每条都回原文核验，多选几层会更久。"
           />
         )}
       </div>
@@ -272,7 +272,7 @@ export function AnnotatedReader({
 
       {total === 0 ? (
         <p className="text-sm text-[var(--color-ink)]">
-          这几层在全书没挂出核验得了的批注——换层、或填别的母题 / 人物名再试。
+          这几层在全书没挂出核验得了的批注，换层、或填别的母题 / 人物名再试。
         </p>
       ) : (
         <>

@@ -365,7 +365,7 @@ export function CharacterFlow({
           人物叙事流
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          每个人一条横线穿过全书章节——同章同场聚成一束、各自行动分开、退场线止。一眼看见谁何时入场、哪几章是群戏。
+          每个人一条横线穿过全书章节，同章同场聚成一束、各自行动分开、退场线止。一眼看见谁何时入场、哪几章是群戏。
         </p>
         <button
           type="button"
@@ -388,7 +388,7 @@ export function CharacterFlow({
         {loading && (
           <RunningProcess
             label="读全书抽人物叙事流"
-            hint="整本书喂进模型逐章抽同场结构——每条同场判定都回原文核验，约 1 分钟。"
+            hint="整本书喂进模型逐章抽同场结构，每条同场判定都回原文核验，约 1 分钟。"
           />
         )}
       </div>
@@ -436,7 +436,7 @@ export function CharacterFlow({
         {totalCast > names.length
           ? `图中主要 ${names.length} 人 / 全书共 ${totalCast} 人`
           : `${names.length} 个人物`}
-        、{n} 章（{totalPairs} 条同场）。横线穿全书、线越粗这章戏越多；同场处两线靠拢成束——点束看那一章的原文出处（点开现取）。
+        、{n} 章（{totalPairs} 条同场）。横线穿全书、线越粗这章戏越多；同场处两线靠拢成束，点束看那一章的原文出处（点开现取）。
       </p>
 
       <svg

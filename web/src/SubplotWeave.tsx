@@ -169,7 +169,7 @@ export function SubplotWeave({
           支线编织
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          每条情节支线一条横向泳道穿过全书——活跃段亮、休眠段灰断，两条线同章交汇画连接节点。一眼看见哪条支线断更太久、哪几章是多线交汇的高潮。点活跃段 / 交汇看原文。
+          每条情节支线一条横向泳道穿过全书，活跃段亮、休眠段灰断，两条线同章交汇画连接节点。一眼看见哪条支线断更太久、哪几章是多线交汇的高潮。点活跃段 / 交汇看原文。
         </p>
         <button
           type="button"
@@ -192,7 +192,7 @@ export function SubplotWeave({
         {loading && (
           <RunningProcess
             label="读全书抽支线编织"
-            hint="整本书喂进模型抽情节支线 + 逐章活跃 + 交汇——支线和交汇都回原文核验，约 1 分钟。"
+            hint="整本书喂进模型抽情节支线 + 逐章活跃 + 交汇，支线和交汇都回原文核验，约 1 分钟。"
           />
         )}
       </div>

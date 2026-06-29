@@ -1445,7 +1445,7 @@ export function App() {
               className="mb-6 w-full text-left rounded-lg border border-[var(--color-seal)]/40 px-4 py-3 text-sm text-[var(--color-ink)] hover:border-[var(--color-seal)] transition-colors"
               style={{ background: "var(--color-seal-soft)" }}
             >
-              先填一个 LLM 的 API key 才能用——点这里去
+              先填一个 LLM 的 API key 才能用，点这里去
               <span style={{ color: "var(--color-seal)" }}>设置</span>
               （左栏底部，自带的 key、不上传服务器）。
             </button>
@@ -3029,9 +3029,9 @@ const FEATURE_INFO: Record<string, string> = {
     "逐章数能数的事：每章高度 = 事件数 + 转折数（伏笔回收），朱砂点标转折章。点一章列出这章实际发生的几件事，每件回原文核验。张力只在明细里附带，标「模型判读」，不当高度。",
   consistency:
     "全书前后矛盾的两处对照（如第 5 章左撇子、第 80 章用右手），编的会被滤掉。",
-  argument: "作者的论证骨架——主张 + 撑住它的原文 + 在哪章，一条条理清。",
+  argument: "作者的论证骨架：主张 + 撑住它的原文 + 在哪章，一条条理清。",
   concept: "一个概念在全书怎么从提出走到深化，分阶段、每段带原文。",
-  technique: "作者怎么写——论证 / 结构 / 铺陈的手法，每条配一句原文例子。",
+  technique: "作者怎么写：论证 / 结构 / 铺陈的手法，每条配一句原文例子。",
   cards: "一组知识点卡，每张一道启发自测题，先自己想、再翻看解释和原文。",
   style: "用词重复 / 视角越界 / 支线失踪的毛病单，保守只报清楚的、编的滤掉。",
 };
@@ -3100,7 +3100,7 @@ function CanvasHeader({
           >
             <SealMark size={20} />
             <span className="text-xs text-[var(--color-ink-muted)] leading-relaxed">
-              每条结论都钉在原文上、核验过才盖章显示——没出处的不编、不输出。
+              每条结论都钉在原文上、核验过才盖章显示，没出处的不编、不输出。
             </span>
           </div>
         </div>
@@ -3182,7 +3182,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     backend: "anthropic",
     baseUrl: "",
     keyHint:
-      "填 console.anthropic.com 的按量 API key（sk-ant-api…）。Claude 的 Pro/Max 订阅接不了——那是只许官方 app 用的 token。",
+      "填 console.anthropic.com 的按量 API key（sk-ant-api…）。Claude 的 Pro/Max 订阅接不了，那是只许官方 app 用的 token。",
     models: [
       { value: "", label: "claude-opus-4-8 · 默认最强" },
       { value: "claude-sonnet-4-6", label: "claude-sonnet-4-6 · 均衡" },
@@ -3393,7 +3393,7 @@ function ProviderConfig(props: {
       )}
 
       <p className="text-[11px] text-[var(--color-ink-muted)] leading-relaxed">
-        BYOK——key 自带、直发你选的厂商，BookScope 不内置任何 key。除 Anthropic 外都走
+        BYOK，key 自带、直发你选的厂商，BookScope 不内置任何 key。除 Anthropic 外都走
         OpenAI 兼容接口（选厂商即自动填好官方 Base URL）。订阅制 coding plan（百炼 / 智谱）
         也是这条路，填套餐专属 key 即可。模型名以各厂商官方为准（核对日期 2026-06-26），
         滚动快就选「自定义」自己填。
@@ -3627,7 +3627,7 @@ function SuggestedQuestions(props: {
   return (
     <div className="mb-4 rounded border border-[var(--color-rule)] bg-[var(--color-surface)] p-3">
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        想问点什么？点一下试试，或者自己写一道——后端会自动判要不要深查。
+        想问点什么？点一下试试，或者自己写一道，后端会自动判要不要深查。
       </p>
       <div className="flex flex-wrap gap-2 mb-2">
         <span className="text-xs text-[var(--color-ink-muted)] self-center">
@@ -3756,7 +3756,7 @@ function AskModeToggle({
       </div>
       <p className="mt-2 text-xs text-[var(--color-ink-muted)] leading-relaxed">
         {mode === "question"
-          ? "问一个具体问题，后端自动判要不要深查——这是原来的问书。"
+          ? "问一个具体问题，后端自动判要不要深查，这是原来的问书。"
           : "说一个目标（不知道点哪个功能也行），agent 会自己挑该跑哪几个分析、串起来跑、综合成带原文证据的结论，每块还能点进完整视图。"}
       </p>
     </div>
@@ -4190,7 +4190,7 @@ function AnswerBlock({ answer }: { answer: AskResponse }) {
                           color: "var(--color-seal)",
                           border: "1px solid var(--color-seal)",
                         }}
-                        title="这条引用是真的，但未必撑得起答案的论断——建议自己再看一眼原文"
+                        title="这条引用是真的，但未必撑得起答案的论断，建议自己再看一眼原文"
                       >
                         弱支撑
                       </span>
@@ -4420,7 +4420,7 @@ function SettingsDrawer(props: {
         >
           关于
         </div>
-        书鉴 · BookScope v{APP_VERSION}——查询时智能代理 + 原文证据的深读引擎。BYOK：你的
+        书鉴 · BookScope v{APP_VERSION}，查询时智能代理 + 原文证据的深读引擎。BYOK：你的
         key 只存本地、随请求直发你选的 LLM，不经 BookScope 服务器。
         <a
           href="https://github.com/moyu-good/BookScope"

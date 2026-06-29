@@ -63,7 +63,7 @@ const GROUPS: { title: string; feats: Feat[] }[] = [
   {
     title: "读着用",
     feats: [
-      { id: "chapter-ask", label: "问这一章", hint: "只问你正读的这一章——答案只从本章原文来，留空给本章导读" },
+      { id: "chapter-ask", label: "问这一章", hint: "只问你正读的这一章，答案只从本章原文来，留空给本章导读" },
       { id: "orchestrate", label: "给目标", hint: "说一句你想搞清的事，它编排几个分析、综合带证据回答" },
       { id: "recap", label: "前情回顾", hint: "无剧透地回顾到某一章为止发生了什么" },
       { id: "annotate", label: "行间批注", hint: "原文行间浮出带证据的朱砂批注（伏笔/矛盾/母题/人物）" },
@@ -72,7 +72,7 @@ const GROUPS: { title: string; feats: Feat[] }[] = [
   {
     title: "人物",
     feats: [
-      { id: "relationship", label: "关系", hint: "关系网(全书星图) + 关系演变(带时间轴)——一个入口内部切" },
+      { id: "relationship", label: "关系", hint: "关系网(全书星图) + 关系演变(带时间轴)，一个入口内部切" },
       { id: "flow", label: "叙事流", hint: "谁何时入场、哪几章群戏" },
       { id: "charvoice", label: "声口一致", hint: "标出「这句不像他说的」" },
     ],
@@ -80,7 +80,7 @@ const GROUPS: { title: string; feats: Feat[] }[] = [
   {
     title: "情节",
     feats: [
-      { id: "chapter-curves", label: "逐章曲线", hint: "叙事曲线(山水)/人物弧线(花鸟)/节奏——逐章看张力情感视角,一个入口内部切" },
+      { id: "chapter-curves", label: "逐章曲线", hint: "叙事曲线(山水)/人物弧线(花鸟)/节奏，逐章看张力情感视角,一个入口内部切" },
       { id: "foreshadow", label: "伏笔回收", hint: "哪个伏笔埋了、收没收" },
       { id: "subplot", label: "支线编织", hint: "每条支线何时活跃、在哪交汇" },
       { id: "timeline", label: "时间线", hint: "多线倒叙也理清真实时序" },
@@ -250,7 +250,7 @@ export function AnalysisOverlay({
                       读着读着，挑一项分析
                     </p>
                     <p className="text-xs text-[var(--color-ink-muted)] leading-relaxed">
-                      左边挑一项，就在这儿跑、就在这儿看——结论都带原文证据，收起就回到你刚读的地方。
+                      左边挑一项，就在这儿跑、就在这儿看，结论都带原文证据，收起就回到你刚读的地方。
                     </p>
                   </div>
                 </div>

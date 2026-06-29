@@ -96,7 +96,7 @@ export function Recap({
   return (
     <div className="pt-4">
       <p className="text-sm text-[var(--color-ink-muted)] mb-3 leading-relaxed">
-        告诉我你读到第几章，回顾到此为止的前情——后文绝不剧透（模型根本看不到后文）。
+        告诉我你读到第几章，回顾到此为止的前情，后文绝不剧透（模型根本看不到后文）。
       </p>
 
       <form
@@ -132,11 +132,11 @@ export function Recap({
         </p>
       )}
 
-      {loading && <RunningProcess label="回顾前情（不读后文）" hint="只把你读到的章节喂进模型——后文物理上看不到，零剧透。" />}
+      {loading && <RunningProcess label="回顾前情（不读后文）" hint="只把你读到的章节喂进模型，后文物理上看不到，零剧透。" />}
 
       {!scanned && points && (
         <p className="text-sm text-[var(--color-ink-muted)]">
-          回顾失败——书太大、或这一章之前没识别到原文。换个章号或稍后重试。
+          回顾失败，书太大、或这一章之前没识别到原文。换个章号或稍后重试。
         </p>
       )}
 

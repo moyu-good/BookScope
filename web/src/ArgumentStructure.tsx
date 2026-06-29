@@ -79,7 +79,7 @@ export function ArgumentStructure({
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed pr-4">
-          拆这本书的论证骨架——作者主张了什么、靠什么撑，每条钉在原文。
+          拆这本书的论证骨架：作者主张了什么、靠什么撑，每条钉在原文。
         </p>
         <button
           type="button"

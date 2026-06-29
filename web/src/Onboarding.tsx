@@ -57,11 +57,11 @@ interface OnboardingProps {
 
 const COPY: Record<OnboardingType, string> = {
   first_visit:
-    "BookScope 是给写过、在写长文本的人用的——上传你的书或文章，AI 给你带原文出处的判断（不只是摘要）。",
+    "BookScope 是给写过、在写长文本的人用的，上传你的书或文章，AI 给你带原文出处的判断（不只是摘要）。",
   first_upload:
-    "上传完了——可以点上方“快问 / 深问”里的题试一道，或者输入自己的问题。",
+    "上传完了，可以点上方“快问 / 深问”里的题试一道，或者输入自己的问题。",
   first_switch:
-    "切到《{bookTitle}》了——之前的问答记录在右侧 HistoryPanel 还能翻回来。",
+    "切到《{bookTitle}》了，之前的问答记录在右侧 HistoryPanel 还能翻回来。",
 };
 
 export function Onboarding({ type, triggered, bookTitle }: OnboardingProps) {

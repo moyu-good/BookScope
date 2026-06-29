@@ -151,7 +151,7 @@ export function CharacterArc({
           人物弧线
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          给主要角色各画一枝——枝条上扬下垂是处境起落，着花疏密是戏份多寡。点一朵花看那章原文。
+          给主要角色各画一枝，枝条上扬下垂是处境起落，着花疏密是戏份多寡。点一朵花看那章原文。
         </p>
         <button
           type="button"
@@ -172,7 +172,7 @@ export function CharacterArc({
         {loading && (
           <RunningProcess
             label="读全书出人物弧线"
-            hint="整本书喂进模型，给主要角色逐章判戏份与处境——每个点都回原文核验，约 1 分钟。"
+            hint="整本书喂进模型，给主要角色逐章判戏份与处境，每个点都回原文核验，约 1 分钟。"
           />
         )}
       </div>
@@ -214,7 +214,7 @@ export function CharacterArc({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜人名，如「刘备」——只看他一枝"
+          placeholder="搜人名，如「刘备」，只看他一枝"
           className="w-full text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-white focus:border-[var(--color-seal)] outline-none"
         />
         <div className="mt-2 max-h-44 overflow-y-auto rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)]">
@@ -316,7 +316,7 @@ export function CharacterArc({
             {sel.evidence || "（这章没给出原文依据）"}
           </p>
           <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-            {sel.verified ? "原文已核验" : "原文未在书中比对命中——这点仅供参考"}
+            {sel.verified ? "原文已核验" : "原文未在书中比对命中，这点仅供参考"}
           </p>
         </div>
       )}

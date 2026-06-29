@@ -134,7 +134,7 @@ export function ForeshadowArcs({
           伏笔回收
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          每条伏笔从埋点章拱到回收点章画一道弧——埋了没回收的画成灰虚线悬空，一眼挑出没填的坑。点弧线看两端原文。
+          每条伏笔从埋点章拱到回收点章画一道弧，埋了没回收的画成灰虚线悬空，一眼挑出没填的坑。点弧线看两端原文。
         </p>
         <button
           type="button"
@@ -157,7 +157,7 @@ export function ForeshadowArcs({
         {loading && (
           <RunningProcess
             label="读全书找伏笔回收"
-            hint="整本书喂进模型抽伏笔配对——埋点和回收点都回原文核验，约 1 分钟。"
+            hint="整本书喂进模型抽伏笔配对，埋点和回收点都回原文核验，约 1 分钟。"
           />
         )}
       </div>
@@ -416,7 +416,7 @@ export function ForeshadowArcs({
             </div>
           ) : (
             <p className="mt-2 text-xs" style={{ color: "var(--color-seal)" }}>
-              全书未找到回收原文——这个坑可能没填，建议人工复核。
+              全书未找到回收原文，这个坑可能没填，建议人工复核。
             </p>
           )}
         </div>

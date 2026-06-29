@@ -80,7 +80,7 @@ export function WritingTechnique({
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed pr-4">
-          看作者怎么写——论证 / 结构 / 铺陈 / 用语的手法，每条配原文例子。学手艺。
+          看作者怎么写：论证 / 结构 / 铺陈 / 用语的手法，每条配原文例子。学手艺。
         </p>
         <button
           type="button"

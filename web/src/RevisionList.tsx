@@ -275,7 +275,7 @@ export function RevisionList({
           </p>
           <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
             点上面「一键汇总全书诊断」，把这本书已扫出的矛盾 / 断伏笔 / 塌节奏 /
-            文体毛病攒成一份带原文的修改清单——核不过原文的发现不会进来。
+            文体毛病攒成一份带原文的修改清单，核不过原文的发现不会进来。
           </p>
         </div>
       )}

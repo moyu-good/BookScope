@@ -47,7 +47,7 @@ const STAGES = ["取出整本书", "喂模型通读", "梳理结构", "核验原
  */
 export function RunningProcess({
   label = "读全书分析中",
-  hint = "整本书喂进模型通读——大书约 1 分钟，请稍候。",
+  hint = "整本书喂进模型通读，大书约 1 分钟，请稍候。",
 }: {
   label?: string;
   hint?: string;

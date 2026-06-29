@@ -81,7 +81,7 @@ export function ChapterAsk({
   if (chapter == null) {
     return (
       <p className="text-sm text-[var(--color-ink-muted)]">
-        先翻开一章再问——这里只问你正读的那一章。
+        先翻开一章再问，这里只问你正读的那一章。
       </p>
     );
   }
@@ -89,7 +89,7 @@ export function ChapterAsk({
   return (
     <div>
       <p className="text-sm text-[var(--color-ink)] mb-3 leading-relaxed">
-        只问<strong>第 {chapter} 章</strong>——答案只从这一章的原文来，不掺别章、不剧透后文。
+        只问<strong>第 {chapter} 章</strong>，答案只从这一章的原文来，不掺别章、不剧透后文。
       </p>
 
       <div className="flex gap-2 flex-wrap mb-3">
@@ -140,7 +140,7 @@ export function ChapterAsk({
         <div className="mt-1">
           {!result.scanned ? (
             <p className="text-sm text-[var(--color-ink)]">
-              这一章没取到可分析的原文——换一章试试。
+              这一章没取到可分析的原文，换一章试试。
             </p>
           ) : (
             <>

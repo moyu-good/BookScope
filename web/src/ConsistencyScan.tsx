@@ -124,7 +124,7 @@ export function ConsistencyScan({
 
       {result && result.scanned && result.contradictions.length === 0 && (
         <p className="text-sm text-[var(--color-ink)]">
-          没扫出明显的前后矛盾——这本书的设定挺自洽。
+          没扫出明显的前后矛盾，这本书的设定挺自洽。
         </p>
       )}
 

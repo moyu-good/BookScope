@@ -89,7 +89,7 @@ const ERROR_COPY_MAP: Record<string, ErrorCopy> = {
   },
   MaxIterationsExceeded: {
     message:
-      "翻了 12 轮没想清楚——多半是题问得太大。拆成两三个具体的小题分别问。比如别问「主角怎么变的」，问「主角在第几章发生转变」「转变以后他做了什么」。",
+      "翻了 12 轮没想清楚，多半是题问得太大。拆成两三个具体的小题分别问。比如别问「主角怎么变的」，问「主角在第几章发生转变」「转变以后他做了什么」。",
     buttons: [{ action: "retry", label: "再问一次", variant: "primary" }],
   },
   ProviderUnavailable: {
@@ -102,7 +102,7 @@ const ERROR_COPY_MAP: Record<string, ErrorCopy> = {
   },
   LoopTimeout: {
     message:
-      "这题查得太深，超过 3 分钟还没综合完。下方是已经查到的原文片段——别让等的时间白费。你可以直接看这些片段答自己题，或者点「再问一次」让 AI 再跑一次。",
+      "这题查得太深，超过 3 分钟还没综合完。下方是已经查到的原文片段，别让等的时间白费。你可以直接看这些片段答自己题，或者点「再问一次」让 AI 再跑一次。",
     buttons: [{ action: "retry", label: "再问一次", variant: "primary" }],
   },
   LLMFormatError: {
@@ -112,7 +112,7 @@ const ERROR_COPY_MAP: Record<string, ErrorCopy> = {
   },
   ToolDispatchError: {
     message:
-      "AI 在查书的时候出岔子了——检索或拉章节的工具连环失败。下方是失败前已经查到的片段。再问一次基本能恢复。",
+      "AI 在查书的时候出岔子了，检索或拉章节的工具连环失败。下方是失败前已经查到的片段。再问一次基本能恢复。",
     buttons: [{ action: "retry", label: "再问一次", variant: "primary" }],
   },
 };

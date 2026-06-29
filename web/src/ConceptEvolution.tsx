@@ -103,7 +103,7 @@ export function ConceptEvolution({
   return (
     <div className="pt-4">
       <p className="text-sm text-[var(--color-ink-muted)] mb-3 leading-relaxed">
-        输一个概念，看它在全书怎么一步步发展——每阶段在哪章、被怎么用/深化，带原文。
+        输一个概念，看它在全书怎么一步步发展，每阶段在哪章、被怎么用/深化，带原文。
       </p>
 
       <form
@@ -146,7 +146,7 @@ export function ConceptEvolution({
 
       {scanned && stages && stages.length === 0 && queried && (
         <p className="text-sm text-[var(--color-ink)]">
-          全书没回溯出「{queried}」的演进——可能书里没这个概念，或换个说法再试。
+          全书没回溯出「{queried}」的演进，可能书里没这个概念，或换个说法再试。
         </p>
       )}
 

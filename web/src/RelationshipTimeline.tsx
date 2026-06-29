@@ -272,7 +272,7 @@ export function RelationshipTimeline({
           关系演变
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          挑一对人，看他俩的关系一章章怎么走到今天——先给一句本质总判，再一幕幕排开：哪章发生了什么、此刻是敌是友、为什么变，每一笔都钉在原文。（谁和谁的整张关系网看「关系图」。）
+          挑一对人，看他俩的关系一章章怎么走到今天，先给一句本质总判，再一幕幕排开：哪章发生了什么、此刻是敌是友、为什么变，每一笔都钉在原文。（谁和谁的整张关系网看「关系图」。）
         </p>
         <button
           type="button"
@@ -295,7 +295,7 @@ export function RelationshipTimeline({
         {listLoading && (
           <RunningProcess
             label="扫全书人物来往"
-            hint="先快扫一遍谁和谁有来往，列出全书所有人物对——这一步不调模型、很快。选定一对后再细读那对的关系编年。"
+            hint="先快扫一遍谁和谁有来往，列出全书所有人物对，这一步不调模型、很快。选定一对后再细读那对的关系编年。"
           />
         )}
       </div>
@@ -339,7 +339,7 @@ export function RelationshipTimeline({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜人名，如「刘备」——列出含他的所有关系对"
+          placeholder="搜人名，如「刘备」，列出含他的所有关系对"
           className="w-full text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-white focus:border-[var(--color-seal)] outline-none"
         />
         <div className="mt-2 max-h-44 overflow-y-auto rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)]">
@@ -385,7 +385,7 @@ export function RelationshipTimeline({
       {pairLoading && (
         <RunningProcess
           label="细读这一对的关系编年"
-          hint="整本书喂进模型，逐章梳理他俩的来往——本质、走向、每一幕怎么变，每一笔回原文核验，约几十秒。"
+          hint="整本书喂进模型，逐章梳理他俩的来往，本质、走向、每一幕怎么变，每一笔回原文核验，约几十秒。"
         />
       )}
 

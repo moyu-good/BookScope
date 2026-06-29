@@ -92,7 +92,7 @@ export function NarrativeCurve({
           叙事曲线
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          逐章数能数的事——每章高度 = 事件数 + 转折数（伏笔回收），一眼看出整本书哪几章戏多、哪几章是转折。点一章列出这章实际发生的几件事，每件回原文核验。
+          逐章数能数的事：每章高度 = 事件数 + 转折数（伏笔回收），一眼看出整本书哪几章戏多、哪几章是转折。点一章列出这章实际发生的几件事，每件回原文核验。
         </p>
         <button
           type="button"
@@ -175,7 +175,7 @@ export function NarrativeCurve({
                     </p>
                   ) : (
                     <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)]">
-                      原文未在书中比对命中——待核
+                      原文未在书中比对命中，待核
                     </p>
                   )}
                 </li>
@@ -183,7 +183,7 @@ export function NarrativeCurve({
             </ul>
           ) : (
             <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-              这章没数出关键事件——平铺过渡 / 待核。
+              这章没数出关键事件，平铺过渡 / 待核。
             </p>
           )}
 
@@ -206,7 +206,7 @@ export function NarrativeCurve({
                       </p>
                     ) : (
                       <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)]">
-                        原文未命中——待核
+                        原文未命中，待核
                       </p>
                     )}
                   </li>

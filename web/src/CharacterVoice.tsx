@@ -122,7 +122,7 @@ export function CharacterVoice({
   return (
     <div className="pt-4">
       <p className="text-sm text-[var(--color-ink-muted)] mb-3 leading-relaxed">
-        输一个角色，归拢他全书的对白，刻画说话的腔调，再标出哪几句「不像他说的」——每条挂原文，你自己判断。
+        输一个角色，归拢他全书的对白，刻画说话的腔调，再标出哪几句「不像他说的」，每条挂原文，你自己判断。
       </p>
 
       <form
@@ -167,7 +167,7 @@ export function CharacterVoice({
         features &&
         sampleTooSmall && (
           <p className="text-sm text-[var(--color-ink)]">
-            「{queried}」全书对白太少，不够刻画稳定的声口——样本不足，不硬下判定。
+            「{queried}」全书对白太少，不够刻画稳定的声口，样本不足，不硬下判定。
           </p>
         )}
 
@@ -178,7 +178,7 @@ export function CharacterVoice({
         driftItems.length === 0 &&
         queried && (
           <p className="text-sm text-[var(--color-ink)]">
-            没归拢到「{queried}」可锚到原文的对白——换个角色名 / 写法再试试。
+            没归拢到「{queried}」可锚到原文的对白，换个角色名 / 写法再试试。
           </p>
         )}
 
@@ -239,11 +239,11 @@ export function CharacterVoice({
               「这句不像他说的」
             </h3>
             <p className="text-xs text-[var(--color-ink-muted)] mb-3 leading-relaxed">
-              这是提示，不是定论——合理的剧情驱动口吻变化不在这里。点开看原文，你自己判断。
+              这是提示，不是定论，合理的剧情驱动口吻变化不在这里。点开看原文，你自己判断。
             </p>
             {driftItems.length === 0 ? (
               <p className="text-sm text-[var(--color-ink)]">
-                没挑出可疑的句子——「{queried}」的声口从头到尾挺稳。
+                没挑出可疑的句子，「{queried}」的声口从头到尾挺稳。
               </p>
             ) : (
               <ol className="relative border-l border-[var(--color-rule)] ml-2">

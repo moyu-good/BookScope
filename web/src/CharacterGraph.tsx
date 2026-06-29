@@ -597,7 +597,7 @@ export function CharacterGraph({
     return (
       <div className="pt-4">
         <p className="text-sm text-[var(--color-ink-muted)] mb-4">
-          把整本书的关系网画成可拖动的动态图——连线越粗、节点越近 = 关系越紧密，每条边点得到原文。挑一种生成：
+          把整本书的关系网画成可拖动的动态图，连线越粗、节点越近 = 关系越紧密，每条边点得到原文。挑一种生成：
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
@@ -669,7 +669,7 @@ export function CharacterGraph({
         {loading && (
           <RunningProcess
             label={`抽取${unit === "concept" ? "概念" : "人物"}关系图`}
-            hint="整本书喂进模型抽关系网——每条边都要回原文核验，约 1 分钟。"
+            hint="整本书喂进模型抽关系网，每条边都要回原文核验，约 1 分钟。"
           />
         )}
         {!apiKey && (

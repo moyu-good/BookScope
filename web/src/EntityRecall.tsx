@@ -104,7 +104,7 @@ export function EntityRecall({
   return (
     <div className="pt-4">
       <p className="text-sm text-[var(--color-ink-muted)] mb-3 leading-relaxed">
-        输一个人 / 物 / 地点 / 概念，回溯它在全书每次出现——在做什么、在哪一章、带原文出处。
+        输一个人 / 物 / 地点 / 概念，回溯它在全书每次出现，在做什么、在哪一章、带原文出处。
       </p>
 
       <form
@@ -147,7 +147,7 @@ export function EntityRecall({
 
       {scanned && appearances && appearances.length === 0 && queried && (
         <p className="text-sm text-[var(--color-ink)]">
-          全书没找到「{queried}」的出现——换个说法 / 写法再试试。
+          全书没找到「{queried}」的出现，换个说法 / 写法再试试。
         </p>
       )}
 
