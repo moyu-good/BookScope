@@ -94,6 +94,7 @@ from bookscope.agent.genre_detect import (
     is_theory_genre,
 )
 from bookscope.agent.long_context import run_long_context
+from bookscope.agent.meeting_spine import action_ledger_from_meeting
 from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.orchestrate import orchestrate
 from bookscope.agent.question_processor import rewrite_followup
@@ -154,6 +155,8 @@ from bookscope.api.schemas import (
     GenreDetectRequest,
     GenreDetectResponse,
     GraphEdge,
+    MeetingActionLedgerRequest,
+    MeetingActionLedgerResponse,
     MotifTrackingRequest,
     MotifTrackingResponse,
     NarrativeCurveRequest,
@@ -3341,6 +3344,52 @@ async def agent_redhead_hard_facts(
     return RedheadHardFactsResponse(
         facts=facts,
         scanned=bool(facts),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/meeting/action-ledger",
+    response_model=MeetingActionLedgerResponse,
+)
+async def agent_meeting_action_ledger(
+    request: MeetingActionLedgerRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> MeetingActionLedgerResponse:
+    """行动项台账 / 我的行动项:一份会议记录精读一次出会脉,派生「谁·做什么·何时·落实哪条决议」清单。
+
+    会议命根子不是「谁说了什么」(几百轮口水话),是「定了什么、谁要去做什么」(三五条干货)。
+    loose_end(owner 空或 due 空)是会议最大黑洞,台账置顶;含金量按开环/闭环判,叶子档是会议版
+    「空头表态」。传 owner 就只返该身份的行动项(我的行动项)。owner/due 抽不到留空、绝不编人。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = action_ledger_from_meeting(
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        full_text=full_text,
+        form=request.form,
+        owner=request.owner,
+    )
+    action_items = result.get("action_items") or []
+    decisions = result.get("decisions") or []
+    head = result.get("head") or []
+    # scanned=精读成功:抽到任一行动项 / 决议,或头要素抽到了东西(读过这份会议)。
+    head_has_value = any(str(el.get("value", "")).strip() for el in head)
+    return MeetingActionLedgerResponse(
+        form=result.get("form", "纪要"),
+        head=head,
+        decisions=decisions,
+        action_items=action_items,
+        open_issues=result.get("open_issues") or [],
+        owner=result.get("owner"),
+        scanned=bool(action_items or decisions or head_has_value),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )

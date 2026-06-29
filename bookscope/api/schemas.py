@@ -1108,6 +1108,86 @@ class RedheadHardFactsResponse(BaseModel):
     trace: dict = Field(default_factory=dict, description="运行用量 trace。")
 
 
+class MeetingActionLedgerRequest(RedheadDocStructureRequest):
+    """POST /api/agent/meeting/action-ledger 请求体（1.7 会议·行动项台账 / 我的行动项）。
+
+    一份会议记录 = 一个已有的 book session（用户照现有 /books/upload 各传一份会议记录 txt）；
+    这里收单个 book_session_id，建这份的会脉、派生行动项台账。BYOK，同其它整本结构化功能。
+
+    比单份解读多两个可选项：
+    - ``form``：形态（逐字稿/纪要）。传了当门控、不再让模型判；不传则会脉抽取里让模型判
+      （判不准默认纪要）。
+    - ``owner``：传了就只返该 owner 的行动项（「我的行动项」，按身份筛）；不传则返全部
+      （「行动项台账」）。
+    """
+
+    form: Literal["逐字稿", "纪要"] | None = Field(
+        default=None,
+        description="形态门控（逐字稿/纪要）。不传则自动判（判不准默认纪要）。",
+    )
+    owner: str | None = Field(
+        default=None,
+        max_length=100,
+        description="只看某人的行动项（我的行动项）。不传=全部行动项（台账）。",
+    )
+
+
+class MeetingActionLedgerResponse(BaseModel):
+    """POST /api/agent/meeting/action-ledger 响应体（会脉行动项台账）。
+
+    一份会议记录精读一次出会脉（head + decisions + action_items），首炮两个功能都从它派生：
+    行动项台账（全部行动项）+ 我的行动项（请求带 owner 时按身份筛）。
+    """
+
+    form: str = Field(
+        default="纪要",
+        description="判出的形态（逐字稿/纪要）。下游据此调期望：纪要里 owner 到组/会议级不算抽坏。",
+    )
+    head: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "会议头要素，固定 6 条（会议主题/会议时间/主持人/参会人/缺席列席/记录范围）。"
+            "每条 {field, value, evidence, verified, match_score}；该形态天生没有的（如纪要的"
+            "缺席列席、逐字稿的记录范围）空着时带 not_applicable=true（本形态无此项，非待核）。"
+            "抽不到的留空 value + verified=false（待核，绝不编）。"
+        ),
+    )
+    decisions: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "这场会真定下来的事，按序号排。每条 {chapter, decision, decided_by, background, "
+            "substance(真金白银/有条件兑现/空头表态), substance_reason, evidence, verified, "
+            "match_score}。substance 是开环/闭环判的含金量档，不是打分。"
+        ),
+    )
+    action_items: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "行动项台账（传 owner 时只含该身份的）。每条 {chapter, task, owner, due, "
+            "from_decision(落实哪条决议序号，可空), source, substance, substance_reason, "
+            "loose_end(owner 空或 due 空=true，BE 纯计算), evidence, verified, match_score}。"
+            "排序：loose_end 置顶（没人接/没时限的黑洞）→ 含金量 → 序号。"
+            "owner/due 空是信号不是缺陷。"
+        ),
+    )
+    open_issues: list[dict] = Field(
+        default_factory=list,
+        description="议而未决（首炮恒空 []，schema 占位，第二炮再填）。",
+    )
+    owner: str | None = Field(
+        default=None, description="回显请求里的 owner（我的行动项时）；台账模式为 null。"
+    )
+    scanned: bool = Field(
+        default=False,
+        description=(
+            "是否成功精读。false=失败，前端提示重试；"
+            "true+空 action_items=读过但没抽到行动项。"
+        ),
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
 class RedheadTimelineResponse(BaseModel):
     """POST /api/agent/redhead/timeline 响应体（关键时间轴）。"""
 
