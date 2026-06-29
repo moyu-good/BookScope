@@ -45,6 +45,7 @@ BookScope 是一个**查询时智能代理 + 原文证据优先**的深度阅读
 | r2-agent-protocol | [chapter-10](./chapter-10-ingest-layer-second-cut.md) | **把性能第二刀切到上传那一侧**（Sprint 6 + 第十七波）·三层缓存 664x/1271x + quality probe 撞 reviewer 限制 |
 | r2-agent-protocol | [chapter-11](./chapter-11-the-day-of-reckonings.md) | **翻案日**（2026-06-10 · 第十八波）·一天收回三个结论：prompt 冻结 44 天 + reviewer"拒答"错误归因 + 版本污染虚惊·测量仪器先于实验 |
 | r2-agent-protocol | [chapter-12](./chapter-12-from-probe-to-product.md) | **把验过的能力搬上货架**（2026-06-12～15）·发明区六炮 GO 后建成关系图/概念图/citation 精度/出题/节奏曲线·结构化输出三守卫·dogfood 驱动·测量层母题在输出端的续篇 |
+| r2-agent-protocol | [chapter-13](./chapter-13-one-engine-three-spines.md) | **一台引擎，三根脊**（2026-06-24～29）·从"读书"扩成"读长文档"·章脉/文脉/会脉一台引擎三承载单位·公文第一次实战 + 会议第二次验证·七步方法论固化成 skill·诚实标出第四步"派生视图"是最生的一环 |
 
 > **章节号不按时间顺序排版**——前两章按"读者认知路径"组织：先讲"产品跑起来是什么样"（chapter-01），再回溯讲前期架构铺垫（chapter-02）。chapter-03 之后回到时间顺序，按 Sprint 推进沉淀。
 
