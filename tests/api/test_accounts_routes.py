@@ -100,4 +100,27 @@ def test_local_mode_has_no_auth_routes(monkeypatch, tmp_path):
             "/api/auth/register", json={"email": "a@b.com", "password": "pw123456"}
         )
         assert r.status_code == 404
+
+
+def test_delete_account(hosted_client):
+    hosted_client.post(
+        "/api/auth/register", json={"email": "del@b.com", "password": "pw123456"}
+    )
+    login = hosted_client.post(
+        "/api/auth/login", json={"email": "del@b.com", "password": "pw123456"}
+    )
+    hdr = {"Authorization": f"Bearer {login.json()['token']}"}
+    # 注销 → 204
+    assert hosted_client.delete("/api/auth/me", headers=hdr).status_code == 204
+    # 账号没了:再登录 401
+    relogin = hosted_client.post(
+        "/api/auth/login", json={"email": "del@b.com", "password": "pw123456"}
+    )
+    assert relogin.status_code == 401
+    # 令牌随之失效:whoami 401(user 查不到了)
+    assert hosted_client.get("/api/auth/me", headers=hdr).status_code == 401
+
+
+def test_delete_account_requires_login(hosted_client):
+    assert hosted_client.delete("/api/auth/me").status_code == 401
     deployment._reset_accounts_store()

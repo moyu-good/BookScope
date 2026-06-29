@@ -12,7 +12,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from bookscope.api.auth import issue_token
-from bookscope.api.deployment import get_accounts_store, get_current_user
+from bookscope.api.dependencies import get_book_session_store
+from bookscope.api.deployment import (
+    get_accounts_store,
+    get_current_user,
+    require_user,
+)
 from bookscope.api.schemas import (
     AuthResponse,
     LoginRequest,
@@ -73,6 +78,27 @@ async def me(current: User | None = Depends(get_current_user)) -> UserPublic:
             status_code=status.HTTP_401_UNAUTHORIZED, detail="未登录"
         )
     return _to_public(current)
+
+
+@accounts_router.delete(
+    "/auth/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
+async def delete_account(
+    store=Depends(get_book_session_store),
+    current=Depends(require_user),
+):
+    """彻底注销账号(ADR-011 删除权):删账号 + 名下所有书(连索引 / 缓存)+ 归属记录。
+
+    先删这个用户名下每份文档对应的 session(store.delete 连带清 storage + 各级缓存),
+    再 delete_user(ON DELETE CASCADE 连带删 documents 归属行)。不可逆。
+    """
+    acc = get_accounts_store()
+    for doc in acc.list_documents(current.id):
+        store.delete(doc.id)
+    acc.delete_user(current.id)
+    return None
 
 
 __all__ = ["accounts_router"]
