@@ -18,7 +18,13 @@ DB / 账号表 / 鉴权路由 / argon2 / JWT 全是 Phase 1+，这里一律不�
 from __future__ import annotations
 
 import os
-from typing import Literal
+import threading
+from typing import TYPE_CHECKING, Literal
+
+from fastapi import Request
+
+if TYPE_CHECKING:
+    from bookscope.store.accounts import AccountsStore, User
 
 DeploymentMode = Literal["local", "hosted"]
 
@@ -44,28 +50,80 @@ def is_hosted() -> bool:
     return deployment_mode() == "hosted"
 
 
-def get_current_user() -> None:
-    """当前用户依赖（FastAPI ``Depends``）——Phase 0 永远返回 ``None``。
+# ---- 托管版账号单例 + 鉴权(只 hosted 用,全程懒加载) ----
+#
+# 这些函数只在 hosted 路径被调到。模块顶层绝不 import accounts / auth,免得
+# local 启动时把 argon2 / itsdangerous 拽进来——ADR-011 定本地版不加载账号层,
+# 且纯 ``pip install -e .``(没装 hosted extra)也得跑得起来。
 
-    ``local`` 模式没有"用户"这个概念，账号层旁路，永远 ``None``，所有现有
-    端点行为不变。
+_accounts_store: AccountsStore | None = None
+_accounts_lock = threading.Lock()
 
-    ``hosted`` 模式 Phase 0 也先返 ``None``：账号 / 鉴权（校 JWT 或 session
-    cookie、查 ``users`` 表、失败 401）是 Phase 1 才接的活。这里留个桩，把
-    "现有端点该在哪拿当前用户"这个接缝先焊好，Phase 1 只改这个函数体、不
-    动调用它的路由。
 
-    返回值类型现在是 ``None``；Phase 1 接真鉴权后会变成 ``User | None``
-    （local 仍 None，hosted 返当前用户或抛 401）。
+def get_accounts_store() -> AccountsStore:
+    """进程级 :class:`AccountsStore` 单例(只 hosted 用)。
+
+    DB 路径来自 env ``BOOKSCOPE_ACCOUNTS_DB``,默认 ``data/accounts.db``。
+    懒建:第一次调到才连库,local 模式永不触发。
     """
-    # TODO(1.6.2 Phase 1): hosted 模式在此校 JWT / session cookie，查 users
-    # 表，失败抛 401；local 模式保持返 None。当前两种模式都旁路。
-    return None
+    global _accounts_store
+    if _accounts_store is None:
+        with _accounts_lock:
+            if _accounts_store is None:
+                from bookscope.store.accounts import AccountsStore
+
+                db_path = os.environ.get("BOOKSCOPE_ACCOUNTS_DB", "").strip()
+                _accounts_store = AccountsStore(db_path or "data/accounts.db")
+    return _accounts_store
+
+
+def _reset_accounts_store() -> None:
+    """仅供测试:清掉单例,好让下个用例换一个干净 DB。"""
+    global _accounts_store
+    if _accounts_store is not None:
+        try:
+            _accounts_store.close()
+        except Exception:
+            pass
+        _accounts_store = None
+
+
+def resolve_user_from_token(authorization: str | None) -> User | None:
+    """从 ``Authorization`` 头解析当前用户:验签 / 验时限 / 查库,任一不过返 ``None``。
+
+    抽出来跟 FastAPI 解耦,好单测(直接喂字符串,不用造 Request)。local 模式
+    一律 ``None``——账号层旁路,即便带合法令牌也当匿名。
+    """
+    if not is_hosted():
+        return None
+    from bookscope.api.auth import bearer_token_from_header, verify_token
+
+    token = bearer_token_from_header(authorization)
+    if not token:
+        return None
+    user_id = verify_token(token)
+    if not user_id:
+        return None
+    return get_accounts_store().get_user_by_id(user_id)
+
+
+def get_current_user(request: Request) -> User | None:
+    """当前用户依赖(FastAPI ``Depends``)。
+
+    ``local``:账号层旁路,永远 ``None``,所有现有端点行为逐字节不变。
+
+    ``hosted``:校 ``Authorization`` 里的 Bearer 令牌 → 查 users 表 → 返当前用户;
+    令牌缺失 / 坏 / 过期返 ``None``。是否据此抛 401 由具体路由按需决定,不在这里
+    一刀切(有的端点匿名也能用)。
+    """
+    return resolve_user_from_token(request.headers.get("authorization"))
 
 
 __all__ = [
     "DeploymentMode",
     "deployment_mode",
+    "get_accounts_store",
     "get_current_user",
     "is_hosted",
+    "resolve_user_from_token",
 ]
