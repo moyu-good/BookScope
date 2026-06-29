@@ -9,6 +9,7 @@ import { bookScale } from "./bookScale";
 import type { BookScale } from "./bookScale";
 import { ScaleBanner } from "./ScaleBanner";
 import { ActionLedger } from "./ActionLedger";
+import { CommitmentTracker } from "./CommitmentTracker";
 import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
@@ -834,6 +835,7 @@ export function App() {
     | "redhead_policy"
     | "redhead_level"
     | "meeting_ledger"
+    | "meeting_commitments"
   >("library");
   // 手机端左栏收成抽屉，这个控制开合
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -2178,6 +2180,22 @@ export function App() {
             />
           </div>
 
+          {/* 1.7 会议·跨会承诺追踪（杀手价值）。跟跨文件视图同一层：吃的是一组会议（卷宗），
+              不挂在「案上当前书」下。至少 2 场会才跑（组件内守卫 + 入口提示）。 */}
+          <div className={mode === "meeting_commitments" ? "" : "hidden"}>
+            <CanvasHeader
+              title="跨会承诺追踪"
+              subtitle="把同一条线上的好几场会摆一起，沿时间线追每条承诺兑现没：谁在哪场会答应了什么，到后来的会做了没。逾期、没兑现的捞最前，点开看是哪场会承诺的、哪场坐实的，都钉原文。判不出兑现没就标进行中 / 未知，绝不替它猜成做完了。先去「卷宗」选一组会（≥2 场），如同一项目的几次周会。"
+            />
+            <CommitmentTracker
+              bookSessionIds={dossierIds}
+              provider={provider}
+              apiKey={apiKey}
+              model={model}
+              baseUrl={effectiveBaseUrl()}
+            />
+          </div>
+
           <Footer />
         </div>
       </main>
@@ -2227,7 +2245,8 @@ type Mode =
   | "redhead_depgraph"
   | "redhead_policy"
   | "redhead_level"
-  | "meeting_ledger";
+  | "meeting_ledger"
+  | "meeting_commitments";
 
 // 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
@@ -2345,7 +2364,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     key: "meeting",
     title: "会议 · 行动项",
-    modes: [{ id: "meeting_ledger", label: "行动项台账" }],
+    modes: [
+      { id: "meeting_ledger", label: "行动项台账" },
+      { id: "meeting_commitments", label: "跨会承诺追踪" },
+    ],
   },
 ];
 

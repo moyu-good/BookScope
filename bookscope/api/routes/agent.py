@@ -94,6 +94,7 @@ from bookscope.agent.genre_detect import (
     is_theory_genre,
 )
 from bookscope.agent.long_context import run_long_context
+from bookscope.agent.meeting_commitments import commitments_across_meetings
 from bookscope.agent.meeting_spine import action_ledger_from_meeting
 from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.orchestrate import orchestrate
@@ -162,6 +163,8 @@ from bookscope.api.schemas import (
     GraphEdge,
     MeetingActionLedgerRequest,
     MeetingActionLedgerResponse,
+    MeetingCommitmentsRequest,
+    MeetingCommitmentsResponse,
     MotifTrackingRequest,
     MotifTrackingResponse,
     NarrativeCurveRequest,
@@ -3445,6 +3448,69 @@ async def agent_meeting_action_ledger(
         scanned=bool(action_items or decisions or head_has_value),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+def _collect_meeting_inputs(
+    store: BookSessionStore,
+    session_ids: list[str],
+) -> tuple[list[list[dict]], list[str]]:
+    """逐个 resolve assembler → 拿 (full_text, chunks),凑成多场会的输入栈。
+
+    每个 session_id 都过 ``_resolve_assembler``(找不到照样翻 404,不静默跳过——卷宗里点名的
+    会议必须都在)。返 ``(各场 chunks, 各场 full_text)`` 两条同序 list,喂给
+    ``commitments_across_meetings``(它内部逐场建会脉、跨会追)。
+    """
+    chunks_stack: list[list[dict]] = []
+    full_texts: list[str] = []
+    for sid in session_ids:
+        assembler = _resolve_assembler(store, sid)
+        full_text, chunks = _long_context_inputs(assembler)
+        chunks_stack.append(chunks)
+        full_texts.append(full_text)
+    return chunks_stack, full_texts
+
+
+@agent_router.post(
+    "/agent/meeting/commitments",
+    response_model=MeetingCommitmentsResponse,
+)
+async def agent_meeting_commitments(
+    request: MeetingCommitmentsRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> MeetingCommitmentsResponse:
+    """跨会承诺—兑现追踪(1.7 杀手价值):多场会摆一起,追「谁承诺了、后来兑现没」。
+
+    单场会的行动项台账只看一场;这里把一卷宗的好几场会按时间串起来,沿时间线追每条承诺的下落——
+    张三 6 月说「下周交鉴权」,7 月的会还没影,这条就标「逾期 / 未兑现」捞出来。跟公文跨文件的依据
+    链网一个道理:价值在跨单元的连线。
+
+    ``commitments_across_meetings`` 逐场建会脉(承诺=行动项)→ 一次全局推理跨会判兑现 → 锚回真实
+    承诺 + 核兑现证据(更晚会议的已核原话,锚不到降「未知」)+ 逾期 BE 据 due 纯算。死守 evidence-
+    first:判不出兑现没就标「进行中 / 未知」,绝不猜「兑现」(假阳性=骗用户说做完了,最坏)。
+    传 owner 就只返该身份的承诺(我的承诺)。不足 2 场会 / 一条承诺都没抽到 → 空态。
+    """
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    chunks_stack, full_texts = _collect_meeting_inputs(store, request.book_session_ids)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = commitments_across_meetings(
+        meeting_chunks=chunks_stack,
+        llm_client=rec,
+        model=model,
+        meeting_full_texts=full_texts,
+        owner=request.owner,
+    )
+    commitments = (result or {}).get("commitments", [])
+    return MeetingCommitmentsResponse(
+        commitments=commitments,
+        meetings=(result or {}).get("meetings", []),
+        owners=(result or {}).get("owners", []),
+        owner=request.owner.strip() if (request.owner and request.owner.strip()) else None,
+        # scanned=成功跨会追到了(有承诺台账)。result None=不足2场/无承诺=空态。
+        scanned=result is not None,
+        trace=_run_trace(rec, "", _t0),
     )
 
 

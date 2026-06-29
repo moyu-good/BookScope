@@ -1188,6 +1188,63 @@ class MeetingActionLedgerResponse(BaseModel):
     trace: dict = Field(default_factory=dict, description="运行用量 trace。")
 
 
+class MeetingCommitmentsRequest(RedheadCrossDocRequest):
+    """POST /api/agent/meeting/commitments 请求体（1.7 会议·跨会承诺—兑现追踪，杀手价值）。
+
+    「卷宗」复用法：客户端传一组 ``book_session_ids``（每个是一份已上传的会议记录 txt）。端点逐个
+    建会脉、把承诺按会议时间串起来，跨会追每条承诺后来兑现没。BYOK，同跨文件视图。
+
+    比跨文件视图多一个可选 owner：传了就只返该 owner 的承诺（「我的承诺」，按身份筛）；不传则返
+    全部人的承诺台账。
+    """
+
+    owner: str | None = Field(
+        default=None,
+        max_length=100,
+        description="只看某人的承诺（我的承诺）。不传=全部人的承诺台账。",
+    )
+
+
+class MeetingCommitmentsResponse(BaseModel):
+    """POST /api/agent/meeting/commitments 响应体（跨会承诺—兑现台账）。
+
+    多场会摆一起：每场出会脉、承诺=行动项，跨会沿时间线追每条承诺后来兑现没。状态死守
+    evidence-first——「兑现」必须更晚的会里有原话坐实（过核验），判不出就标「进行中/未知」，
+    绝不猜兑现；「逾期」由 BE 据 due 纯算（不让模型打这个标）。
+    """
+
+    commitments: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "跨会追下来的承诺台账，按「逾期/未兑现置顶→进行中→未知→兑现」排（要追的捞最前）。"
+            "每条 {cid, from_mid, from_meeting(哪场会承诺的), from_date, owner, task, due, "
+            "substance, status(兑现/未兑现/逾期/进行中/未知), status_note, evidence_mid, "
+            "evidence_meeting(哪场更晚的会坐实的), evidence(那句原话), evidence_verified, "
+            "from_evidence(承诺那句原话), from_verified}。owner/due 空是信号不是缺陷。"
+            "传 owner 时只含该身份的。"
+        ),
+    )
+    meetings: list[dict] = Field(
+        default_factory=list,
+        description="这组会按时间排的清单，每条 {mid, label(会议主题), date}。给前端按会标注。",
+    )
+    owners: list[str] = Field(
+        default_factory=list,
+        description="按承诺数多到少排的 owner 列表，给前端按人分组。",
+    )
+    owner: str | None = Field(
+        default=None, description="回显请求里的 owner（我的承诺时）；台账模式为 null。"
+    )
+    scanned: bool = Field(
+        default=False,
+        description=(
+            "是否成功跨会追踪。false=失败/不足 2 场会/一条承诺都没抽到（空态）；"
+            "true+空 commitments=读过但没追出承诺。"
+        ),
+    )
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
 class RedheadTimelineResponse(BaseModel):
     """POST /api/agent/redhead/timeline 响应体（关键时间轴）。"""
 
@@ -1918,6 +1975,10 @@ __all__ = [
     "ForeshadowArcsResponse",
     "GraphEdge",
     "HealthResponse",
+    "MeetingActionLedgerRequest",
+    "MeetingActionLedgerResponse",
+    "MeetingCommitmentsRequest",
+    "MeetingCommitmentsResponse",
     "NarrativeCurveRequest",
     "NarrativeCurveResponse",
     "OrchestrateRequest",
