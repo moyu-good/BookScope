@@ -27,6 +27,16 @@ import { HistoryPanel } from "./HistoryPanel";
 import { MotifTracking } from "./MotifTracking";
 import { appendEntry, newEntryId } from "./historyStorage";
 import type { QAEntry } from "./historyStorage";
+import { AccountStrip, AuthModal } from "./AuthGate";
+import type { AuthUser, DeploymentMode } from "./authClient";
+import {
+  clearAuthToken,
+  fetchMe,
+  installAuthFetch,
+  loadAuthToken,
+  logout as logoutToken,
+  probeDeployment,
+} from "./authClient";
 import { Onboarding } from "./Onboarding";
 import { QuestionBreakdown } from "./QuestionBreakdown";
 import { Recap } from "./Recap";
@@ -830,6 +840,51 @@ export function App() {
   // 读书优先 IA：进沉浸阅读器时为 true，整页渲染 Reader、不挂分析台外壳。
   const [readerOpen, setReaderOpen] = useState(false);
 
+  // ── 托管版账号(1.6.2) ──────────────────────────────────────────────
+  // local 模式这三个状态恒为初始值、不触发任何账号 UI;只有探测到 hosted 才激活。
+  // deploymentMode: null=还没探测出来;探出来是 local / hosted。
+  const [deploymentMode, setDeploymentMode] = useState<DeploymentMode | null>(null);
+  // 当前登录用户;null=没登录。
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  // 启动那次"验明身份"是否跑完(避免没验完就闪一下登录弹窗)。
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // 启动:先给 fetch 挂上令牌注入层(没令牌时是纯透传,local 零影响),再探测部署形态;
+  // hosted 且本地有令牌就调 /auth/me 验,401 清掉过期令牌。local 直接当账号功能不存在。
+  useEffect(() => {
+    installAuthFetch();
+    let cancelled = false;
+    (async () => {
+      const mode = await probeDeployment();
+      if (cancelled) return;
+      setDeploymentMode(mode);
+      if (mode !== "hosted") {
+        setAuthChecked(true);
+        return;
+      }
+      // hosted:有令牌就验一次身份
+      if (loadAuthToken()) {
+        const me = await fetchMe();
+        if (cancelled) return;
+        if (me) setAuthUser(me);
+        else clearAuthToken(); // 令牌过期 / 坏 → 清掉,回到未登录
+      }
+      if (!cancelled) setAuthChecked(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    logoutToken();
+    setAuthUser(null);
+  }, []);
+
+  // 只有 hosted + 验过身份 + 没登录,才挂登录弹窗。
+  const needsAuth =
+    deploymentMode === "hosted" && authChecked && authUser === null;
+
   // 配置变化时同步写 localStorage
   useEffect(() => {
     savePersistedConfig({ provider, apiKey, model, baseUrl });
@@ -1361,20 +1416,24 @@ export function App() {
   // 分析在阅读器内的「鉴」浮层就地跑（AnalysisOverlay），不跳回这里。
   if (readerOpen && currentSession) {
     return (
-      <Reader
-        sessionId={currentSession.session_id}
-        bookTitle={currentSession.book_title}
-        provider={provider}
-        apiKey={apiKey}
-        model={model}
-        baseUrl={effectiveBaseUrl()}
-        onExit={() => setReaderOpen(false)}
-      />
+      <>
+        {needsAuth && <AuthModal onAuthed={setAuthUser} />}
+        <Reader
+          sessionId={currentSession.session_id}
+          bookTitle={currentSession.book_title}
+          provider={provider}
+          apiKey={apiKey}
+          model={model}
+          baseUrl={effectiveBaseUrl()}
+          onExit={() => setReaderOpen(false)}
+        />
+      </>
     );
   }
 
   return (
     <div className="min-h-screen md:p-3">
+      {needsAuth && <AuthModal onAuthed={setAuthUser} />}
       <MobileBar onOpenNav={() => setSidebarOpen(true)} />
 
       {sidebarOpen && (
@@ -1407,6 +1466,8 @@ export function App() {
           setSettingsOpen(true);
           setSidebarOpen(false);
         }}
+        authUser={authUser}
+        onLogout={handleLogout}
       />
 
       <main className="flex-1 min-w-0 px-5 sm:px-8 lg:px-14 pt-[4.5rem] md:pt-12 pb-16">
@@ -2722,9 +2783,21 @@ function Sidebar(props: {
   genre?: string | null;
   open: boolean;
   onOpenSettings: () => void;
+  /** hosted 模式登录后的当前用户;local / 未登录为 null,不渲染账号条。 */
+  authUser?: AuthUser | null;
+  onLogout?: () => void;
 }) {
-  const { mode, onMode, currentBook, hasBook, genre, open, onOpenSettings } =
-    props;
+  const {
+    mode,
+    onMode,
+    currentBook,
+    hasBook,
+    genre,
+    open,
+    onOpenSettings,
+    authUser,
+    onLogout,
+  } = props;
 
   // 题材 → 突出哪几组。null = 不偏向任何组（没 genre / 认不出的题材都走这条，全显）。
   const highlighted = genreHighlightGroups(genre);
@@ -2952,9 +3025,13 @@ function Sidebar(props: {
         })}
       </nav>
 
-      {/* 底部：书库 + 设置 一行 */}
+      {/* 底部：账号条(hosted 已登录才显) + 书库 + 设置 一行 */}
+      <div className="mt-auto">
+      {authUser && onLogout && (
+        <AccountStrip user={authUser} onLogout={onLogout} />
+      )}
       <div
-        className="px-3 py-3.5 mt-auto flex items-center justify-between"
+        className="px-3 py-3.5 flex items-center justify-between"
         style={{ borderTop: "1px solid var(--color-rule)" }}
       >
         <button
@@ -2992,6 +3069,7 @@ function Sidebar(props: {
         >
           <NavIcon id="settings" size={16} />
         </button>
+      </div>
       </div>
     </aside>
   );
