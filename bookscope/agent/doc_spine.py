@@ -98,6 +98,22 @@ _REGULATION_NA_HEAD_FIELDS: frozenset[str] = frozenset(
     {"发文字号", "密级", "紧急程度", "主送机关", "抄送机关", "签发人"}
 )
 
+# ── 头要素空值三态(task #29 根一)──────────────────────────────────────────────
+# evidence-first 的"空"分三态,别一律落"待核"(WP-evidence-empty-semantics §根一):
+#   present          抽到了(+ 核过)——现状不变。
+#   absent_confirmed 确证为无 / 本文种不适用——笃定答案,带 reason(公开件无密级、此文种无
+#                    签发人栏、平件未标紧急、法规本体无发文要素…)。前端显笃定的"公开 / 无 /
+#                    不适用",不显"待核"。
+#   unverified       真没抽到 / 没核到——才显"待核"。
+HEAD_STATUS_PRESENT = "present"
+HEAD_STATUS_ABSENT_CONFIRMED = "absent_confirmed"
+HEAD_STATUS_UNVERIFIED = "unverified"
+HEAD_STATUSES: tuple[str, ...] = (
+    HEAD_STATUS_PRESENT,
+    HEAD_STATUS_ABSENT_CONFIRMED,
+    HEAD_STATUS_UNVERIFIED,
+)
+
 # 文种封闭集 = 法定公文文种 + 法规/公布令文种。文种识别只能落在这个集合里,
 # 落不进就留空标待核——不让模型自造一个「文种」(§5.2 GB/T 要素绝不编)。
 DOC_TYPES: tuple[str, ...] = _STATUTORY_DOC_TYPES + _REGULATION_DOC_TYPES
@@ -227,6 +243,27 @@ _AUTHORITY_APPRAISAL: dict[str, str] = {
     "商洽函": "平行商洽 / 询问，没有上下级强制力——是协商性质，对方可办可不办。",
 }
 _DEFAULT_AUTHORITY_LEVEL = "一般公文"
+
+# ── 发文机关行政层级(task #29 根二)──────────────────────────────────────────────
+# 效力研判除文种外要吃**发文机关的行政层级**(WP-evidence-empty-semantics §根二):同样一个
+# 「意见」,国务院办公厅发的跟县政府发的分量天差地别。光按文种一刀切,会把国办《意见》判成
+# "一般公文、容易被上位覆盖"——错。层级从已抽的「发文机关」头要素判,deterministic、引原文。
+AGENCY_LEVEL_TOP = "最高"      # 国务院 / 国办 / 中共中央 / 中办——全国约束、上位极少
+AGENCY_LEVEL_HIGH = "高"      # 部委 / 省级党委政府——本系统 / 本省权威
+AGENCY_LEVEL_MID = "中低"     # 市 / 县——地方层级
+_AGENCY_LEVELS: tuple[str, ...] = (AGENCY_LEVEL_TOP, AGENCY_LEVEL_HIGH, AGENCY_LEVEL_MID)
+
+# 最高层级机关名标志(出现即判最高)。国务院办公厅 / 中共中央办公厅都含"国务院"/"中共中央",
+# 单列"国办""中办"简称兜底。全国人大及其常委会是最高国家权力机关,也归最高。
+_TOP_AGENCY_MARKERS: tuple[str, ...] = (
+    "国务院", "国办", "中共中央", "中央办公厅", "中办",
+    "全国人民代表大会", "全国人大",
+)
+# 高层级:部委(以"部""委员会""总局""总署""署""局"结尾的国家级)、省级党委政府。市/县在更下,
+# 用"省/自治区/直辖市 + 人民政府/党委"判;命中省级关键词且不含市/县 → 高。
+_PROVINCE_MARKERS: tuple[str, ...] = ("省", "自治区", "直辖市")
+_MINISTRY_MARKERS: tuple[str, ...] = ("部", "国家", "总局", "总署")
+_MID_AGENCY_MARKERS: tuple[str, ...] = ("市", "县", "区", "乡", "镇")
 
 # 普通公文的"身份要素"——缺了就存疑/非正式(WP §二缺席信号)。只对**非法规、非 N/A** 的公文报:
 # 法规本体天生没有发文字号/成文日期这些"发文"要素(已被 not_applicable 标过),报它们=误报。
@@ -432,6 +469,62 @@ def _parse_head(text: str) -> dict[str, dict[str, str]] | None:
     return out
 
 
+def _confirmed_absent_reason(field: str, doc_type: str) -> str | None:
+    """某个**空着**的头要素,是不是"确证为无 / 本文种不适用"?是就返一句站得住的 reason。
+
+    evidence-first 死守(WP-evidence-empty-semantics §根一铁律):reason 必须基于文种 / GB/T
+    9704 公文格式规则,不是瞎判"无"。拿不准的(可能该有却没抽到)一律返 None → 退 ``unverified``
+    标"待核",绝不硬判"确证无"。判据只看**已抽的文种**(已核事实),deterministic、无脑补。
+
+    三类确证为无(都基于公文格式规则):
+
+    - **密级**:GB/T 9704 版头要素,只有涉密件才标(绝密/机密/秘密);绝大多数公开红头文件
+      本就没有密级 → 空 = 公开件无密级(确证,不是没抽到)。
+    - **紧急程度**:版头要素,只有特急/加急件才标;多数文件是平件不标 → 空 = 平件(未标紧急)。
+    - **签发人**:GB/T 9704 只要求**上行文**(请示/报告/议案,下级报上级)标签发人;下行文
+      (意见/通知/命令…)与平行文(函)本就没有签发人栏 → 这些文种空 = 此文种无签发人栏。
+      上行文该有签发人却空,是真没抽到 → 返 None 退待核。
+    - **法规本体**(条例/规定/办法…):立法文本不是"发文",结构上没有发文字号/密级/紧急程度/
+      主送/抄送/签发人这些发文要素 → 空 = 法规本体无此发文要素。
+
+    Args:
+        field: 头要素字段名。
+        doc_type: 已抽到的文种(已过封闭集归一);空串表示文种没抽到。
+
+    Returns:
+        确证为无时返 reason(一句话依据);可能该有却没抽到 → 返 ``None``(退待核)。
+    """
+    dt = (doc_type or "").strip()
+    # 法规本体:发文类要素天生没有(立法文本不是发文)。最优先——条例的密级/签发人都归这条。
+    if dt in _REGULATION_PROPER_TYPES and field in _REGULATION_NA_HEAD_FIELDS:
+        return "法规本体无此发文要素"
+    if field == "密级":
+        return "公开件无密级"
+    if field == "紧急程度":
+        return "平件(未标紧急)"
+    if field == "签发人":
+        # 上行文该有签发人,空着是真没抽到 → 退待核;下行 / 平行 / 方向不定的文种本就没有。
+        if dt in _UPWARD_DOC_TYPES:
+            return None
+        return "此文种无签发人栏"
+    return None
+
+
+def _classify_head_status(field: str, value: str, doc_type: str) -> tuple[str, str]:
+    """给一个头要素定三态(present / absent_confirmed / unverified)+ reason。
+
+    - value 非空 → ``present``(reason 空)。
+    - value 空 + :func:`_confirmed_absent_reason` 给得出依据 → ``absent_confirmed`` + reason。
+    - value 空 + 给不出依据 → ``unverified``(reason 空,前端显"待核")。
+    """
+    if value.strip():
+        return HEAD_STATUS_PRESENT, ""
+    reason = _confirmed_absent_reason(field, doc_type)
+    if reason is not None:
+        return HEAD_STATUS_ABSENT_CONFIRMED, reason
+    return HEAD_STATUS_UNVERIFIED, ""
+
+
 def _build_head_elements(
     *,
     full_text: str,
@@ -444,7 +537,11 @@ def _build_head_elements(
     """头要素维:一次抽取整份公文的头要素 → 每要素 evidence 过 verify_citations 附 verified。
 
     抽不到 / 解析不出 / 调用失败 → 返**全要素留空待核**的骨架(verified=False),不编。
-    每要素结构:``{field, value, evidence, verified, match_score}``。文种已过封闭集归一。
+    每要素结构:``{field, value, evidence, verified, match_score, status, reason
+    [, not_applicable]}``。文种已过封闭集归一。``status``(task #29 根一)是空值三态
+    (present / absent_confirmed / unverified):据已抽文种把"确证为无"(公开件无密级、下行文
+    无签发人栏、平件未标紧急、法规本体无发文要素)标 ``absent_confirmed`` + ``reason``、并对齐旧
+    ``not_applicable=True``;真没抽到才退 ``unverified``(前端显"待核")。
     """
     system = build_longctx_system(full_text, _INSTR_HEAD)
     parsed: dict[str, dict[str, str]] | None = None
@@ -488,17 +585,22 @@ def _build_head_elements(
         el["verified"] = bool(vc.get("verified", False))
         el["match_score"] = vc.get("match_score", 0.0)
 
-    # N/A 区分(回应"全是待核是文件如此嘛"):法规本体(条例/规定/办法…,非公布令「令」)结构上
-    # 没有发文字号/密级/紧急程度/主送/抄送/签发人这些"发文"要素——它们是立法文本不是发文。
-    # 空着时标 not_applicable=True,前端显"本文种无此项"而非"待核",且不计入"抽到 X/Y"分母。
+    # 空值三态(task #29 根一):每个要素的"空"分 present / absent_confirmed / unverified。
+    # 据**已抽的文种**(已核事实)判:密级空=公开件无密级、签发人空+下行文=此文种无签发人栏、
+    # 紧急空=平件、法规本体的发文要素空=本文种无此项……这些是 absent_confirmed(确证无,带
+    # reason、前端显笃定的"公开/无/不适用");真没抽到的退 unverified(前端才显"待核")。
+    # absent_confirmed ⟺ not_applicable=True(向后兼容旧字段):前端据 not_applicable 不计入
+    # "抽到 X/Y"分母、看结构层的缺席信号也跳过它(确证无不是"缺失存疑")。
     doc_type = next(
         (str(el["value"]).strip() for el in elements if el["field"] == "文种"), ""
     )
-    if doc_type in _REGULATION_PROPER_TYPES:
-        for el in elements:
-            na = el["field"] in _REGULATION_NA_HEAD_FIELDS
-            if na and not str(el["value"]).strip():
-                el["not_applicable"] = True
+    for el in elements:
+        status, reason = _classify_head_status(el["field"], str(el["value"]), doc_type)
+        el["status"] = status
+        el["reason"] = reason
+        # 旧字段 not_applicable 保留并对齐新三态:确证无 = 不适用(不计分母 / 不报缺席)。
+        if status == HEAD_STATUS_ABSENT_CONFIRMED:
+            el["not_applicable"] = True
     return elements
 
 
@@ -563,6 +665,60 @@ def _head_value(head: list[dict[str, Any]], field: str) -> dict[str, Any]:
     return {"value": "", "evidence": "", "verified": False, "not_applicable": False}
 
 
+def _classify_agency_level(issuer: str) -> str:
+    """据**已抽的发文机关**判行政层级(最高 / 高 / 中低),判不出返空串。task #29 根二。
+
+    deterministic 串匹配已核机关名,无脑补:
+
+    - **最高**:国务院 / 国办 / 中共中央 / 中办 / 全国人大(及其常委会)——全国约束、上位极少。
+    - **高**:部委(国家级"部 / 委 / 总局 / 总署")、省级党委政府(省 / 自治区 / 直辖市 + 政府/
+      党委,且不含市 / 县)。
+    - **中低**:市 / 县 / 区 / 乡 / 镇这类地方层级。
+    - 判不出(机关空 / 认不出)→ 空串,效力研判退回只按文种(向后兼容)。
+
+    优先级:最高 > 中低标志(市/县出现即拉到中低,免得"XX市国务院派出机构"误判) > 省级/部委。
+    其实更稳的序是先扣最高,再看有没有市/县(中低),再省级(高),最后部委(高)。
+    """
+    iss = (issuer or "").strip()
+    if not iss:
+        return ""
+    if any(m in iss for m in _TOP_AGENCY_MARKERS):
+        return AGENCY_LEVEL_TOP
+    # 市 / 县 / 区 / 乡 / 镇出现 → 中低(地方)。先于省级判:"XX省XX市"这种以更低的市为准。
+    if any(m in iss for m in _MID_AGENCY_MARKERS):
+        return AGENCY_LEVEL_MID
+    # 省 / 自治区 / 直辖市级党委政府 → 高。
+    if any(m in iss for m in _PROVINCE_MARKERS):
+        return AGENCY_LEVEL_HIGH
+    # 国家级部委 / 总局 / 总署 → 高。
+    if any(m in iss for m in _MINISTRY_MARKERS):
+        return AGENCY_LEVEL_HIGH
+    return ""
+
+
+def _high_authority_appraisal(agency_level: str, issuer: str) -> str | None:
+    """高层级发文机关(最高 / 高)的效力研判覆盖句——点出权威范围,**绝不说"容易被覆盖"**。
+
+    WP-evidence-empty-semantics §根二死规矩:国务院 / 国办这类最高层级文件,哪怕文种是「意见」
+    (文种维度归"一般公文"),也不准用"一般公文、容易被上位覆盖"那套话术研判它——要点出它的
+    全国约束力、上位极少。中低层级不覆盖(返 None,仍用文种维度的研判)。
+    """
+    iss = (issuer or "").strip()
+    who = f"「{iss}」" if iss else "该机关"
+    if agency_level == AGENCY_LEVEL_TOP:
+        return (
+            f"{who}是最高层级发文机关——这份文件有全国范围的约束力，下位文件都得服从它，"
+            "其上几乎没有更高的行政规范能覆盖它。哪怕文种是意见 / 通知，也是顶格权威，"
+            "绝不是可有可无的一般公文。"
+        )
+    if agency_level == AGENCY_LEVEL_HIGH:
+        return (
+            f"{who}是高层级发文机关(部委 / 省级)——在本系统 / 本行政区划内是权威规范，"
+            "管得到下面各方，一般只服从国家法律法规和更高层级文件，同级或下位文件覆盖不了它。"
+        )
+    return None
+
+
 def _classify_authority(doc_type: str, issuer: str) -> str:
     """据**已抽的文种 + 发文机关**判效力层级,落进 :data:`_AUTHORITY_LEVELS` 封闭集。
 
@@ -613,9 +769,11 @@ def _build_structure_read(
     Returns:
         ``{
             "authority": {level, rank, doc_type, doc_type_evidence, issuer,
-                          issuer_evidence, appraisal, verified_basis},
+                          issuer_evidence, agency_level, appraisal, verified_basis},
             "signals": [{kind: "missing"|"ordering"|"weight", element, note}],
-        }``;文种空(判不了层级)返 None。
+        }``;文种空(判不了层级)返 None。``agency_level``(最高/高/中低/空,task #29 根二)是
+        据发文机关判的行政层级;最高 / 高层级时 ``appraisal`` 已被覆盖成点权威范围的研判,
+        不再说"容易被上位覆盖"。
     """
     wenzhong = _head_value(head, "文种")
     doc_type = str(wenzhong.get("value", "")).strip()
@@ -626,6 +784,15 @@ def _build_structure_read(
     issuer = str(issuer_el.get("value", "")).strip()
 
     level = _classify_authority(doc_type, issuer)
+    # 根二:效力研判除文种外吃发文机关行政层级。最高 / 高层级机关(国务院/国办/部委/省级)的
+    # 文件,哪怕文种归"一般公文",也要点出全国 / 本系统约束力,绝不说"容易被上位覆盖"。
+    agency_level = _classify_agency_level(issuer)
+    appraisal = _AUTHORITY_APPRAISAL.get(
+        level, _AUTHORITY_APPRAISAL[_DEFAULT_AUTHORITY_LEVEL]
+    )
+    high_appraisal = _high_authority_appraisal(agency_level, issuer)
+    if high_appraisal is not None:
+        appraisal = high_appraisal
     # verified_basis:层级研判的两个事实(文种 + 机关)是否都来自已核 head。
     # 机关空时只凭文种判,verified_basis 看文种这一条核没核过(机关缺不算造假,只是依据更薄)。
     basis_verified = bool(wenzhong.get("verified")) and (
@@ -638,9 +805,8 @@ def _build_structure_read(
         "doc_type_evidence": str(wenzhong.get("evidence", "")).strip(),
         "issuer": issuer,
         "issuer_evidence": str(issuer_el.get("evidence", "")).strip(),
-        "appraisal": _AUTHORITY_APPRAISAL.get(
-            level, _AUTHORITY_APPRAISAL[_DEFAULT_AUTHORITY_LEVEL]
-        ),
+        "agency_level": agency_level,  # 最高 / 高 / 中低 / 空(判不出);引发文机关 evidence
+        "appraisal": appraisal,
         "verified_basis": basis_verified,
     }
 
@@ -800,14 +966,22 @@ def build_doc_spine(
     Returns:
         ``{
             "schema_version": "v1",
-            "head": [{field, value, evidence, verified, match_score}],
+            "head": [{field, value, evidence, verified, match_score, status, reason
+                      [, not_applicable]}],  # status=空值三态(task #29 根一)
             "clauses": [{chapter, matter, instruction_type, actor, deadline, basis_ref,
                          evidence, verified, match_score,
                          substance(真金白银/有条件兑现/空头倡导),  # 1.6.1 含金量层
                          substance_reason,                          # 凭哪些 marker 判的(锚原文)
                          penalty}],                                  # 不办的代价(无罚则=空)
         }``。
-        头要素维抽不到的要素出一条空待核记录(verified=False),绝不编。条款维空 → ``clauses: []``。
+        头要素维抽不到的要素出一条空记录,绝不编。条款维空 → ``clauses: []``。
+
+        **空值三态层**(task #29 根一,向后兼容、纯增字段):每个头要素带 ``status``
+        (present / absent_confirmed / unverified)+ ``reason``。"空"不再一律落"待核"——据已抽
+        文种把"确证为无"(公开件无密级、下行文无签发人栏、平件未标紧急、法规本体无发文要素)标
+        ``absent_confirmed`` + reason(前端显笃定的"公开 / 无 / 不适用"),真没抽到的才 ``unverified``
+        (前端显"待核")。``absent_confirmed`` 同时对齐旧 ``not_applicable=True``
+        (不计分母 / 不报缺席)。
 
         **1.6.1 给「办事清单」加的含金量层**(向后兼容,纯增字段):每条条款多带 ``substance``
         (办事清单据此分「真要办 vs 做做样子」+ 按含金量排轻重缓急)、``substance_reason``、
@@ -885,8 +1059,15 @@ def build_doc_spine(
 
 
 __all__ = [
+    "AGENCY_LEVEL_HIGH",
+    "AGENCY_LEVEL_MID",
+    "AGENCY_LEVEL_TOP",
     "DOC_SPINE_SCHEMA_VERSION",
     "DOC_TYPES",
+    "HEAD_STATUSES",
+    "HEAD_STATUS_ABSENT_CONFIRMED",
+    "HEAD_STATUS_PRESENT",
+    "HEAD_STATUS_UNVERIFIED",
     "INSTRUCTION_TYPES",
     "SUBSTANCE_LEVELS",
     "build_doc_spine",

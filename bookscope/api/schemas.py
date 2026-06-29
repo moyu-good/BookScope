@@ -843,16 +843,21 @@ class RedheadDocStructureResponse(BaseModel):
         default=None,
         description=(
             "看结构（结构即信号）研判，文种判不出时缺省。{authority:{level,rank,doc_type,issuer,"
-            "appraisal,verified_basis…}, signals:[{kind,element,note}]}。权威刻度据文种+机关判效力"
-            "层级，结构信号读缺席/排序/篇幅。评估层（研判，前端不盖鉴印）。"
+            "agency_level,appraisal,verified_basis…}, signals:[{kind,element,note}]}。权威刻度据"
+            "文种+发文机关行政层级（agency_level：最高/高/中低，task #29 根二）判效力——最高/高"
+            "层级（国务院/国办/部委/省级）点出全国/本系统约束，绝不说'容易被覆盖'；结构信号读"
+            "缺席/排序/篇幅。评估层（研判，前端不盖鉴印）。"
         ),
     )
     head: list[dict] = Field(
         default_factory=list,
         description=(
             "文件头要素，固定 8 条（发文字号/文种/发文机关/主送机关/抄送机关/标题事由/"
-            "成文日期/签发人）。每条 {field, value, evidence, verified, match_score}；"
-            "抽不到的留空 value + verified=false（待核，绝不编）。"
+            "成文日期/签发人）。每条 {field, value, evidence, verified, match_score, status, "
+            "reason[, not_applicable]}；status 是空值三态（task #29 根一）：present=抽到了 / "
+            "absent_confirmed=确证为无（带 reason，如公开件无密级、下行文无签发人栏、平件未标"
+            "紧急、法规本体无发文要素，前端显笃定的'公开/无/不适用'）/ unverified=真没抽到"
+            "（前端才显'待核'）。absent_confirmed 同时带 not_applicable=true（不计分母）。"
         ),
     )
     clauses: list[dict] = Field(

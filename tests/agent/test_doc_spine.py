@@ -340,11 +340,27 @@ def test_regulation_marks_na_not_pending(monkeypatch):
         assert by_field[f].get("not_applicable") is not True, f"{f} 不该标 N/A"
 
 
-def test_notice_head_no_na(monkeypatch):
-    """普通公文(通知)不标 N/A——空要素仍是待核(该有可能没抽到,不是文种没有)。"""
+def test_notice_head_status_three_states(monkeypatch):
+    """普通公文(通知)的空值三态(task #29 根一):
+    密级/紧急程度空=确证为无(公开件/平件,absent_confirmed),不是待核;
+    主送机关/抄送机关空=真没抽到(unverified,前端显待核);
+    抽到的(发文字号/文种/发文机关/成文日期/签发人)=present。
+    """
     spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
-    for el in spine["head"]:
-        assert el.get("not_applicable") is not True
+    by_field = {el["field"]: el for el in spine["head"]}
+    # 密级/紧急程度:公文格式规则下确证为无 → absent_confirmed + reason,不是待核
+    assert by_field["密级"]["status"] == "absent_confirmed"
+    assert by_field["密级"]["reason"] == "公开件无密级"
+    assert by_field["密级"].get("not_applicable") is True  # 旧字段对齐:不计分母
+    assert by_field["紧急程度"]["status"] == "absent_confirmed"
+    assert by_field["紧急程度"]["reason"] == "平件(未标紧急)"
+    # 主送/抄送机关:通知该有却没抽到 → unverified(真待核)
+    assert by_field["主送机关"]["status"] == "unverified"
+    assert by_field["主送机关"].get("not_applicable") is not True
+    assert by_field["抄送机关"]["status"] == "unverified"
+    # 抽到的要素 = present
+    for f in ("发文字号", "文种", "发文机关", "成文日期", "签发人"):
+        assert by_field[f]["status"] == "present", f"{f} 抽到了该 present"
 
 
 def test_classification_extracted_and_verified(monkeypatch):
@@ -657,3 +673,238 @@ def test_classify_authority_pure():
     assert ds._classify_authority("条例", "国务院") == "公布令/法规"  # 中央本级条例
     assert ds._classify_authority("通知", "") == ds._DEFAULT_AUTHORITY_LEVEL
     assert ds._classify_authority("", "") == ds._DEFAULT_AUTHORITY_LEVEL  # 空退兜底
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# task #29 根一:头要素空值三态(present / absent_confirmed / unverified)
+# 设计稿 docs/design/WP-evidence-empty-semantics.md §根一。"空"不再一律落"待核":
+# 据公文格式规则把"确证为无"标 absent_confirmed + reason,真没抽到才退 unverified。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def test_head_status_field_exists_for_all_elements(monkeypatch):
+    """每个头要素都带 status(三态之一)+ reason 字段(纯增,向后兼容)。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    for el in spine["head"]:
+        assert "status" in el and "reason" in el
+        assert el["status"] in ds.HEAD_STATUSES
+
+
+def test_head_status_present_when_extracted(monkeypatch):
+    """抽到了的要素 = present(reason 空)。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    by_field = {el["field"]: el for el in spine["head"]}
+    assert by_field["发文字号"]["status"] == "present"
+    assert by_field["发文字号"]["reason"] == ""
+
+
+def test_head_status_classification_absent_confirmed(monkeypatch):
+    """密级/紧急程度空 = 确证为无(公开件/平件),带站得住的 reason,前端显笃定不是待核。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    by_field = {el["field"]: el for el in spine["head"]}
+    assert by_field["密级"]["status"] == "absent_confirmed"
+    assert by_field["密级"]["reason"] == "公开件无密级"
+    assert by_field["紧急程度"]["status"] == "absent_confirmed"
+    assert by_field["紧急程度"]["reason"] == "平件(未标紧急)"
+
+
+def test_head_status_signoff_absent_confirmed_for_downward(monkeypatch):
+    """下行文(通知)无签发人栏 = absent_confirmed(GB/T 只上行文要签发人)。
+    _full_head 里签发人抽到了,这里专造一份签发人空的通知验确证为无分支。"""
+    head = _head_payload([
+        {"field": "文种", "value": "通知", "evidence": "关于做好新能源补贴申报的通知"},
+        {"field": "发文机关", "value": "市发展改革委", "evidence": "市发展改革委文件"},
+        # 签发人不给 → 通知是下行文,本就没签发人栏
+    ])
+    spine = _run(monkeypatch, head_text=head, clause_text=_full_clauses())
+    by_field = {el["field"]: el for el in spine["head"]}
+    assert by_field["签发人"]["status"] == "absent_confirmed"
+    assert by_field["签发人"]["reason"] == "此文种无签发人栏"
+
+
+def test_head_status_signoff_unverified_for_upward(monkeypatch):
+    """上行文(请示)该有签发人却空 = unverified(真没抽到,退待核,绝不硬判'确证无')。
+    这是 evidence-first 死守:拿不准是不是该有,就退 unverified。"""
+    head = _head_payload([
+        {"field": "文种", "value": "请示", "evidence": "关于xx的请示"},
+        {"field": "发文机关", "value": "某县政府", "evidence": "某县政府文件"},
+        # 签发人空 → 上行文该有签发人,空着是真没抽到
+    ])
+    spine = _run(
+        monkeypatch, head_text=head,
+        clause_text=_clause_payload([
+            {"chapter": 1, "matter": "请求批准", "instruction_type": "依据陈述",
+             "actor": "", "deadline": "", "basis_ref": "",
+             "evidence": "各县区发展改革局应当于2024年6月30日前完成本辖区补贴申报材料的汇总上报。"},
+        ]),
+    )
+    by_field = {el["field"]: el for el in spine["head"]}
+    assert by_field["签发人"]["status"] == "unverified", "上行文缺签发人=真待核,不准判确证无"
+    assert by_field["签发人"].get("not_applicable") is not True
+
+
+def test_head_status_unverified_for_real_miss(monkeypatch):
+    """主送机关(没有公文格式规则说它本就没有)空 = unverified(真没抽到 → 待核)。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    by_field = {el["field"]: el for el in spine["head"]}
+    assert by_field["主送机关"]["status"] == "unverified"
+    assert by_field["主送机关"]["reason"] == ""
+
+
+def test_head_status_regulation_na_is_absent_confirmed(monkeypatch):
+    """法规本体(条例)的发文要素空 = absent_confirmed(法规本体无此发文要素),不是待核。"""
+    head = _head_payload([
+        {"field": "文种", "value": "条例", "evidence": "制定本条例"},
+        {"field": "发文机关", "value": "广州市人民代表大会常务委员会",
+         "evidence": "广州市第十五届人民代表大会常务委员会第四十二次会议通过"},
+        {"field": "标题事由", "value": "广州市优化营商环境条例",
+         "evidence": "广州市优化营商环境条例"},
+        {"field": "成文日期", "value": "2020年10月28日",
+         "evidence": "2020年10月28日广州市第十五届人民代表大会常务委员会第四十二次会议通过"},
+    ])
+    chunks = [
+        {"chunk_id": "h0", "chapter": 0,
+         "text": "广州市优化营商环境条例 2020年10月28日广州市第十五届人民代表大会常务委员会"
+                 "第四十二次会议通过 第一条 为优化营商环境，制定本条例。"},
+    ]
+    spine = _run(
+        monkeypatch, head_text=head,
+        clause_text=_clause_payload([
+            {"chapter": 1, "matter": "立法目的", "instruction_type": "依据陈述",
+             "actor": "", "deadline": "", "basis_ref": "",
+             "evidence": "第一条 为优化营商环境，制定本条例。"},
+        ]),
+        chunks=chunks,
+    )
+    by_field = {el["field"]: el for el in spine["head"]}
+    # 法规本体的发文字号/密级/签发人等 → 确证为无(法规本体无此发文要素),不待核
+    for f in ("发文字号", "密级", "签发人"):
+        assert by_field[f]["status"] == "absent_confirmed", f"{f} 该确证为无"
+        assert by_field[f]["reason"] == "法规本体无此发文要素"
+        assert by_field[f].get("not_applicable") is True
+
+
+def test_confirmed_absent_reason_pure():
+    """_confirmed_absent_reason 纯件:确证为无给依据,拿不准返 None(退待核)。"""
+    # 密级/紧急程度:任何文种空着都是确证为无
+    assert ds._confirmed_absent_reason("密级", "通知") == "公开件无密级"
+    assert ds._confirmed_absent_reason("紧急程度", "通知") == "平件(未标紧急)"
+    # 签发人:下行/平行文确证无,上行文返 None(该有却没抽到 → 待核)
+    assert ds._confirmed_absent_reason("签发人", "通知") == "此文种无签发人栏"
+    assert ds._confirmed_absent_reason("签发人", "函") == "此文种无签发人栏"
+    assert ds._confirmed_absent_reason("签发人", "请示") is None  # 上行文该有
+    assert ds._confirmed_absent_reason("签发人", "报告") is None
+    # 法规本体:发文要素都确证无(优先级最高,密级也走法规这条)
+    assert ds._confirmed_absent_reason("发文字号", "条例") == "法规本体无此发文要素"
+    assert ds._confirmed_absent_reason("密级", "条例") == "法规本体无此发文要素"
+    # 没有格式规则兜底的字段 → None(退待核)
+    assert ds._confirmed_absent_reason("主送机关", "通知") is None
+    assert ds._confirmed_absent_reason("发文字号", "通知") is None
+
+
+def test_classify_head_status_pure():
+    """_classify_head_status 纯件:有值=present、确证无=absent_confirmed、其余=unverified。"""
+    assert ds._classify_head_status("发文字号", "X发〔2024〕5号", "通知") == (
+        "present", "")
+    assert ds._classify_head_status("密级", "", "通知") == (
+        "absent_confirmed", "公开件无密级")
+    assert ds._classify_head_status("主送机关", "", "通知") == ("unverified", "")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# task #29 根二:效力研判吃发文机关行政层级
+# 设计稿 §根二。光按文种一刀切会把国办《意见》判成"一般公文、容易被覆盖"——错。
+# 高层级(国务院/国办/部委/省级)文件要点出权威范围,绝不说"容易被上位覆盖"。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def test_classify_agency_level_pure():
+    """_classify_agency_level 纯件:最高/高/中低/空。"""
+    # 最高:国务院/国办/中共中央/全国人大
+    assert ds._classify_agency_level("国务院") == "最高"
+    assert ds._classify_agency_level("国务院办公厅") == "最高"
+    assert ds._classify_agency_level("中共中央办公厅") == "最高"
+    assert ds._classify_agency_level("全国人民代表大会常务委员会") == "最高"
+    # 高:部委(国家级)、省级
+    assert ds._classify_agency_level("教育部") == "高"
+    assert ds._classify_agency_level("国家发展和改革委员会") == "高"
+    assert ds._classify_agency_level("广东省人民政府") == "高"
+    # 中低:市/县
+    assert ds._classify_agency_level("广州市人民政府") == "中低"
+    assert ds._classify_agency_level("某县发展改革局") == "中低"
+    # 市优先于省:"广东省广州市..."以更低的市为准
+    assert ds._classify_agency_level("广东省广州市人民政府") == "中低"
+    # 判不出 → 空串
+    assert ds._classify_agency_level("") == ""
+    assert ds._classify_agency_level("xx办公室") == ""
+
+
+def test_structure_read_carries_agency_level(monkeypatch):
+    """structure_read.authority 带 agency_level(据已抽发文机关判)。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    # _full_head 发文机关=市发展改革委 → 中低
+    assert spine["structure_read"]["authority"]["agency_level"] == "中低"
+
+
+def test_top_agency_yi_jian_not_called_general_doc(monkeypatch):
+    """触发实例:国务院办公厅《意见》——文种维度归'一般公文',但发文机关是最高层级 →
+    appraisal 必须点出全国约束力、绝不说'容易被上位覆盖/一般公文'。这是根二的命门。"""
+    head = _head_payload([
+        {"field": "文种", "value": "意见", "evidence": "国务院办公厅关于xx的意见"},
+        {"field": "发文机关", "value": "国务院办公厅",
+         "evidence": "国务院办公厅关于xx的意见"},
+    ])
+    chunks = [
+        {"chunk_id": "h0", "chapter": 0,
+         "text": "国务院办公厅关于xx的意见 各省、自治区、直辖市人民政府……"},
+        {"chunk_id": "c1", "chapter": 1,
+         "text": "各县区发展改革局应当于2024年6月30日前完成本辖区补贴申报材料的汇总上报。"},
+    ]
+    spine = _run(monkeypatch, head_text=head, clause_text=_full_clauses(), chunks=chunks)
+    auth = spine["structure_read"]["authority"]
+    # 文种维度的层级标签仍是"一般公文"(意见 by 文种就是),但 agency_level=最高
+    assert auth["agency_level"] == "最高"
+    # appraisal 被高层级覆盖:点出全国约束,绝不出现"容易被覆盖/可有可无"那套
+    assert "全国" in auth["appraisal"]
+    assert "容易被" not in auth["appraisal"]
+    assert "最高层级" in auth["appraisal"]
+
+
+def test_high_agency_appraisal_override(monkeypatch):
+    """部委/省级(高层级)的通知/意见 → appraisal 点出本系统权威,不说'容易被覆盖'。"""
+    head = _head_payload([
+        {"field": "文种", "value": "通知", "evidence": "教育部关于xx的通知"},
+        {"field": "发文机关", "value": "教育部", "evidence": "教育部关于xx的通知"},
+    ])
+    chunks = [
+        {"chunk_id": "h0", "chapter": 0, "text": "教育部关于xx的通知 各省教育厅……"},
+        {"chunk_id": "c1", "chapter": 1,
+         "text": "各县区发展改革局应当于2024年6月30日前完成本辖区补贴申报材料的汇总上报。"},
+    ]
+    spine = _run(monkeypatch, head_text=head, clause_text=_full_clauses(), chunks=chunks)
+    auth = spine["structure_read"]["authority"]
+    assert auth["agency_level"] == "高"
+    assert "容易被" not in auth["appraisal"]
+    assert "高层级" in auth["appraisal"]
+
+
+def test_mid_agency_keeps_doctype_appraisal(monkeypatch):
+    """中低层级(市/县)通知 → 不覆盖,仍用文种维度的'一般公文'研判(包含'容易被覆盖')。
+    根二只给高层级翻案,不动中低层级的诚实研判。"""
+    spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+    auth = spine["structure_read"]["authority"]
+    # _full_head 发文机关=市发展改革委(中低)
+    assert auth["agency_level"] == "中低"
+    assert auth["level"] == "一般公文"
+    # 中低层级保留文种维度的研判(一般公文 = 能管到主送机关但容易被覆盖)
+    assert auth["appraisal"] == ds._AUTHORITY_APPRAISAL["一般公文"]
+
+
+def test_high_authority_appraisal_pure():
+    """_high_authority_appraisal 纯件:最高/高给覆盖句,中低/空返 None。"""
+    top = ds._high_authority_appraisal("最高", "国务院办公厅")
+    assert top is not None and "全国" in top and "容易被" not in top
+    high = ds._high_authority_appraisal("高", "教育部")
+    assert high is not None and "容易被" not in high
+    assert ds._high_authority_appraisal("中低", "广州市人民政府") is None
+    assert ds._high_authority_appraisal("", "") is None

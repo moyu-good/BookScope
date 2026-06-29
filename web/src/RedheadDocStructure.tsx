@@ -31,11 +31,15 @@ import { SealMark } from "./SealMark";
 
 interface HeadElement {
   field: string; // 8 个之一：发文字号 / 文种 / 发文机关 / 主送机关 / 抄送机关 / 标题事由 / 成文日期 / 签发人
-  value: string; // 抽不到为空 → 显示"待核"
+  value: string; // 抽到的值；空 + status 决定显"无/不适用"还是"待核"
   evidence: string;
   verified: boolean;
   match_score: number;
-  not_applicable?: boolean; // 法规本体(条例/规定/办法…)无此"发文"要素 → 显"本文种无此项"而非"待核"，且不计入分母
+  // 空值三态（task #29 根一）：present 抽到了 / absent_confirmed 确证为无（带 reason，显笃定的
+  // "公开 / 无 / 不适用"）/ unverified 真没抽到（才显"待核"）。不再把笃定的"无"显成像系统故障的待核。
+  status?: "present" | "absent_confirmed" | "unverified";
+  reason?: string; // absent_confirmed 的依据（公开件无密级 / 此文种无签发人栏 / 平件…），小字附在后
+  not_applicable?: boolean; // 与 absent_confirmed 同义的旧字段：不计入分母 / 不报缺席（向后兼容）
 }
 
 interface Clause {
@@ -60,6 +64,7 @@ interface StructureAuthority {
   doc_type_evidence: string;
   issuer: string; // 引到的已抽发文机关（可能空）
   issuer_evidence: string;
+  agency_level?: string; // 发文机关行政层级：最高 / 高 / 中低 / 空（task #29 根二，判不出为空）
   appraisal: string; // 一句研判：多大分量 / 能管到谁 / 会否被上位覆盖（推断）
   verified_basis: boolean; // 文种+机关是否都来自已核 head（false=研判依据更薄）
 }
@@ -114,6 +119,23 @@ function instructionStyle(type: string): { fg: string; bg: string } {
 // 一条头要素是否真有内容（value 非空白才算抽到了）。
 function hasValue(v: string): boolean {
   return v.trim().length > 0;
+}
+
+// 确证为无（absent_confirmed）时，按字段给一个笃定的短词——不是"待核"那种像系统故障的口吻。
+// 密级特殊：确证无密级 = 这是公开件，直接说"公开"最贴用户的认知；其余给"无"。
+function confirmedAbsentLabel(field: string): string {
+  if (field === "密级") return "公开 · 无密级";
+  if (field === "紧急程度") return "平件 · 未标紧急";
+  return "无";
+}
+
+// 一条头要素当前是哪一态（present / absent_confirmed / unverified）。后端给了 status 就认它；
+// 没给（旧数据）就退回老逻辑：not_applicable 当 absent_confirmed，否则按有没有值分 present/unverified。
+function headStatus(h: HeadElement): "present" | "absent_confirmed" | "unverified" {
+  if (h.status) return h.status;
+  if (hasValue(h.value)) return "present";
+  if (h.not_applicable) return "absent_confirmed";
+  return "unverified";
 }
 
 // 结构信号三类 → 一个短中文标签（缺席 / 排序 / 篇幅），渲染成研判带里的小角标。
@@ -344,6 +366,7 @@ export function RedheadDocStructure({
           const filled = hasValue(h.value);
           const canOpen = filled && !!h.evidence;
           const isOpen = openHead === h.field;
+          const status = headStatus(h);
           return (
             <div
               key={h.field || i}
@@ -396,10 +419,19 @@ export function RedheadDocStructure({
                         </button>
                       )}
                     </div>
-                  ) : h.not_applicable ? (
-                    <span className="text-sm text-[var(--color-ink-muted)]">
-                      本文种无此项
-                    </span>
+                  ) : status === "absent_confirmed" ? (
+                    // 确证为无：笃定地说"公开 / 无 / 平件"，不是像故障的"待核"。后端给了
+                    // reason（公开件无密级 / 此文种无签发人栏…）就当小字依据附在后头。
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-sm text-[var(--color-ink)]">
+                        {confirmedAbsentLabel(h.field)}
+                      </span>
+                      {h.reason && (
+                        <span className="text-[11px] text-[var(--color-ink-muted)]">
+                          {h.reason}
+                        </span>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-sm text-[var(--color-ink-muted)] italic">
                       待核
@@ -456,6 +488,29 @@ export function RedheadDocStructure({
             >
               {structureRead.authority.level}
             </span>
+            {/* 发文机关行政层级（根二）：最高 / 高层级单独标出来——这类文件分量重，
+                绝不是"一般公文"。最高用朱砂强调，高用木褐，中低/空不另标（信息已在层级里）。 */}
+            {(structureRead.authority.agency_level === "最高" ||
+              structureRead.authority.agency_level === "高") && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                style={
+                  structureRead.authority.agency_level === "最高"
+                    ? {
+                        color: "#9a3a2e",
+                        background: "rgba(154, 58, 46, 0.10)",
+                      }
+                    : {
+                        color: "#8a6b3f",
+                        background: "rgba(138, 107, 63, 0.12)",
+                      }
+                }
+              >
+                {structureRead.authority.agency_level === "最高"
+                  ? "最高层级机关"
+                  : "高层级机关"}
+              </span>
+            )}
             {structureRead.authority.doc_type && (
               <span className="text-[11px] text-[var(--color-ink-muted)]">
                 据文种「{structureRead.authority.doc_type}」
