@@ -83,7 +83,7 @@ async def register(req: RegisterRequest) -> AuthResponse:
     store = get_accounts_store()
     try:
         user = store.create_user(
-            email=req.email, password=req.password, phone=req.phone
+            email=req.email, password=req.password
         )
     except DuplicateEmailError as exc:
         raise HTTPException(

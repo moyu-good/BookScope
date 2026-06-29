@@ -1887,7 +1887,8 @@ class RegisterRequest(BaseModel):
     password: str = Field(
         ..., min_length=8, max_length=128, description="密码,至少 8 位。"
     )
-    phone: str | None = Field(default=None, max_length=32, description="可选手机号。")
+    # 手机号 2026-06-29 撤掉(PIPL 最小必要:SMS 缓做、收了没用)。数据层 users.phone
+    # 列 + UserPublic.phone 保留给将来 SMS,注册暂不收集。
 
     @field_validator("email")
     @classmethod

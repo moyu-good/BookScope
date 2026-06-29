@@ -1,7 +1,7 @@
 // 托管版登录 / 注册界面(1.6.2 FE)。
 //
 // 两块:
-//   - AuthModal:登录 / 注册弹窗。邮箱 / 密码 / 手机(可选);切换登录注册;错误回显人话。
+//   - AuthModal:登录 / 注册弹窗。邮箱 / 密码;切换登录注册;错误回显人话。
 //     只在 hosted 模式、且没登录时挂出来。
 //   - AccountStrip:左栏底部的"当前账号 + 退出"一行。登录后显示邮箱;退出=前端清令牌。
 //
@@ -25,7 +25,6 @@ export function AuthModal({
   const [tab, setTab] = useState<AuthTab>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [errMsg, setErrMsg] = useState("");
 
@@ -45,7 +44,6 @@ export function AuthModal({
           ? await register({
               email: email.trim(),
               password,
-              phone: phone.trim() || undefined,
             })
           : await login({ email: email.trim(), password });
       saveAuthToken(resp.token);
@@ -150,17 +148,6 @@ export function AuthModal({
             placeholder={tab === "register" ? "至少 8 位" : "你的密码"}
             autoComplete={tab === "register" ? "new-password" : "current-password"}
           />
-          {tab === "register" && (
-            <Field
-              id="auth-phone"
-              label="手机"
-              type="tel"
-              value={phone}
-              onChange={setPhone}
-              placeholder="可不填"
-              autoComplete="tel"
-            />
-          )}
 
           {errMsg && (
             <p
