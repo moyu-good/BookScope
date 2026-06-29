@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class PreviousReviewHint(BaseModel):
@@ -1808,7 +1808,58 @@ class ErrorResponse(BaseModel):
     )
 
 
+# ---- 托管版账号(1.6.2 · 只 hosted 路由用,纯 pydantic 不碰 argon2) ----
+
+
+class RegisterRequest(BaseModel):
+    """POST /api/auth/register 请求体(只 hosted)。"""
+
+    email: str = Field(..., min_length=3, max_length=254, description="登录邮箱。")
+    password: str = Field(
+        ..., min_length=8, max_length=128, description="密码,至少 8 位。"
+    )
+    phone: str | None = Field(default=None, max_length=32, description="可选手机号。")
+
+    @field_validator("email")
+    @classmethod
+    def _email_shape(cls, v: str) -> str:
+        v = v.strip()
+        host = v.rsplit("@", 1)[-1] if "@" in v else ""
+        if "@" not in v or "." not in host:
+            raise ValueError("邮箱格式不对")
+        return v
+
+
+class LoginRequest(BaseModel):
+    """POST /api/auth/login 请求体(只 hosted)。"""
+
+    email: str = Field(..., min_length=3, max_length=254, description="登录邮箱。")
+    password: str = Field(..., min_length=1, max_length=128, description="密码。")
+
+
+class UserPublic(BaseModel):
+    """账号对外视图——绝不含密码哈希。"""
+
+    id: str
+    email: str
+    phone: str | None = None
+    created_at: str
+
+
+class AuthResponse(BaseModel):
+    """注册 / 登录成功返回:令牌 + 账号。令牌存浏览器,后续请求带 Bearer。"""
+
+    token: str = Field(
+        ..., description="带签名时限的鉴权令牌;只装 user_id,不含 API key。"
+    )
+    user: UserPublic
+
+
 __all__ = [
+    "AuthResponse",
+    "LoginRequest",
+    "RegisterRequest",
+    "UserPublic",
     "AgentAskRequest",
     "AgentAskResponse",
     "AnnotationsRequest",

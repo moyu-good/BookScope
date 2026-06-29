@@ -1,0 +1,103 @@
+"""账号路由 e2e 单测(1.6.2 Phase 1b-ii)。
+
+走 TestClient 真打端点。命门两条:
+1. hosted 下注册 / 登录 / whoami 全通,返回里**绝不带密码哈希**。
+2. local 下 /auth/* 根本不挂 → 404(本地版零账号面)。
+"""
+
+from __future__ import annotations
+
+import pytest
+from fastapi.testclient import TestClient
+
+from bookscope.api import deployment
+from bookscope.api.app import create_app
+
+
+@pytest.fixture
+def hosted_client(monkeypatch, tmp_path):
+    monkeypatch.setenv("BOOKSCOPE_DEPLOYMENT_MODE", "hosted")
+    monkeypatch.setenv("BOOKSCOPE_AUTH_SECRET", "test-secret-key")
+    monkeypatch.setenv("BOOKSCOPE_ACCOUNTS_DB", str(tmp_path / "acc.db"))
+    monkeypatch.setenv("BOOKSCOPE_RATELIMIT_DISABLED", "1")
+    deployment._reset_accounts_store()
+    with TestClient(create_app()) as client:
+        yield client
+    deployment._reset_accounts_store()
+
+
+def test_register_returns_token_and_user(hosted_client):
+    r = hosted_client.post(
+        "/api/auth/register", json={"email": "a@b.com", "password": "pw123456"}
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["token"]
+    assert body["user"]["email"] == "a@b.com"
+    # 对外绝不漏哈希 / 密码。
+    assert "password" not in body["user"]
+    assert "password_hash" not in body["user"]
+
+
+def test_register_duplicate_returns_409(hosted_client):
+    payload = {"email": "dup@b.com", "password": "pw123456"}
+    hosted_client.post("/api/auth/register", json=payload)
+    r = hosted_client.post("/api/auth/register", json=payload)
+    assert r.status_code == 409
+
+
+def test_register_short_password_422(hosted_client):
+    r = hosted_client.post(
+        "/api/auth/register", json={"email": "x@b.com", "password": "short"}
+    )
+    assert r.status_code == 422
+
+
+def test_register_bad_email_422(hosted_client):
+    r = hosted_client.post(
+        "/api/auth/register", json={"email": "notanemail", "password": "pw123456"}
+    )
+    assert r.status_code == 422
+
+
+def test_login_then_me(hosted_client):
+    hosted_client.post(
+        "/api/auth/register", json={"email": "log@b.com", "password": "pw123456"}
+    )
+    r = hosted_client.post(
+        "/api/auth/login", json={"email": "log@b.com", "password": "pw123456"}
+    )
+    assert r.status_code == 200
+    token = r.json()["token"]
+    me = hosted_client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert me.status_code == 200
+    assert me.json()["email"] == "log@b.com"
+
+
+def test_login_wrong_password_401(hosted_client):
+    hosted_client.post(
+        "/api/auth/register", json={"email": "w@b.com", "password": "pw123456"}
+    )
+    r = hosted_client.post(
+        "/api/auth/login", json={"email": "w@b.com", "password": "nope-wrong"}
+    )
+    assert r.status_code == 401
+
+
+def test_me_without_token_401(hosted_client):
+    assert hosted_client.get("/api/auth/me").status_code == 401
+
+
+def test_local_mode_has_no_auth_routes(monkeypatch, tmp_path):
+    # 命门:local 模式 /auth/* 根本没挂 → 404,本地版零账号面。
+    monkeypatch.delenv("BOOKSCOPE_DEPLOYMENT_MODE", raising=False)
+    monkeypatch.setenv("BOOKSCOPE_RATELIMIT_DISABLED", "1")
+    deployment._reset_accounts_store()
+    with TestClient(create_app()) as client:
+        r = client.post(
+            "/api/auth/register", json={"email": "a@b.com", "password": "pw123456"}
+        )
+        assert r.status_code == 404
+    deployment._reset_accounts_store()

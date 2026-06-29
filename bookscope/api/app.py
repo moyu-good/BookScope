@@ -22,11 +22,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import FileResponse
 
 from bookscope import __version__
 from bookscope.api.book_sessions import get_book_session_store
-from bookscope.api.deployment import deployment_mode
+from bookscope.api.deployment import deployment_mode, is_hosted
 from bookscope.api.middleware import AbuseGuardMiddleware
 from bookscope.api.routes import (
     agent_router,
@@ -119,6 +118,13 @@ def create_app() -> FastAPI:
     app.include_router(agent_router, prefix="/api")
     app.include_router(books_router, prefix="/api")
     app.include_router(sessions_router, prefix="/api")
+
+    # 托管版才挂账号路由(ADR-011)。懒 import:local 不挂、也不 import 本模块,
+    # 故启动不会把 argon2 / itsdangerous 拽进来——纯 pip install -e . 照样跑得起。
+    if is_hosted():
+        from bookscope.api.routes.accounts import accounts_router
+
+        app.include_router(accounts_router, prefix="/api")
 
     # 生产：同源托管前端 dist（Vite base="/" 产物）。dev 不设此变量则跳过，
     # 前端仍由 vite dev server 出。
