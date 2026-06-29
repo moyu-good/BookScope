@@ -8,6 +8,7 @@ import { Reader } from "./Reader";
 import { bookScale } from "./bookScale";
 import type { BookScale } from "./bookScale";
 import { ScaleBanner } from "./ScaleBanner";
+import { ActionLedger } from "./ActionLedger";
 import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
@@ -822,6 +823,7 @@ export function App() {
     | "redhead_depgraph"
     | "redhead_policy"
     | "redhead_level"
+    | "meeting_ledger"
   >("library");
   // 手机端左栏收成抽屉，这个控制开合
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -2037,6 +2039,22 @@ export function App() {
                   baseUrl={effectiveBaseUrl()}
                 />
               </div>
+
+              {/* 1.7 会议·行动项台账（单份文档，跟单份公文功能同一层 currentSession 守卫内）。
+                  会议题材还没进 genre_detect，这是手动入口——任何文档都能点进来试。 */}
+              <div className={mode === "meeting_ledger" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="行动项台账"
+                  subtitle="一份会议记录精读一次，把这场会派下去的活列成一张能勾的台账：每条说清做什么、谁负责、几号前办完、落实哪条决议，标含金量（真金白银 / 有条件兑现 / 空头表态）、钉原文。没人接、没定时限的活排最前。填上名字就只看派到你头上的那几条。逐字稿、纪要都能读。"
+                />
+                <ActionLedger
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
             </>
           )}
 
@@ -2147,7 +2165,8 @@ type Mode =
   | "redhead_formatcheck"
   | "redhead_depgraph"
   | "redhead_policy"
-  | "redhead_level";
+  | "redhead_level"
+  | "meeting_ledger";
 
 // 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
@@ -2156,7 +2175,7 @@ const WHOLE_BOOK_MODES = new Set<Mode>([
   "timeline", "narrative", "consistency", "argument", "style", "technique",
   "cards", "revision", "redhead", "redhead_actions", "redhead_plain",
   "redhead_relevance", "redhead_stakes", "redhead_hardfacts", "redhead_timeline",
-  "redhead_glossary", "redhead_formatcheck",
+  "redhead_glossary", "redhead_formatcheck", "meeting_ledger",
 ]);
 
 // 左栏功能按"用户想干啥"分五组，每组可折叠（WP-1.5.4）。
@@ -2259,6 +2278,14 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "redhead_level", label: "上下级一致性" },
     ],
   },
+  // 1.7 会议垂直·首炮。会议题材还没进后端 genre_detect，所以这组不靠题材门控——
+  // genreVisibleGroups 里把 "meeting" 加进了每个分支，任何已上传的文档都能点进来试
+  // （会议题材自动识别是另一个后端任务）。
+  {
+    key: "meeting",
+    title: "会议 · 行动项",
+    modes: [{ id: "meeting_ledger", label: "行动项台账" }],
+  },
 ];
 
 // 题材 → 高亮哪几组（genre hook，#10 给 session.genre 后接）。
@@ -2293,9 +2320,17 @@ function genreHighlightGroups(genre: string | undefined | null): Set<string> | n
 function genreVisibleGroups(genre: string | undefined | null): Set<string> | null {
   if (!genre) return null;
   const g = genre.toLowerCase();
+  // 会议组(1.7)不靠题材门控:会议还没进 genre_detect,任何题材下都留着这个手动入口。
+  // 所以每个分支都带上 "meeting"——书 / 公文的门控一字不动,只多放行这一组。
   // 公文:只留「问 & 读」+ 三个公文组,书的人物/情节/思想/质量全藏。
   if (/(公文|红头)/.test(g)) {
-    return new Set(["read", "redhead_read", "redhead_act", "redhead_cross"]);
+    return new Set([
+      "read",
+      "redhead_read",
+      "redhead_act",
+      "redhead_cross",
+      "meeting",
+    ]);
   }
   // 书类(小说/历史/理论/论文/诗歌/工具书):只留「问 & 读」+ 书的组,公文三组全藏。
   if (
@@ -2303,7 +2338,7 @@ function genreVisibleGroups(genre: string | undefined | null): Set<string> | nul
       g,
     )
   ) {
-    return new Set(["read", "character", "plot", "thought", "quality"]);
+    return new Set(["read", "character", "plot", "thought", "quality", "meeting"]);
   }
   // 其他 / 认不出:全显(兜底)。
   return null;
