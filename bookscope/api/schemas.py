@@ -1016,6 +1016,35 @@ class RedheadPlainLanguageResponse(BaseModel):
     trace: dict = Field(default_factory=dict, description="运行用量 trace。")
 
 
+class RedheadCloseReadingResponse(BaseModel):
+    """POST /api/agent/redhead/close-reading 响应体（逐条精读）。
+
+    公文整合 centerpiece（设计稿 WP-redhead-consolidation 整合 1+2）：一条公文的三个切面合到
+    一张卡——大白话 + 结构标签 + 内联术语 + 对原文，一个富视图替原来大白话 / 名词解释 / 公文结构
+    条款三趟。从同一份文脉后端合成（不走前端三端点对齐）。
+    """
+
+    items: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "逐条精读条目，按条款序号排。每条 {chapter, matter, plain(大白话，改写失败退回 "
+            "matter), structure:{instruction_type(硬要求/软倡导/方针部署/信息告知/依据陈述), "
+            "actor, deadline, basis_ref}, glossary:[{term, explanation, context_meaning, "
+            "policy_intent}]（内联术语，可空）, evidence(逐字原文), verified, match_score}；"
+            "可带可选 nuance=[{marker, meaning}]（命中措辞刻度才点弦外之意）。结构标签直接取文脉"
+            "条款骨架不重抽；内联术语核不过的不挂；核的是原文不是白话。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False,
+        description=(
+            "false=失败/没拆出可逐条精读的正文（前端优雅退场）；true+空 items=读过但没条款。"
+        ),
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
 class RedheadRelevanceRequest(RedheadDocStructureRequest):
     """POST /api/agent/redhead/relevance 请求体（跟我相关）。比单份解读多一个身份。"""
 

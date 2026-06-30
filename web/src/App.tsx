@@ -48,10 +48,9 @@ import { RedheadDependencyGraph } from "./RedheadDependencyGraph";
 import { RedheadDocStructure } from "./RedheadDocStructure";
 import { RedheadLevelConsistency } from "./RedheadLevelConsistency";
 import { RedheadPolicyEvolution } from "./RedheadPolicyEvolution";
+import { RedheadCloseReading } from "./RedheadCloseReading";
 import { RedheadFormatCheck } from "./RedheadFormatCheck";
-import { RedheadGlossary } from "./RedheadGlossary";
 import { RedheadHardFacts } from "./RedheadHardFacts";
-import { RedheadPlainLanguage } from "./RedheadPlainLanguage";
 import { RedheadRelevance } from "./RedheadRelevance";
 import { RedheadStakes } from "./RedheadStakes";
 import { RedheadTimeline } from "./RedheadTimeline";
@@ -862,7 +861,6 @@ export function App() {
     | "redhead_stakes"
     | "redhead_hardfacts"
     | "redhead_timeline"
-    | "redhead_glossary"
     | "redhead_formatcheck"
     | "redhead_depgraph"
     | "redhead_policy"
@@ -2119,10 +2117,10 @@ export function App() {
 
               <div className={mode === "redhead_plain" ? "" : "hidden"}>
                 <CanvasHeader
-                  title="大白话翻译"
-                  subtitle="公文有两种看不懂。一种是文绉绉的，「应当于三十日内予以办结」翻成「三十天内得办完」就完事。真正难的是第二种，看着懂其实没懂：「原则上同意」留了口子、「研究研究」约等于不办、「由相关部门认定」真规则在别人手里。这功能逐句翻成人话，碰到这类话还点破弦外之意。每句白话背后的原文核得到才盖「鉴」印，只忠实转述、不替你脑补。适合党政公文 / 红头文件。"
+                  title="逐条精读"
+                  subtitle="一条一条把红头文件吃透，三件事一次看全。一是大白话：「应当于三十日内予以办结」就是「三十天内得办完」，碰到「原则上同意」留了口子、「研究研究」约等于不办、「由相关部门认定」真规则在别人手里，这类看着懂其实没懂的话还点破弦外之意。二是结构标签：这条是硬要求还是软倡导、谁负责、到几号、依据哪份上位文件。三是生词随手点开当场解释。背后原文核得到才盖「鉴」印，只忠实转述、不替你脑补。适合党政公文 / 红头文件。"
                 />
-                <RedheadPlainLanguage
+                <RedheadCloseReading
                   sessionId={currentSession.session_id}
                   provider={provider}
                   apiKey={apiKey}
@@ -2179,20 +2177,6 @@ export function App() {
                   subtitle="把一份红头文件里所有跟时间有关的点排成一条线：什么时候起施行、几号前要办完、哪天截止、分几个阶段，按先后摆开，每个时间点钉在原文。适合党政公文 / 红头文件。"
                 />
                 <RedheadTimeline
-                  sessionId={currentSession.session_id}
-                  provider={provider}
-                  apiKey={apiKey}
-                  model={model}
-                  baseUrl={effectiveBaseUrl()}
-                />
-              </div>
-
-              <div className={mode === "redhead_glossary" ? "" : "hidden"}>
-                <CanvasHeader
-                  title="名词解释"
-                  subtitle="把一份红头文件里的专有名词、简称、术语挑出来逐个解释：这个词在这份文件里指什么、依哪份上位文件定义的，每条钉在原文，看不懂的词不用再去别处查。适合党政公文 / 红头文件。"
-                />
-                <RedheadGlossary
                   sessionId={currentSession.session_id}
                   provider={provider}
                   apiKey={apiKey}
@@ -2368,7 +2352,6 @@ type Mode =
   | "redhead_stakes"
   | "redhead_hardfacts"
   | "redhead_timeline"
-  | "redhead_glossary"
   | "redhead_formatcheck"
   | "redhead_depgraph"
   | "redhead_policy"
@@ -2384,7 +2367,7 @@ const WHOLE_BOOK_MODES = new Set<Mode>([
   "timeline", "narrative", "consistency", "argument", "style", "technique",
   "cards", "revision", "redhead", "redhead_actions", "redhead_plain",
   "redhead_relevance", "redhead_stakes", "redhead_hardfacts", "redhead_timeline",
-  "redhead_glossary", "redhead_formatcheck", "meeting_ledger", "meeting_stance",
+  "redhead_formatcheck", "meeting_ledger", "meeting_stance",
 ]);
 
 // 左栏功能按"用户想干啥"分五组，每组可折叠（WP-1.5.4）。
@@ -2461,8 +2444,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "公文 · 读懂这份",
     modes: [
       { id: "redhead", label: "公文结构" },
-      { id: "redhead_plain", label: "大白话翻译" },
-      { id: "redhead_glossary", label: "名词解释" },
+      { id: "redhead_plain", label: "逐条精读" },
       { id: "redhead_formatcheck", label: "规范性自检" },
     ],
   },
@@ -2856,15 +2838,6 @@ function NavIcon({
         <path d="M5 3v18h6" />
         <circle cx="16" cy="16" r="4" />
         <path d="M16 14v2l1.4 1" />
-      </>
-    ),
-    // 名词解释——文件 + 引号气泡
-    redhead_glossary: (
-      <>
-        <path d="M5 3h9l3 3v5" />
-        <path d="M5 3v18h5" />
-        <path d="M12 13h8v6h-5l-3 2.5z" />
-        <path d="M14.5 15v2M17.5 15v2" />
       </>
     ),
     // 规范性自检——文件 + 对勾盾

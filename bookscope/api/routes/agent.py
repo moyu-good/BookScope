@@ -101,6 +101,7 @@ from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.orchestrate import orchestrate
 from bookscope.agent.question_processor import rewrite_followup
 from bookscope.agent.recap import generate_recap
+from bookscope.agent.redhead_close_reading import close_reading_from_spine
 from bookscope.agent.redhead_format_check import format_check_from_spine
 from bookscope.agent.redhead_glossary import glossary_from_spine
 from bookscope.agent.redhead_hard_facts import hard_facts_from_spine
@@ -178,6 +179,7 @@ from bookscope.api.schemas import (
     PreviousReviewHint,
     RecapRequest,
     RecapResponse,
+    RedheadCloseReadingResponse,
     RedheadCrossDocRequest,
     RedheadDependencyGraphResponse,
     RedheadDocStructureRequest,
@@ -3320,6 +3322,39 @@ async def agent_redhead_plain_language(
 
 
 @agent_router.post(
+    "/agent/redhead/close-reading",
+    response_model=RedheadCloseReadingResponse,
+)
+async def agent_redhead_close_reading(
+    request: RedheadDocStructureRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> RedheadCloseReadingResponse:
+    """逐条精读(公文整合 centerpiece):一份公文一次出每条的大白话 + 结构标签 + 内联术语 + 对原文。
+
+    整合 1+2(设计稿 WP-redhead-consolidation):原先大白话 / 名词解释 / 公文结构条款三个 tab 啃的是
+    同一批原文条款,合到一张卡。后端合成,三件套全从同一份文脉派生——大白话改写吃条款事项+原文、
+    结构标签直接取条款骨架(不重抽)、术语全文挑出后按原句归到对应条款。核的是原文不是白话;术语
+    核不过的不挂;命中措辞刻度才点弦外之意。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = close_reading_from_spine(
+        chunks=chunks, llm_client=rec, model=model, full_text=full_text
+    )
+    items = result.get("items") or []
+    return RedheadCloseReadingResponse(
+        items=items,
+        scanned=bool(items),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post(
     "/agent/redhead/relevance",
     response_model=RedheadRelevanceResponse,
 )
@@ -3599,7 +3634,13 @@ async def agent_redhead_glossary(
     request: RedheadDocStructureRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadGlossaryResponse:
-    """名词解释:挑出这份公文里普通人看不懂的术语/政策黑话,用人话释义。"""
+    """名词解释:挑出这份公文里普通人看不懂的术语/政策黑话,用人话释义。
+
+    **已退役(1.6 整合,设计稿 WP-redhead-consolidation 整合 2)**:术语逻辑已内联进「逐条精读」
+    (``/redhead/close-reading``,术语锚在出现它的那条上)。前端入口 + 组件已撤;端点 + ``glossary_
+    from_spine`` 暂留(逐条精读复用它全文挑词的逻辑),不再单独对外亮出。将来若实测要「全文术语
+    总览」,在逐条精读加折叠区,不复活本入口。
+    """
     assembler = _resolve_assembler(store, request.book_session_id)
     client = _build_params_client_or_raise(request)
     model = request.model or default_model_for(request.provider)
