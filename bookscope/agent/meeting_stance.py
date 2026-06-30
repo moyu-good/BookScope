@@ -89,15 +89,15 @@ logger = logging.getLogger(__name__)
 STANCE_SCHEMA_VERSION = "v1"
 """立场与弦外记录结构版本——升级要让这层重算(不影响别的功能)。"""
 
-DEFAULT_STANCE_MAX_TOKENS = 5000
+DEFAULT_STANCE_MAX_TOKENS = 16000
 """一次扫全份出多议题多人立场 + 弦外 + basis 列表的 max_tokens。
 
-比 ``stakes_from_doc`` 的 3000 多(设计稿 §4.4):立场弦外一次出多议题、多人立场 + 弦外,且
-每条 basis 是**原话列表**(摘长更费 token)比 stakes 的单条 evidence 长。比 ``meeting_spine``
-结论项维的 8000 少(不抽决议 / 行动项那么多结构字段)。deepseek-v4-flash 把 reasoning_content
-算进 max_tokens(reference_reasoning_model_token_budget),整份进上下文后先吐一大段 reasoning,
-预算太小会被吃光导致 content 空、``finish_reason=length``、抽空。5000 装得下多议题研判还给
-reasoning 留头;真被截断有 ``extract_first_json_object`` + ``salvage_closed_objects`` 兜底。"""
+deepseek-v4-flash 把 reasoning_content 算进 max_tokens(reference_reasoning_model_token_budget),
+整份进上下文后先吐一大段 reasoning,预算太小会被吃光导致 content 截断、``finish_reason=length``。
+**live 抽查校准(2026-06-30)**:设计稿 §4.4 估的 5000 不够——一份 2187 字、6 议题的逐字稿在 5000
+下被截断,salvage 只捞回前 2 个干净议题,后面 4 个带拖延 / 空头表态的议题全丢,还静默显示成「确证
+一致无弦外」(假装没暗流,对红线功能危险)。16000 实测装得下整场多议题研判 + reasoning 头。真被
+截断仍有 ``extract_first_json_object`` + ``salvage_closed_objects`` 兜底,但默认就该给够。"""
 
 # ── 封闭集(落不进退最保守档,evidence-first 评估层纪律)─────────────────────────
 # 立场方向五态(封闭集)。落不进退「摇摆」——最中性,不替用户断成支持或反对。
@@ -498,7 +498,8 @@ def stances_from_meeting(
             退回 ``chunks`` 拼接(向后兼容)。
         form: 形态(``逐字稿`` | ``纪要``)。传了就用它当门控;不传则退「纪要」(更保守,不会误开
             只有逐字稿能跑的立场功能)。**纪要直接退场,绝不硬编**。
-        max_tokens: 一次扫全份的 max_tokens(默认 5000,比 stakes 多因为 basis 是原话列表)。
+        max_tokens: 一次扫全份的 max_tokens(默认 16000,live 校准:reasoning 模型 + 多议题输出,
+            5000 会截断把带张力的议题静默丢成「确证一致无弦外」)。
         cache_enabled: 是否走 L2 缓存(默认开,同份会议重看命中)。
 
     Returns:
