@@ -92,6 +92,38 @@ interface UploadResponse {
   message: string;
 }
 
+/** 上传队列里的一条：一个文件 + 它自己的状态。多选 / 拖进来多本时逐条入库，
+ *  各自显示等待 / 上传中 / 成功 / 失败，某条失败不连累其它。 */
+type UploadItemStatus = "queued" | "uploading" | "done" | "error";
+interface UploadItem {
+  /** 队列内稳定 id（文件名可能重复，用它当 key 和定位） */
+  id: string;
+  file: File;
+  /** 入库书名，从文件名去扩展名得来 */
+  title: string;
+  status: UploadItemStatus;
+  /** 成功后的元数据 */
+  result?: UploadResponse;
+  /** 失败时的错误 */
+  error?: ApiError;
+}
+
+let _uploadItemSeq = 0;
+function makeUploadItem(file: File): UploadItem {
+  _uploadItemSeq += 1;
+  return {
+    id: `${Date.now()}-${_uploadItemSeq}`,
+    file,
+    title: stripExt(file.name),
+    status: "queued",
+  };
+}
+
+/** 去掉文件扩展名当书名（六种支持的后缀都剥掉）。 */
+function stripExt(name: string): string {
+  return name.replace(/\.(epub|txt|pdf|docx|md|markdown)$/i, "");
+}
+
 interface Citation {
   chapter: number;
   snippet: string;
@@ -894,11 +926,12 @@ export function App() {
     savePersistedConfig({ provider, apiKey, model, baseUrl });
   }, [provider, apiKey, model, baseUrl]);
 
-  // 上传区
-  const [file, setFile] = useState<File | null>(null);
-  const [bookTitle, setBookTitle] = useState("");
+  // 上传区。queue 支持多选 / 拖拽进来多本，逐条入库；单本时也是一条的队列。
+  const [queue, setQueue] = useState<UploadItem[]>([]);
   const [language, setLanguage] = useState("zh");
   const [uploading, setUploading] = useState(false);
+  /** 正在上传的那条 item id（串行逐条传，进度条只跟当前这条） */
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
   /** 最近一次 upload 的产出元数据；仅供贰区下方"已入库"提示行展示 */
   const [lastUpload, setLastUpload] = useState<UploadResponse | null>(null);
   /** 真实 KG ingest 进度（SSE 流接进来时实时更新）；null=未开始 / 走兜底曲线 */
@@ -1225,63 +1258,130 @@ export function App() {
     return baseUrl.trim();
   }
 
+  /** 传一条 item：跑 SSE 流，成功返 UploadResponse，失败抛 ApiError。
+   *  进度回调让外层把当前这条的进度条折出来。 */
+  async function uploadOne(item: UploadItem): Promise<UploadResponse> {
+    setIngestProgress(INGEST_PROGRESS_INITIAL);
+    let finalResult: UploadResponse | null = null;
+    const stream = streamUploadBook({
+      file: item.file,
+      bookTitle: item.title,
+      language,
+      provider,
+      apiKey,
+      model: model.trim(),
+      baseUrl: effectiveBaseUrl(),
+    });
+    for await (const event of stream) {
+      if (event.event_type === "upload_complete") {
+        // 末帧 upload_complete 含 session_id / chunk_count 等元数据
+        // (剥掉 event_type 后即为 UploadResponse)
+        const { event_type: _et, ...rest } = event as UploadCompleteFrame;
+        finalResult = rest as UploadResponse;
+      } else if (event.event_type === "upload_error") {
+        // SSE 流内 ingest 失败 —— 翻译成 ApiError 抛出去
+        throw {
+          error_type: event.error_type,
+          message: event.message,
+        } as ApiError;
+      } else {
+        // ingest 增量事件 —— 折进进度状态
+        setIngestProgress((prev) =>
+          reduceIngestProgress(prev ?? INGEST_PROGRESS_INITIAL, event),
+        );
+      }
+    }
+    if (!finalResult) {
+      throw {
+        error_type: "UploadStreamIncomplete",
+        message: "上传流提前结束，没有拿到 session_id",
+      } as ApiError;
+    }
+    return finalResult;
+  }
+
+  /** 提交整个队列：逐条串行入库。某条失败不影响后面的——它自己标红，继续传下一条。
+   *  串行而非并发：每条都是几十秒的 LLM 调用，并发会同时打爆用户的 key，
+   *  且进度条是共享的一根，串行才说得清现在在传哪本。 */
   async function handleUpload(e: FormEvent) {
     e.preventDefault();
-    if (!file || !bookTitle || !apiKey) return;
+    if (uploading || !apiKey) return;
+    // 只传还没成功的（queued / 之前失败过想重试的 error）
+    const pending = queue.filter(
+      (it) => it.status === "queued" || it.status === "error",
+    );
+    if (pending.length === 0) return;
+
     setError(null);
     setUploading(true);
-    setIngestProgress(INGEST_PROGRESS_INITIAL);
-    try {
-      let finalResult: UploadResponse | null = null;
-      const stream = streamUploadBook({
-        file,
-        bookTitle,
-        language,
-        provider,
-        apiKey,
-        model: model.trim(),
-        baseUrl: effectiveBaseUrl(),
-      });
-      for await (const event of stream) {
-        if (event.event_type === "upload_complete") {
-          // 末帧 upload_complete 含 session_id / chunk_count 等元数据
-          // (剥掉 event_type 后即为 UploadResponse)
-          const {
-            event_type: _et,
-            ...rest
-          } = event as UploadCompleteFrame;
-          finalResult = rest as UploadResponse;
-        } else if (event.event_type === "upload_error") {
-          // SSE 流内 ingest 失败 —— 翻译成 ErrorBanner
-          throw {
-            error_type: event.error_type,
-            message: event.message,
-          } as ApiError;
-        } else {
-          // ingest 增量事件 —— 折进进度状态
-          setIngestProgress((prev) =>
-            reduceIngestProgress(prev ?? INGEST_PROGRESS_INITIAL, event),
-          );
-        }
+
+    let lastOk: UploadResponse | null = null;
+    let anyFailed = false;
+
+    for (const item of pending) {
+      setActiveItemId(item.id);
+      setQueue((prev) =>
+        prev.map((it) =>
+          it.id === item.id ? { ...it, status: "uploading", error: undefined } : it,
+        ),
+      );
+      try {
+        const result = await uploadOne(item);
+        lastOk = result;
+        uploadedSessionIdsRef.current.add(result.session_id);
+        setQueue((prev) =>
+          prev.map((it) =>
+            it.id === item.id ? { ...it, status: "done", result } : it,
+          ),
+        );
+        // 每成功一本就刷一次书柜，让它即时出现在架上
+        setShelfRefresh((n) => n + 1);
+      } catch (err) {
+        anyFailed = true;
+        const apiErr =
+          err && typeof err === "object" && "error_type" in err
+            ? (err as ApiError)
+            : { error_type: "UploadFailed", message: String(err) };
+        setQueue((prev) =>
+          prev.map((it) =>
+            it.id === item.id ? { ...it, status: "error", error: apiErr } : it,
+          ),
+        );
       }
-      if (!finalResult) {
-        throw {
-          error_type: "UploadStreamIncomplete",
-          message: "上传流提前结束，没有拿到 session_id",
-        } as ApiError;
-      }
-      setLastUpload(finalResult);
-      uploadedSessionIdsRef.current.add(finalResult.session_id);
-      setHasUploaded(true);
-      // 让书柜重新拉 list 并自动选中新书
-      setPendingAutoSelectId(finalResult.session_id);
-      setShelfRefresh((n) => n + 1);
-    } catch (err) {
-      setError(err as ApiError);
-    } finally {
-      setUploading(false);
-      setIngestProgress(null);
     }
+
+    setActiveItemId(null);
+    setIngestProgress(null);
+    setUploading(false);
+
+    // 至少成功一本：记最近一本、标已上传、自动选中最后成功的那本
+    if (lastOk) {
+      setLastUpload(lastOk);
+      setHasUploaded(true);
+      setPendingAutoSelectId(lastOk.session_id);
+      setShelfRefresh((n) => n + 1);
+    }
+    // 全军覆没才弹顶层 banner；部分成功的失败项各自在队列里标红就够了
+    if (anyFailed && !lastOk) {
+      const firstErr = queue.find((it) => it.status === "error")?.error;
+      if (firstErr) setError(firstErr);
+    }
+  }
+
+  /** 把选中 / 拖进来的文件加进队列（去重靠文件名+大小，避免一次拖重）。 */
+  function addFilesToQueue(files: File[]) {
+    if (files.length === 0) return;
+    setQueue((prev) => {
+      const seen = new Set(prev.map((it) => `${it.file.name}::${it.file.size}`));
+      const fresh = files
+        .filter((f) => !seen.has(`${f.name}::${f.size}`))
+        .map(makeUploadItem);
+      return [...prev, ...fresh];
+    });
+  }
+
+  function removeQueueItem(id: string) {
+    setQueue((prev) => prev.filter((it) => it.id !== id));
   }
 
   async function handleAsk(e: FormEvent) {
@@ -1560,19 +1660,24 @@ export function App() {
               ) : (
                 <div className="mt-6 pt-5 border-t border-[var(--color-rule)]">
                   <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-                    书架里没有？上传一本新的（epub / txt / pdf / docx / md）：
+                    书架里没有？上传新的（epub / txt / pdf / docx / md），一次可选多本或直接拖进来：
                   </p>
                   <UploadForm
-                    file={file}
-                    setFile={setFile}
-                    bookTitle={bookTitle}
-                    setBookTitle={setBookTitle}
+                    queue={queue}
+                    onAddFiles={addFilesToQueue}
+                    onRemoveItem={removeQueueItem}
                     language={language}
                     setLanguage={setLanguage}
                     uploading={uploading}
+                    activeItemId={activeItemId}
                     session={lastUpload}
                     onSubmit={handleUpload}
-                    canSubmit={!!file && !!bookTitle && !!apiKey}
+                    canSubmit={
+                      !!apiKey &&
+                      queue.some(
+                        (it) => it.status === "queued" || it.status === "error",
+                      )
+                    }
                     ingestProgress={ingestProgress}
                   />
                 </div>
@@ -3566,76 +3671,116 @@ function ProviderConfig(props: {
 }
 
 function UploadForm(props: {
-  file: File | null;
-  setFile: (f: File | null) => void;
-  bookTitle: string;
-  setBookTitle: (s: string) => void;
+  queue: UploadItem[];
+  onAddFiles: (files: File[]) => void;
+  onRemoveItem: (id: string) => void;
   language: string;
   setLanguage: (s: string) => void;
   uploading: boolean;
+  /** 正在上传的那条 id，进度条只挂在它下面 */
+  activeItemId: string | null;
   session: UploadResponse | null;
   onSubmit: (e: FormEvent) => void;
   canSubmit: boolean;
   ingestProgress: IngestProgressState | null;
 }) {
   const {
-    file,
-    setFile,
-    bookTitle,
-    setBookTitle,
+    queue,
+    onAddFiles,
+    onRemoveItem,
     language,
     setLanguage,
     uploading,
+    activeItemId,
     session,
     onSubmit,
     canSubmit,
     ingestProgress,
   } = props;
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  // 拖拽高亮：dragOver 时给 drop 区一圈朱砂描边。enter/leave 用计数避免子元素
+  // 进出抖动（dragleave 在移到子元素时也会触发）。
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
+
+  function pickFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    onAddFiles(Array.from(list));
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    pickFiles(e.dataTransfer?.files ?? null);
+  }
+
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
-      <label
-        htmlFor="file"
-        className="border-2 border-dashed border-[var(--color-rule)] rounded-lg px-6 py-8 text-center cursor-pointer hover:border-[var(--color-seal)]/50 transition-colors"
+      {/* drop 区：点开文件选择器 + 接住拖进来的文件。multiple 支持一次选多本。 */}
+      <div
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        }}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          dragDepth.current += 1;
+          setDragging(true);
+        }}
+        onDragLeave={() => {
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (dragDepth.current === 0) setDragging(false);
+        }}
+        onDrop={handleDrop}
+        role="button"
+        tabIndex={0}
+        aria-label="点击选择或拖放书籍文件，可多本"
+        className={[
+          "border-2 border-dashed rounded-lg px-6 py-8 text-center cursor-pointer transition-colors",
+          dragging
+            ? "border-[var(--color-seal)] bg-[var(--color-seal-soft)]"
+            : "border-[var(--color-rule)] hover:border-[var(--color-seal)]/50",
+        ].join(" ")}
       >
         <input
+          ref={inputRef}
           id="file"
           type="file"
+          multiple
           accept=".epub,.txt,.pdf,.docx,.md,.markdown"
           onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            setFile(f);
-            if (f && !bookTitle) {
-              setBookTitle(f.name.replace(/\.(epub|txt|pdf)$/i, ""));
-            }
+            pickFiles(e.target.files);
+            // 清空 value，下次再选同名文件也能触发 onChange
+            e.target.value = "";
           }}
           className="hidden"
         />
-        <p className="text-sm">
-          {file ? (
-            <>
-              <span className="font-medium">{file.name}</span>
-              <span className="text-[var(--color-ink-muted)]">
-                {" · "}
-                {(file.size / 1024).toFixed(1)} KB
-              </span>
-            </>
-          ) : (
-            <span className="text-[var(--color-ink-muted)]">
-              点击或拖放 epub / txt / pdf 文件
-            </span>
-          )}
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          {dragging
+            ? "松手即可加入上传队列"
+            : "点击选择或把文件拖到这里 · 一次可多本（epub / txt / pdf / docx / md）"}
         </p>
-      </label>
+      </div>
 
-      <div className="grid grid-cols-[auto_1fr_auto_1fr] gap-3 items-center">
-        <Label htmlFor="title">书名</Label>
-        <input
-          id="title"
-          value={bookTitle}
-          onChange={(e) => setBookTitle(e.target.value)}
-          required
-          className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm"
+      {/* 上传队列：每本一行，各自显示等待 / 上传中 / 成功 / 失败。 */}
+      {queue.length > 0 && (
+        <UploadQueueList
+          queue={queue}
+          activeItemId={activeItemId}
+          uploading={uploading}
+          onRemoveItem={onRemoveItem}
         />
+      )}
+
+      <div className="grid grid-cols-[auto_1fr] gap-3 items-center">
         <Label htmlFor="lang">语种</Label>
         <input
           id="lang"
@@ -3649,7 +3794,7 @@ function UploadForm(props: {
         <SubmitButton
           loading={uploading}
           disabled={!canSubmit || uploading}
-          label="上传并解析"
+          label={pendingCount(queue) > 1 ? `上传并解析 ${pendingCount(queue)} 本` : "上传并解析"}
           loadingLabel="解析中 · 大书需几分钟"
         />
         {!uploading && session && (
@@ -3676,6 +3821,135 @@ function UploadForm(props: {
         />
       )}
     </form>
+  );
+}
+
+/** 还没成功的本数（queued + 失败待重试），驱动按钮文案。 */
+function pendingCount(queue: UploadItem[]): number {
+  return queue.filter((it) => it.status === "queued" || it.status === "error")
+    .length;
+}
+
+/** 上传队列清单。每本一行：状态点 + 书名 + 大小 / 结果 / 错误 + 删除。 */
+function UploadQueueList({
+  queue,
+  activeItemId,
+  uploading,
+  onRemoveItem,
+}: {
+  queue: UploadItem[];
+  activeItemId: string | null;
+  uploading: boolean;
+  onRemoveItem: (id: string) => void;
+}) {
+  return (
+    <ul className="flex flex-col rounded border border-[var(--color-rule)] divide-y divide-[var(--color-rule)] overflow-hidden">
+      {queue.map((item) => {
+        const isActive = item.id === activeItemId;
+        return (
+          <li
+            key={item.id}
+            className="flex items-center gap-3 px-3 py-2 bg-[var(--color-paper-raised)]"
+          >
+            <UploadStatusBadge status={item.status} active={isActive} />
+            <div className="flex flex-col min-w-0 flex-1">
+              <span
+                className="text-sm text-[var(--color-ink)] truncate"
+                title={item.file.name}
+              >
+                {item.title}
+              </span>
+              <span className="text-xs text-[var(--color-ink-muted)] truncate">
+                {uploadItemHint(item)}
+              </span>
+            </div>
+            {/* 上传中的那本不给删（流正在跑）；其余都可从队列移除 */}
+            {!(uploading && isActive) && (
+              <button
+                type="button"
+                onClick={() => onRemoveItem(item.id)}
+                aria-label={`从队列移除 ${item.title}`}
+                className="shrink-0 text-xs px-2 py-1 rounded text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+              >
+                移除
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** 每条队列项右侧那行小字：按状态给不同提示。 */
+function uploadItemHint(item: UploadItem): string {
+  const sizeKb = `${(item.file.size / 1024).toFixed(1)} KB`;
+  switch (item.status) {
+    case "queued":
+      return `等待上传 · ${sizeKb}`;
+    case "uploading":
+      return `正在解析 · ${sizeKb}`;
+    case "done":
+      return item.result
+        ? `已入库 · ${item.result.chunk_count} 段 / ${item.result.character_count} 个角色`
+        : "已入库";
+    case "error":
+      return `失败：${item.error?.message ?? "未知错误"}`;
+    default:
+      return sizeKb;
+  }
+}
+
+/** 状态点：等待灰 / 上传中朱砂脉动 / 成功对勾 / 失败叉。 */
+function UploadStatusBadge({
+  status,
+  active,
+}: {
+  status: UploadItemStatus;
+  active: boolean;
+}) {
+  if (status === "done") {
+    return (
+      <span
+        aria-label="成功"
+        className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs text-white"
+        style={{ backgroundColor: "var(--color-seal)" }}
+      >
+        ✓
+      </span>
+    );
+  }
+  if (status === "error") {
+    return (
+      <span
+        aria-label="失败"
+        className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs border border-[var(--color-seal)] text-[var(--color-seal)]"
+      >
+        ✕
+      </span>
+    );
+  }
+  if (status === "uploading") {
+    return (
+      <span
+        aria-label="上传中"
+        className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center"
+      >
+        <span
+          className={active ? "w-2.5 h-2.5 rounded-full animate-pulse" : "w-2.5 h-2.5 rounded-full"}
+          style={{ backgroundColor: "var(--color-seal)" }}
+        />
+      </span>
+    );
+  }
+  // queued
+  return (
+    <span
+      aria-label="等待"
+      className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center"
+    >
+      <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-rule)]" />
+    </span>
   );
 }
 
