@@ -10,6 +10,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnalysisOverlay } from "./AnalysisOverlay";
 import { bookScale } from "./bookScale";
+import {
+  annotationStore,
+  buildAnchor,
+  newAnnotationId,
+} from "./annotationStore";
+import type { Annotation, AnnotationColor, AnnotationKind } from "./annotationStore";
+import {
+  AnnotatedProse,
+  AnnotationActions,
+  AnnotationOverview,
+  NoteEditor,
+  SelectionToolbar,
+} from "./ReaderAnnotations";
+import type { PendingSelection } from "./ReaderAnnotations";
 
 interface TocChapter {
   chapter: number;
@@ -187,18 +201,59 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
   const [jianOpen, setJianOpen] = useState(false);
+  const [piOpen, setPiOpen] = useState(false); // 「批」总览抽屉
   const [chromeShown, setChromeShown] = useState(true);
+
+  // ── 标注层（WP-reading-workspace Phase A，纯本地 / 不调 LLM）──
+  // 本书全部标注；划词工具条 / 笔记框 / 已有标注的编辑卡都从这套状态长出来。
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [pendingSel, setPendingSel] = useState<PendingSelection | null>(null);
+  // 正在写 / 改的笺注：new=划词新建一条 note；edit=改已有那条。
+  const [noteDraft, setNoteDraft] = useState<
+    | { mode: "new"; sel: PendingSelection }
+    | { mode: "edit"; ann: Annotation }
+    | null
+  >(null);
+  // 点已有标注浮出的编辑 / 删除卡。
+  const [activeAnn, setActiveAnn] = useState<Annotation | null>(null);
+  // 跳到某条标注：换到它那章 + 标记一下要滚过去。
+  const [jumpTo, setJumpTo] = useState<Annotation | null>(null);
 
   const cache = useRef<Map<number, ChapterText>>(new Map());
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const chromeTimer = useRef<number | null>(null);
+
+  // 换书：重新载这本书的标注（local 范式，照 historyStorage）。
+  useEffect(() => {
+    setAnnotations(annotationStore.list(sessionId));
+    setPiOpen(false);
+    setPendingSel(null);
+    setNoteDraft(null);
+    setActiveAnn(null);
+  }, [sessionId]);
+
+  // 重载一次本书标注 —— 任何增删改后调，保 UI 与存储一致。
+  const reloadAnnotations = useCallback(() => {
+    setAnnotations(annotationStore.list(sessionId));
+  }, [sessionId]);
+
+  // 跨章跳转：换到目标章、正文取回来后，滚到那条标注（用 data-anno-id 锚）。
+  useEffect(() => {
+    if (!jumpTo || !chapter || chapter.chapter !== jumpTo.anchor.chapter) return;
+    // 等这一帧渲染完正文再滚
+    const t = window.setTimeout(() => {
+      scrollToAnnotation(jumpTo);
+      setJumpTo(null);
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [jumpTo, chapter]);
 
   useEffect(() => {
     savePrefs(prefs);
   }, [prefs]);
 
   // 顶栏自动隐:动鼠标显形并重置计时;浮层开着时常显。
-  const anyPanelOpen = settingsOpen || tocOpen || jianOpen;
+  const anyPanelOpen = settingsOpen || tocOpen || jianOpen || piOpen;
   useEffect(() => {
     function wake() {
       setChromeShown(true);
@@ -308,6 +363,142 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
   const theme = THEMES[prefs.theme];
   const pct = idx >= 0 && total > 0 ? Math.round(((idx + 1) / total) * 100) : 0;
 
+  // ── 标注动作 ──────────────────────────────────────────────────────────
+  // 高亮 / 重点：从选区造锚点直接落一条。笔记：先开输入框，写完再落。
+  const addFromSelection = useCallback(
+    (kind: AnnotationKind, color: AnnotationColor | null, noteText: string | null) => {
+      if (!pendingSel) return;
+      const anchor = buildAnchor({
+        chapter: pendingSel.chapter,
+        paraIndex: pendingSel.paraIndex,
+        paraText: pendingSel.paraText,
+        selStart: pendingSel.selStart,
+        selEnd: pendingSel.selEnd,
+      });
+      const now = new Date().toISOString();
+      const ann: Annotation = {
+        id: newAnnotationId(),
+        book_session_id: sessionId,
+        kind,
+        anchor,
+        note_text: noteText,
+        color,
+        created_at: now,
+        updated_at: now,
+      };
+      annotationStore.add(ann);
+      reloadAnnotations();
+      setPendingSel(null);
+      clearSelection();
+    },
+    [pendingSel, sessionId, reloadAnnotations],
+  );
+
+  const handleHighlight = useCallback(
+    (color: AnnotationColor) => addFromSelection("highlight", color, null),
+    [addFromSelection],
+  );
+  const handleEmphasis = useCallback(
+    () => addFromSelection("emphasis", "seal", null),
+    [addFromSelection],
+  );
+  const handleStartNote = useCallback(() => {
+    if (pendingSel) {
+      setNoteDraft({ mode: "new", sel: pendingSel });
+      setPendingSel(null);
+    }
+  }, [pendingSel]);
+
+  // 书签：不依赖选区，落「读到这章」——锚到当前章、段级（quote 空 / char_start null）。
+  // 划词时也能从工具条加，锚到选中那段段首；纯按钮加则锚到本章第一段。
+  const addBookmark = useCallback(
+    (fromSel: PendingSelection | null) => {
+      if (current == null) return;
+      const now = new Date().toISOString();
+      const ann: Annotation = {
+        id: newAnnotationId(),
+        book_session_id: sessionId,
+        kind: "bookmark",
+        anchor: {
+          chapter: current,
+          para_index: fromSel?.paraIndex ?? 0,
+          quote: "",
+          prefix: "",
+          suffix: "",
+          char_start: null,
+        },
+        note_text: null,
+        color: "ink",
+        created_at: now,
+        updated_at: now,
+      };
+      annotationStore.add(ann);
+      reloadAnnotations();
+      setPendingSel(null);
+      clearSelection();
+    },
+    [current, sessionId, reloadAnnotations],
+  );
+
+  // 笺注存盘：new 落新条；edit 改已有。
+  const saveNote = useCallback(
+    (text: string) => {
+      if (!noteDraft) return;
+      const trimmed = text.trim();
+      if (noteDraft.mode === "new") {
+        const { sel } = noteDraft;
+        const anchor = buildAnchor({
+          chapter: sel.chapter,
+          paraIndex: sel.paraIndex,
+          paraText: sel.paraText,
+          selStart: sel.selStart,
+          selEnd: sel.selEnd,
+        });
+        const now = new Date().toISOString();
+        annotationStore.add({
+          id: newAnnotationId(),
+          book_session_id: sessionId,
+          kind: "note",
+          anchor,
+          note_text: trimmed,
+          color: "ink",
+          created_at: now,
+          updated_at: now,
+        });
+      } else {
+        annotationStore.update(noteDraft.ann.id, { note_text: trimmed });
+      }
+      reloadAnnotations();
+      setNoteDraft(null);
+      clearSelection();
+    },
+    [noteDraft, sessionId, reloadAnnotations],
+  );
+
+  const deleteAnnotation = useCallback(
+    (ann: Annotation) => {
+      annotationStore.remove(ann.id);
+      reloadAnnotations();
+      setActiveAnn(null);
+    },
+    [reloadAnnotations],
+  );
+
+  // 批注总览点一条 / 章末降级条点一条 → 跳到它那章那处。
+  const jumpToAnnotation = useCallback(
+    (ann: Annotation) => {
+      setPiOpen(false);
+      setActiveAnn(null);
+      if (ann.anchor.chapter !== current) {
+        setCurrent(ann.anchor.chapter);
+        setJumpTo(ann); // 换章取完正文后再滚（见下面 effect）
+      } else {
+        scrollToAnnotation(ann);
+      }
+    },
+    [current],
+  );
+
   return (
     <div className="fixed inset-0 z-40 flex flex-col transition-colors" style={{ background: theme.bg, color: theme.fg }}>
       {/* 顶栏:停读自动淡隐,动鼠标显形 */}
@@ -329,6 +520,24 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
         <div className="flex items-center gap-1.5">
           <ChromeBtn onClick={() => setTocOpen(true)} label="目录" />
           <ChromeBtn onClick={() => setSettingsOpen((v) => !v)} label="排版" />
+          {/* 批：用户标注总览抽屉（与目录左右对称、右滑）。有标注时角标记数。 */}
+          <button
+            type="button"
+            onClick={() => setPiOpen(true)}
+            className="relative text-xs px-3 py-1 rounded-full border opacity-80 hover:opacity-100"
+            style={{ borderColor: "currentColor" }}
+            title="我的批注"
+          >
+            批
+            {annotations.length > 0 && (
+              <span
+                className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full text-[10px] leading-4 text-center text-white"
+                style={{ background: "var(--color-ink)" }}
+              >
+                {annotations.length}
+              </span>
+            )}
+          </button>
           <button type="button" onClick={() => setJianOpen(true)} className="text-xs px-3 py-1 rounded-full text-white hover:brightness-110" style={{ background: "var(--color-seal)" }}>
             鉴
           </button>
@@ -369,7 +578,15 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
               <h1 className="font-bold mb-8" style={{ fontSize: `${prefs.fontPx + 5}px`, opacity: 0.92 }}>
                 {chapter.title?.trim() ? chapter.title : `第 ${chapter.chapter} 章`}
               </h1>
-              <ChapterProse text={chapter.text} paraGapRem={PARA_GAPS[prefs.paraGap].rem} />
+              <AnnotatedProse
+                text={chapter.text}
+                paraGapRem={PARA_GAPS[prefs.paraGap].rem}
+                chapter={chapter.chapter}
+                annotations={annotations}
+                fg={theme.fg}
+                onPickAnnotation={(ann) => setActiveAnn(ann)}
+                onSelect={(sel) => setPendingSel(sel)}
+              />
               <div className="mt-12 pt-6 flex items-center justify-between" style={{ borderTop: `0.5px solid ${theme.faint}` }}>
                 <ChapterNavBtn disabled={!hasPrev} onClick={goPrev} label="上一章" fg={theme.fg} faint={theme.faint} />
                 <button type="button" onClick={() => setTocOpen(true)} className="text-xs opacity-50 hover:opacity-90">目录</button>
@@ -434,31 +651,86 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
           onClose={() => setJianOpen(false)}
         />
       )}
+
+      {/* 批：标注总览抽屉（右滑，与目录左右对称）。点一条跳到那章那处。 */}
+      {piOpen && (
+        <Drawer side="right" onClose={() => setPiOpen(false)}>
+          <AnnotationOverview
+            annotations={annotations}
+            onJump={jumpToAnnotation}
+            onDelete={deleteAnnotation}
+          />
+        </Drawer>
+      )}
+
+      {/* 划词工具条：选中文字浮出，高亮 / 笔记 / 重点 / 书签。 */}
+      {pendingSel && (
+        <SelectionToolbar
+          selection={pendingSel}
+          onHighlight={handleHighlight}
+          onNote={handleStartNote}
+          onEmphasis={handleEmphasis}
+          onBookmark={() => addBookmark(pendingSel)}
+          onClose={() => {
+            setPendingSel(null);
+            clearSelection();
+          }}
+        />
+      )}
+
+      {/* 笺注输入框：写新笺注 / 改已有。 */}
+      {noteDraft && (
+        <NoteEditor
+          initial={noteDraft.mode === "edit" ? noteDraft.ann.note_text ?? "" : ""}
+          quote={
+            noteDraft.mode === "edit"
+              ? noteDraft.ann.anchor.quote
+              : noteDraft.sel.paraText.slice(noteDraft.sel.selStart, noteDraft.sel.selEnd)
+          }
+          onSave={saveNote}
+          onCancel={() => {
+            setNoteDraft(null);
+            clearSelection();
+          }}
+        />
+      )}
+
+      {/* 点已有标注浮出的编辑 / 删除卡。 */}
+      {activeAnn && (
+        <AnnotationActions
+          ann={activeAnn}
+          onEditNote={() => {
+            const a = activeAnn;
+            setActiveAnn(null);
+            setNoteDraft({ mode: "edit", ann: a });
+          }}
+          onDelete={() => deleteAnnotation(activeAnn)}
+          onClose={() => setActiveAnn(null)}
+        />
+      )}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// 一章正文
-// ---------------------------------------------------------------------------
-function ChapterProse({ text, paraGapRem }: { text: string; paraGapRem: number }) {
-  const paras = useMemo(
-    () => text.split(/\n{1,}/).map((p) => p.trim()).filter(Boolean),
-    [text],
-  );
-  return (
-    <div>
-      {paras.map((p, i) => (
-        <p key={i} className="whitespace-pre-wrap" style={{ marginBottom: `${paraGapRem}rem` }}>
-          {p}
-        </p>
-      ))}
-    </div>
-  );
+// 划词后清掉浏览器选区（落了标注 / 取消时调，免得选区残留盖着新染的底色）。
+function clearSelection(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.getSelection()?.removeAllRanges();
+  } catch {
+    /* 个别环境取不到 selection，忽略 */
+  }
+}
+
+// 滚到某条标注所在的段（按 data-para；降级到章级的也能滚到记的那段）。
+function scrollToAnnotation(ann: Annotation): void {
+  if (typeof document === "undefined") return;
+  const el = document.querySelector(`[data-para="${ann.anchor.para_index}"]`);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 // ---------------------------------------------------------------------------
-// 通用:左侧滑出抽屉(目录用)
+// 通用:左 / 右侧滑出抽屉(目录左滑 / 批注右滑)
 // ---------------------------------------------------------------------------
 function Drawer({ side, width = "20rem", onClose, children }: { side: "left" | "right"; width?: string; onClose: () => void; children: React.ReactNode }) {
   return (

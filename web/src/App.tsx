@@ -1570,6 +1570,11 @@ export function App() {
           setSettingsOpen(true);
           setSidebarOpen(false);
         }}
+        onRead={() => {
+          // 常驻「读」：选中书直接进沉浸阅读器（退出回进来前的 mode，不强制经书库）。
+          if (currentSession) openReader(currentSession);
+        }}
+        readerActive={readerOpen}
         authUser={authUser}
         onLogout={handleLogout}
       />
@@ -2642,10 +2647,18 @@ function NavIcon({
   id,
   size = 17,
 }: {
-  id: Mode | "settings";
+  id: Mode | "settings" | "read";
   size?: number;
 }) {
   const paths: Record<string, React.ReactNode> = {
+    // 读——摊开的书（常驻「读」门）
+    read: (
+      <>
+        <path d="M12 6c-1.8-1.3-4.2-2-7-2v13c2.8 0 5.2.7 7 2" />
+        <path d="M12 6c1.8-1.3 4.2-2 7-2v13c-2.8 0-5.2.7-7 2z" />
+        <path d="M12 6v13" />
+      </>
+    ),
     ask: (
       <>
         <path d="M5 5h14v10H10l-4 4v-4H5z" />
@@ -2937,6 +2950,10 @@ function Sidebar(props: {
   genre?: string | null;
   open: boolean;
   onOpenSettings: () => void;
+  /** 常驻「读」门：选中书直接进沉浸阅读器（不必回书库）。 */
+  onRead: () => void;
+  /** 进了阅读器（整页 Reader）时为 true——让「读」项高亮，跟其它 mode 一致。 */
+  readerActive?: boolean;
   /** hosted 模式登录后的当前用户;local / 未登录为 null,不渲染账号条。 */
   authUser?: AuthUser | null;
   onLogout?: () => void;
@@ -2949,6 +2966,8 @@ function Sidebar(props: {
     genre,
     open,
     onOpenSettings,
+    onRead,
+    readerActive,
     authUser,
     onLogout,
   } = props;
@@ -3136,6 +3155,41 @@ function Sidebar(props: {
               </button>
               {!collapsed && (
                 <ul className="space-y-0.5 mt-0.5">
+                  {/* 常驻「读」门（WP-reading-workspace §2.2）：排「问 & 读」组首位，
+                      选中书直接进沉浸阅读器，不必回书库。它不是一个 mode、是整页 Reader 开关。 */}
+                  {group.key === "read" && (
+                    <li>
+                      <button
+                        type="button"
+                        disabled={!hasBook}
+                        onClick={onRead}
+                        className="w-full flex items-center gap-2.5 rounded-md pl-2.5 pr-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        style={
+                          readerActive
+                            ? {
+                                background: "var(--color-seal-soft)",
+                                borderLeft: "2px solid var(--color-seal)",
+                                color: "var(--color-seal)",
+                              }
+                            : {
+                                borderLeft: "2px solid transparent",
+                                color: "var(--color-ink)",
+                              }
+                        }
+                      >
+                        <NavIcon id="read" />
+                        <span
+                          className="text-[13.5px]"
+                          style={{
+                            fontFamily: "var(--font-display)",
+                            fontWeight: readerActive ? 600 : 400,
+                          }}
+                        >
+                          读
+                        </span>
+                      </button>
+                    </li>
+                  )}
                   {group.modes.map((m) => {
                     const active = mode === m.id;
                     return (
