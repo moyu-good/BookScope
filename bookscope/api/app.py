@@ -119,12 +119,16 @@ def create_app() -> FastAPI:
     app.include_router(books_router, prefix="/api")
     app.include_router(sessions_router, prefix="/api")
 
-    # 托管版才挂账号路由(ADR-011)。懒 import:local 不挂、也不 import 本模块,
-    # 故启动不会把 argon2 / itsdangerous 拽进来——纯 pip install -e . 照样跑得起。
+    # 托管版才挂账号路由(ADR-011)+ 标注路由(WP-reading-workspace Phase C)。
+    # 懒 import:local 不挂、也不 import 这些模块,故启动不会把 argon2 /
+    # itsdangerous 拽进来——纯 pip install -e . 照样跑得起。标注 local 走前端
+    # localStorage,这些端点 local 打过去 404,本地版逐字节零变化。
     if is_hosted():
         from bookscope.api.routes.accounts import accounts_router
+        from bookscope.api.routes.annotations import annotations_router
 
         app.include_router(accounts_router, prefix="/api")
+        app.include_router(annotations_router, prefix="/api")
 
     # 生产：同源托管前端 dist（Vite base="/" 产物）。dev 不设此变量则跳过，
     # 前端仍由 vite dev server 出。

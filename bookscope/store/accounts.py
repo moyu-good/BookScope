@@ -18,6 +18,7 @@ DB 选型先 SQLite(ADR-011 第 29 行"先 SQLite 后 Postgres")。两张表:
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 import uuid
@@ -60,6 +61,26 @@ class Document(BaseModel):
     created_at: str
 
 
+class Annotation(BaseModel):
+    """一条用户标注(WP-reading-workspace §3、§4.1)。
+
+    字段形状对齐前端 ``annotationStore.ts`` 的 ``Annotation``:锚点整个
+    序列化成一列 JSON(``anchor`` 是值对象,不拆表)。**没有任何 key 字段**
+    (红线,跟 users / documents 一样焊死);也不存被标注的整段原文,只在锚点里
+    存选中文字 + 前后文窗口。
+    """
+
+    id: str
+    owner_user_id: str
+    book_session_id: str
+    kind: str
+    anchor: dict
+    note_text: str | None = None
+    color: str | None = None
+    created_at: str
+    updated_at: str
+
+
 def hash_password(plain: str) -> str:
     """argon2id 哈希一个明文密码。"""
     return _ph.hash(plain)
@@ -93,6 +114,29 @@ def _row_to_doc(row: sqlite3.Row | None) -> Document | None:
         owner_user_id=row["owner_user_id"],
         title=row["title"],
         created_at=row["created_at"],
+    )
+
+
+def _row_to_annotation(row: sqlite3.Row | None) -> Annotation | None:
+    if row is None:
+        return None
+    try:
+        anchor = json.loads(row["anchor_json"])
+    except (ValueError, TypeError):
+        # 锚点 JSON 坏了不连累整行——给个空 dict,标注降级显示,前端二次定位会处理。
+        anchor = {}
+    if not isinstance(anchor, dict):
+        anchor = {}
+    return Annotation(
+        id=row["id"],
+        owner_user_id=row["owner_user_id"],
+        book_session_id=row["book_session_id"],
+        kind=row["kind"],
+        anchor=anchor,
+        note_text=row["note_text"],
+        color=row["color"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
     )
 
 
@@ -135,6 +179,22 @@ class AccountsStore:
                 );
                 CREATE INDEX IF NOT EXISTS idx_documents_owner
                     ON documents(owner_user_id);
+                CREATE TABLE IF NOT EXISTS annotations (
+                    id              TEXT PRIMARY KEY,
+                    owner_user_id   TEXT NOT NULL
+                                    REFERENCES users(id) ON DELETE CASCADE,
+                    book_session_id TEXT NOT NULL,
+                    kind            TEXT NOT NULL,
+                    anchor_json     TEXT NOT NULL,
+                    note_text       TEXT,
+                    color           TEXT,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_annotations_owner
+                    ON annotations(owner_user_id);
+                CREATE INDEX IF NOT EXISTS idx_annotations_owner_book
+                    ON annotations(owner_user_id, book_session_id);
                 """
             )
         self._migrate_add_email_verified()
@@ -299,12 +359,167 @@ class AccountsStore:
             )
         return cur.rowcount > 0
 
+    # ---- 标注(隔离命门,跟文档归属同一套纪律) ----
+
+    def add_annotation(
+        self,
+        *,
+        owner_user_id: str,
+        book_session_id: str,
+        kind: str,
+        anchor: dict,
+        note_text: str | None = None,
+        color: str | None = None,
+        annotation_id: str | None = None,
+    ) -> Annotation:
+        """加一条标注。归属由 ``owner_user_id`` 钉死,锚点整个序列化进一列 JSON。
+
+        ``annotation_id`` 不传则后端发一个;锚点是值对象、不拆表。**不存任何 key**
+        (这条链根本不传 key)。
+        """
+        aid = annotation_id or uuid.uuid4().hex
+        now = datetime.now(tz=UTC).isoformat()
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO annotations "
+                "(id, owner_user_id, book_session_id, kind, anchor_json, "
+                "note_text, color, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    aid,
+                    owner_user_id,
+                    book_session_id,
+                    kind,
+                    json.dumps(anchor, ensure_ascii=False),
+                    note_text,
+                    color,
+                    now,
+                    now,
+                ),
+            )
+        return Annotation(
+            id=aid,
+            owner_user_id=owner_user_id,
+            book_session_id=book_session_id,
+            kind=kind,
+            anchor=anchor,
+            note_text=note_text,
+            color=color,
+            created_at=now,
+            updated_at=now,
+        )
+
+    def list_annotations_by_user(
+        self, owner_user_id: str, *, book_session_id: str | None = None
+    ) -> list[Annotation]:
+        """列这个用户自己的标注;给了 ``book_session_id`` 就只列这本书的。
+
+        隔离做在 WHERE、不在 Python:``WHERE owner_user_id = ?``(再可选叠
+        ``AND book_session_id = ?``)。别人的标注根本不会被取出来。
+        """
+        if book_session_id is not None:
+            rows = self._conn.execute(
+                "SELECT id, owner_user_id, book_session_id, kind, anchor_json, "
+                "note_text, color, created_at, updated_at FROM annotations "
+                "WHERE owner_user_id = ? AND book_session_id = ? "
+                "ORDER BY created_at ASC, id ASC",
+                (owner_user_id, book_session_id),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT id, owner_user_id, book_session_id, kind, anchor_json, "
+                "note_text, color, created_at, updated_at FROM annotations "
+                "WHERE owner_user_id = ? "
+                "ORDER BY created_at DESC, id DESC",
+                (owner_user_id,),
+            ).fetchall()
+        return [a for r in rows if (a := _row_to_annotation(r)) is not None]
+
+    def get_owned_annotation(
+        self, *, owner_user_id: str, annotation_id: str
+    ) -> Annotation | None:
+        """取单条并校验归属:不是这个用户的就当不存在、返 ``None``。
+
+        归属焊进 ``WHERE id = ? AND owner_user_id = ?``——绝不先取别人的再判断。
+        """
+        row = self._conn.execute(
+            "SELECT id, owner_user_id, book_session_id, kind, anchor_json, "
+            "note_text, color, created_at, updated_at FROM annotations "
+            "WHERE id = ? AND owner_user_id = ?",
+            (annotation_id, owner_user_id),
+        ).fetchone()
+        return _row_to_annotation(row)
+
+    def update_annotation(
+        self,
+        *,
+        owner_user_id: str,
+        annotation_id: str,
+        kind: str | None = None,
+        anchor: dict | None = None,
+        note_text: str | None = None,
+        color: str | None = None,
+        clear_note_text: bool = False,
+        clear_color: bool = False,
+    ) -> Annotation | None:
+        """改一条自己的标注(改笔记 / 颜色 / 锚点 / 类型)。
+
+        只能改自己的——改别人的等于改不动、返 ``None``。``clear_*`` 用于把可空字段
+        显式置空(区别于"这次没传、保持不变")。改不到任何字段就只刷 ``updated_at``。
+        """
+        sets: list[str] = []
+        params: list[object] = []
+        if kind is not None:
+            sets.append("kind = ?")
+            params.append(kind)
+        if anchor is not None:
+            sets.append("anchor_json = ?")
+            params.append(json.dumps(anchor, ensure_ascii=False))
+        if clear_note_text:
+            sets.append("note_text = ?")
+            params.append(None)
+        elif note_text is not None:
+            sets.append("note_text = ?")
+            params.append(note_text)
+        if clear_color:
+            sets.append("color = ?")
+            params.append(None)
+        elif color is not None:
+            sets.append("color = ?")
+            params.append(color)
+        sets.append("updated_at = ?")
+        params.append(datetime.now(tz=UTC).isoformat())
+        params.extend([annotation_id, owner_user_id])
+        with self._lock, self._conn:
+            cur = self._conn.execute(
+                f"UPDATE annotations SET {', '.join(sets)} "  # noqa: S608 — 列名是写死白名单,值全走占位符
+                "WHERE id = ? AND owner_user_id = ?",
+                params,
+            )
+        if cur.rowcount == 0:
+            return None
+        return self.get_owned_annotation(
+            owner_user_id=owner_user_id, annotation_id=annotation_id
+        )
+
+    def delete_annotation(
+        self, *, owner_user_id: str, annotation_id: str
+    ) -> bool:
+        """删一条自己的标注。只能删自己的——删别人的等于删不动,返 ``False``。"""
+        with self._lock, self._conn:
+            cur = self._conn.execute(
+                "DELETE FROM annotations WHERE id = ? AND owner_user_id = ?",
+                (annotation_id, owner_user_id),
+            )
+        return cur.rowcount > 0
+
     def close(self) -> None:
         self._conn.close()
 
 
 __all__ = [
     "AccountsStore",
+    "Annotation",
     "Document",
     "DuplicateEmailError",
     "User",
