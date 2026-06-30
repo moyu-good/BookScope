@@ -14,6 +14,7 @@
 
 import { useMemo, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { Checkbox } from "./ui/FormControls";
 
 interface Arc {
   description: string;
@@ -268,8 +269,7 @@ export function ForeshadowArcs({
       {danglingN > 0 && (
         <div className="flex items-center gap-3 mb-2 text-xs">
           <label className="flex items-center gap-1 cursor-pointer text-[var(--color-ink)]">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={onlyDangling}
               onChange={(e) => {
                 setOnlyDangling(e.target.checked);

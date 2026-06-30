@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnalysisOverlay } from "./AnalysisOverlay";
 import { bookScale } from "./bookScale";
+import { RangeInput } from "./ui/FormControls";
 import {
   annotationStore,
   buildAnchor,
@@ -613,8 +614,7 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
           }}
         >
           <span className="text-xs opacity-60 shrink-0 tabular-nums">第 {current} / {total} 章</span>
-          <input
-            type="range"
+          <RangeInput
             min={0}
             max={Math.max(0, total - 1)}
             value={idx >= 0 ? idx : 0}
@@ -623,7 +623,6 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
               if (tocNums[v] != null) setCurrent(tocNums[v]);
             }}
             className="flex-1"
-            style={{ accentColor: "var(--color-seal)" }}
             aria-label="阅读进度,拖动跳章"
           />
           <span className="text-xs opacity-60 shrink-0 tabular-nums">{pct}%</span>

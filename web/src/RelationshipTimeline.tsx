@@ -340,7 +340,7 @@ export function RelationshipTimeline({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜人名，如「刘备」，列出含他的所有关系对"
-          className="w-full text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-white focus:border-[var(--color-seal)] outline-none"
+          className="w-full text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] focus:border-[var(--color-seal)] outline-none"
         />
         <div className="mt-2 max-h-44 overflow-y-auto rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)]">
           {filtered.length === 0 ? (

@@ -203,6 +203,59 @@ button {
   border-radius: 2px;
 }
 
+/* ---------------------------------------------------------------------------
+ * 善本风滑块——轨道是细 rule 线、拇指是朱砂圆点。
+ * webkit / firefox 的轨道与拇指要用各自的伪元素写（内联 Tailwind 写不了），
+ * 所以收在这里，由 ui/FormControls 的 RangeInput 挂 .seal-range 类。
+ * ------------------------------------------------------------------------- */
+.seal-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 1.25rem;
+  background: transparent;
+  cursor: pointer;
+}
+/* 轨道——一条细墨线（用 rule token） */
+.seal-range::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-rule);
+}
+.seal-range::-moz-range-track {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-rule);
+}
+/* 拇指——朱砂圆点，纸色描边让它从轨道上浮起 */
+.seal-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6px; /* 把 14px 拇指竖向居中到 2px 轨道上 */
+  border-radius: 50%;
+  background: var(--color-seal);
+  border: 2px solid var(--color-paper);
+  box-shadow: var(--shadow-soft);
+}
+.seal-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-seal);
+  border: 2px solid var(--color-paper);
+  box-shadow: var(--shadow-soft);
+}
+.seal-range:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-seal);
+  outline-offset: 2px;
+}
+.seal-range:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--color-seal);
+  outline-offset: 2px;
+}
+
 /* 无障碍：尊重"减少动态"偏好，一律静态呈现 */
 @media (prefers-reduced-motion: reduce) {
   *,

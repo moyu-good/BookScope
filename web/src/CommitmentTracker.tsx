@@ -299,7 +299,7 @@ export function CommitmentTracker({
           }}
           placeholder="留空看全部，或填一个名字（如「作者」）"
           disabled={loading}
-          className="flex-1 text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-white text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-seal)] disabled:opacity-50"
+          className="flex-1 text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-seal)] disabled:opacity-50"
           style={{ fontFamily: "var(--font-display)" }}
         />
         <button

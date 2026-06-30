@@ -14,6 +14,7 @@
 import { useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { Select } from "./ui/FormControls";
 import {
   READER_FONTS,
   READER_SIZES,
@@ -401,7 +402,7 @@ function LayerToggles({
               value={motif}
               onChange={(e) => setMotif(e.target.value)}
               placeholder="母题（如：忠义 / 漂泊）"
-              className="rounded border border-[var(--color-rule)] bg-white px-2.5 py-1.5 text-xs focus:border-[var(--color-seal)] outline-none"
+              className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-2.5 py-1.5 text-xs focus:border-[var(--color-seal)] outline-none"
               style={{ fontFamily: "var(--font-display)", width: "11rem" }}
             />
           )}
@@ -410,7 +411,7 @@ function LayerToggles({
               value={entity}
               onChange={(e) => setEntity(e.target.value)}
               placeholder="人物 / 物（如：刘备 / 青釭剑）"
-              className="rounded border border-[var(--color-rule)] bg-white px-2.5 py-1.5 text-xs focus:border-[var(--color-seal)] outline-none"
+              className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-2.5 py-1.5 text-xs focus:border-[var(--color-seal)] outline-none"
               style={{ fontFamily: "var(--font-display)", width: "11rem" }}
             />
           )}
@@ -435,18 +436,18 @@ function ReaderTypeControls({
   onFont: (id: string) => void;
   onSize: (id: string) => void;
 }) {
-  const selectCls =
-    "text-xs px-2 py-1.5 rounded border border-[var(--color-rule)] bg-white text-[var(--color-ink)] hover:border-[var(--color-seal)] focus:border-[var(--color-seal)] outline-none transition-colors cursor-pointer";
+  // 工具栏里的紧凑变体：比默认下拉小一号字、窄一点 padding（右侧仍留出朱砂箭头的位）
+  const compact = "text-xs pl-2 pr-8 py-1.5";
   return (
     <div className="flex items-center gap-1.5 shrink-0">
       <label className="sr-only" htmlFor="reader-font">
         阅读字体
       </label>
-      <select
+      <Select
         id="reader-font"
         value={fontId}
         onChange={(e) => onFont(e.target.value)}
-        className={selectCls}
+        className={compact}
         title="正文字体"
         aria-label="正文字体"
       >
@@ -455,15 +456,15 @@ function ReaderTypeControls({
             {f.label}
           </option>
         ))}
-      </select>
+      </Select>
       <label className="sr-only" htmlFor="reader-size">
         阅读字号
       </label>
-      <select
+      <Select
         id="reader-size"
         value={sizeId}
         onChange={(e) => onSize(e.target.value)}
-        className={selectCls}
+        className={compact}
         title="正文字号"
         aria-label="正文字号"
       >
@@ -472,7 +473,7 @@ function ReaderTypeControls({
             {s.label}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 }

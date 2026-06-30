@@ -117,7 +117,7 @@ export function ConceptEvolution({
           value={concept}
           onChange={(e) => setConcept(e.target.value)}
           placeholder="比如：制内市场 / 国家能力 / 某个理论概念"
-          className="flex-1 rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm focus:border-[var(--color-seal)] outline-none"
+          className="flex-1 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm focus:border-[var(--color-seal)] outline-none"
           style={{ fontFamily: "var(--font-display)" }}
         />
         <button

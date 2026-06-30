@@ -177,7 +177,7 @@ export function RedheadPolicyEvolution({
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder="如：补贴标准 / 审批流程 / 适用范围"
-            className="w-full max-w-md text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-white focus:border-[var(--color-seal)] focus:outline-none"
+            className="w-full max-w-md text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] focus:border-[var(--color-seal)] focus:outline-none"
             style={{ fontFamily: "var(--font-display)" }}
           />
         </div>

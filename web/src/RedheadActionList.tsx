@@ -25,6 +25,7 @@
 import { useMemo, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { Checkbox } from "./ui/FormControls";
 
 // ---- 后端契约（跟 RedheadDocStructure 同一份，对着写，别改后端） ----
 
@@ -389,13 +390,11 @@ export function RedheadActionList({
                 <div className="flex items-start gap-3">
                   {/* 勾选框（本地阅读态） */}
                   <label className="flex items-center pt-0.5 cursor-pointer shrink-0">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isDone}
                       onChange={() =>
                         setChecked((cur) => ({ ...cur, [idx]: !cur[idx] }))
                       }
-                      className="w-4 h-4 accent-[var(--color-seal)] cursor-pointer"
                     />
                   </label>
 

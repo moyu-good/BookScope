@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import type { ApiError } from "./ErrorBanner";
 import type { SessionMetadata } from "./BookShelf";
 import { formatRelativeTime } from "./historyStorage";
+import { Checkbox } from "./ui/FormControls";
 
 interface DossierProps {
   /** 当前卷宗里选中的 session_id 集合（App 顶层持有） */
@@ -217,11 +218,10 @@ export function Dossier({
                   className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r"
                   style={{ background: on ? "var(--color-seal)" : "transparent" }}
                 />
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={on}
                   onChange={() => onToggle(s.session_id)}
-                  className="w-4 h-4 accent-[var(--color-seal)] cursor-pointer shrink-0 ml-1"
+                  className="ml-1"
                 />
                 <div className="min-w-0 flex-1">
                   <div

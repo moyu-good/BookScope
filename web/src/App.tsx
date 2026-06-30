@@ -62,6 +62,7 @@ import type {
 } from "./QuestionBreakdown";
 import { RouteDecisionBanner } from "./RouteDecisionBanner";
 import { SealMark } from "./SealMark";
+import { Select } from "./ui/FormControls";
 import { StudyCards } from "./StudyCards";
 import { StyleIssues } from "./StyleIssues";
 import { SubplotWeave } from "./SubplotWeave";
@@ -3604,18 +3605,18 @@ function ProviderConfig(props: {
     <div className="grid gap-4">
       <div className="grid grid-cols-[auto_1fr] gap-3 items-center">
         <Label htmlFor="provider">厂商</Label>
-        <select
+        <Select
           id="provider"
           value={preset.id}
           onChange={(e) => selectPreset(e.target.value)}
-          className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm"
+          wrapperClassName="w-full"
         >
           {PROVIDER_PRESETS.map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="grid grid-cols-[auto_1fr] gap-3 items-start">
@@ -3628,7 +3629,7 @@ function ProviderConfig(props: {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="粘贴你的 key（存在本地浏览器、刷新不丢）"
-            className="w-full rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm"
+            className="w-full rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm"
           />
           {preset.keyHint && (
             <p className="text-[11px] text-[var(--color-ink-muted)] mt-1 leading-relaxed">
@@ -3641,14 +3642,14 @@ function ProviderConfig(props: {
       <div className="grid grid-cols-[auto_1fr] gap-3 items-start">
         <Label htmlFor="model">模型</Label>
         <div>
-          <select
+          <Select
             id="model"
             value={isCustomModel ? CUSTOM_MODEL : model}
             onChange={(e) => {
               const v = e.target.value;
               setModel(v === CUSTOM_MODEL ? "" : v);
             }}
-            className="w-full rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm"
+            wrapperClassName="w-full"
           >
             {preset.models.map((m) => (
               <option key={m.value || "__default__"} value={m.value}>
@@ -3656,13 +3657,13 @@ function ProviderConfig(props: {
               </option>
             ))}
             <option value={CUSTOM_MODEL}>自定义…</option>
-          </select>
+          </Select>
           {isCustomModel && (
             <input
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="自己填模型名（按该厂商最新公布）"
-              className="mt-2 w-full rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm font-mono"
+              className="mt-2 w-full rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm font-mono"
             />
           )}
           <p className="text-[11px] text-[var(--color-ink-muted)] mt-1">
@@ -3681,7 +3682,7 @@ function ProviderConfig(props: {
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="OpenAI 兼容 endpoint（选了厂商会自动填；走代理可改）"
-            className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm font-mono"
+            className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm font-mono"
           />
         </div>
       )}
@@ -3809,16 +3810,18 @@ function UploadForm(props: {
 
       <div className="grid grid-cols-[auto_1fr] gap-3 items-center">
         <Label htmlFor="lang">语种</Label>
-        <select
-          id="lang"
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm w-40"
-        >
-          <option value="zh">中文</option>
-          <option value="en">English</option>
-          <option value="ja">日本語</option>
-        </select>
+        <div className="w-40">
+          <Select
+            id="lang"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            wrapperClassName="w-full"
+          >
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+          </Select>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
@@ -4315,7 +4318,7 @@ function AskForm(props: {
         onChange={(e) => setQuestion(e.target.value)}
         placeholder="比如：这本书里主要有哪几个角色？他们之间是什么关系？"
         rows={3}
-        className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm resize-y min-h-[80px]"
+        className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm resize-y min-h-[80px]"
       />
       <SubmitButton
         loading={asking}

@@ -338,7 +338,7 @@ export function RedheadStakes({
           }}
           placeholder="也可以自己写，比如「一家做餐饮的小公司」"
           disabled={loading}
-          className="flex-1 text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-white text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-seal)] disabled:opacity-50"
+          className="flex-1 text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-seal)] disabled:opacity-50"
           style={{ fontFamily: "var(--font-display)" }}
         />
         <button

@@ -113,7 +113,7 @@ export function Recap({
           value={chapter}
           onChange={(e) => setChapter(e.target.value)}
           placeholder="X"
-          className="w-20 rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm text-center focus:border-[var(--color-seal)] outline-none"
+          className="w-20 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm text-center focus:border-[var(--color-seal)] outline-none"
         />
         <span className="text-sm text-[var(--color-ink-muted)]">章</span>
         <button

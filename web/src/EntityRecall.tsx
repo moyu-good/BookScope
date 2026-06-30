@@ -122,7 +122,7 @@ export function EntityRecall({
           value={entity}
           onChange={(e) => setEntity(e.target.value)}
           placeholder="比如：安禄山 / 灵宝之战 / 某个设定"
-          className="flex-1 rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm focus:border-[var(--color-seal)] outline-none"
+          className="flex-1 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm focus:border-[var(--color-seal)] outline-none"
           style={{ fontFamily: "var(--font-display)" }}
         />
         <button

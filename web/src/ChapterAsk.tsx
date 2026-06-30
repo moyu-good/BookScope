@@ -101,7 +101,7 @@ export function ChapterAsk({
           }}
           placeholder={`问第 ${chapter} 章……（比如：这章谁占上风？为什么）`}
           disabled={loading || !apiKey}
-          className="flex-1 min-w-[12rem] rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm focus:border-[var(--color-seal)] outline-none"
+          className="flex-1 min-w-[12rem] rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm focus:border-[var(--color-seal)] outline-none"
           style={{ fontFamily: "var(--font-display)" }}
         />
         <button

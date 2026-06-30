@@ -271,7 +271,7 @@ export function AgentOrchestrate({
           onChange={(e) => setGoal(e.target.value)}
           placeholder="说一个目标，让 agent 自己规划该跑哪几个分析、串起来综合给你。比如：这本书伏笔铺得怎么样？或：这书在论证什么、证据扎不扎实？"
           rows={3}
-          className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm resize-y min-h-[80px]"
+          className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm resize-y min-h-[80px]"
         />
         <button
           type="submit"
