@@ -40,6 +40,8 @@ export function EntityRecall({
   const [queried, setQueried] = useState<string | null>(null);
   const [appearances, setAppearances] = useState<Appearance[] | null>(null);
   const [scanned, setScanned] = useState(true);
+  // 空值三态（task #29 根一）：扫过全书确实没这个实体 = 确证全书未出现（这是答案，不是搜漏）。
+  const [confirmedAbsent, setConfirmedAbsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
@@ -88,10 +90,12 @@ export function EntityRecall({
         entity: string;
         appearances: Appearance[];
         scanned: boolean;
+        confirmed_absent?: boolean;
         trace?: RunTrace;
       };
       setTrace(data.trace ?? null);
       setScanned(data.scanned);
+      setConfirmedAbsent(!!data.confirmed_absent);
       setAppearances(data.appearances);
       setQueried(data.entity);
     } catch (err) {
@@ -145,10 +149,30 @@ export function EntityRecall({
         </p>
       )}
 
+      {/* 确证全书未出现（空值三态 task #29）：扫过全书确实没这个实体——这是答案，笃定地说，
+          不是"搜漏了 / 换个写法再试"那种像系统没找到的口吻。区别于 scanned=false 的"扫失败"。 */}
       {scanned && appearances && appearances.length === 0 && queried && (
-        <p className="text-sm text-[var(--color-ink)]">
-          全书没找到「{queried}」的出现，换个说法 / 写法再试试。
-        </p>
+        <div
+          className="rounded-md px-3.5 py-3 flex items-start gap-2.5"
+          style={{
+            background: "rgba(79, 122, 82, 0.07)",
+            border: "1px solid rgba(79, 122, 82, 0.28)",
+          }}
+        >
+          <SealMark size={18} title="扫过全书" className="mt-0.5" />
+          <div>
+            <p
+              className="text-sm font-bold"
+              style={{ color: "#4f7a52", fontFamily: "var(--font-display)" }}
+            >
+              全书未出现「{queried}」
+            </p>
+            <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+              回溯了全书每一章，这本书里确实没有「{queried}」。这是个确定的答案——不是没扫到。
+              {confirmedAbsent ? "" : "（若怀疑是别名 / 别的写法，可换个说法再查。）"}
+            </p>
+          </div>
+        </div>
       )}
 
       {appearances && appearances.length > 0 && (

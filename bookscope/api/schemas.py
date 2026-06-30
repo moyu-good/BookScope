@@ -602,6 +602,15 @@ class ForeshadowArcsResponse(BaseModel):
         default=False,
         description="是否成功抽取。false=失败/书太大，前端提示重试；区别于扫过但空（scanned=true、空列表）。",
     )
+    confirmed_none: bool = Field(
+        default=False,
+        description=(
+            "空值三态（task #29 根一）：是否**确证全书没有伏笔**——扫过全书（scanned=true）且"
+            "没抽出挂得上原文的伏笔弧。true 时前端笃定显示「全书没埋伏笔」，区别于 "
+            "scanned=false 的「扫失败 / 待核」。注意：单条弧的 status=dangling（埋了没回收）是"
+            "另一层确证（这条伏笔确证未回收），由各弧自己带，不归这个列表级字段。"
+        ),
+    )
     book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
     trace: dict = Field(
         default_factory=dict,
@@ -811,6 +820,14 @@ class ConsistencyScanResponse(BaseModel):
     scanned: bool = Field(
         default=False,
         description="是否成功扫描。true+空=自洽无矛盾；false=扫描失败/书太大，前端提示重试。",
+    )
+    confirmed_clean: bool = Field(
+        default=False,
+        description=(
+            "空值三态（task #29 根一）：是否**确证无矛盾**——扫过全书（scanned=true）且没扫出"
+            "矛盾。true 时前端正面笃定显示「全书自洽」（好消息），区别于 scanned=false 的"
+            "「扫失败 / 待核」。evidence-first：只在真扫过全书 + 确实没矛盾时为 true。"
+        ),
     )
     book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
     trace: dict = Field(
@@ -1448,6 +1465,15 @@ class EntityRecallResponse(BaseModel):
     scanned: bool = Field(
         default=False,
         description="是否成功回溯。false=失败/书太大；区别于扫过但没找到（scanned=true、空列表）。",
+    )
+    confirmed_absent: bool = Field(
+        default=False,
+        description=(
+            "空值三态（task #29 根一）：是否**确证全书未出现**——扫过全书（scanned=true）且"
+            "确实没找到这个实体。true 时前端笃定显示「全书没有这个实体」（这是答案，不是搜漏），"
+            "区别于 scanned=false 的「扫失败 / 待核」。evidence-first：只在真扫过全书 + 确实"
+            "没出现时为 true（probe 实测假阳性 0%）。"
+        ),
     )
     book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
     trace: dict = Field(

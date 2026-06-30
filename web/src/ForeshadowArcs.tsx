@@ -54,6 +54,9 @@ export function ForeshadowArcs({
   const [arcs, setArcs] = useState<Arc[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 空值三态（task #29 根一）：扫过全书确实没埋伏笔 = 确证全书没伏笔（笃定答案，正面显示），
+  // 区别于扫失败（走 error）。单条弧的 status=dangling 是另一层确证（这条伏笔确证未回收）。
+  const [confirmedNone, setConfirmedNone] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [trace, setTrace] = useState<RunTrace | null>(null);
   const [onlyDangling, setOnlyDangling] = useState(false);
@@ -63,6 +66,7 @@ export function ForeshadowArcs({
   async function load() {
     setLoading(true);
     setError(null);
+    setConfirmedNone(false);
     setSelected(null);
     try {
       const body: Record<string, unknown> = {
@@ -86,15 +90,17 @@ export function ForeshadowArcs({
       const data = (await resp.json()) as {
         arcs: Arc[];
         scanned?: boolean;
+        confirmed_none?: boolean;
         trace?: RunTrace;
       };
       setTrace(data.trace ?? null);
       if (!data.arcs || data.arcs.length === 0) {
-        setError(
-          data.scanned
-            ? "扫过全书，没找到挂得上原文的伏笔。"
-            : "没抽出伏笔弧，稍后重试。",
-        );
+        // 确证全书没伏笔(扫过全书且空)走正面笃定显示,不当 error;真扫失败才走 error。
+        if (data.confirmed_none || data.scanned) {
+          setConfirmedNone(true);
+        } else {
+          setError("没抽出伏笔弧，稍后重试。");
+        }
       } else {
         setArcs(
           [...data.arcs].sort((a, b) => a.setup_chapter - b.setup_chapter),
@@ -148,6 +154,33 @@ export function ForeshadowArcs({
           <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
             {error}
           </p>
+        )}
+        {/* 确证全书没伏笔（空值三态 task #29）：扫过全书确实没埋伏笔——笃定答案，正面显示，
+            不是上面 error 那种像扫失败的红字。 */}
+        {confirmedNone && (
+          <div
+            className="mt-3 rounded-md px-3.5 py-3 flex items-start gap-2.5"
+            style={{
+              background: "rgba(79, 122, 82, 0.07)",
+              border: "1px solid rgba(79, 122, 82, 0.28)",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 20 20" className="mt-0.5 shrink-0" aria-hidden>
+              <circle cx="10" cy="10" r="9" fill="none" stroke="#4f7a52" strokeWidth="1.5" />
+              <path d="M6 10.5l2.5 2.5L14.5 7" fill="none" stroke="#4f7a52" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <div>
+              <p
+                className="text-sm font-bold"
+                style={{ color: "#4f7a52", fontFamily: "var(--font-display)" }}
+              >
+                全书没有挂得上原文的伏笔
+              </p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+                读了全书，没找到前埋后收的伏笔线索。这是个确定的结果——不是没扫到。
+              </p>
+            </div>
+          </div>
         )}
         {!apiKey && (
           <p className="mt-3 text-xs text-[var(--color-ink-muted)]">

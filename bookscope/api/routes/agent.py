@@ -49,6 +49,7 @@ from bookscope.agent import (
 )
 from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
 from bookscope.agent._internal.doc_spine_cache import get_or_build_doc_spine
+from bookscope.agent._internal.empty_semantics import is_confirmed_empty
 from bookscope.agent.annotations import generate_annotations
 from bookscope.agent.argument_structure import generate_argument_structure_exhaustive
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
@@ -1360,9 +1361,12 @@ async def agent_foreshadow_arcs(
     # 逐段盲（逐段看不见别段→只能凑同章 span-0 假伏笔）。spine 多半已为别的功能建过、L2 命中。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
     arcs = foreshadow_from_spine(spine=spine, llm_client=rec, model=model, chunks=chunks)
+    # 空值三态(task #29 根一):扫过全书(arcs 是列表)且没抽出伏笔 = 确证全书没埋伏笔,
+    # 区别于扫失败(arcs=None)。注:单条弧的 status=dangling 是另一层确证(这条伏笔确证未回收)。
     return ForeshadowArcsResponse(
         arcs=arcs or [],
         scanned=arcs is not None,
+        confirmed_none=is_confirmed_empty(arcs),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
@@ -1618,9 +1622,12 @@ async def agent_consistency_scan(
     # 矛盾要跨章对比,整本单次大书截断——章脉(紧凑全书结构)一次全局找,扫得到全书。
     spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
     result = consistency_scan_from_spine(spine=spine, llm_client=rec, model=model, chunks=chunks)
+    # 空值三态(task #29 根一):扫过全书(result 是列表)且没矛盾 = 确证无矛盾(好消息),
+    # 区别于扫失败(result=None → confirmed_clean=False,前端显待核)。
     return ConsistencyScanResponse(
         contradictions=result or [],
         scanned=result is not None,
+        confirmed_clean=is_confirmed_empty(result),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
@@ -1735,10 +1742,13 @@ async def agent_entity_recall(
         model=model,
         session_id=request.book_session_id,
     )
+    # 空值三态(task #29 根一):扫过全书(appearances 是列表)且没找到 = 确证全书未出现该实体
+    # (这是答案,不是搜漏),区别于扫失败(appearances=None → confirmed_absent=False)。
     return EntityRecallResponse(
         entity=request.entity,
         appearances=appearances or [],
         scanned=appearances is not None,
+        confirmed_absent=is_confirmed_empty(appearances),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )

@@ -41,6 +41,8 @@ export function ConsistencyScan({
   const [result, setResult] = useState<{
     contradictions: Contradiction[];
     scanned: boolean;
+    // 空值三态（task #29 根一）：扫过全书没矛盾 = 确证无矛盾（好消息），区别于扫失败。
+    confirmed_clean?: boolean;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +73,7 @@ export function ConsistencyScan({
       const data = (await resp.json()) as {
         contradictions: Contradiction[];
         scanned: boolean;
+        confirmed_clean?: boolean;
         trace?: RunTrace;
       };
       setTrace(data.trace ?? null);
@@ -122,10 +125,29 @@ export function ConsistencyScan({
         </p>
       )}
 
+      {/* 确证无矛盾（空值三态 task #29）：扫过全书确实没矛盾——这是笃定的好消息，正面显示，
+          不是"待核"那种像系统故障的口吻。区别于上面 scanned=false 的"扫失败"。 */}
       {result && result.scanned && result.contradictions.length === 0 && (
-        <p className="text-sm text-[var(--color-ink)]">
-          没扫出明显的前后矛盾，这本书的设定挺自洽。
-        </p>
+        <div
+          className="rounded-md px-3.5 py-3 flex items-start gap-2.5"
+          style={{
+            background: "rgba(79, 122, 82, 0.07)",
+            border: "1px solid rgba(79, 122, 82, 0.28)",
+          }}
+        >
+          <SealMark size={18} title="扫过全书" className="mt-0.5" />
+          <div>
+            <p
+              className="text-sm font-bold"
+              style={{ color: "#4f7a52", fontFamily: "var(--font-display)" }}
+            >
+              全书自洽 · 没有前后矛盾
+            </p>
+            <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+              扫了全书的设定与人物，没发现前后打架的地方。这是个好消息——不是没扫到，是确实没有。
+            </p>
+          </div>
+        </div>
       )}
 
       {result && result.contradictions.length > 0 && (
