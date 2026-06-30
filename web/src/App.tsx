@@ -2431,8 +2431,8 @@ function genreVisibleGroups(genre: string | undefined | null): Set<string> | nul
   if (/(会议|纪要|meeting)/.test(g)) {
     return new Set(["read", "meeting"]);
   }
-  // 书 / 公文题材下,会议组仍作为手动入口放行(genre 没测准成会议时还能点进来试)——
-  // 所以下面两个分支都带上 "meeting",书 / 公文自己的门控一字不动。
+  // 会议组只在 genre=会议 时显示。书 / 公文不再混入会议功能(作者 2026-06-30 实测嫌冲突,
+  // 把"meeting 当手动入口"的旧 fallback 去掉);会议没测准的极端情况靠重传 / 后续 genre 改写解。
   // 公文:只留「问 & 读」+ 三个公文组,书的人物/情节/思想/质量全藏。
   if (/(公文|红头)/.test(g)) {
     return new Set([
@@ -2440,7 +2440,6 @@ function genreVisibleGroups(genre: string | undefined | null): Set<string> | nul
       "redhead_read",
       "redhead_act",
       "redhead_cross",
-      "meeting",
     ]);
   }
   // 书类(小说/历史/理论/论文/诗歌/工具书):只留「问 & 读」+ 书的组,公文三组全藏。
@@ -2449,7 +2448,7 @@ function genreVisibleGroups(genre: string | undefined | null): Set<string> | nul
       g,
     )
   ) {
-    return new Set(["read", "character", "plot", "thought", "quality", "meeting"]);
+    return new Set(["read", "character", "plot", "thought", "quality"]);
   }
   // 其他 / 认不出:全显(兜底)。
   return null;
