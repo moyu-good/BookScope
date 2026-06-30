@@ -55,7 +55,7 @@ from bookscope.agent.utils.json_parsing import (
 
 logger = logging.getLogger(__name__)
 
-DOC_SPINE_SCHEMA_VERSION = "v1"
+DOC_SPINE_SCHEMA_VERSION = "v2"  # v2(task #29):头要素加空值三态 + 机关层级,结构变必须 bump 失旧缓存
 """文脉记录结构版本——升级要让缓存整份失效(接 ADR-008,与章脉 SPINE_SCHEMA_VERSION 同理)。"""
 
 DEFAULT_DOC_SPINE_MAX_TOKENS = 8000
