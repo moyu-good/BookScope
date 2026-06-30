@@ -10,6 +10,7 @@ import type { BookScale } from "./bookScale";
 import { ScaleBanner } from "./ScaleBanner";
 import { ActionLedger } from "./ActionLedger";
 import { CommitmentTracker } from "./CommitmentTracker";
+import { StanceSubtext } from "./StanceSubtext";
 import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
@@ -835,6 +836,7 @@ export function App() {
     | "redhead_policy"
     | "redhead_level"
     | "meeting_ledger"
+    | "meeting_stance"
     | "meeting_commitments"
   >("library");
   // 手机端左栏收成抽屉，这个控制开合
@@ -2118,6 +2120,22 @@ export function App() {
                   baseUrl={effectiveBaseUrl()}
                 />
               </div>
+
+              {/* 1.7 会议·立场与弦外（单份文档，跟行动项台账同一层 currentSession 守卫内）。
+                  整块是评估层（标研判、不盖鉴印），跟证据层功能视觉刻意两样。 */}
+              <div className={mode === "meeting_stance" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="立场与弦外"
+                  subtitle="会议里大家心里怎么想，常不写在脸上：「再研究研究」往往是不想办，「我理解但是」往往是软反对。这块替你挖字面底下的真实态度——谁真同意、谁附条件、谁嘴上应付实则拖延、谁在打太极，每条钉发言原话、标把握。读出来的是研判不是核实结论，对不对你看着原话自己判。大家是真一致、没有暗流也会明说是好事。只读逐字稿；纪要会建议你传逐字稿。"
+                />
+                <StanceSubtext
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
             </>
           )}
 
@@ -2246,6 +2264,7 @@ type Mode =
   | "redhead_policy"
   | "redhead_level"
   | "meeting_ledger"
+  | "meeting_stance"
   | "meeting_commitments";
 
 // 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
@@ -2255,7 +2274,7 @@ const WHOLE_BOOK_MODES = new Set<Mode>([
   "timeline", "narrative", "consistency", "argument", "style", "technique",
   "cards", "revision", "redhead", "redhead_actions", "redhead_plain",
   "redhead_relevance", "redhead_stakes", "redhead_hardfacts", "redhead_timeline",
-  "redhead_glossary", "redhead_formatcheck", "meeting_ledger",
+  "redhead_glossary", "redhead_formatcheck", "meeting_ledger", "meeting_stance",
 ]);
 
 // 左栏功能按"用户想干啥"分五组，每组可折叠（WP-1.5.4）。
@@ -2366,6 +2385,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "会议 · 行动项",
     modes: [
       { id: "meeting_ledger", label: "行动项台账" },
+      { id: "meeting_stance", label: "立场与弦外" },
       { id: "meeting_commitments", label: "跨会承诺追踪" },
     ],
   },

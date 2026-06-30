@@ -1193,6 +1193,69 @@ class MeetingActionLedgerResponse(BaseModel):
     trace: dict = Field(default_factory=dict, description="运行用量 trace。")
 
 
+class MeetingStanceRequest(RedheadDocStructureRequest):
+    """POST /api/agent/meeting/stance 请求体（1.7 会议·立场与弦外，第四炮）。
+
+    一份会议记录 = 一个已有的 book session（照现有 /books/upload 传一份会议记录 txt）；这里收
+    单个 book_session_id，读出这份会议各议题的真实立场与言下之意。BYOK，同其它整本结构化功能。
+
+    比单份解读多一个可选项：
+    - ``form``：形态（逐字稿/纪要）。**立场弦外靠口语细节，纪要是编辑过的概括稿读不出语气**——
+      传了纪要直接优雅退场（返空 + 提示传逐字稿），绝不在概括句上硬编。不传则按会脉判出的形态
+      （判不准默认纪要，会退场）。逐字稿才正常跑。
+    """
+
+    form: Literal["逐字稿", "纪要"] | None = Field(
+        default=None,
+        description="形态门控（逐字稿/纪要）。纪要退场（读不出语气），逐字稿才判立场弦外。",
+    )
+
+
+class MeetingStanceResponse(BaseModel):
+    """POST /api/agent/meeting/stance 响应体（立场与弦外）。
+
+    **整个是评估层**（同公文「利害与风向」的信号段）：没有一条是盖鉴印的事实，全是带原话基础的
+    研判。死守 evidence-first：每条立场/弦外的 ``basis`` 必须过核验，一条都核不到就丢整条；
+    **stance/subtext 都没有 verified 字段**（评估层、绝不盖鉴印，前端标「研判」不是钤印核验）。
+    """
+
+    form: str = Field(
+        default="纪要",
+        description="判出/传入的形态（逐字稿/纪要）。纪要时 topics 空 + form_note 给退场提示。",
+    )
+    form_note: str = Field(
+        default="",
+        description="纪要退场提示（建议传逐字稿）；逐字稿为空串。",
+    )
+    topics: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "按核心议题聚合的立场与弦外。每个议题 {topic, verdict, stances, subtexts}。"
+            "verdict 三态：「有立场张力」（读出了立场/弦外）/「确证一致无弦外」（确证纯通报或真"
+            "一致同意，stances/subtexts 空但 verdict 本身是答案，是笃定的「无」不是抽不到）/"
+            "「读不出（纪要/待核）」。stance 每条 {person, topic, "
+            "position(支持/反对/保留/摇摆/回避),"
+            " reading(人话解读), substance(真金白银/有条件兑现/空头表态), substance_reason,"
+            " basis(引发研判的原话列表), confidence(高/中/低)}。subtext 每条 {kind(表面同意实则"
+            "保留/拖延搁置/甩锅推责/回避问题/留口子/口头答应没底), person, topic, subtext,"
+            " basis(原话列表), confidence}。评估层：标研判、绝不盖鉴印；basis 核不到的整条不出。"
+        ),
+    )
+    summary: str = Field(
+        default="",
+        description="系统一句话总览（带立场，谁在推谁在拖、谁嘴上答应实则没动）；没料返空串。",
+    )
+    scanned: bool = Field(
+        default=False,
+        description=(
+            "是否成功读出。false=失败/纪要退场/非会议；true+空=读过但没立场张力。"
+            "抽到任一立场/弦外、或任一议题 verdict 是「确证一致无弦外」（确证无也是扫过了）→ true。"
+        ),
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
 class MeetingCommitmentsRequest(RedheadCrossDocRequest):
     """POST /api/agent/meeting/commitments 请求体（1.7 会议·跨会承诺—兑现追踪，杀手价值）。
 

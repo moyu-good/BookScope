@@ -96,6 +96,7 @@ from bookscope.agent.genre_detect import (
 from bookscope.agent.long_context import run_long_context
 from bookscope.agent.meeting_commitments import commitments_across_meetings
 from bookscope.agent.meeting_spine import action_ledger_from_meeting
+from bookscope.agent.meeting_stance import stances_from_meeting
 from bookscope.agent.motif_tracking import generate_motif_tracking
 from bookscope.agent.orchestrate import orchestrate
 from bookscope.agent.question_processor import rewrite_followup
@@ -165,6 +166,8 @@ from bookscope.api.schemas import (
     MeetingActionLedgerResponse,
     MeetingCommitmentsRequest,
     MeetingCommitmentsResponse,
+    MeetingStanceRequest,
+    MeetingStanceResponse,
     MotifTrackingRequest,
     MotifTrackingResponse,
     NarrativeCurveRequest,
@@ -3446,6 +3449,53 @@ async def agent_meeting_action_ledger(
         open_issues=result.get("open_issues") or [],
         owner=result.get("owner"),
         scanned=bool(action_items or decisions or head_has_value),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post(
+    "/agent/meeting/stance",
+    response_model=MeetingStanceResponse,
+)
+async def agent_meeting_stance(
+    request: MeetingStanceRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> MeetingStanceResponse:
+    """立场与弦外(1.7 会议·第四炮):读一场会的逐字稿,挖字面底下的真实态度 + 言下之意。
+
+    前面四块回答「定了什么、谁要办什么」,立场与弦外回答「大家心里到底怎么想、表态有几分真」——
+    会议比公文多出的一维(多方角力)。整个是**评估层**(同公文信号段):每条立场/弦外标研判 +
+    引原话基础 + 置信度,**绝不盖鉴印**;basis 一条都核不到就丢整条(命门)。
+    position 五态 / 弦外六类 / 含金量三档 / verdict 三态都是封闭集,落不进退最保守。
+    **纪要退场**:纪要是编辑稿读不出语气 → 返空 + 提示传逐字稿(绝不在概括句上硬编)。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    client = _build_params_client_or_raise(request)
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = stances_from_meeting(
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        full_text=full_text,
+        form=request.form,
+    )
+    topics = result.get("topics") or []
+    # scanned=精读成功:抽到任一立场/弦外,或任一议题确证一致无弦外(确证无也是扫过了)。
+    has_any = any(
+        t.get("stances") or t.get("subtexts")
+        or t.get("verdict") == "确证一致无弦外"
+        for t in topics
+    )
+    return MeetingStanceResponse(
+        form=result.get("form", "纪要"),
+        form_note=result.get("form_note", ""),
+        topics=topics,
+        summary=result.get("summary", ""),
+        scanned=has_any,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
