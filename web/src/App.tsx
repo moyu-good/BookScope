@@ -3782,12 +3782,16 @@ function UploadForm(props: {
 
       <div className="grid grid-cols-[auto_1fr] gap-3 items-center">
         <Label htmlFor="lang">语种</Label>
-        <input
+        <select
           id="lang"
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
-          className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm font-mono w-24"
-        />
+          className="rounded border border-[var(--color-rule)] bg-white px-3 py-2 text-sm w-40"
+        >
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
       </div>
 
       <div className="flex items-center gap-4">
