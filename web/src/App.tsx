@@ -51,9 +51,7 @@ import { RedheadPolicyEvolution } from "./RedheadPolicyEvolution";
 import { RedheadCloseReading } from "./RedheadCloseReading";
 import { RedheadFormatCheck } from "./RedheadFormatCheck";
 import { RedheadHardFacts } from "./RedheadHardFacts";
-import { RedheadRelevance } from "./RedheadRelevance";
 import { RedheadStakes } from "./RedheadStakes";
-import { RedheadTimeline } from "./RedheadTimeline";
 import { RelationshipTimeline } from "./RelationshipTimeline";
 import { RevisionList } from "./RevisionList";
 import type {
@@ -858,10 +856,8 @@ export function App() {
     | "redhead"
     | "redhead_actions"
     | "redhead_plain"
-    | "redhead_relevance"
     | "redhead_stakes"
     | "redhead_hardfacts"
-    | "redhead_timeline"
     | "redhead_formatcheck"
     | "redhead_depgraph"
     | "redhead_policy"
@@ -2113,6 +2109,7 @@ export function App() {
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
+                  onJumpToFacts={() => setMode("redhead_hardfacts")}
                 />
               </div>
 
@@ -2130,24 +2127,10 @@ export function App() {
                 />
               </div>
 
-              <div className={mode === "redhead_relevance" ? "" : "hidden"}>
-                <CanvasHeader
-                  title="跟我相关"
-                  subtitle="说一句你是谁、什么处境，把一份红头文件里跟你直接相关的条款挑出来：这条管不管你、要你做什么、到几号、不办会怎样，每条钉在原文。适合党政公文 / 红头文件。"
-                />
-                <RedheadRelevance
-                  sessionId={currentSession.session_id}
-                  provider={provider}
-                  apiKey={apiKey}
-                  model={model}
-                  baseUrl={effectiveBaseUrl()}
-                />
-              </div>
-
               <div className={mode === "redhead_stakes" ? "" : "hidden"}>
                 <CanvasHeader
                   title="利害与风向"
-                  subtitle="说一句你是谁，把这份公文藏着的机会（可争取的红利）和风险（暴露面 / 代价）挑出来，每条标含金量（真金白银 / 有条件 / 空头倡导）、钉原文；再研判它透出的政策风向（弦外之音），标研判、不当成核实的事实。适合党政公文 / 红头文件。"
+                  subtitle="说一句你是谁，先把这份公文里跟你直接相关的条款圈出来，再把它藏着的机会（可争取的红利）和风险（暴露面 / 代价）挑出来，每条标含金量（真金白银 / 有条件 / 空头倡导）、钉原文；再研判它透出的政策风向（弦外之音），标研判、不当成核实的事实。不填身份也能看一份通用利害。适合党政公文 / 红头文件。"
                 />
                 <RedheadStakes
                   sessionId={currentSession.session_id}
@@ -2160,24 +2143,10 @@ export function App() {
 
               <div className={mode === "redhead_hardfacts" ? "" : "hidden"}>
                 <CanvasHeader
-                  title="硬信息提取"
-                  subtitle="把一份红头文件里所有钉死的硬信息抠出来：金额、比例、期限、门槛、数量、适用范围，逐条列清并标出处，省得自己在长文里翻。适合党政公文 / 红头文件。"
+                  title="要点提取"
+                  subtitle="把一份红头文件里所有钉死的硬信息抠出来：金额、比例、期限、门槛、数量、适用范围、生效废止，逐条列清并标出处，省得自己在长文里翻。时间类的还能切到「时序视图」按先后排成一条线。适合党政公文 / 红头文件。"
                 />
                 <RedheadHardFacts
-                  sessionId={currentSession.session_id}
-                  provider={provider}
-                  apiKey={apiKey}
-                  model={model}
-                  baseUrl={effectiveBaseUrl()}
-                />
-              </div>
-
-              <div className={mode === "redhead_timeline" ? "" : "hidden"}>
-                <CanvasHeader
-                  title="关键时间轴"
-                  subtitle="把一份红头文件里所有跟时间有关的点排成一条线：什么时候起施行、几号前要办完、哪天截止、分几个阶段，按先后摆开，每个时间点钉在原文。适合党政公文 / 红头文件。"
-                />
-                <RedheadTimeline
                   sessionId={currentSession.session_id}
                   provider={provider}
                   apiKey={apiKey}
@@ -2349,10 +2318,8 @@ type Mode =
   | "redhead"
   | "redhead_actions"
   | "redhead_plain"
-  | "redhead_relevance"
   | "redhead_stakes"
   | "redhead_hardfacts"
-  | "redhead_timeline"
   | "redhead_formatcheck"
   | "redhead_depgraph"
   | "redhead_policy"
@@ -2367,7 +2334,7 @@ const WHOLE_BOOK_MODES = new Set<Mode>([
   "graph", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
   "timeline", "narrative", "consistency", "argument", "style", "technique",
   "cards", "revision", "redhead", "redhead_actions", "redhead_plain",
-  "redhead_relevance", "redhead_stakes", "redhead_hardfacts", "redhead_timeline",
+  "redhead_stakes", "redhead_hardfacts",
   "redhead_formatcheck", "meeting_ledger", "meeting_stance",
 ]);
 
@@ -2455,9 +2422,7 @@ const NAV_GROUPS: NavGroup[] = [
     modes: [
       { id: "redhead_stakes", label: "利害与风向" },
       { id: "redhead_actions", label: "办事清单" },
-      { id: "redhead_relevance", label: "跟我相关" },
-      { id: "redhead_hardfacts", label: "硬信息提取" },
-      { id: "redhead_timeline", label: "关键时间轴" },
+      { id: "redhead_hardfacts", label: "要点提取" },
     ],
   },
   {
@@ -2804,15 +2769,6 @@ function NavIcon({
         <path d="M8 18h5" />
       </>
     ),
-    // 跟我相关——文件 + 人像，挑出跟你相关的条款
-    redhead_relevance: (
-      <>
-        <path d="M5 3h9l3 3v6" />
-        <path d="M5 3v18h7" />
-        <circle cx="17" cy="16" r="2.5" />
-        <path d="M13.5 21a3.5 3.5 0 0 1 7 0" />
-      </>
-    ),
     // 利害与风向——天平(权衡机会/风险)
     redhead_stakes: (
       <>
@@ -2823,22 +2779,13 @@ function NavIcon({
         <path d="M8 21h8" />
       </>
     ),
-    // 硬信息提取——文件 + 放大镜，把硬数据抠出来
+    // 要点提取——文件 + 放大镜，把硬数据抠出来
     redhead_hardfacts: (
       <>
         <path d="M5 3h9l3 3v5" />
         <path d="M5 3v18h6" />
         <circle cx="16.5" cy="15.5" r="3" />
         <path d="M18.7 17.7 21 20" />
-      </>
-    ),
-    // 关键时间轴——文件 + 时钟
-    redhead_timeline: (
-      <>
-        <path d="M5 3h9l3 3v4" />
-        <path d="M5 3v18h6" />
-        <circle cx="16" cy="16" r="4" />
-        <path d="M16 14v2l1.4 1" />
       </>
     ),
     // 规范性自检——文件 + 对勾盾
@@ -3242,15 +3189,19 @@ function Sidebar(props: {
           </svg>
           书库
         </button>
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          aria-label="设置 · LLM 配置"
-          title="设置 · LLM 配置"
-          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
-        >
-          <NavIcon id="settings" size={16} />
-        </button>
+        <div className="flex items-center gap-1">
+          {/* §五:清分析缓存挪到这里(显眼小入口),不再埋设置抽屉底部 */}
+          <ClearCacheButton />
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            aria-label="设置 · LLM 配置"
+            title="设置 · LLM 配置"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-md text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+          >
+            <NavIcon id="settings" size={16} />
+          </button>
+        </div>
       </div>
       </div>
     </aside>
@@ -4689,6 +4640,68 @@ function AnswerBlock({ answer }: { answer: AskResponse }) {
   );
 }
 
+// 清缓存（§五：从设置抽屉底部挪到左栏底，用户找得到的显眼小入口）。
+// 自带状态 + 调 /api/cache/clear，文案点明「只清分析结果、书和卷宗都不动」——跟「清空卷宗」
+// （只清选的文档组）划清边界，两个「清」别再混。
+function ClearCacheButton() {
+  const [clearing, setClearing] = useState(false);
+  const [msg, setMsg] = useState("");
+  async function handleClear() {
+    if (clearing) return;
+    setClearing(true);
+    setMsg("");
+    try {
+      const resp = await fetch("/api/cache/clear", { method: "POST" });
+      setMsg(resp.ok ? "已清，下次分析重算" : "清理失败，稍后再试");
+    } catch {
+      setMsg("清理失败，稍后再试");
+    } finally {
+      setClearing(false);
+      // 提示两秒后淡出，不长留占位
+      setTimeout(() => setMsg(""), 2600);
+    }
+  }
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={handleClear}
+        disabled={clearing}
+        aria-label="清分析缓存"
+        title="清分析缓存：只清分析结果，下次重算会重新花 token，书和卷宗都不动"
+        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
+      >
+        {/* 刷新 / 重算意象的小图标 */}
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+          <path d="M21 3v5h-5" />
+          <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          <path d="M3 21v-5h5" />
+        </svg>
+        {clearing ? "清理中…" : "清缓存"}
+      </button>
+      {msg && (
+        <span
+          className="absolute left-0 -top-5 whitespace-nowrap text-[11px] text-[var(--color-seal)]"
+          role="status"
+        >
+          {msg}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function SettingsDrawer(props: {
   provider: Provider;
   setProvider: (p: Provider) => void;
@@ -4712,23 +4725,6 @@ function SettingsDrawer(props: {
     setTheme,
     ...config
   } = props;
-  const [clearing, setClearing] = useState(false);
-  const [clearMsg, setClearMsg] = useState("");
-  async function handleClearCache() {
-    if (clearing) return;
-    setClearing(true);
-    setClearMsg("");
-    try {
-      const resp = await fetch("/api/cache/clear", { method: "POST" });
-      setClearMsg(
-        resp.ok ? "分析缓存已清空,下次分析重新现算。" : "清理失败,稍后再试。",
-      );
-    } catch {
-      setClearMsg("清理失败,稍后再试。");
-    } finally {
-      setClearing(false);
-    }
-  }
   return (
     <div
       className="reveal mt-6 rounded-lg border border-[var(--color-rule)] p-4"
@@ -4848,36 +4844,8 @@ function SettingsDrawer(props: {
         </button>
       </div>
 
-      {/* 清分析缓存(#20) */}
-      <div
-        className="mt-4 pt-4"
-        style={{ borderTop: "1px solid var(--color-rule)" }}
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div
-              className="text-sm text-[var(--color-ink)]"
-              style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
-            >
-              清分析缓存
-            </div>
-            <p className="mt-1 text-xs text-[var(--color-ink-muted)] leading-relaxed">
-              结果像旧的、或换了书重抓后想强制重算时点一下。只清分析缓存，书不会删；下次分析重新现算（会重新花 token）。
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleClearCache}
-            disabled={clearing}
-            className="shrink-0 mt-0.5 text-xs px-3 py-1.5 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-          >
-            {clearing ? "清理中…" : "清缓存"}
-          </button>
-        </div>
-        {clearMsg && (
-          <p className="mt-2 text-xs text-[var(--color-seal)]">{clearMsg}</p>
-        )}
-      </div>
+      {/* §五:清分析缓存已挪到左栏底(ClearCacheButton)——高频动作不该埋在设置抽屉底部、
+          跟「配 API key」这种一次性配置挤一个抽屉。设置里不再放清缓存。 */}
 
       {/* 关于(#20) */}
       <div

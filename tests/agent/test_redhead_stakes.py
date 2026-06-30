@@ -63,11 +63,22 @@ def _run(monkeypatch, canned: str, *, role: str = "个体工商户"):
 
 
 def _full_payload() -> str:
-    """一份齐全的三段研判:机会两条(一真金白银一空头)、风险一条(真金白银)、信号一条。
+    """一份齐全的四段研判:相关条款两条、机会两条(一真金白银一空头)、风险一条、信号一条。
 
     机会顺序故意把空头放前面、真金白银放后面——用来验排序确实把真金白银提前。
+    相关条款故意把相关度「中」放前、「高」放后——用来验排序把「高」提前。
     """
     return json.dumps({
+        "related_clauses": [
+            {
+                "chapter": 2, "matter": "便利登记", "relevance": "中",
+                "bearing": "利好", "note": "你将来办登记可能更方便", "evidence": _HOLLOW,
+            },
+            {
+                "chapter": 1, "matter": "登记费减免", "relevance": "高",
+                "bearing": "利好", "note": "你新登记能省200元", "evidence": _HARD,
+            },
+        ],
         "opportunities": [
             {
                 "what": "探索更便利登记方式",
@@ -113,9 +124,15 @@ def test_three_sections_and_fields(monkeypatch):
     out = _run(monkeypatch, _full_payload())
     assert out["schema_version"] == rs.STAKES_SCHEMA_VERSION
     assert out["role"] == "个体工商户"
+    assert len(out["related_clauses"]) == 2
     assert len(out["opportunities"]) == 2
     assert len(out["risks"]) == 1
     assert len(out["signals"]) == 1
+    # 相关条款字段齐全(证据层,有 verified)
+    rc = out["related_clauses"][0]
+    for k in ("chapter", "matter", "relevance", "bearing", "note",
+              "evidence", "verified", "match_score"):
+        assert k in rc, f"相关条款缺字段 {k}"
     # 机会字段齐全
     opp = out["opportunities"][0]
     for k in ("what", "why", "action", "substance", "substance_reason",
@@ -290,21 +307,90 @@ def test_recommendation_empty_when_nothing(monkeypatch):
     assert out["recommendation"] == ""
 
 
-# ── 空 role 退场返空,不跑 LLM ────────────────────────────────────────────────
-def test_empty_role_returns_empty_without_llm(monkeypatch):
-    """role 空 → 直接返空结构,绝不调 LLM(调了就炸,证明没调)。"""
-    def _boom(*_a, **_kw):  # noqa: ANN002, ANN003, ANN202
-        raise AssertionError("空 role 不该调用 LLM")
-    monkeypatch.setattr(rs, "invoke_client_cached", _boom)
-    out = rs.stakes_from_doc(
-        chunks=_CHUNKS, role="   ", llm_client=_FakeClient(),
+# ── 相关条款(吸收自跟我相关,整合 3)──────────────────────────────────────────
+def test_related_clauses_verified_and_sorted(monkeypatch):
+    """相关条款逐条核验(canned evidence 命中=verified)+ 按相关度排(高在前)。"""
+    out = _run(monkeypatch, _full_payload())
+    rcs = out["related_clauses"]
+    assert len(rcs) == 2
+    # canned 故意「中」在前「高」在后,排序应把「高」提前
+    assert rcs[0]["relevance"] == "高"
+    assert rcs[0]["chapter"] == 1
+    # 都命中原文 → verified
+    assert all(rc["verified"] is True for rc in rcs)
+
+
+def test_related_clause_unverified_kept_not_dropped(monkeypatch):
+    """相关条款核不过的**不丢、只标待核**(对齐原 relevance 契约,跟机会/风险丢掉不一样)。"""
+    canned = json.dumps({
+        "related_clauses": [{
+            "chapter": 1, "matter": "编的条款", "relevance": "高", "bearing": "义务",
+            "note": "x", "evidence": "原文压根没有这句话的条款。",
+        }],
+        "opportunities": [], "risks": [], "signals": [],
+    }, ensure_ascii=False)
+    out = _run(monkeypatch, canned)
+    # 核不过但仍保留(标 verified=False),不像机会/风险那样丢
+    assert len(out["related_clauses"]) == 1
+    assert out["related_clauses"][0]["verified"] is False
+
+
+def test_related_bearing_relevance_closed_set(monkeypatch):
+    """相关条款的 relevance / bearing 落不进封闭集 → 退兜底(中 / 条件)。"""
+    canned = json.dumps({
+        "related_clauses": [{
+            "chapter": 1, "matter": "x", "relevance": "超高", "bearing": "随便",
+            "note": "", "evidence": _HARD,
+        }],
+        "opportunities": [], "risks": [], "signals": [],
+    }, ensure_ascii=False)
+    out = _run(monkeypatch, canned)
+    assert out["related_clauses"][0]["relevance"] == "中"
+    assert out["related_clauses"][0]["bearing"] == "条件"
+
+
+# ── 空 role 跑通用版(整合 3,作者拍板点 3:不强制要身份)──────────────────────
+def test_empty_role_runs_generic_not_empty(monkeypatch):
+    """role 空 → 跑通用版(仍调 LLM 研判机会/风险/信号),不再直接返空。相关条款恒空。"""
+    canned = json.dumps({
+        "related_clauses": [{
+            # 通用版就算模型给了相关条款也该被丢(没身份谈不上个性化相关)
+            "chapter": 1, "matter": "不该出现", "relevance": "高", "bearing": "义务",
+            "note": "", "evidence": _HARD,
+        }],
+        "opportunities": [{
+            "what": "登记费减免每户200元", "why": "新登记能省钱", "action": "去办登记",
+            "substance": "真金白银", "substance_reason": "有数字+时限+主体", "horizon": "近",
+            "evidence": _HARD,
+        }],
+        "risks": [], "signals": [],
+    }, ensure_ascii=False)
+    out = _run(monkeypatch, canned, role="   ")  # 全空白身份
+    assert out["role"] == ""
+    # 通用版仍研判出机会(不再返空)
+    assert len(out["opportunities"]) == 1
+    # 相关条款个性化,通用版恒空
+    assert out["related_clauses"] == []
+
+
+def test_empty_role_uses_generic_instruction(monkeypatch):
+    """role 空时拼的是通用版指令(不含「用户身份」尾段),不喂荒谬身份判定那套。"""
+    captured = {}
+
+    def _capture(*_a, **kw):  # noqa: ANN002, ANN003, ANN202
+        captured["system"] = kw.get("system", "")
+        return json.dumps(
+            {"related_clauses": [], "opportunities": [], "risks": [], "signals": []},
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(rs, "invoke_client_cached", _capture)
+    rs.stakes_from_doc(
+        chunks=_CHUNKS, role="", llm_client=_FakeClient(),
         model="deepseek-v4-flash", full_text=_FULL_TEXT,
     )
-    assert out["role"] == ""
-    assert out["opportunities"] == []
-    assert out["risks"] == []
-    assert out["signals"] == []
-    assert out["recommendation"] == ""
+    assert "用户身份:" not in captured["system"]  # 通用版不拼身份尾段
+    assert "面向**一般读者**" in captured["system"]  # 用的是通用指令
 
 
 # ── parse 兜底:去 markdown 围栏 ──────────────────────────────────────────────
@@ -377,3 +463,16 @@ def test_coerce_signal_drops_no_basis():
     ok2 = rs._coerce_signal({"direction": "d", "basis": "单条原文"})
     assert ok2 is not None
     assert ok2["basis"] == ["单条原文"]
+
+
+def test_coerce_related_pure():
+    # matter 和 evidence 都空 → 丢(没说法也没原文)
+    assert rs._coerce_related({"matter": "", "evidence": ""}) is None
+    # 只要有 matter 或 evidence 之一就保留(evidence 进核验那步)
+    ok = rs._coerce_related({"matter": "x", "evidence": ""})
+    assert ok is not None
+    assert ok["relevance"] == "中"  # 缺 relevance 退兜底
+    assert ok["bearing"] == "条件"  # 缺 bearing 退兜底
+    # chapter 非整数 → None(锚不回具体条次)
+    assert rs._coerce_related({"matter": "x", "chapter": "一"})["chapter"] is None
+    assert rs._coerce_related({"matter": "x", "chapter": 3})["chapter"] == 3

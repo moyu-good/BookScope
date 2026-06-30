@@ -1063,7 +1063,12 @@ class RedheadCloseReadingResponse(BaseModel):
 
 
 class RedheadRelevanceRequest(RedheadDocStructureRequest):
-    """POST /api/agent/redhead/relevance 请求体（跟我相关）。比单份解读多一个身份。"""
+    """POST /api/agent/redhead/relevance 请求体（跟我相关）。比单份解读多一个身份。
+
+    **已退役（1.6 整合 3，设计稿 WP-redhead-consolidation）**：「跟我相关」并进「利害与风向」
+    （/redhead/stakes 输出的 related_clauses 段）。前端入口 + 组件已撤；端点 + schema 暂留一个
+    版本周期返兼容响应，不再单独对外亮出。
+    """
 
     role: str = Field(
         ..., min_length=1, max_length=100,
@@ -1072,7 +1077,7 @@ class RedheadRelevanceRequest(RedheadDocStructureRequest):
 
 
 class RedheadRelevanceResponse(BaseModel):
-    """POST /api/agent/redhead/relevance 响应体。"""
+    """POST /api/agent/redhead/relevance 响应体（已退役，见 Request 注释）。"""
 
     role: str = Field(default="", description="回显请求里的身份。")
     items: list[dict] = Field(
@@ -1089,26 +1094,42 @@ class RedheadRelevanceResponse(BaseModel):
 
 
 class RedheadStakesRequest(RedheadDocStructureRequest):
-    """POST /api/agent/redhead/stakes 请求体（利害与风向：机会/风险/信号 + 含金量，按角色）。
+    """POST /api/agent/redhead/stakes 请求体（利害与风向：相关条款 + 机会/风险/信号 + 含金量）。
 
-    比单份解读多一个身份：同一份公文，个体户/投资人/某局看到的利害与风向不同。
+    1.6 整合 3 吸收「跟我相关」：身份可选——填了先列跟你相关的条款再研判利害；**不填给通用版**
+    （面向一般读者研判，作者拍板点 3）。
     """
 
     role: str = Field(
-        ..., min_length=1, max_length=100,
-        description="用户身份（个体户/投资人/某局/企业…），据此研判利害与风向。",
+        default="", max_length=100,
+        description=(
+            "用户身份（个体户/投资人/某局/企业…）。填了据此筛相关条款 + 研判利害；空=通用版。"
+        ),
     )
 
 
 class RedheadStakesResponse(BaseModel):
     """POST /api/agent/redhead/stakes 响应体（利害与风向）。
 
-    两种证据契约（1.6.1 evidence-first 升级）：机会/风险=**证据层**（锚原文、过核验、可盖鉴印）；
-    信号=**评估层**（标研判 + 引发它的原文基础 + 置信度，绝不盖鉴印冒充事实）。裸推断零容忍。
-    含金量（substance）按钱学森开环/闭环判：闭环(指令+主体+时限+考核罚则)=真金白银，开环(纯号召)=空头。
+    1.6 整合 3（设计稿 WP-redhead-consolidation）：吸收原「跟我相关」——输出先列 ``related_clauses``
+    （跟这身份直接相关的条款，事实底座），再研判机会/风险/信号。原 /redhead/relevance 端点软退役。
+
+    两种证据契约（1.6.1 evidence-first 升级）：相关条款 + 机会/风险=**证据层**（锚原文、过核验、
+    可盖鉴印）；信号=**评估层**（标研判 + 引发它的原文基础 + 置信度，绝不盖鉴印冒充事实）。裸推断
+    零容忍。含金量（substance）按钱学森开环/闭环判：闭环(指令+主体+时限+考核罚则)=真金白银，
+    开环(纯号召)=空头。
     """
 
-    role: str = Field(default="", description="回显用户身份。")
+    role: str = Field(default="", description="回显用户身份（通用版为空串）。")
+    related_clauses: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "跟这身份直接相关的条款（吸收自原跟我相关，作利害研判的事实底座）。每条 "
+            "{chapter, matter, relevance(高/中), bearing(义务/利好/条件), note(对你一句话), "
+            "evidence, verified, match_score}。证据层，按相关度排；核不过的不丢只标待核。"
+            "通用版（没填身份）恒空。"
+        ),
+    )
     opportunities: list[dict] = Field(
         default_factory=list,
         description=(
@@ -1145,13 +1166,19 @@ class RedheadStakesResponse(BaseModel):
 
 
 class RedheadHardFactsResponse(BaseModel):
-    """POST /api/agent/redhead/hard-facts 响应体（硬信息提取表）。"""
+    """POST /api/agent/redhead/hard-facts 响应体（要点提取，原硬信息提取表）。
+
+    1.6 整合 4（设计稿 WP-redhead-consolidation）：吸收「关键时间轴」——时间类硬事实（时限 /
+    生效废止）就是原时间轴抽的东西，前端在表里加「时序视图」把这两类按时序排（保留时间轴那条线的
+    形态）。原 /redhead/timeline 端点软退役。功能 label 改「要点提取」，端点 path 不变。
+    """
 
     facts: list[dict] = Field(
         default_factory=list,
         description=(
             "散落全文的硬信息，每条 {kind(时限/数字指标/适用范围/生效废止/责任主体), value, "
-            "context, evidence, verified, match_score}。"
+            "context, evidence, verified, match_score, binding(硬指标/参考值,约束力层), "
+            "binding_reason}。kind=时限/生效废止 是时间类，前端「时序视图」按时序排这两类。"
         ),
     )
     scanned: bool = Field(default=False, description="false=失败；true+空=没抽到硬信息。")
@@ -1360,7 +1387,12 @@ class MeetingCommitmentsResponse(BaseModel):
 
 
 class RedheadTimelineResponse(BaseModel):
-    """POST /api/agent/redhead/timeline 响应体（关键时间轴）。"""
+    """POST /api/agent/redhead/timeline 响应体（关键时间轴）。
+
+    **已退役（1.6 整合 4，设计稿 WP-redhead-consolidation）**：关键时间轴并进「要点提取」
+    （/redhead/hard-facts 的时间类硬事实 + 前端「时序视图」切换）。前端入口 + 组件已撤；端点 +
+    schema 暂留一个版本周期，不再单独对外亮出。
+    """
 
     nodes: list[dict] = Field(
         default_factory=list,

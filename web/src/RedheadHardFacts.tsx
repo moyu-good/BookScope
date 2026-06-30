@@ -1,12 +1,16 @@
 // ---------------------------------------------------------------------------
-// RedheadHardFacts — 公文硬信息提取表（1.6 红头文件垂直·第三块前端）
+// RedheadHardFacts — 公文要点提取（1.6 整合 4：原硬信息提取表 + 吸收关键时间轴）
 //
 // 点"生成"→ 调 /api/agent/redhead/hard-facts（整份公文进上下文）→ 把散落各处的硬信息
 // 捞出来聚成一张速查表，按五类分组：时限 / 数字指标 / 适用范围 / 生效废止 / 责任主体。
 // 每条说清三件事：value（那个数 / 日期 / 范围 / 主体，要醒目）、context（管的什么事）、
 // evidence（钉一句原文）。
 //
-// 它跟公文结构解读的分工：结构解读是逐条款竖着拆（这条管啥）；硬信息表是横切（不管在哪条，
+// 整合 4（设计稿 WP-redhead-consolidation）：吸收原「关键时间轴」——时间类硬事实（时限 /
+// 生效废止）就是原时间轴抽的东西，这里加一个「时序视图」切换，把这两类按先后排成一条编年
+// 时序（保留时间轴那条线的形态价值）。两个视图共用同一份后端数据，纯前端切换，不多调一次。
+//
+// 它跟公文结构解读的分工：结构解读是逐条款竖着拆（这条管啥）；要点提取是横切（不管在哪条，
 // 只要是要照着办的硬信息就汇到一处），回答"我得记住哪几个数 / 哪几个日子 / 归谁管"。
 //
 // evidence-first（跟全站一个规矩）：原文核验过的盖"鉴"印；没核上的老实标"未在原文比对
@@ -17,6 +21,7 @@
 //   整份做成一卷"案牍要目"：五类各成一栏，每栏朱砂小标领起（像善本提要的纲目标目，
 //     朱书纲、墨书目）；栏内每条硬信息——value 用大宋体当目（读者扫表第一眼抓的就是那个
 //     数 / 日期），墨钉领格、context 走小字副行点明管啥，原文引文宋体留白收在末尾。
+//   时序视图复用关键时间轴的编年意象：一道竖直朱砂时轴贯穿，时间类硬事实按先后钉在轴上。
 //   克制是高级——朱砂只落在纲目标目、value 前的墨钉、钤印这几个语义位，绝不当大色块；
 //     栏与栏之间靠留白和一道朱砂细线分隔，不堆边框、不上花鸟山水、不堆古风。
 // ---------------------------------------------------------------------------
@@ -73,6 +78,12 @@ const KIND_HINT: Record<string, string> = {
   责任主体: "谁来办、谁牵头",
 };
 
+// 时间类硬事实（整合 4：吸收自原关键时间轴）——时序视图只排这两类。
+const TIME_KINDS: ReadonlySet<string> = new Set(["时限", "生效废止"]);
+
+// 两种视图：要目（按五类分栏的速查表）/ 时序（时间类硬事实排成编年线）。
+type ViewMode = "table" | "timeline";
+
 // 一条硬信息是否真有值（value 非空白才算抽到了——后端已保证，前端再兜一道）。
 function hasValue(v: string): boolean {
   return v.trim().length > 0;
@@ -113,6 +124,8 @@ export function RedheadHardFacts({
   const [trace, setTrace] = useState<RunTrace | null>(null);
   // 某条点开看原文出处（用 kind+索引拼 key → 开/合）
   const [openFact, setOpenFact] = useState<string | null>(null);
+  // 整合 4：要目（速查表）/ 时序（时间类排成编年线）两视图切换，纯前端。
+  const [view, setView] = useState<ViewMode>("table");
 
   async function load() {
     setLoading(true);
@@ -166,10 +179,10 @@ export function RedheadHardFacts({
             className="h-4 w-[3px] rounded-full bg-[var(--color-seal)]"
             aria-hidden="true"
           />
-          硬信息提取表
+          要点提取
         </h3>
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          一份红头文件里真正要照着办的硬信息——什么时候前办完、要达多少比例、管哪些单位、哪天生效哪天废止、谁来负责——往往散落在好几条款、好几页里。这功能把它们从全份里捞出来，聚成一张速查表，按五类分好，每条钉在原文。适合党政公文 / 红头文件。
+          一份红头文件里真正要照着办的硬信息——什么时候前办完、要达多少比例、管哪些单位、哪天生效哪天废止、谁来负责——往往散落在好几条款、好几页里。这功能把它们从全份里捞出来，聚成一张速查表，按五类分好，每条钉在原文。时间类的还能切到「时序视图」按先后排成一条线。适合党政公文 / 红头文件。
         </p>
         <button
           type="button"
@@ -177,7 +190,7 @@ export function RedheadHardFacts({
           disabled={loading || !apiKey}
           className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
         >
-          {loading ? "读这份公文捞硬信息中（约 1 分钟）…" : "生成硬信息提取表"}
+          {loading ? "读这份公文捞要点中（约 1 分钟）…" : "生成要点提取"}
         </button>
         {error && (
           <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
@@ -191,7 +204,7 @@ export function RedheadHardFacts({
         )}
         {loading && (
           <RunningProcess
-            label="读这份公文捞硬信息"
+            label="读这份公文捞要点"
             hint="整份公文喂进模型，把时限 / 数字 / 范围 / 起止日 / 责任主体五类硬信息全捞出来，每条都回原文核验，约 1 分钟。"
           />
         )}
@@ -208,7 +221,7 @@ export function RedheadHardFacts({
             className="text-base font-bold text-[var(--color-ink)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            硬信息提取表
+            要点提取
           </h3>
           <button
             type="button"
@@ -220,7 +233,7 @@ export function RedheadHardFacts({
           </button>
         </div>
         {loading ? (
-          <RunningProcess label="读这份公文捞硬信息" />
+          <RunningProcess label="读这份公文捞要点" />
         ) : (
           <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
             没捞到能钉在原文的硬信息——这份可能偏原则倡导、没有具体的时限 / 数字 / 范围 / 起止日，或者不是规范的红头文件。换一份规范公文，或稍后重试。
@@ -235,7 +248,14 @@ export function RedheadHardFacts({
   const total = groups.reduce((n, g) => n + g.items.length, 0);
   const verifiedCount = facts.filter((f) => f.verified && f.evidence).length;
 
-  // ---- 已抽到：案牍要目纲目表 ----
+  // 整合 4：时间类硬事实（时限 / 生效废止）——时序视图排这些，按后端给的顺序（同类内已保抽取序）。
+  const timeFacts = facts.filter((f) => TIME_KINDS.has(f.kind) && hasValue(f.value));
+  // 没有时间类硬事实就不给时序视图入口（避免空轴）；当前在时序视图但没料则退回要目。
+  const hasTimeline = timeFacts.length > 0;
+  const effectiveView: ViewMode =
+    view === "timeline" && hasTimeline ? "timeline" : "table";
+
+  // ---- 已抽到：案牍要目纲目表 / 编年时序（整合 4 两视图切换）----
   return (
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
@@ -243,7 +263,7 @@ export function RedheadHardFacts({
           className="text-base font-bold text-[var(--color-ink)]"
           style={{ fontFamily: "var(--font-display)" }}
         >
-          硬信息提取表
+          要点提取
         </h3>
         <button
           type="button"
@@ -254,6 +274,31 @@ export function RedheadHardFacts({
           {loading ? "重出中…" : "重新生成"}
         </button>
       </div>
+
+      {/* 视图切换：要目（按五类分栏速查）/ 时序（时间类排成编年线）。只有抽到时间类硬事实才给时序入口。 */}
+      {hasTimeline && (
+        <div className="mb-4 flex items-center gap-2">
+          <ViewTab
+            active={effectiveView === "table"}
+            onClick={() => setView("table")}
+            label="要目"
+          />
+          <ViewTab
+            active={effectiveView === "timeline"}
+            onClick={() => setView("timeline")}
+            label={`时序视图（${timeFacts.length}）`}
+          />
+        </div>
+      )}
+
+      {effectiveView === "timeline" ? (
+        <HardFactsTimeline
+          facts={timeFacts}
+          openFact={openFact}
+          setOpenFact={setOpenFact}
+        />
+      ) : (
+        <>
 
       {/* 要目卷首：一道朱砂细线 + 居中卷题 + 收束短线，仿善本提要的卷端纲目页 */}
       <div className="text-center mb-1">
@@ -394,13 +439,212 @@ export function RedheadHardFacts({
           </section>
         ))}
       </div>
+        </>
+      )}
 
       {!loading && (
         <RunStats
           trace={trace}
-          note={`硬信息 ${total} 条 · ${groups.length} 类`}
+          note={
+            effectiveView === "timeline"
+              ? `时序 ${timeFacts.length} 个时间节点`
+              : `要点 ${total} 条 · ${groups.length} 类`
+          }
         />
       )}
+    </div>
+  );
+}
+
+// ---- 视图切换按钮（要目 / 时序）----
+function ViewTab({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-xs px-3 py-1 rounded-full border transition-colors"
+      style={
+        active
+          ? {
+              color: "var(--color-seal)",
+              borderColor: "var(--color-seal)",
+              background: "var(--color-seal-soft)",
+            }
+          : {
+              color: "var(--color-ink-muted)",
+              borderColor: "var(--color-rule)",
+              background: "white",
+            }
+      }
+    >
+      {label}
+    </button>
+  );
+}
+
+// ---- 时序视图（整合 4：吸收自原关键时间轴的编年形态）----
+// 把时间类硬事实（时限 / 生效废止）按先后排成一条编年线：一道竖直朱砂时轴贯穿，每个时间点一枚
+// 年轮墨钉钉在轴上，左边日晷牌摆「时间」（value）、右边墨字事项（context）+ 约束力签 + 原文。
+// 数据复用要点提取那张表，纯前端切换，不多调一次后端。
+function HardFactsTimeline({
+  facts,
+  openFact,
+  setOpenFact,
+}: {
+  facts: HardFact[];
+  openFact: string | null;
+  setOpenFact: (fn: (cur: string | null) => string | null) => void;
+}) {
+  const verifiedCount = facts.filter((f) => f.verified && f.evidence).length;
+  return (
+    <div>
+      {/* 题署一行：共几个时间节点 · 原文核验几个 */}
+      <div className="mb-4 flex items-center gap-2 flex-wrap">
+        <span
+          className="inline-block text-xs px-2 py-0.5 rounded-full"
+          style={{
+            color: "var(--color-seal)",
+            border: "0.5px solid var(--color-seal)",
+          }}
+        >
+          编年 · {facts.length} 个时间节点
+        </span>
+        <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
+          原文核验 {verifiedCount}/{facts.length}
+        </span>
+      </div>
+
+      {/* 编年时序：一道竖直朱砂时轴贯穿，每个节点一枚年轮墨钉钉在轴上。 */}
+      <div className="relative pl-1">
+        <div
+          aria-hidden
+          className="absolute top-0 bottom-0"
+          style={{
+            left: "calc(6rem + 7px)",
+            width: "2px",
+            background:
+              "linear-gradient(to bottom, transparent, var(--color-seal) 6%, var(--color-seal) 94%, transparent)",
+            opacity: 0.5,
+          }}
+        />
+        <ol className="space-y-5">
+          {facts.map((f, i) => {
+            const verified = f.verified && hasValue(f.evidence);
+            const factKey = `tl-${i}`;
+            const isOpen = openFact === factKey;
+            const canOpen = !!f.evidence;
+            const bs = bindingStyle(f.binding);
+            return (
+              <li key={factKey} className="relative flex items-stretch gap-0">
+                {/* 左栏：日晷牌——朱砂描边小牌摆「时间」（value） */}
+                <div className="shrink-0 pt-0.5" style={{ width: "6rem" }}>
+                  <div
+                    className="inline-flex flex-col items-end text-right rounded px-2 py-1 leading-tight"
+                    style={{
+                      border: "0.5px solid var(--color-seal)",
+                      background: "var(--color-seal-soft)",
+                      fontFamily: "var(--font-display)",
+                    }}
+                  >
+                    <span
+                      className="text-[12.5px] font-bold"
+                      style={{ color: "var(--color-seal)" }}
+                    >
+                      {f.value}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 中栏：年轮墨钉——钉在竖轴上的朱砂圆印 */}
+                <div className="w-4 shrink-0 flex flex-col items-center relative">
+                  <span
+                    aria-hidden
+                    className="mt-1 rounded-full shrink-0 z-10"
+                    style={{
+                      width: "12px",
+                      height: "12px",
+                      background: verified
+                        ? "var(--color-seal)"
+                        : "var(--color-paper)",
+                      border: "2px solid var(--color-seal)",
+                      opacity: verified ? 1 : 0.55,
+                    }}
+                  />
+                </div>
+
+                {/* 右栏：事项（context）+ 约束力签 + 原文 */}
+                <div className="flex-1 min-w-0 pl-3 pb-1">
+                  <div className="flex items-start gap-2 flex-wrap">
+                    {verified && <SealMark size={17} title="原文已核验" />}
+                    <p
+                      className="text-[15px] leading-7 text-[var(--color-ink)]"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      {hasValue(f.context) ? f.context : f.value}
+                    </p>
+                    {/* 约束力签：硬指标（咬人的硬期限）vs 参考值（软目标）。悬停看判据 */}
+                    {bs && (
+                      <span
+                        className="self-center text-[11px] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+                        style={{ color: bs.fg, background: bs.bg }}
+                        title={f.binding_reason || undefined}
+                      >
+                        {bs.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 核不过老实标一行，绝不假装这个日期有原文撑 */}
+                  {!verified && (
+                    <p className="mt-1 text-xs text-[var(--color-ink-muted)] italic">
+                      {hasValue(f.evidence)
+                        ? "未在原文比对命中·仅供参考"
+                        : "暂无贴切原文（待核）"}
+                    </p>
+                  )}
+
+                  {/* 原文——默认收起，点开看撑这个时间的那句 */}
+                  {canOpen && (
+                    <div className="mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenFact((cur) =>
+                            cur === factKey ? null : factKey,
+                          )
+                        }
+                        className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                      >
+                        {isOpen ? "收起原文" : "看原文出处"}
+                      </button>
+                      {isOpen && (
+                        <p
+                          className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+                          style={{
+                            borderColor:
+                              "color-mix(in oklch, var(--color-seal) 40%, transparent)",
+                            fontFamily: "var(--font-display)",
+                          }}
+                        >
+                          {f.evidence}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </div>
   );
 }

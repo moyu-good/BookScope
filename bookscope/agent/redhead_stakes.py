@@ -1,13 +1,18 @@
 """公文「利害与风向」研判(1.6.1·机会/风险/信号 + 含金量,按角色)——同一份公文,带上身份
-重看一遍,研判出**对这角色的机会、暴露的风险、透出的政策风向**,并评每条的含金量、给一句带立
-场的建议。
+重看一遍,先列**跟你直接相关的条款**(事实底座),再研判出**对这角色的机会、暴露的风险、透出
+的政策风向**,并评每条的含金量、给一句带立场的建议。
 
 **它解决什么**:读公文的真正用事(JTBD)不是「读懂字面」(那是大白话翻译干的),而是「这份文件对
-我藏着什么机会、什么风险,透出什么风向」。「跟我相关」回答的是「这份公文里哪几条落到你头上、是
-义务还是利好」(条款清单);本功能更进一步——研判你**可争取的红利**(不是现成便利,是试点可申请、
-扶持方向早卡位这种)、你的**暴露面/代价**(门槛抬高把你挤出、不办的代价、监管收紧),以及这文件
-透出的**政策方向**(行业要松还是要紧)。同一份公文,个体户/投资人/某局看到的利害与风向不同——
-独有维度 = 带身份的利害研判 + 政策风向。
+我藏着什么机会、什么风险,透出什么风向」。整合后(设计稿 WP-redhead-consolidation 整合 3)它吸收
+了原「跟我相关」——输出先列「跟你直接相关的条款」(义务/利好/条件,这正是原跟我相关的内容,作为
+利害研判的事实底座),再在其上研判你**可争取的红利**(不是现成便利,是试点可申请、扶持方向早卡位
+这种)、你的**暴露面/代价**(门槛抬高把你挤出、不办的代价、监管收紧),以及这文件透出的**政策方向**
+(行业要松还是要紧)。同一份公文,个体户/投资人/某局看到的利害与风向不同——独有维度 = 带身份的
+相关条款 + 利害研判 + 政策风向。
+
+**没填身份时给通用版**(整合 3,作者拍板点 3):不强制要 role——身份空时跳过「相关条款」(那是
+个性化的)、跳过荒谬身份判定,直接对全份做通用利害研判(机会/风险/信号面向一般读者),让人不填
+身份也能先看个大概。
 
 **两种证据契约(evidence-first 升级,1.6.1 命门)**:
 
@@ -69,14 +74,17 @@ logger = logging.getLogger(__name__)
 STAKES_SCHEMA_VERSION = "v1"
 """利害与风向记录结构版本——升级要让这层重算(不影响别的功能)。"""
 
-DEFAULT_STAKES_MAX_TOKENS = 3000
-"""一次扫全份出三段(机会/风险/信号)的 max_tokens。
+DEFAULT_STAKES_MAX_TOKENS = 4000
+"""一次扫全份出四段(相关条款 + 机会/风险/信号)的 max_tokens。
 
-这功能整份公文进上下文,且要一次吐三段带 substance_reason / basis 的结构化 JSON——比
-逐条款功能(``redhead_relevance``/``redhead_plain`` 各 1200)输出长得多。deepseek-v4-flash
-把 reasoning_content 算进 max_tokens(见 reference_reasoning_model_token_budget),全文进上下文
-后会先吐一大段 reasoning,预算太小会被吃光导致 content 空、``finish_reason=length``、三段全抽空。
-3000 装得下三段研判还给 reasoning 留头;真被截断也有 ``extract_first_json_object`` 兜底。"""
+这功能整份公文进上下文,且要一次吐四段带 substance_reason / basis 的结构化 JSON——比
+逐条款功能(``redhead_plain`` 各 1200)输出长得多。deepseek-v4-flash 把 reasoning_content
+算进 max_tokens(见 reference_reasoning_model_token_budget),全文进上下文后会先吐一大段
+reasoning,预算太小会被吃光导致 content 空、``finish_reason=length``、四段全抽空。
+
+整合 3 吸收相关条款后多了一段(条款可能十几条、每条带 chapter/matter/relevance/bearing/note/
+evidence),输出比原来三段更长——所以从 3000 提到 4000,装得下四段还给 reasoning 留头;真被截断
+也有 ``extract_first_json_object`` 兜底。"""
 
 # 含金量三档 / 归一 / 排序权重统一取自 redhead_codebook(单一真相源,见 codebook 文档)——
 # 本模块不各定一套,免得 codebook 演进时 stakes 漂移(原本地重抄已删)。
@@ -90,12 +98,37 @@ _DEFAULT_HORIZON = "无期"
 CONFIDENCE_LEVELS: tuple[str, ...] = ("高", "中", "低")
 _DEFAULT_CONFIDENCE = "低"
 
+# 相关条款两档相关度(封闭集,吸收自原 redhead_relevance)。落不进退「中」。
+RELEVANCE_LEVELS: tuple[str, ...] = ("高", "中")
+_DEFAULT_RELEVANCE = "中"
+
+# 相关条款「对你意味着什么」三标签(封闭集,吸收自原 redhead_relevance)。落不进退「条件」(最中性)。
+BEARINGS: tuple[str, ...] = ("义务", "利好", "条件")
+_DEFAULT_BEARING = "条件"
+
+# 相关条款段指令(role 模式才拼,吸收自原 redhead_relevance)——先列跟这身份直接相关的条款,
+# 当利害研判的事实底座。死守:不相关就别列、相关判断只依据原文、锚原文逐字。
+_INSTR_RELATED = (
+    "【〇、跟你直接相关的条款(related_clauses)】先从这份公文里挑出**直接落到这个身份头上**的"
+    "条款(要他办、给他好处、或设了他要满足的条件),当作下面利害研判的事实底座。每条给:\n"
+    "  - chapter:这条在原文里的条次序号(整数;说不清填 0)。\n"
+    "  - matter:这条管的事(短、准,照公文口径)。\n"
+    "  - relevance:相关度,只能填「高」或「中」(明显主要冲这身份来的填「高」,沾边的填「中」)。\n"
+    "  - bearing:对他意味着什么,只能填「义务」(他得照办)/「利好」(给他的好处)/"
+    "「条件」(满足了才适用)之一。\n"
+    "  - note:用人话写一句「对你」——直接称呼「你」,说清这条对他到底什么意思。\n"
+    "  - evidence:原文里**这条的逐字片段**(原样摘录、不改写)。\n"
+    "  只列**明显跟这身份相关**的;管别的部门/别类主体的别硬塞。没有明显相关的就给空列表 []。\n"
+    "\n"
+)
+
 # 一次扫全份出三段的指令。死守:机会/风险锚原文 + 评含金量(开环/闭环判据写进 prompt)、
 # 信号标研判 + 引原文基础 + 置信度、绝不编原文没有的、荒谬角色老实说判不出。
 _INSTR_STAKES = (
     "你在帮一个**带着身份**读党政机关公文(红头文件)的人,研判这份文件**对他这个角色**的"
-    "利害与风向。用户身份在「=== 任务要求 ===」之后给出。你要研判三件事:\n"
-    "\n"
+    "利害与风向。用户身份在「=== 任务要求 ===」之后给出。你要研判四件事(先列相关条款,再研判"
+    "机会/风险/信号):\n"
+    "\n" + _INSTR_RELATED +
     "【一、机会(opportunities)】这角色**可以去争取/早布局的红利**——不是现成就有的便利,而是"
     "试点资格可申请、扶持方向可早卡位、政策窗口可抢这类。每条给:\n"
     "  - what:这个机会是什么(短、准)。\n"
@@ -126,20 +159,60 @@ _INSTR_STAKES = (
     "  - confidence:这个研判的把握,只能填「高」「中」「低」。\n"
     "\n"
     "死守铁律:\n"
-    "①机会/风险的 evidence、信号的 basis,都必须是原文里**真有**的逐字片段——原文没写的承诺/"
-    "数字/方向,一个都别编、别猜、别推。找不到原文撑的那条,宁可不写。\n"
-    "②只研判**对这个角色**有意义的;跟这角色八竿子打不着的别硬凑。\n"
-    "③如果用户给的身份是**荒谬的/根本读不出利害**的(比如「一块石头」「一阵风」),就老实把三段都"
-    "留空(opportunities/risks/signals 都给 []),**别硬编**去附和这个假前提。\n"
+    "①相关条款的 evidence、机会/风险的 evidence、信号的 basis,都必须是原文里**真有**的逐字"
+    "片段——原文没写的承诺/数字/方向,一个都别编、别猜、别推。找不到原文撑的那条,宁可不写。\n"
+    "②只列/研判**对这个角色**有意义的;跟这角色八竿子打不着的别硬凑。\n"
+    "③如果用户给的身份是**荒谬的/根本读不出利害**的(比如「一块石头」「一阵风」),就老实把四段都"
+    "留空(related_clauses/opportunities/risks/signals 都给 []),**别硬编**去附和这个假前提。\n"
     "严格输出 JSON(别的话别说、别加 markdown 围栏),形如:\n"
-    '{"opportunities":[{"what":"","why":"","action":"","substance":"真金白银",'
+    '{"related_clauses":[{"chapter":1,"matter":"","relevance":"高","bearing":"义务",'
+    '"note":"","evidence":""}],'
+    '"opportunities":[{"what":"","why":"","action":"","substance":"真金白银",'
     '"substance_reason":"","horizon":"近","evidence":""}],'
     '"risks":[{"what":"","cost":"","substance":"空头倡导","substance_reason":"",'
     '"horizon":"无期","evidence":""}],'
     '"signals":[{"direction":"","basis":["",""],"confidence":"中"}]}'
 )
 
-_USER_MSG = "请按上面的要求,研判这份公文对该角色的机会、风险、信号,并评含金量,输出 JSON。"
+# 通用版指令(role 空时拼,作者拍板点 3:不填身份也给个大概)——跳过相关条款(那是个性化的),
+# 面向一般读者研判机会/风险/信号,其余口径同 role 版。
+_INSTR_STAKES_GENERIC = (
+    "你在帮一个读党政机关公文(红头文件)的普通读者,研判这份文件透出的利害与风向。"
+    "用户**没给具体身份**,所以你面向**一般读者**研判,不挑特定角色。你要研判三件事:\n"
+    "\n"
+    "【一、机会(opportunities)】这份文件里**一般人/相关方可以去争取或早布局的红利**——试点资格、"
+    "扶持方向、政策窗口这类。每条给:what(机会是什么)/why(为什么是机会,一句话)/action(可采取"
+    "的动作)/evidence(原文逐字片段)。\n"
+    "\n"
+    "【二、风险(risks)】这份文件带来的**暴露面/代价**——新增义务、门槛抬高、监管收紧、不办的代价。"
+    "每条给:what(风险是什么)/cost(代价/后果)/evidence(原文逐字片段)。\n"
+    "\n"
+    "【含金量(substance)——机会和风险每条都必须评】公文条款分轻重缓急,有的真金白银会兑现,有的"
+    "是空头支票。判据(开环/闭环)见下文「公文措辞刻度」块,按那把尺判。每条机会/风险再给:substance"
+    "(真金白银/有条件兑现/空头倡导)/substance_reason(凭哪些 marker 判,锚原文)/"
+    "horizon(近/远/无期)。\n"
+    "\n"
+    "【三、信号(signals)】从全文研判这文件透出的**政策方向**(这行业要松还是要紧)。这是**推断**,"
+    "每条给:direction(方向一句话)/basis(引发它的原文片段列表,逐字摘录,没有原文基础的一条别写)/"
+    "confidence(高/中/低)。\n"
+    "\n"
+    "死守铁律:机会/风险的 evidence、信号的 basis 都必须是原文里**真有**的逐字片段——原文没写的一个"
+    "都别编、别猜、别推,找不到原文撑的宁可不写。这份不是党政公文/没实质内容就把三段都留空。\n"
+    "严格输出 JSON(别的话别说、别加 markdown 围栏),形如:\n"
+    '{"related_clauses":[],'
+    '"opportunities":[{"what":"","why":"","action":"","substance":"真金白银",'
+    '"substance_reason":"","horizon":"近","evidence":""}],'
+    '"risks":[{"what":"","cost":"","substance":"空头倡导","substance_reason":"",'
+    '"horizon":"无期","evidence":""}],'
+    '"signals":[{"direction":"","basis":["",""],"confidence":"中"}]}'
+)
+
+_USER_MSG = (
+    "请按上面的要求,先列跟这角色相关的条款,再研判机会、风险、信号并评含金量,输出 JSON。"
+)
+_USER_MSG_GENERIC = (
+    "请按上面的要求,面向一般读者研判这份公文的机会、风险、信号,并评含金量,输出 JSON。"
+)
 
 
 def _coerce_horizon(value: Any) -> str:
@@ -152,6 +225,42 @@ def _coerce_confidence(value: Any) -> str:
     """置信度归一:必须落进三档封闭集,落不进退「低」(最保守)。"""
     s = value.strip() if isinstance(value, str) else ""
     return s if s in CONFIDENCE_LEVELS else _DEFAULT_CONFIDENCE
+
+
+def _coerce_relevance(value: Any) -> str:
+    """相关度归一(吸收自原 relevance):落进两档封闭集,落不进退「中」。"""
+    s = value.strip() if isinstance(value, str) else ""
+    return s if s in RELEVANCE_LEVELS else _DEFAULT_RELEVANCE
+
+
+def _coerce_bearing(value: Any) -> str:
+    """bearing 归一(吸收自原 relevance):落进三类封闭集,落不进退「条件」(最中性)。"""
+    s = value.strip() if isinstance(value, str) else ""
+    return s if s in BEARINGS else _DEFAULT_BEARING
+
+
+def _coerce_related(item: Any) -> dict[str, Any] | None:
+    """归一一条相关条款(吸收自原 relevance);matter 与 evidence 都空 → 丢。
+
+    chapter 缺/非整数 → 置 None(条款仍保留,锚不回具体条次)。evidence 留着进核验那步
+    (核不过会被丢——相关条款是证据层,同机会/风险)。
+    """
+    if not isinstance(item, dict):
+        return None
+    matter = str(item.get("matter", "")).strip()
+    evidence = str(item.get("evidence", "")).strip()
+    if not matter and not evidence:
+        return None
+    ch = item.get("chapter")
+    chapter = ch if isinstance(ch, int) else None
+    return {
+        "chapter": chapter,
+        "matter": matter,
+        "relevance": _coerce_relevance(item.get("relevance")),
+        "bearing": _coerce_bearing(item.get("bearing")),
+        "note": str(item.get("note", "")).strip(),
+        "evidence": evidence,
+    }
 
 
 def _coerce_opportunity(item: Any) -> dict[str, Any] | None:
@@ -220,13 +329,14 @@ def _coerce_signal(item: Any) -> dict[str, Any] | None:
 
 
 def _parse_stakes(text: str) -> dict[str, list[dict[str, Any]]]:
-    """解析 ``{opportunities, risks, signals}`` → 三段归一后的列表。
+    """解析 ``{related_clauses, opportunities, risks, signals}`` → 四段归一后的列表。
 
-    两层兜底:strip 围栏 → json.loads → 抠首个 obj。三段各自走对应 coerce(丢残缺条)。
-    解析不出 / 不是 dict → 三段全空。
+    两层兜底:strip 围栏 → json.loads → 抠首个 obj。各段各自走对应 coerce(丢残缺条)。
+    解析不出 / 不是 dict → 四段全空。
     """
     raw = (text or "").strip()
     empty: dict[str, list[dict[str, Any]]] = {
+        "related_clauses": [],
         "opportunities": [],
         "risks": [],
         "signals": [],
@@ -259,6 +369,7 @@ def _parse_stakes(text: str) -> dict[str, list[dict[str, Any]]]:
         return out
 
     return {
+        "related_clauses": _coerce_list("related_clauses", _coerce_related),
         "opportunities": _coerce_list("opportunities", _coerce_opportunity),
         "risks": _coerce_list("risks", _coerce_risk),
         "signals": _coerce_list("signals", _coerce_signal),
@@ -314,6 +425,32 @@ def _filter_signals_by_basis(
     return kept
 
 
+def _verify_related(
+    items: list[dict[str, Any]], evidence_map: dict[str, dict]
+) -> list[dict[str, Any]]:
+    """相关条款逐条过 ``verify_citations``,附 ``verified``/``match_score``(吸收自原 relevance)。
+
+    相关条款是证据层(同机会/风险),但**核不过的不丢、只标待核**——对齐原 redhead_relevance 的
+    契约(核的是「这条原文在文里找得到」,不是核相关判断;核不过标 verified=False,前端老实标
+    「未在原文比对命中」)。按相关度(高在前)再按条次序号排。
+    """
+    if not items:
+        return []
+    citations = [{"snippet": it["evidence"]} for it in items]
+    verify_citations(citations, evidence_map)
+    for it, vc in zip(items, citations, strict=True):
+        it["verified"] = bool(vc.get("verified", False))
+        it["match_score"] = vc.get("match_score", 0.0)
+    _level_rank = {"高": 0, "中": 1}
+    items.sort(
+        key=lambda it: (
+            _level_rank.get(it.get("relevance"), 2),
+            it["chapter"] if isinstance(it.get("chapter"), int) else 1_000_000,
+        )
+    )
+    return items
+
+
 def stakes_from_doc(
     *,
     chunks: list[dict[str, Any]],
@@ -336,20 +473,24 @@ def stakes_from_doc(
     Args:
         chunks: 这份公文的 chunk 列表(每条含 ``chunk_id`` / ``chapter`` / ``text``)。
         role: 用户报的身份(自由文本,如「个体工商户」「投资人」「某市市场监管局」)。
-            空身份 → 直接返空结构(没身份没法研判利害),不跑 LLM。
+            **空身份 → 跑通用版**(整合 3,作者拍板点 3):跳过相关条款,面向一般读者研判
+            机会/风险/信号,不再直接返空。
         llm_client: duck-typed LLM client(同 AgentLoop / 其它公文功能)。
         model: 模型名。
         full_text: 这份公文的**完整原文**(含公布头)。传了就用它进上下文 + 当核验兜底锚
             (公布头在「第一章」前会被分块层丢掉);没传退回 ``chunks`` 拼接(向后兼容)。
-        max_tokens: 一次扫全份出三段的 max_tokens。整份原文进上下文后 reasoning 也吃这预算
-            (deepseek-v4-flash),太小会被吃光导致三段抽空——默认 3000,比逐条款功能给得多。
+        max_tokens: 一次扫全份出四段的 max_tokens。整份原文进上下文后 reasoning 也吃这预算
+            (deepseek-v4-flash),太小会被吃光导致四段抽空——默认 3000,比逐条款功能给得多。
         max_workers: 占位,不生效(一次扫全份不分段),留参对齐兄弟模块签名。
         cache_enabled: 是否走 L2 缓存(默认开)。
 
     Returns:
         ``{
             "schema_version": "v1",
-            "role": 回显用户身份,
+            "role": 回显用户身份(通用版为空串),
+            "related_clauses": [{chapter, matter, relevance(高/中), bearing(义务/利好/条件),
+                                 note(对你一句话), evidence, verified, match_score}],
+                                # 证据层,事实底座(吸收自原跟我相关);通用版恒空
             "opportunities": [{what, why, action, substance, substance_reason, horizon,
                                evidence, verified, match_score}],  # 证据层,按 substance 排序
             "risks": [{what, cost, substance, substance_reason, horizon,
@@ -358,19 +499,12 @@ def stakes_from_doc(
             "recommendation": 系统一句话建议(带立场),
         }``。
         机会/风险只含核验过的(核不过的丢);按含金量排(真金白银 > 有条件兑现 > 空头倡导)。
-        信号只含 basis 有原文基础的。身份空 / 没原文 / 没研判出 → 三段空 + recommendation 空。
+        相关条款核不过的不丢只标待核(同原 relevance 契约),按相关度排。信号只含 basis 有原文
+        基础的。没原文 / 没研判出 → 各段空 + recommendation 空。
         ``scanned`` / ``book_session_id`` / ``trace`` 由端点层加,本模块不管。
     """
     role = (role or "").strip()
-    if not role:
-        return {
-            "schema_version": STAKES_SCHEMA_VERSION,
-            "role": "",
-            "opportunities": [],
-            "risks": [],
-            "signals": [],
-            "recommendation": "",
-        }
+    has_role = bool(role)
 
     # 一次扫全份:整份原文进上下文(优先完整原文,含公布头;没传退 chunk 拼接)。
     source_text = (
@@ -382,18 +516,25 @@ def stakes_from_doc(
         return {
             "schema_version": STAKES_SCHEMA_VERSION,
             "role": role,
+            "related_clauses": [],
             "opportunities": [],
             "risks": [],
             "signals": [],
             "recommendation": "",
         }
 
-    # 角色拼进指令尾段(变化段,落在 book 之后,不破前缀缓存:同份公文不同角色共用前缀)。
-    # codebook_block() 是固定判据块,拼在固定指令之后、变化 role 之前——仍是稳定前缀。
-    instruction = _INSTR_STAKES + "\n\n" + codebook_block() + f"\n\n用户身份:{role}"
+    # role 版:角色拼进指令尾段(变化段,落在 book 之后,不破前缀缓存:同份公文不同角色共用前缀)。
+    # 通用版:不拼身份、走通用指令。codebook_block() 是固定判据块,拼在固定指令之后、变化 role 之前。
+    if has_role:
+        instruction = _INSTR_STAKES + "\n\n" + codebook_block() + f"\n\n用户身份:{role}"
+        user_msg = _USER_MSG
+    else:
+        instruction = _INSTR_STAKES_GENERIC + "\n\n" + codebook_block()
+        user_msg = _USER_MSG_GENERIC
     system = build_longctx_system(source_text, instruction)
 
     parsed: dict[str, list[dict[str, Any]]] = {
+        "related_clauses": [],
         "opportunities": [],
         "risks": [],
         "signals": [],
@@ -404,7 +545,7 @@ def stakes_from_doc(
             model=model,
             system=system,
             tools=[],
-            messages=[{"role": "user", "content": _USER_MSG}],
+            messages=[{"role": "user", "content": user_msg}],
             max_tokens=max_tokens,
             cache_enabled=cache_enabled,
         )
@@ -415,10 +556,16 @@ def stakes_from_doc(
         )
 
     # 证据登记表:chunks + 整份原文兜底锚(公布头在「第一章」前会被分块层丢掉,光拿 chunks
-    # 当证据表那类原文永远核不过)。机会/风险核验、信号校 basis 都用这同一张表。
+    # 当证据表那类原文永远核不过)。相关条款核验、机会/风险核验、信号校 basis 都用这同一张表。
     evidence_map = build_evidence_map(chunks)
     if source_text.strip():
         evidence_map["__doc_full_text__"] = {"chapter": 0, "text": source_text}
+
+    # 相关条款:证据层事实底座(吸收自原 relevance)。核不过的不丢只标待核,按相关度排。
+    # 通用版没填身份,相关条款是个性化的——直接置空(就算模型给了也不要)。
+    related = (
+        _verify_related(parsed["related_clauses"], evidence_map) if has_role else []
+    )
 
     # 机会 / 风险:证据层,逐条核验,核不过的丢(绝不留编的原文)。
     opportunities = _verify_evidence_items(parsed["opportunities"], evidence_map)
@@ -436,6 +583,7 @@ def stakes_from_doc(
     return {
         "schema_version": STAKES_SCHEMA_VERSION,
         "role": role,
+        "related_clauses": related,
         "opportunities": opportunities,
         "risks": risks,
         "signals": signals,
@@ -480,9 +628,11 @@ def _build_recommendation(
 
 
 __all__ = [
+    "BEARINGS",
     "CONFIDENCE_LEVELS",
     "DEFAULT_STAKES_MAX_TOKENS",
     "HORIZONS",
+    "RELEVANCE_LEVELS",
     "STAKES_SCHEMA_VERSION",
     "SUBSTANCE_LEVELS",
     "stakes_from_doc",

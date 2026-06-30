@@ -3372,7 +3372,12 @@ async def agent_redhead_relevance(
     request: RedheadRelevanceRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadRelevanceResponse:
-    """跟我相关:据用户身份(role)筛出这份公文里跟他相关的条款 + 对他的义务/利好/条件。"""
+    """跟我相关:据用户身份(role)筛出这份公文里跟他相关的条款 + 对他的义务/利好/条件。
+
+    **已退役(1.6 整合 3,设计稿 WP-redhead-consolidation 整合 3)**:逻辑已并进「利害与风向」
+    (``/redhead/stakes`` 输出的 related_clauses 段,身份可选)。前端入口 + 组件已撤;端点 +
+    ``relevance_from_spine`` 暂留一个版本周期,不再单独对外亮出。
+    """
     assembler = _resolve_assembler(store, request.book_session_id)
     client = _build_params_client_or_raise(request)
     model = request.model or default_model_for(request.provider)
@@ -3397,9 +3402,11 @@ async def agent_redhead_stakes(
     request: RedheadStakesRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadStakesResponse:
-    """利害与风向:按角色研判这份公文藏的机会/风险(带含金量:真金白银 vs 空头)+ 透出的信号(弦外之音)。
+    """利害与风向:先列跟你相关的条款,再按角色研判机会/风险(带含金量)+ 透出的信号(弦外之音)。
 
-    机会/风险=证据层(锚原文核验);信号=评估层(标研判+置信度+原文基础,绝不盖鉴印)。
+    整合 3(设计稿 WP-redhead-consolidation):吸收原「跟我相关」——输出多一段 related_clauses
+    (跟这身份直接相关的条款,事实底座)。身份可选,不填给通用版(面向一般读者研判)。
+    相关条款/机会/风险=证据层(锚原文核验);信号=评估层(标研判+置信度+原文基础,绝不盖鉴印)。
     含金量按开环/闭环判:闭环(有主体+时限+考核罚则)=真金白银,开环(纯号召)=空头倡导。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
@@ -3411,16 +3418,18 @@ async def agent_redhead_stakes(
     result = stakes_from_doc(
         chunks=chunks, role=request.role, llm_client=rec, model=model, full_text=full_text
     )
+    related = result.get("related_clauses") or []
     opportunities = result.get("opportunities") or []
     risks = result.get("risks") or []
     signals = result.get("signals") or []
     return RedheadStakesResponse(
         role=result.get("role", request.role),
+        related_clauses=related,
         opportunities=opportunities,
         risks=risks,
         signals=signals,
         recommendation=result.get("recommendation", ""),
-        scanned=bool(opportunities or risks or signals),
+        scanned=bool(related or opportunities or risks or signals),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
@@ -3617,7 +3626,12 @@ async def agent_redhead_timeline(
     request: RedheadDocStructureRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadTimelineResponse:
-    """关键时间轴:抽这份公文里的时间节点(申报/实施/过渡/生效/废止)排成时序。"""
+    """关键时间轴:抽这份公文里的时间节点(申报/实施/过渡/生效/废止)排成时序。
+
+    **已退役(1.6 整合 4,设计稿 WP-redhead-consolidation 整合 4)**:时间类硬事实并进「要点提取」
+    (``/redhead/hard-facts`` 的时限/生效废止两类 + 前端「时序视图」切换)。前端入口 + 组件已撤;
+    端点 + ``timeline_from_spine`` 暂留一个版本周期,不再单独对外亮出。
+    """
     assembler = _resolve_assembler(store, request.book_session_id)
     client = _build_params_client_or_raise(request)
     model = request.model or default_model_for(request.provider)

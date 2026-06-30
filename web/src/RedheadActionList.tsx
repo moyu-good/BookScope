@@ -60,6 +60,8 @@ interface RedheadActionListProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  // 整合 4：跳到「要点提取」看同一条的完整硬事实上下文（交叉引用锚）。不传则不显锚。
+  onJumpToFacts?: () => void;
 }
 
 // 指令类型彩标，跟 RedheadDocStructure 一致（封闭集四标签，纯分类不打分）。
@@ -131,6 +133,7 @@ export function RedheadActionList({
   apiKey,
   model,
   baseUrl,
+  onJumpToFacts,
 }: RedheadActionListProps) {
   const [result, setResult] = useState<DocStructureResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -361,6 +364,21 @@ export function RedheadActionList({
           已勾 {doneCount}/{shown.length}
         </span>
       </div>
+
+      {/* 交叉引用锚（整合 4）：要点提取那张表汇了同一批期限 / 数字 / 责任主体的完整上下文，
+          想查某条的硬事实出处可跳过去。两功能共享底层硬事实（查 vs 办两种姿态）。 */}
+      {onJumpToFacts && (
+        <p className="mb-3 text-xs text-[var(--color-ink-muted)] leading-relaxed">
+          想查某条的到几号 / 谁负责的完整出处？
+          <button
+            type="button"
+            onClick={onJumpToFacts}
+            className="ml-1 text-[var(--color-seal)] hover:underline"
+          >
+            去「要点提取」看硬事实速查表 →
+          </button>
+        </p>
+      )}
 
       {/* ── 可勾清单 ── */}
       {shown.length === 0 ? (

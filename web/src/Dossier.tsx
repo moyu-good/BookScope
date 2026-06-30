@@ -152,6 +152,7 @@ export function Dossier({
           <button
             type="button"
             onClick={onClear}
+            title="只清这次选进卷宗的文档组，分析结果和书都不动（跟「清缓存」是两回事）"
             className="ml-auto text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
           >
             清空卷宗

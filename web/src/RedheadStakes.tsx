@@ -66,8 +66,23 @@ interface Signal {
   confidence: Confidence;
 }
 
+// 相关条款（整合 3：吸收自原「跟我相关」，作利害研判的事实底座）。
+type RelevanceLevel = "高" | "中";
+type Bearing = "义务" | "利好" | "条件";
+interface RelatedClause {
+  chapter: number | null; // 原条款序号（可能 null）
+  matter: string; // 这条管的事
+  relevance: RelevanceLevel; // 相关度：高 / 中
+  bearing: Bearing; // 对你：义务 / 利好 / 条件
+  note: string; // 「对你」那一句人话
+  evidence: string; // 原条款逐字原文
+  verified: boolean;
+  match_score: number;
+}
+
 interface StakesResponse {
-  role: string; // 回显身份
+  role: string; // 回显身份（通用版为空串）
+  related_clauses?: RelatedClause[]; // 整合 3：相关条款事实底座（老缓存可能没这字段）
   opportunities: Opportunity[];
   risks: Risk[];
   signals: Signal[];
@@ -165,6 +180,13 @@ const HORIZON_HINT: Record<Horizon, string> = {
   无期: "无明确时限",
 };
 
+// 相关条款 bearing 的一句注脚（整合 3，吸收自原「跟我相关」）。
+const BEARING_HINT: Record<Bearing, string> = {
+  义务: "你得照办",
+  利好: "给你的好处",
+  条件: "满足了才适用",
+};
+
 // 置信度徽章样式（评估层专用——刻意不用朱砂，免得跟核验态撞色误导）。
 const CONFIDENCE_STYLE: Record<Confidence, { fg: string; bg: string }> = {
   高: { fg: "#3a6378", bg: "rgba(58, 99, 120, 0.12)" },
@@ -238,7 +260,7 @@ export function RedheadStakes({
   const roleTrimmed = role.trim();
 
   async function load() {
-    if (!roleTrimmed) return;
+    // 整合 3：身份可选——不填也能生成（通用版）。只要有 apiKey 就放行。
     setLoading(true);
     setError(null);
     setOpenEvidence({});
@@ -248,7 +270,7 @@ export function RedheadStakes({
         book_session_id: sessionId,
         provider,
         api_key: apiKey,
-        role: roleTrimmed,
+        role: roleTrimmed, // 空串后端走通用版
       };
       if (model) body.model = model;
       if (baseUrl) body.base_url = baseUrl;
@@ -273,13 +295,15 @@ export function RedheadStakes({
     }
   }
 
+  const relatedClauses = result?.related_clauses ?? [];
   const opportunities = result?.opportunities ?? [];
   const risks = result?.risks ?? [];
   const signals = result?.signals ?? [];
   const scanned = !!result && result.scanned;
   const gotSomething =
     scanned &&
-    (opportunities.length > 0 ||
+    (relatedClauses.length > 0 ||
+      opportunities.length > 0 ||
       risks.length > 0 ||
       signals.length > 0 ||
       hasText(result?.recommendation));
@@ -306,10 +330,10 @@ export function RedheadStakes({
         className="block text-sm font-bold text-[var(--color-ink)] mb-1.5"
         style={{ fontFamily: "var(--font-display)" }}
       >
-        你是谁？
+        你是谁？<span className="font-normal text-[var(--color-ink-muted)]">（可不填）</span>
       </label>
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        报上你的身份——同一份公文，个体户的机会和投资人看到的风向不是一回事。
+        报上你的身份——同一份公文，个体户的机会和投资人看到的风向不是一回事，填了还会先圈出跟你直接相关的条款。不填也行，给你看一份面向一般人的通用利害。
       </p>
       <div className="flex flex-wrap items-center gap-2 mb-2">
         {ROLE_PRESETS.map((preset) => (
@@ -334,9 +358,9 @@ export function RedheadStakes({
           value={role}
           onChange={(e) => setRole(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && roleTrimmed && !loading && apiKey) load();
+            if (e.key === "Enter" && !loading && apiKey) load();
           }}
-          placeholder="也可以自己写，比如「一家做餐饮的小公司」"
+          placeholder="也可以自己写，比如「一家做餐饮的小公司」；留空看通用版"
           disabled={loading}
           className="flex-1 text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-seal)] disabled:opacity-50"
           style={{ fontFamily: "var(--font-display)" }}
@@ -344,10 +368,10 @@ export function RedheadStakes({
         <button
           type="button"
           onClick={load}
-          disabled={loading || !apiKey || !roleTrimmed}
+          disabled={loading || !apiKey}
           className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors whitespace-nowrap"
         >
-          {loading ? "研判中…" : "判利害与风向"}
+          {loading ? "研判中…" : roleTrimmed ? "判利害与风向" : "看通用利害"}
         </button>
       </div>
       {error && (
@@ -384,7 +408,7 @@ export function RedheadStakes({
       <div className="pt-4">
         {header}
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          读公文真正想知道的不是字面意思，是「这份文件对我藏着什么机会、什么风险、透出什么风向」。报上你的身份，按身份给你判三段：能争取的<b>机会</b>、要当心的<b>风险</b>（都锚原文、评含金量——真金白银还是空头倡导），外加弦外之音的<b>信号</b>（标研判、不冒充事实），最后给一句带立场的建议。适合党政公文
+          读公文真正想知道的不是字面意思，是「这份文件对我藏着什么机会、什么风险、透出什么风向」。报上你的身份，先圈出<b>跟你直接相关的条款</b>（义务 / 利好 / 条件），再按身份判：能争取的<b>机会</b>、要当心的<b>风险</b>（都锚原文、评含金量——真金白银还是空头倡导），外加弦外之音的<b>信号</b>（标研判、不冒充事实），最后给一句带立场的建议。不填身份也能看一份通用利害。适合党政公文
           / 红头文件。
         </p>
         {identityBar}
@@ -409,7 +433,9 @@ export function RedheadStakes({
         ) : (
           <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
             {scanned
-              ? `这份公文没研判出明显冲「${result.role}」来的机会 / 风险 / 风向——可能它不直接管到你这类身份，或者偏叙述、没有分条式的实质内容。换个身份再判一遍，或换一份公文。`
+              ? hasText(result.role)
+                ? `这份公文没研判出明显冲「${result.role}」来的相关条款 / 机会 / 风险 / 风向——可能它不直接管到你这类身份，或者偏叙述、没有分条式的实质内容。换个身份再判一遍，或换一份公文。`
+                : "这份公文没研判出明显的机会 / 风险 / 风向——可能偏叙述、没有分条式的实质内容。填上你的身份再判一遍，或换一份公文。"
               : "没读出可研判的实质内容——这份可能不是党政公文 / 红头文件，或格式太特殊。换一份规范公文，或稍后重试。"}
           </p>
         )}
@@ -423,7 +449,7 @@ export function RedheadStakes({
       {header}
       {identityBar}
 
-      {/* 题署一行：替「身份」判出几机会几风险 · 真金白银几条 · 原文核验几条 */}
+      {/* 题署一行：替「身份」判出几相关条款几机会几风险 · 真金白银几条 · 原文核验几条 */}
       <div className="mb-3 flex items-center gap-2 flex-wrap">
         <span
           className="inline-block text-xs px-2 py-0.5 rounded-full"
@@ -432,8 +458,13 @@ export function RedheadStakes({
             border: "0.5px solid var(--color-seal)",
           }}
         >
-          替「{result.role}」研判
+          {hasText(result.role) ? `替「${result.role}」研判` : "通用研判"}
         </span>
+        {relatedClauses.length > 0 && (
+          <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
+            相关条款 {relatedClauses.length}
+          </span>
+        )}
         {opportunities.length > 0 && (
           <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
             机会 {opportunities.length}
@@ -492,6 +523,33 @@ export function RedheadStakes({
             {result.recommendation}
           </p>
         </div>
+      )}
+
+      {/* ── 跟你直接相关的条款（证据层·事实底座，整合 3：吸收自原「跟我相关」）──
+          摆在机会/风险研判之前——先看哪几条落到你头上（事实），再看研判（机会/风险/信号）。 */}
+      {relatedClauses.length > 0 && (
+        <section className="mb-6">
+          <SectionHead
+            title="跟你直接相关的条款"
+            sub="先看哪几条落到你头上"
+            count={relatedClauses.length}
+          />
+          <div className="space-y-2.5">
+            {relatedClauses.map((rc, i) => (
+              <RelatedClauseRow
+                key={`rc${i}`}
+                clause={rc}
+                open={!!openEvidence[`rc${i}`]}
+                onToggle={() =>
+                  setOpenEvidence((cur) => ({
+                    ...cur,
+                    [`rc${i}`]: !cur[`rc${i}`],
+                  }))
+                }
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       {/* ── 机会（证据层）── */}
@@ -836,6 +894,114 @@ function StakeCard({
               原文
             </span>
             {evidence}
+          </p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+// ---- 相关条款一行（整合 3：吸收自原「跟我相关」的事实底座）----
+// 条次 + 事项（墨字主体）+ bearing 朱签（义务/利好/条件）+「对你」一句 + 原文（核过盖印）。
+// 相关度高的左脊朱砂重、中的淡——视觉权重跟着相关度走。
+function RelatedClauseRow({
+  clause,
+  open,
+  onToggle,
+}: {
+  clause: RelatedClause;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const strong = clause.relevance === "高";
+  const isVerified = clause.verified && hasText(clause.evidence);
+  const canOpen = hasText(clause.evidence);
+  return (
+    <article className="relative rounded border border-[var(--color-rule)] bg-white p-3 pl-4">
+      {/* 相关度脊：左一道竖脊，高相关朱砂重、中相关淡 */}
+      <span
+        className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full"
+        style={{
+          background: "var(--color-seal)",
+          opacity: strong ? 0.65 : 0.3,
+        }}
+        aria-hidden="true"
+      />
+      {/* 标题行：条次 + 事项（主体）+ 右上 bearing 朱签 */}
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[15px] font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
+          {typeof clause.chapter === "number" && (
+            <span
+              className="text-[12px] mr-1.5 align-top tabular-nums"
+              style={{ color: "var(--color-seal)" }}
+            >
+              第{clause.chapter}条
+            </span>
+          )}
+          {hasText(clause.matter) ? clause.matter : "（这条没抽到事项）"}
+        </p>
+        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+          {!strong && (
+            <span className="text-[10px] text-[var(--color-ink-muted)] whitespace-nowrap">
+              间接相关
+            </span>
+          )}
+          <span
+            className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap"
+            title={BEARING_HINT[clause.bearing] ?? ""}
+            style={{
+              color: "var(--color-seal)",
+              border: "0.5px solid var(--color-seal)",
+              fontFamily: "var(--font-display)",
+            }}
+          >
+            {clause.bearing}
+          </span>
+        </div>
+      </div>
+
+      {/* 「对你」一句人话 */}
+      {hasText(clause.note) && (
+        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+          <span className="text-[var(--color-ink)]">对你</span> · {clause.note}
+        </p>
+      )}
+
+      {/* 原文：核过盖印 + 可展开；核不过老实标待核 */}
+      <div className="mt-2">
+        {isVerified ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <SealMark size={17} title="原文已核验" />
+            {canOpen && (
+              <button
+                type="button"
+                onClick={onToggle}
+                className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+              >
+                {open ? "收起原文" : "看原文出处"}
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-[var(--color-ink-muted)] italic">
+            {canOpen ? "未在原文比对命中·仅供参考" : "暂无贴切原文（待核）"}
+          </p>
+        )}
+        {canOpen && open && (
+          <p
+            className="mt-2 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+            style={{
+              fontFamily: "var(--font-display)",
+              borderColor: "var(--color-seal)",
+            }}
+          >
+            <span
+              className="text-[11px] mr-1.5 align-top"
+              style={{ color: "var(--color-seal)" }}
+            >
+              原文
+            </span>
+            {clause.evidence}
           </p>
         )}
       </div>
