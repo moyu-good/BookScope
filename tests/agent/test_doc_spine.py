@@ -276,6 +276,88 @@ def test_coerce_instruction_type_pure():
     assert ds._coerce_instruction_type(None) == "信息告知"
 
 
+# ── 叙述体公文支持(v3):公报/意见把每个原则/部署抽一条,不压成一条 ──────────────────
+def test_fangzhen_bushu_is_a_valid_instruction_type():
+    """新增「方针部署」进了指令类型封闭集(收叙述体公文的原则/方向/部署点)。"""
+    assert "方针部署" in ds.INSTRUCTION_TYPES
+    assert ds._coerce_instruction_type("方针部署") == "方针部署"
+
+
+def test_clause_prompt_handles_narrative_bulletin():
+    """条款维 prompt 明确教模型:叙述体公文(公报/意见)按原则/部署逐条抽,别压成一条。"""
+    instr = ds._INSTR_CLAUSE
+    # 认两类写法 + 叙述体专门教法
+    assert "分条式" in instr and "叙述体" in instr
+    # 六项原则要抽成六条、绝不压成一条空泛的「遵循以下原则」
+    assert "遵循以下原则" in instr
+    assert "压成一条" in instr or "绝不压成" in instr
+    # 没有责任主体/时限也照抽(叙述体常缺)
+    assert "没有责任主体" in instr or "缺主体缺时限" in instr
+    # 新指令类型在 prompt 里
+    assert "方针部署" in instr
+
+
+def test_narrative_six_principles_extracted_as_six_clauses(monkeypatch):
+    """模拟公报「六项原则」:模型把六个「坚持X」各抽一条 → 六条都保住、各带原文撑,
+    绝不退化成一条。每条 instruction_type=方针部署、无主体无时限留空、不编代价。"""
+    chunks = [
+        {"chunk_id": "h0", "chapter": 0,
+         "text": "中国共产党第二十届中央委员会第四次全体会议公报"},
+        {"chunk_id": "c1", "chapter": 0,
+         "text": "全会指出，必须遵循以下原则，坚持党的全面领导，坚持人民至上，"
+                 "坚持高质量发展，坚持全面深化改革，坚持有效市场和有为政府相结合，"
+                 "坚持统筹发展和安全。"},
+    ]
+    principles = [
+        ("坚持党的全面领导", "坚持党的全面领导"),
+        ("坚持人民至上", "坚持人民至上"),
+        ("坚持高质量发展", "坚持高质量发展"),
+        ("坚持全面深化改革", "坚持全面深化改革"),
+        ("坚持有效市场和有为政府相结合", "坚持有效市场和有为政府相结合"),
+        ("坚持统筹发展和安全", "坚持统筹发展和安全"),
+    ]
+    clauses = _clause_payload([
+        {"chapter": i, "matter": matter, "instruction_type": "方针部署",
+         "actor": "", "deadline": "", "basis_ref": "",
+         "substance": "空头倡导", "substance_reason": "纯原则无数字无时限无主体无罚则",
+         "penalty": "",
+         "evidence": ev}
+        for i, (matter, ev) in enumerate(principles, start=1)
+    ])
+    spine = _run(monkeypatch, head_text=_head_payload([
+        {"field": "文种", "value": "公报", "evidence": "全体会议公报"},
+    ]), clause_text=clauses, chunks=chunks)
+    # 六条原则全保住,没压成一条
+    assert len(spine["clauses"]) == 6
+    for c in spine["clauses"]:
+        assert c["instruction_type"] == "方针部署"
+        assert c["actor"] == ""  # 叙述体原则无责任主体,留空不编
+        assert c["deadline"] == ""  # 无时限,留空不编
+        assert c["penalty"] == ""  # 无罚则,留空不编
+        assert c["evidence"]  # 每条钉到对应那半句原文
+        assert c["verified"] is True  # evidence 命中合成原文
+
+
+def test_narrative_clause_substance_not_forced_real_money(monkeypatch):
+    """死守:叙述体方针部署口气坚定(坚持/必须)但无配套兑现 → 不该判真金白银。
+    模型若误判真金白银,coerce 不拦(它是合法档),但 prompt 已明示别只看语气;这里验
+    模型按 prompt 给空头/有条件兑现时如实保留。"""
+    clauses = _clause_payload([
+        {"chapter": 1, "matter": "坚持高质量发展", "instruction_type": "方针部署",
+         "actor": "", "deadline": "", "basis_ref": "",
+         "substance": "空头倡导", "substance_reason": "方向性号召,无数字时限主体罚则",
+         "penalty": "",
+         "evidence": "坚持高质量发展"},
+    ])
+    chunks = [
+        {"chunk_id": "h0", "chapter": 0, "text": "公报。坚持高质量发展。"},
+    ]
+    spine = _run(monkeypatch, head_text=_head_payload([
+        {"field": "文种", "value": "公报", "evidence": "公报"},
+    ]), clause_text=clauses, chunks=chunks)
+    assert spine["clauses"][0]["substance"] == "空头倡导"
+
+
 def test_coerce_clause_drops_non_int_chapter():
     assert ds._coerce_clause({"chapter": "一", "matter": "x"}) is None
     assert ds._coerce_clause({"matter": "无序号"}) is None

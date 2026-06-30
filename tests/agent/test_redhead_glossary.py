@@ -111,9 +111,24 @@ def _run(monkeypatch, seg_outs, *, head=None, clauses=None):
 # ════════════════════════════════════════════════════════════════════════════
 # 整体结构 + 字段齐全 + schema 版本
 # ════════════════════════════════════════════════════════════════════════════
-def test_schema_version_is_v2(monkeypatch):
+def test_schema_version_is_v3(monkeypatch):
     out = _run(monkeypatch, [[_term("证照分离", explanation="x", evidence=_C1)]])
-    assert out["schema_version"] == rg.GLOSSARY_SCHEMA_VERSION == "v2"
+    assert out["schema_version"] == rg.GLOSSARY_SCHEMA_VERSION == "v3"
+
+
+def test_glossary_prompt_catches_policy_jargon():
+    """识别 prompt 明确教模型抓政策黑话(五年规划简称/新概念/数字缩略语),
+    同时仍守住别挑大白话(通知/会议/单位)。"""
+    instr = rg._INSTR_GLOSSARY
+    # 抓政策黑话:核心原则 + 三类举例
+    assert "政策黑话" in instr
+    assert "普通人懂不懂" in instr  # 判据是普通人懂不懂,不是政界用得多不多
+    assert "十五五" in instr or "十四五" in instr  # 五年规划简称
+    assert "新质生产力" in instr  # 治理经济新概念
+    assert "五位一体" in instr or "四个全面" in instr  # 数字缩略语
+    # 仍守住别挑大白话
+    assert "通知" in instr and "会议" in instr and "单位" in instr
+    assert "别挑大白话" in instr or "大白话" in instr
 
 
 def test_term_has_all_v2_fields(monkeypatch):
@@ -298,7 +313,7 @@ def test_empty_spine_returns_empty_without_segments(monkeypatch):
         chunks=_CHUNKS, llm_client=_FakeClient(),
         model="deepseek-v4-flash", full_text=_FULL_TEXT,
     )
-    assert out["schema_version"] == "v2"
+    assert out["schema_version"] == "v3"
     assert out["terms"] == []
 
 
