@@ -5,9 +5,8 @@
 // 公文体（像古籍夹注），一道朱砂细规一隔，醒目墨色摆大白话。白话是对原文的**忠实转述、
 // 不是编**——背后那句原文核得到，就在白话角上盖「鉴」印。
 //
-// 两种看法（一个开关切）：
-//   · 逐条款（clauses，默认）：走文脉条款，一条一句白话，要对照分条结构时用。
-//   · 全文逐句（fulltext，#22 作者点名）：整份公文按句顺下来，每句一对，一句不落地跟原文走。
+// 翻法（统一走全文逐句）：整份公文按句顺下来，每句一对，一句不落地跟原文走。一句不漏、
+// 也不靠条款抽取，公报、意见这类叙述体公文照样能翻。
 //
 // 懂刻度（深度）：翻译不止字面通顺——命中措辞刻度（「原则上」有口子、「研究」约等于不办、
 // 「逐步」没时间表）就在那条白话下点一行朱批「弦外之音」（后端 nuance 字段，命中才有）。
@@ -93,8 +92,8 @@ export function RedheadPlainLanguage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trace, setTrace] = useState<RunTrace | null>(null);
-  // 译法：逐条款（默认）或全文逐句。切换即重出一份。
-  const [mode, setMode] = useState<PlainMode>("clauses");
+  // 翻法只有一种：全文逐句，一句不落。不再给模式开关。
+  const mode: PlainMode = "fulltext";
   // 默认收起原文夹注，点开看「官话原话」——保译笺干净，要对照再展开
   const [openOrigin, setOpenOrigin] = useState<Record<number, boolean>>({});
 
@@ -132,14 +131,6 @@ export function RedheadPlainLanguage({
     }
   }
 
-  // 切到另一种译法：换 mode 并立刻重出（避免显示与开关状态不一致）。
-  function switchMode(next: PlainMode) {
-    if (next === mode || loading) return;
-    setMode(next);
-    setResult(null);
-    void load(next);
-  }
-
   const items = result?.items ?? [];
   const scanned = !!result && result.scanned;
   const gotSomething = scanned && items.length > 0;
@@ -170,7 +161,6 @@ export function RedheadPlainLanguage({
           白话」对照：摆原文，下面是大白话，背后原文核得到的盖「鉴」印；命中「原则上」「研究」「逐步」这类官腔的，再点一句弦外之音。白话只忠实转述、绝不替你脑补原文没说的。适合党政公文
           / 红头文件。
         </p>
-        <ModeToggle mode={mode} onSwitch={setMode} disabled={loading} />
         <button
           type="button"
           onClick={() => load(mode)}
@@ -178,8 +168,8 @@ export function RedheadPlainLanguage({
           className="mt-3 text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
         >
           {loading
-            ? `${modeVerb(mode)}中（约 1 分钟）…`
-            : modeVerb(mode)}
+            ? `${modeVerb()}中（约 1 分钟）…`
+            : modeVerb()}
         </button>
         {error && (
           <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
@@ -193,12 +183,8 @@ export function RedheadPlainLanguage({
         )}
         {loading && (
           <RunningProcess
-            label={modeVerb(mode)}
-            hint={
-              mode === "fulltext"
-                ? "整份公文喂进模型，按句一句句翻成人话，分段并发、每句回原文核验，约 1 分钟。"
-                : "整份公文喂进模型先拆出条款，再逐条把官话改写成人话，每条都回原文核验，约 1 分钟。"
-            }
+            label={modeVerb()}
+            hint="整份公文喂进模型，按句一句句翻成人话，分段并发、每句回原文核验，约 1 分钟。"
           />
         )}
       </div>
@@ -225,14 +211,11 @@ export function RedheadPlainLanguage({
             {loading ? "重出中…" : "重新生成"}
           </button>
         </div>
-        <ModeToggle mode={mode} onSwitch={switchMode} disabled={loading} />
         {loading ? (
-          <RunningProcess label={modeVerb(mode)} />
+          <RunningProcess label={modeVerb()} />
         ) : (
           <p className="mt-3 text-sm text-[var(--color-ink-muted)] leading-relaxed">
-            {shownMode === "fulltext"
-              ? "这份没顺出可逐句翻的正文，可能正文太短或格式太特殊。换一份规范公文，或换「逐条款」试试。"
-              : "没拆出可逐条翻的正文条款，这份可能偏叙述、不是分条式公文，或者格式太特殊。换一份规范公文，或换「全文逐句」试试。"}
+            这份没顺出可逐句翻的正文，可能正文太短或格式太特殊。换一份规范公文，或稍后重试。
           </p>
         )}
       </div>
@@ -259,8 +242,6 @@ export function RedheadPlainLanguage({
           {loading ? "重出中…" : "重新生成"}
         </button>
       </div>
-
-      <ModeToggle mode={mode} onSwitch={switchMode} disabled={loading} />
 
       {/* 题署一行：共几条/句 · 原文核验几条 · 弦外之音几处。朱印描边小签，案头规矩。 */}
       <div className="mt-3 mb-3 flex items-center gap-2 flex-wrap">
@@ -437,54 +418,7 @@ export function RedheadPlainLanguage({
   );
 }
 
-// 两种译法的动作词（按钮/loading 文案共用）。
-function modeVerb(mode: PlainMode): string {
-  return mode === "fulltext" ? "全文逐句翻成大白话" : "逐条翻成大白话";
-}
-
-// 译法切换：逐条款 ↔ 全文逐句。两段式胶囊，朱选墨弃，案头克制。
-function ModeToggle({
-  mode,
-  onSwitch,
-  disabled,
-}: {
-  mode: PlainMode;
-  onSwitch: (next: PlainMode) => void;
-  disabled?: boolean;
-}) {
-  const opts: { key: PlainMode; label: string; hint: string }[] = [
-    { key: "clauses", label: "逐条款", hint: "走文脉条款，一条一句白话，对照分条结构" },
-    { key: "fulltext", label: "全文逐句", hint: "整份按句顺下来，每句一对，一句不落" },
-  ];
-  return (
-    <div
-      className="inline-flex rounded border overflow-hidden"
-      style={{ borderColor: "var(--color-rule)" }}
-      role="tablist"
-      aria-label="译法"
-    >
-      {opts.map((o) => {
-        const active = o.key === mode;
-        return (
-          <button
-            key={o.key}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            title={o.hint}
-            disabled={disabled}
-            onClick={() => onSwitch(o.key)}
-            className="text-xs px-3 py-1 transition-colors disabled:opacity-50"
-            style={{
-              color: active ? "var(--color-paper)" : "var(--color-ink-muted)",
-              background: active ? "var(--color-seal)" : "transparent",
-              fontFamily: "var(--font-display)",
-            }}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
+// 翻译动作词（按钮/loading 文案共用）。只剩全文逐句一条路。
+function modeVerb(): string {
+  return "全文逐句翻成大白话";
 }
