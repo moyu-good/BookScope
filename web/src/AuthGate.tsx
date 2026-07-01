@@ -234,47 +234,153 @@ function Field({
   );
 }
 
-/** 左栏底部账号条:显示当前邮箱 + 退出。只在 hosted 且已登录时挂。
- *  账号信息区可点进「我的案头」(onOpen);退出键单独,不误触。 */
+/** 左栏底部账号条:当前邮箱 + 退出。点账号信息区就地展开一个小面板(注册时间 / 邮箱验证 /
+ *  注销账号),不另开整页——账号管理是件小事,不值一整个页(微信读书那样,书和笔记都在书架上,
+ *  账号只是个小角落)。只在 hosted 且已登录时挂。 */
 export function AccountStrip({
   user,
   onLogout,
-  onOpen,
+  onDeleteAccount,
 }: {
   user: AuthUser;
   onLogout: () => void;
-  /** 点账号信息区进「我的案头」。不传就不可点(纯展示)。 */
-  onOpen?: () => void;
+  /** 注销账号:面板里二次确认后调。不传就不显注销入口。 */
+  onDeleteAccount?: () => Promise<void>;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleDelete() {
+    if (!onDeleteAccount) return;
+    setDeleting(true);
+    setErr("");
+    try {
+      await onDeleteAccount();
+      // 成功后 App 清账号态、这条会卸载,不用复位。
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "注销没成功,稍后再试。");
+      setDeleting(false);
+      setConfirming(false);
+    }
+  }
+
   return (
-    <div
-      className="px-3 py-3 flex items-center justify-between gap-2"
-      style={{ borderTop: "1px solid var(--color-rule)" }}
-    >
-      <button
-        type="button"
-        onClick={onOpen}
-        disabled={!onOpen}
-        title="进我的案头"
-        className="min-w-0 text-left rounded transition-colors enabled:hover:text-[var(--color-seal)] disabled:cursor-default"
-      >
-        <div className="text-[10.5px] tracking-wider text-[var(--color-ink-muted)]">
-          当前账号
-        </div>
+    <div style={{ borderTop: "1px solid var(--color-rule)" }}>
+      {/* 展开的小面板:账号条在左栏最底,往上弹 */}
+      {expanded && (
         <div
-          className="text-[13px] text-[var(--color-ink)] truncate"
-          style={{ fontFamily: "var(--font-display)" }}
+          className="px-3 py-3 text-xs flex flex-col gap-2"
+          style={{
+            borderBottom: "1px solid var(--color-rule)",
+            background: "var(--color-paper)",
+          }}
         >
-          {user.email}
+          <div className="flex justify-between gap-2">
+            <span className="text-[var(--color-ink-muted)]">注册时间</span>
+            <span className="text-[var(--color-ink)]">{fmtDate(user.created_at)}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-[var(--color-ink-muted)]">邮箱验证</span>
+            <span className="text-[var(--color-ink)]">
+              {user.email_verified ? "已验证" : "未验证"}
+            </span>
+          </div>
+          {onDeleteAccount && (
+            <div className="pt-1">
+              {err && (
+                <p
+                  className="mb-1.5 px-2 py-1 rounded"
+                  style={{
+                    background: "var(--color-seal-soft)",
+                    color: "var(--color-seal)",
+                  }}
+                >
+                  {err}
+                </p>
+              )}
+              {!confirming ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirming(true)}
+                  className="text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                >
+                  注销账号
+                </button>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[var(--color-ink)] leading-relaxed">
+                    注销会把你的书和笔记一起删干净,找不回。确定?
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="px-2 py-1 rounded text-white disabled:opacity-50"
+                      style={{ background: "var(--color-seal)" }}
+                    >
+                      {deleting ? "注销中" : "确定,全删"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(false)}
+                      disabled={deleting}
+                      className="px-2 py-1 rounded border disabled:opacity-50"
+                      style={{
+                        borderColor: "var(--color-rule)",
+                        color: "var(--color-ink-muted)",
+                      }}
+                    >
+                      再想想
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </button>
-      <button
-        type="button"
-        onClick={onLogout}
-        className="shrink-0 text-xs px-2.5 py-1.5 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
-      >
-        退出
-      </button>
+      )}
+
+      {/* 账号条一行:邮箱(点开面板) + 退出 */}
+      <div className="px-3 py-3 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          title="账号"
+          className="min-w-0 text-left rounded transition-colors hover:text-[var(--color-seal)]"
+        >
+          <div className="text-[10.5px] tracking-wider text-[var(--color-ink-muted)]">
+            当前账号
+          </div>
+          <div
+            className="text-[13px] text-[var(--color-ink)] truncate"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {user.email}
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="shrink-0 text-xs px-2.5 py-1.5 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+        >
+          退出
+        </button>
+      </div>
     </div>
   );
+}
+
+function fmtDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ApiError } from "./ErrorBanner";
 import { formatRelativeTime } from "./historyStorage";
+import { annotationStore } from "./annotationStore";
 
 // ---------------------------------------------------------------------------
 // 书柜：函套书脊 × 书目索引 的融合形态
@@ -256,6 +257,10 @@ function ShelfBody(props: {
     onConfirmDelete,
   } = props;
 
+  // 订阅标注变化:托管缓存异步预热到位 / 增删改后重算每本的笔记角标(本地即时、托管预热后到位)。
+  const [, forceTick] = useState(0);
+  useEffect(() => annotationStore.subscribe(() => forceTick((n) => n + 1)), []);
+
   if (state.kind === "loading" || state.kind === "idle") {
     return (
       <p className="text-sm text-[var(--color-ink-muted)] italic">
@@ -293,6 +298,7 @@ function ShelfBody(props: {
           <BookRow
             key={s.session_id}
             entry={entry}
+            noteCount={annotationStore.list(s.session_id).length}
             isActive={isActive}
             isConfirming={isConfirming}
             onSelect={() => onSelect(s)}
@@ -309,6 +315,8 @@ function ShelfBody(props: {
 
 function BookRow(props: {
   entry: ShelfEntry;
+  /** 这本书的标注数(书签 / 高亮 / 笔记 / 重点合计),>0 才显角标。 */
+  noteCount: number;
   isActive: boolean;
   isConfirming: boolean;
   onSelect: () => void;
@@ -319,6 +327,7 @@ function BookRow(props: {
 }) {
   const {
     entry,
+    noteCount,
     isActive,
     isConfirming,
     onSelect,
@@ -383,6 +392,18 @@ function BookRow(props: {
                 title={`同名书上传了 ${dupeCount} 份，这行指向最近用过的那份`}
               >
                 × {dupeCount} 份
+              </span>
+            ) : null}
+            {noteCount > 0 ? (
+              <span
+                className="shrink-0 text-[0.65rem] px-1.5 py-0.5 rounded-full leading-none"
+                style={{
+                  background: "var(--color-seal-soft)",
+                  color: "var(--color-seal)",
+                }}
+                title={`你在这本书里标了 ${noteCount} 条`}
+              >
+                {noteCount} 条笔记
               </span>
             ) : null}
           </div>

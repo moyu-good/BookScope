@@ -31,7 +31,6 @@ import { appendEntry, newEntryId } from "./historyStorage";
 import type { QAEntry } from "./historyStorage";
 import { setAnnotationBackend } from "./annotationStore";
 import { AccountStrip, AuthModal } from "./AuthGate";
-import { MyDesk } from "./MyDesk";
 import type { AuthUser, DeploymentMode } from "./authClient";
 import {
   clearAuthToken,
@@ -832,7 +831,6 @@ export function App() {
   // app-shell 当前主画布显示哪一件事（左栏导航切换）
   const [mode, setMode] = useState<
     | "library"
-    | "account"
     | "ask"
     | "annotate"
     | "graph"
@@ -1602,6 +1600,7 @@ export function App() {
         readerActive={readerOpen}
         authUser={authUser}
         onLogout={handleLogout}
+        onDeleteAccount={handleDeleteAccount}
       />
 
       <main className="flex-1 min-w-0 px-5 sm:px-8 lg:px-14 pt-[4.5rem] md:pt-12 pb-16">
@@ -1649,17 +1648,7 @@ export function App() {
           )}
 
           {/* 主画布：一次只显示一件事 */}
-          {mode === "account" && (
-            <MyDesk
-              deploymentMode={deploymentMode}
-              authUser={authUser}
-              onDeleteAccount={handleDeleteAccount}
-              onOpenBook={handleSelectShelfBook}
-              onReadBook={openReader}
-            />
-          )}
-
-          {(mode === "library" || (!currentSession && mode !== "account")) && (
+          {(mode === "library" || !currentSession) && (
             <section>
               <CanvasHeader
                 title="选一本书"
@@ -2332,7 +2321,6 @@ export function App() {
 
 type Mode =
   | "library"
-  | "account"
   | "ask"
   | "annotate"
   | "graph"
@@ -2919,6 +2907,8 @@ function Sidebar(props: {
   /** hosted 模式登录后的当前用户;local / 未登录为 null,不渲染账号条。 */
   authUser?: AuthUser | null;
   onLogout?: () => void;
+  /** 注销账号(hosted):账号条上点开的小面板里用。 */
+  onDeleteAccount?: () => Promise<void>;
 }) {
   const {
     mode,
@@ -2932,6 +2922,7 @@ function Sidebar(props: {
     readerActive,
     authUser,
     onLogout,
+    onDeleteAccount,
   } = props;
 
   // 题材 → 突出哪几组。null = 不偏向任何组（没 genre / 认不出的题材都走这条，全显）。
@@ -3201,14 +3192,13 @@ function Sidebar(props: {
         <AccountStrip
           user={authUser}
           onLogout={onLogout}
-          onOpen={() => onMode("account")}
+          onDeleteAccount={onDeleteAccount}
         />
       )}
       <div
         className="px-3 py-3.5 flex items-center justify-between"
         style={{ borderTop: "1px solid var(--color-rule)" }}
       >
-        <div className="flex items-center gap-0.5">
         <button
           type="button"
           onClick={() => onMode("library")}
@@ -3235,34 +3225,6 @@ function Sidebar(props: {
           </svg>
           书库
         </button>
-        {/* 「我的案头」常驻入口:local / hosted 都有(WP-reading-workspace 待拍点①)。 */}
-        <button
-          type="button"
-          onClick={() => onMode("account")}
-          className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors"
-          style={
-            mode === "account"
-              ? { color: "var(--color-seal)" }
-              : { color: "var(--color-ink-muted)" }
-          }
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="8" r="3.2" />
-            <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
-          </svg>
-          我的
-        </button>
-        </div>
         <div className="flex items-center gap-1">
           {/* §五:清分析缓存挪到这里(显眼小入口),不再埋设置抽屉底部 */}
           <ClearCacheButton />
