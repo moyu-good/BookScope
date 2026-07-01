@@ -14,6 +14,7 @@
 import { useMemo, useRef, useState } from "react";
 
 import { smoothLine } from "./vizCurve";
+import { usePanZoom } from "./usePanZoom";
 
 export interface CurveEvent {
   text: string;
@@ -63,6 +64,18 @@ const H = BASE + 30;
 export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurveProps) {
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  // pan/zoom + 双指 pinch（移动端）：大书章多时山势挤，手机上捏合才看得清转折点。
+  // 本图有全画布覆盖层 rect 做 hover 吸附 + 点击选章，pinch/pan 进行中（pointersCount>0）
+  // 不吸附 hover，避免平移时 hover 乱跳；click 选章在 tap（无 move）时照常。
+  const {
+    view,
+    pointersCount,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onWheel,
+  } = usePanZoom(svgRef, { width: W, height: H });
 
   const layout = useMemo(() => {
     const n = chapters.length;
@@ -106,6 +119,8 @@ export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurvePro
   }, [maxH]);
 
   function handleMove(e: React.PointerEvent<SVGRectElement>) {
+    // pinch/pan 进行中不吸附 hover（pointersCount>0 = 有指按在画布上拖/捏），否则平移时 hover 乱跳。
+    if (pointersCount > 0) return;
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
@@ -118,11 +133,19 @@ export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurvePro
     <svg
       ref={svgRef}
       viewBox={`0 0 ${W} ${H}`}
-      className="w-full border border-[var(--color-rule)] rounded"
-      style={{ background: "var(--color-paper)", touchAction: "none" }}
+      className="w-full border border-[var(--color-rule)] rounded touch-none"
+      style={{ background: "var(--color-paper)" }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onPointerLeave={onPointerUp}
+      onWheel={onWheel}
     >
       {/* 入场扫场：纯 CSS（不跑也完全可见，动画只增强；绝不用 rAF 当显示开关） */}
       <style>{`@keyframes ss-sweep{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}`}</style>
+      {/* 缩放平移层：刻度 + 山势 + 转折点 + 钤印都在这个 <g> 里；覆盖层 rect 留在 g 外负责收事件 */}
+      <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
 
       {/* 事件数横向参考刻度 */}
       {ticks.map((v) => {
@@ -195,7 +218,9 @@ export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurvePro
       <text x={W - PAD_R - 17} y={TOP + 2} textAnchor="middle" fontSize={10} fill="var(--color-paper)" style={{ fontFamily: "var(--font-display)" }}>书</text>
       <text x={W - PAD_R - 17} y={TOP + 13} textAnchor="middle" fontSize={10} fill="var(--color-paper)" style={{ fontFamily: "var(--font-display)" }}>鉴</text>
 
-      {/* 透明覆盖层：吸附 hover + 点选 */}
+      </g>
+
+      {/* 透明覆盖层：吸附 hover + 点选。留在 transform g 外——它用 viewBox 坐标做 hit-test，不能被缩放变换。 */}
       <rect
         x={0}
         y={0}

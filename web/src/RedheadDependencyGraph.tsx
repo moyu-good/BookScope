@@ -21,8 +21,9 @@
 // 元信息），宋体 var(--font-display)，留白克制——不堆古风、无 emoji、不做成通用流程图。
 // ---------------------------------------------------------------------------
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { usePanZoom } from "./usePanZoom";
 
 // ---- 后端契约（对着 /api/agent/redhead/dependency-graph 写，别改后端） ----
 
@@ -266,6 +267,11 @@ export function RedheadDependencyGraph({
   const rowCount = placed.reduce((mx, p) => Math.max(mx, p.row), 0) + 1;
   const viewH = GRAPH_H_BASE * rowsToH(rowCount);
 
+  // pan/zoom + 双指 pinch（移动端）：公文依据网节点小、文字密，手机上不捏合看不清。
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const { view, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onWheel, resetView } =
+    usePanZoom(svgRef, { width: 1000, height: viewH });
+
   // ---- 未生成：入口卡片 ----
   if (!result) {
     return (
@@ -357,6 +363,13 @@ export function RedheadDependencyGraph({
         <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
           {edges.length} 条关联
         </span>
+        <button
+          type="button"
+          onClick={resetView}
+          className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+        >
+          重置视角
+        </button>
         {activeNode && (
           <button
             type="button"
@@ -371,11 +384,18 @@ export function RedheadDependencyGraph({
       {/* ── 有向关联网 SVG ── */}
       <div className="rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] overflow-hidden">
         <svg
+          ref={svgRef}
           viewBox={`0 0 1000 ${viewH}`}
-          className="w-full"
+          className="w-full touch-none"
           style={{ display: "block" }}
           role="img"
           aria-label="公文依据关联网"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+          onPointerLeave={onPointerUp}
+          onWheel={onWheel}
         >
           <defs>
             {/* 每个边色一个箭头 marker（同色箭头才不串色） */}
@@ -405,6 +425,8 @@ export function RedheadDependencyGraph({
               <path d="M0 0 L10 5 L0 10 z" fill="#6b6359" />
             </marker>
           </defs>
+          {/* 缩放平移层：边和节点都在这个 <g> 里，整图能缩能拖、双指捏合看清小字 */}
+          <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
 
           {/* 边：先画线再画节点（节点压在线上）。曲一点（贝塞尔）避免直线穿过节点。 */}
           {edges.map((e, i) => {
@@ -544,6 +566,7 @@ export function RedheadDependencyGraph({
               </g>
             );
           })}
+          </g>
         </svg>
       </div>
 

@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { usePanZoom } from "./usePanZoom";
 
 interface FlowPair {
   a: string;
@@ -259,6 +260,19 @@ export function CharacterFlow({
   // 动态画布高(泳道多就高);layout 未就绪时退 H_MIN。step / 渲染 / viewBox 都用这个。
   const H = layout?.H ?? H_MIN;
 
+  // pan/zoom + 双指 pinch（移动端）：大书章数多、viewBox 宽，手机上捏合才看得清谁在哪场。
+  // 注：hook 的 view 改名 zoomView，避开下面已有的 view（章数据数组）。
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const {
+    view: zoomView,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onWheel,
+    resetView,
+  } = usePanZoom(svgRef, { width: W, height: H });
+
   // 初始化 LaneNode + 启动松弛动画
   useEffect(() => {
     if (!view || !layout) return;
@@ -440,10 +454,19 @@ export function CharacterFlow({
       </p>
 
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full border border-[var(--color-rule)] rounded"
+        className="w-full border border-[var(--color-rule)] rounded touch-none"
         style={{ maxHeight: 520, background: "var(--color-paper)" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onPointerLeave={onPointerUp}
+        onWheel={onWheel}
       >
+        {/* 缩放平移层：章刻度 + 泳道 + 同场束都在这个 <g> 里，整图能缩能拖、双指捏合看细节 */}
+        <g transform={`translate(${zoomView.tx} ${zoomView.ty}) scale(${zoomView.k})`}>
         {/* 章号刻度（每隔几章标一个，避免拥挤） */}
         {view.map((c, i) =>
           n <= 24 || i % 4 === 0 ? (
@@ -557,7 +580,18 @@ export function CharacterFlow({
             );
           }),
         )}
+        </g>
       </svg>
+
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={resetView}
+          className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+        >
+          重置视角
+        </button>
+      </div>
 
       {selected && (
         <div className="mt-3 p-3 rounded border border-[var(--color-rule)] bg-white">
