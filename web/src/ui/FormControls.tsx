@@ -74,12 +74,9 @@ export const Checkbox = forwardRef<
       <input
         ref={ref}
         type="checkbox"
-        // appearance-none 去原生外观；自己画方框（纸底 rule 边），选中态翻成朱砂底
-        className="peer appearance-none w-4 h-4 rounded-[3px] border border-[var(--color-rule)]
-          bg-[var(--color-paper)] cursor-pointer transition-colors
-          hover:border-[var(--color-seal)]
-          checked:bg-[var(--color-seal)] checked:border-[var(--color-seal)]
-          disabled:opacity-50 disabled:cursor-not-allowed"
+        // .seal-checkbox（index.css）画善本钤印槽：未勾略凹纸槽 + 朱砂淡边，勾了朱砂底。
+        // peer 留着——选中时下面那枚墨白勾靠 peer-checked 浮现。
+        className="peer seal-checkbox"
         {...rest}
       />
       {/* 选中时浮现的墨白勾——只在 checked 时显示，不拦点击 */}

@@ -256,6 +256,40 @@ button {
   outline-offset: 2px;
 }
 
+/* 善本勾选框——未勾 = 略凹纸槽 + 朱砂淡边（像等着盖朱印的钤印槽，不是漂浮的白方框）；
+ * 勾 = 朱砂底、组件覆盖层画墨白勾。收在这里由 ui/FormControls 的 Checkbox 挂 .seal-checkbox
+ * （同 .seal-range 的道理，状态色走 CSS 变量随主题走，比 Tailwind 任意 color-mix 稳）。 */
+.seal-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 3px;
+  border: 1.5px solid color-mix(in oklch, var(--color-seal) 34%, var(--color-rule));
+  background-color: var(--color-paper-sunken);
+  box-shadow: inset 0 1px 2px oklch(0% 0 0 / 0.07);
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.seal-checkbox:hover {
+  border-color: var(--color-seal);
+}
+.seal-checkbox:checked {
+  background-color: var(--color-seal);
+  border-color: var(--color-seal);
+  box-shadow: none;
+}
+.seal-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.seal-checkbox:focus-visible {
+  outline: 2px solid var(--color-seal);
+  outline-offset: 1px;
+}
+
 /* 无障碍：尊重"减少动态"偏好，一律静态呈现 */
 @media (prefers-reduced-motion: reduce) {
   *,
