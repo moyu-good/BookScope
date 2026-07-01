@@ -17,16 +17,14 @@ import { CharacterArc } from "./CharacterArc";
 import { CharacterFlow } from "./CharacterFlow";
 import { CharacterGraph } from "./CharacterGraph";
 import { CharacterVoice } from "./CharacterVoice";
-import { ConceptEvolution } from "./ConceptEvolution";
 import { ConsistencyScan } from "./ConsistencyScan";
-import { EntityRecall } from "./EntityRecall";
+import { RecallHub } from "./RecallHub";
 import { ErrorBanner } from "./ErrorBanner";
 import { ForeshadowArcs } from "./ForeshadowArcs";
 import { NarrativeCurve } from "./NarrativeCurve";
 import { Timeline } from "./Timeline";
 import type { ApiError } from "./ErrorBanner";
 import { HistoryPanel } from "./HistoryPanel";
-import { MotifTracking } from "./MotifTracking";
 import { appendEntry, newEntryId } from "./historyStorage";
 import type { QAEntry } from "./historyStorage";
 import { setAnnotationBackend } from "./annotationStore";
@@ -1947,17 +1945,19 @@ export function App() {
 
               <div className={mode === "entity" ? "" : "hidden"}>
                 <CanvasHeader
-                  title="实体回溯"
+                  title="全书回溯"
                   feature="entity"
-                  subtitle="输一个人 / 物 / 地点 / 概念，回溯它在全书每次出现：在做什么、在哪章，带原文。"
+                  subtitle="追一个词在全书的踪迹——人 / 物 / 地点、概念、还是母题，选一个追什么，回溯它每次出现：在哪章、怎么体现、被怎么用，每处带原文。"
                 />
-                <EntityRecall
+                <RecallHub
                   sessionId={currentSession.session_id}
                   provider={provider}
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
-                  prefill={entityPrefill}
+                  entityPrefill={entityPrefill}
+                  conceptPrefill={conceptPrefill}
+                  motifPrefill={motifPrefill}
                 />
               </div>
 
@@ -1973,22 +1973,6 @@ export function App() {
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
-                />
-              </div>
-
-              <div className={mode === "motif" ? "" : "hidden"}>
-                <CanvasHeader
-                  title="母题追踪"
-                  feature="motif"
-                  subtitle="输一个主题 / 母题，看它在全书哪些地方复现：每处怎么体现、在哪章，带原文。"
-                />
-                <MotifTracking
-                  sessionId={currentSession.session_id}
-                  provider={provider}
-                  apiKey={apiKey}
-                  model={model}
-                  baseUrl={effectiveBaseUrl()}
-                  prefill={motifPrefill}
                 />
               </div>
 
@@ -2034,22 +2018,6 @@ export function App() {
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
-                />
-              </div>
-
-              <div className={mode === "concept" ? "" : "hidden"}>
-                <CanvasHeader
-                  title="概念演进"
-                  feature="concept"
-                  subtitle="输一个概念，看它在全书怎么一步步发展：每阶段在哪章、被怎么用 / 深化，带原文。"
-                />
-                <ConceptEvolution
-                  sessionId={currentSession.session_id}
-                  provider={provider}
-                  apiKey={apiKey}
-                  model={model}
-                  baseUrl={effectiveBaseUrl()}
-                  prefill={conceptPrefill}
                 />
               </div>
 
@@ -2391,7 +2359,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "ask", label: "问书" },
       { id: "annotate", label: "精读" },
       { id: "recap", label: "前情回顾" },
-      { id: "entity", label: "实体回溯" },
+      { id: "entity", label: "全书回溯" },
     ],
   },
   {
@@ -2413,7 +2381,6 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "timeline", label: "时间线" },
       { id: "subplot", label: "支线编织" },
       { id: "foreshadow", label: "伏笔回收" },
-      { id: "motif", label: "母题追踪" },
     ],
   },
   {
@@ -2421,7 +2388,6 @@ const NAV_GROUPS: NavGroup[] = [
     title: "思想 · 理论",
     modes: [
       { id: "argument", label: "论点结构" },
-      { id: "concept", label: "概念演进" },
     ],
   },
   {
@@ -2551,8 +2517,8 @@ const FEATURE_TO_MODE: Record<string, Mode> = {
   timeline: "timeline",
   consistency: "consistency",
   entity_recall: "entity",
-  concept_evolution: "concept",
-  motif: "motif",
+  concept_evolution: "entity",
+  motif: "entity",
   argument_structure: "argument",
   writing_technique: "technique",
   study_cards: "cards",
