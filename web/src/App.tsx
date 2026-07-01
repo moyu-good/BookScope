@@ -1551,6 +1551,10 @@ export function App() {
           model={model}
           baseUrl={effectiveBaseUrl()}
           onExit={() => setReaderOpen(false)}
+          onGoAnnotate={() => {
+            setReaderOpen(false);
+            setMode("annotate");
+          }}
         />
       </>
     );

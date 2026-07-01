@@ -48,6 +48,8 @@ interface ReaderProps {
   baseUrl: string;
   /** 退回书架 */
   onExit: () => void;
+  /** 去「精读」看 AI 批注（整合 round2 C 中间版:读↔精读交叉链,不硬融两套锚点）。不传则不显。 */
+  onGoAnnotate?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +191,7 @@ function saveLastChapter(sessionId: string, chapter: number): void {
 // 主组件
 // ---------------------------------------------------------------------------
 
-export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl, onExit }: ReaderProps) {
+export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl, onExit, onGoAnnotate }: ReaderProps) {
   const [toc, setToc] = useState<TocChapter[] | null>(null);
   const [tocError, setTocError] = useState<string | null>(null);
 
@@ -539,6 +541,8 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
               </span>
             )}
           </button>
+          {/* AI批注:去「精读」看 AI 编排的分层朱批(整合 round2 C 中间版,读↔精读不割裂) */}
+          {onGoAnnotate && <ChromeBtn onClick={onGoAnnotate} label="AI批注" />}
           <button type="button" onClick={() => setJianOpen(true)} className="text-xs px-3 py-1 rounded-full text-white hover:brightness-110" style={{ background: "var(--color-seal)" }}>
             鉴
           </button>
