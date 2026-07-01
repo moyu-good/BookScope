@@ -28,6 +28,14 @@ function sentLabel(s: number): string {
   return "平";
 }
 
+// 张力粗档：exp-016 n=8 实测张力分档内 ±1 档抖、绝对整数不可当真，只有相对高低稳。
+// 所以这里跟 CharacterArc / HuaniaoArc 一样报粗档，不印"7/10"那种假精确（虽标了仅供参考）。
+function tensionLabel(t: number): string {
+  if (t >= 7) return "偏紧";
+  if (t <= 3) return "偏松";
+  return "居中";
+}
+
 export function NarrativeCurve({
   sessionId,
   provider,
@@ -217,7 +225,7 @@ export function NarrativeCurve({
 
           {/* 张力等四维：只附带，标"模型判读"，不当纵轴 */}
           <p className="mt-3 pt-2 border-t border-[var(--color-rule)] text-xs text-[var(--color-ink-muted)]">
-            模型判读（仅供参考，不当数据）：张力 {sel.tension}/10 · 情感{sentLabel(sel.sentiment)} · 视角「{sel.pov}」· {sel.mainline ? "主线" : "支线"}
+            模型判读（仅供参考，不当数据）：张力{tensionLabel(sel.tension)} · 情感{sentLabel(sel.sentiment)} · 视角「{sel.pov}」· {sel.mainline ? "主线" : "支线"}
           </p>
         </div>
       )}
