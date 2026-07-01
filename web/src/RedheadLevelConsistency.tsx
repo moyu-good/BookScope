@@ -368,7 +368,7 @@ function SidePane({
       {/* 层级签 + 发文字号 */}
       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
         <span
-          className="text-[11px] px-1.5 py-0.5 rounded"
+          className="text-caption px-1.5 py-0.5 rounded"
           style={{
             color: accent,
             border: `0.5px solid ${accent}`,
@@ -400,7 +400,7 @@ function SidePane({
         <div className="mt-2 flex items-start gap-2">
           <SealMark size={16} title="原文已核验" />
           <p
-            className="text-[12.5px] leading-relaxed text-[var(--color-ink-muted)] border-l-2 pl-2.5"
+            className="text-caption leading-relaxed text-[var(--color-ink-muted)] border-l-2 pl-2.5"
             style={{
               borderColor: "color-mix(in oklch, var(--color-seal) 35%, transparent)",
               fontFamily: "var(--font-display)",

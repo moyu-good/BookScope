@@ -436,7 +436,7 @@ function AiChapterNotes({ notes }: { notes: AiNote[] }) {
             style={{ border: "0.5px solid var(--color-seal)" }}
           >
             <span
-              className="text-[10.5px] px-1.5 py-0.5 rounded mr-1.5"
+              className="text-caption px-1.5 py-0.5 rounded mr-1.5"
               style={{ color: "var(--color-seal)", background: "var(--color-paper)" }}
             >
               {_AI_LAYER_LABEL[n.layer] ?? n.layer}
@@ -804,7 +804,7 @@ export function AnnotationOverview({
                   onClick={() => onJump(ann)}
                   className="block w-full text-left"
                 >
-                  <div className="flex items-center gap-1.5 text-[10.5px] text-[var(--color-ink-muted)] mb-0.5">
+                  <div className="flex items-center gap-1.5 text-caption text-[var(--color-ink-muted)] mb-0.5">
                     <span>{KIND_LABEL[ann.kind]}</span>
                     <span aria-hidden>·</span>
                     <span>第 {ann.anchor.chapter} 章</span>
@@ -823,7 +823,7 @@ export function AnnotationOverview({
                 <button
                   type="button"
                   onClick={() => onDelete(ann)}
-                  className="mt-1 text-[10.5px] text-[var(--color-ink-muted)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--color-seal)] transition-opacity"
+                  className="mt-1 text-caption text-[var(--color-ink-muted)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--color-seal)] transition-opacity"
                 >
                   删除
                 </button>

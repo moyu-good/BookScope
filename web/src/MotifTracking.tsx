@@ -169,7 +169,7 @@ export function MotifTracking({
                   className="text-left w-full"
                 >
                   <div
-                    className="text-[14px] leading-relaxed text-[var(--color-ink)]"
+                    className="text-body leading-relaxed text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {o.manifestation || "（复现）"}
@@ -184,7 +184,7 @@ export function MotifTracking({
                 </button>
                 {openIdx === i && o.snippet && (
                   <div
-                    className="mt-1.5 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-[13px] leading-relaxed text-[var(--color-ink)]"
+                    className="mt-1.5 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-body-sm leading-relaxed text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {o.snippet}

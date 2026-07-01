@@ -258,7 +258,7 @@ export function RedheadGlossary({
                 {/* 词头：朱砂提行立起的标目 + 章次小签。古籍词条的标目位。 */}
                 <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
                   <span
-                    className="text-[17px] font-bold leading-tight"
+                    className="text-lead font-bold leading-tight"
                     style={{
                       color: "var(--color-seal)",
                       fontFamily: "var(--font-display)",
@@ -280,7 +280,7 @@ export function RedheadGlossary({
                 <div className="flex items-start gap-2">
                   {verified && <SealMark size={18} title="原文已核验" />}
                   <p
-                    className="text-[15px] leading-7 text-[var(--color-ink)]"
+                    className="text-body leading-7 text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {t.explanation || "（这条没给出释义）"}
@@ -291,11 +291,11 @@ export function RedheadGlossary({
                     这词在这具体所指什么。它跟着原句的核验态走，不另起鉴印（鉴印挂在词头那枚）。 */}
                 {hasContext && (
                   <p
-                    className="mt-1.5 text-[14px] leading-7 text-[var(--color-ink)]"
+                    className="mt-1.5 text-body leading-7 text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     <span
-                      className="text-[11px] mr-1.5 align-top whitespace-nowrap"
+                      className="text-caption mr-1.5 align-top whitespace-nowrap"
                       style={{ color: "var(--color-seal)" }}
                     >
                       本文件指
@@ -315,7 +315,7 @@ export function RedheadGlossary({
                     }}
                   >
                     <span
-                      className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap mb-1"
+                      className="inline-flex items-center text-caption px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap mb-1"
                       style={{
                         border: "1px dashed var(--color-ink-muted)",
                         opacity: 0.85,
@@ -324,7 +324,7 @@ export function RedheadGlossary({
                       政策意图 · 研判
                     </span>
                     <p
-                      className="text-[13px] leading-relaxed text-[var(--color-ink-muted)]"
+                      className="text-body-sm leading-relaxed text-[var(--color-ink-muted)]"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {t.policy_intent}
@@ -349,7 +349,7 @@ export function RedheadGlossary({
                       onClick={() =>
                         setOpenOrigin((cur) => ({ ...cur, [i]: !cur[i] }))
                       }
-                      className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                      className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                     >
                       {isOpen ? "收起原文" : "见原文"}
                     </button>
@@ -365,11 +365,11 @@ export function RedheadGlossary({
                           }}
                         />
                         <p
-                          className="text-[13px] leading-relaxed text-[var(--color-ink-muted)]"
+                          className="text-body-sm leading-relaxed text-[var(--color-ink-muted)]"
                           style={{ fontFamily: "var(--font-display)" }}
                         >
                           <span
-                            className="text-[11px] mr-1.5 align-top"
+                            className="text-caption mr-1.5 align-top"
                             style={{ color: "var(--color-seal)" }}
                           >
                             原文

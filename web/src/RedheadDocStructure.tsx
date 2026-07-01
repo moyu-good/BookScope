@@ -313,7 +313,7 @@ export function RedheadDocStructure({
         {titleEl ? (
           <div className="flex items-start justify-center gap-1.5 px-2">
             <h4
-              className="text-[15px] font-bold text-[var(--color-ink)] leading-snug"
+              className="text-body font-bold text-[var(--color-ink)] leading-snug"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {titleEl.value}
@@ -334,7 +334,7 @@ export function RedheadDocStructure({
         {/* 版心短线：版头标题下一道朱砂细线收束，仿公文版头分隔线（红线在心不在面） */}
         <div className="mt-2 flex items-center justify-center gap-2">
           <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
-          <span className="text-[11px] text-[var(--color-ink-muted)] tabular-nums">
+          <span className="text-caption text-[var(--color-ink-muted)] tabular-nums">
             头要素 抽到 {headFilled}/{headApplicable || head.length || 8}
           </span>
           <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
@@ -383,7 +383,7 @@ export function RedheadDocStructure({
                       {h.verified ? (
                         <SealMark size={17} title="原文已核验" />
                       ) : (
-                        <span className="text-[11px] text-[var(--color-ink-muted)]">
+                        <span className="text-caption text-[var(--color-ink-muted)]">
                           未在原文比对命中·仅供参考
                         </span>
                       )}
@@ -395,7 +395,7 @@ export function RedheadDocStructure({
                               cur === h.field ? null : h.field,
                             )
                           }
-                          className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                          className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                         >
                           {isOpen ? "收起原文" : "看原文出处"}
                         </button>
@@ -409,7 +409,7 @@ export function RedheadDocStructure({
                         {confirmedAbsentLabel(h.field)}
                       </span>
                       {h.reason && (
-                        <span className="text-[11px] text-[var(--color-ink-muted)]">
+                        <span className="text-caption text-[var(--color-ink-muted)]">
                           {h.reason}
                         </span>
                       )}
@@ -422,7 +422,7 @@ export function RedheadDocStructure({
                   {/* 点开的原文出处 */}
                   {canOpen && isOpen && (
                     <p
-                      className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 border-[var(--color-seal)]/40 pl-3"
+                      className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 border-[var(--color-seal)]/40 pl-3"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {h.evidence}
@@ -455,7 +455,7 @@ export function RedheadDocStructure({
             </span>
             {/* "研判"角标——明说这是推断不是核验事实，不配鉴印 */}
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded"
+              className="text-caption px-1.5 py-0.5 rounded"
               style={{ color: "#8a6b3f", background: "rgba(138, 107, 63, 0.12)" }}
             >
               研判 · 非核验
@@ -475,7 +475,7 @@ export function RedheadDocStructure({
             {(structureRead.authority.agency_level === "最高" ||
               structureRead.authority.agency_level === "高") && (
               <span
-                className="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                className="text-caption px-1.5 py-0.5 rounded font-bold"
                 style={
                   structureRead.authority.agency_level === "最高"
                     ? {
@@ -494,7 +494,7 @@ export function RedheadDocStructure({
               </span>
             )}
             {structureRead.authority.doc_type && (
-              <span className="text-[11px] text-[var(--color-ink-muted)]">
+              <span className="text-caption text-[var(--color-ink-muted)]">
                 据文种「{structureRead.authority.doc_type}」
                 {structureRead.authority.issuer
                   ? ` + 发文机关「${structureRead.authority.issuer}」`
@@ -504,12 +504,12 @@ export function RedheadDocStructure({
             )}
             {/* 研判依据是否落在已核要素上——薄了如实说，不蒙混 */}
             {!structureRead.authority.verified_basis && (
-              <span className="text-[10px] text-[var(--color-ink-muted)] italic">
+              <span className="text-caption text-[var(--color-ink-muted)] italic">
                 （文种/机关未在原文核实，依据较薄）
               </span>
             )}
           </div>
-          <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-ink)]">
+          <p className="mt-1 text-body-sm leading-relaxed text-[var(--color-ink)]">
             {structureRead.authority.appraisal}
           </p>
 
@@ -519,7 +519,7 @@ export function RedheadDocStructure({
               {structureRead.signals.map((sig, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <span
-                    className="text-[10px] px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+                    className="text-caption px-1.5 py-0.5 rounded shrink-0 mt-0.5"
                     style={{
                       color: "#8a6b3f",
                       background: "rgba(138, 107, 63, 0.12)",
@@ -527,7 +527,7 @@ export function RedheadDocStructure({
                   >
                     {signalKindLabel(sig.kind)}
                   </span>
-                  <p className="text-[12px] leading-relaxed text-[var(--color-ink)]">
+                  <p className="text-caption leading-relaxed text-[var(--color-ink)]">
                     {sig.element && (
                       <span className="text-[var(--color-ink-muted)]">
                         {sig.element} ——{" "}

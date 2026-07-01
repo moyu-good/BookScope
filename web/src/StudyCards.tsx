@@ -138,13 +138,13 @@ export function StudyCards({
                 }}
               >
                 <div
-                  className="text-[15px] text-[var(--color-ink)]"
+                  className="text-body text-[var(--color-ink)]"
                   style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
                 >
                   {c.concept}
                 </div>
                 {c.question && (
-                  <div className="text-[13px] text-[var(--color-seal)] mt-1 leading-relaxed">
+                  <div className="text-body-sm text-[var(--color-seal)] mt-1 leading-relaxed">
                     自测：{c.question}
                   </div>
                 )}
@@ -159,7 +159,7 @@ export function StudyCards({
                   <div className="mt-2">
                     {c.point && (
                       <div
-                        className="text-[14px] leading-relaxed text-[var(--color-ink)] mb-2"
+                        className="text-body leading-relaxed text-[var(--color-ink)] mb-2"
                         style={{ fontFamily: "var(--font-display)" }}
                       >
                         {c.point}
@@ -174,7 +174,7 @@ export function StudyCards({
                           )}
                         </div>
                         <div
-                          className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                          className="text-body-sm leading-relaxed text-[var(--color-ink)]"
                           style={{ fontFamily: "var(--font-display)" }}
                         >
                           {c.snippet}

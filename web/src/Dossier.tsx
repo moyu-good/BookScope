@@ -190,7 +190,7 @@ export function Dossier({
                     →
                   </span>
                 </div>
-                <div className="text-[11px] text-[var(--color-ink-muted)] mt-0.5 leading-snug">
+                <div className="text-caption text-[var(--color-ink-muted)] mt-0.5 leading-snug">
                   {v.hint}
                 </div>
               </button>
@@ -235,7 +235,7 @@ export function Dossier({
                   >
                     {s.book_title}
                   </div>
-                  <div className="text-[11px] text-[var(--color-ink-muted)] mt-0.5">
+                  <div className="text-caption text-[var(--color-ink-muted)] mt-0.5">
                     {s.language} · {formatRelativeTime(s.last_accessed_at)}
                   </div>
                 </div>

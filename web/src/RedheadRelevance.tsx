@@ -373,7 +373,7 @@ export function RedheadRelevance({
                       </span>
                     )}
                     <p
-                      className="text-[15px] leading-7 text-[var(--color-ink)]"
+                      className="text-body leading-7 text-[var(--color-ink)]"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {hasText(it.matter) ? it.matter : "（这条没抽到事项）"}
@@ -397,7 +397,7 @@ export function RedheadRelevance({
                         onClick={() =>
                           setOpenOrigin((cur) => ({ ...cur, [i]: !cur[i] }))
                         }
-                        className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                        className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                       >
                         {isOpen ? "收起原文" : "对原文"}
                       </button>
@@ -412,11 +412,11 @@ export function RedheadRelevance({
                             }}
                           />
                           <p
-                            className="text-[13px] leading-relaxed text-[var(--color-ink-muted)]"
+                            className="text-body-sm leading-relaxed text-[var(--color-ink-muted)]"
                             style={{ fontFamily: "var(--font-display)" }}
                           >
                             <span
-                              className="text-[11px] mr-1.5 align-top"
+                              className="text-caption mr-1.5 align-top"
                               style={{ color: "var(--color-seal)" }}
                             >
                               原文
@@ -437,7 +437,7 @@ export function RedheadRelevance({
                 >
                   <div className="flex items-baseline gap-1.5 mb-1">
                     <span
-                      className="text-[13px] font-bold"
+                      className="text-body-sm font-bold"
                       style={{
                         color: "var(--color-seal)",
                         fontFamily: "var(--font-display)",
@@ -446,7 +446,7 @@ export function RedheadRelevance({
                       {it.bearing}
                     </span>
                     <span
-                      className="text-[10px]"
+                      className="text-caption"
                       style={{ color: "var(--color-seal)", opacity: 0.7 }}
                     >
                       {BEARING_HINT[it.bearing]}
@@ -454,18 +454,18 @@ export function RedheadRelevance({
                   </div>
                   {hasText(it.note) ? (
                     <p
-                      className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                      className="text-body-sm leading-relaxed text-[var(--color-ink)]"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {it.note}
                     </p>
                   ) : (
-                    <p className="text-[12px] text-[var(--color-ink-muted)] italic">
+                    <p className="text-caption text-[var(--color-ink-muted)] italic">
                       （这条没批出一句话）
                     </p>
                   )}
                   {!strong && (
-                    <p className="mt-1 text-[10px] text-[var(--color-ink-muted)]">
+                    <p className="mt-1 text-caption text-[var(--color-ink-muted)]">
                       间接相关
                     </p>
                   )}

@@ -388,7 +388,7 @@ function BookRow(props: {
             </span>
             {dupeCount > 1 ? (
               <span
-                className="shrink-0 text-[0.65rem] px-1.5 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] leading-none"
+                className="shrink-0 text-caption px-1.5 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] leading-none"
                 title={`同名书上传了 ${dupeCount} 份，这行指向最近用过的那份`}
               >
                 × {dupeCount} 份
@@ -396,7 +396,7 @@ function BookRow(props: {
             ) : null}
             {noteCount > 0 ? (
               <span
-                className="shrink-0 text-[0.65rem] px-1.5 py-0.5 rounded-full leading-none"
+                className="shrink-0 text-caption px-1.5 py-0.5 rounded-full leading-none"
                 style={{
                   background: "var(--color-seal-soft)",
                   color: "var(--color-seal)",

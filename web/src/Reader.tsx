@@ -593,7 +593,7 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
             批
             {annotations.length > 0 && (
               <span
-                className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full text-[10px] leading-4 text-center text-white"
+                className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full text-caption leading-4 text-center text-white"
                 style={{ background: "var(--color-ink)" }}
               >
                 {annotations.length}

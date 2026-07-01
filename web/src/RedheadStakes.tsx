@@ -212,7 +212,7 @@ function SubstanceBadge({ substance }: { substance: string }) {
   const st = substanceStyle(substance);
   return (
     <span
-      className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+      className="inline-flex items-center text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
       title={SUBSTANCE_HINT[substance as Substance] ?? ""}
       style={{
         color: st.fg,
@@ -232,7 +232,7 @@ function HorizonTag({ horizon }: { horizon: string }) {
   if (!hasText(horizon)) return null;
   return (
     <span
-      className="text-[10px] text-[var(--color-ink-muted)] whitespace-nowrap"
+      className="text-caption text-[var(--color-ink-muted)] whitespace-nowrap"
       title={HORIZON_HINT[horizon as Horizon] ?? ""}
     >
       {horizon}期
@@ -506,7 +506,7 @@ export function RedheadStakes({
         >
           {/* 判语签：右上一枚朱砂「判」字签，点破这是带立场的总批不是中立罗列 */}
           <span
-            className="absolute -top-2.5 left-4 inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded"
+            className="absolute -top-2.5 left-4 inline-flex items-center gap-1 px-2 py-0.5 text-caption font-bold rounded"
             style={{
               color: "var(--color-paper)",
               background: "var(--color-seal)",
@@ -517,7 +517,7 @@ export function RedheadStakes({
             判语 · 一句话建议
           </span>
           <p
-            className="text-[15px] leading-7 text-[var(--color-ink)] mt-1"
+            className="text-body leading-7 text-[var(--color-ink)] mt-1"
             style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
           >
             {result.recommendation}
@@ -657,7 +657,7 @@ export function RedheadStakes({
                   {/* 研判标：左上一枚虚线降调小签——「研判·非核验」，跟鉴印对立的视觉语言 */}
                   <div className="flex items-start justify-between gap-2 mb-1.5">
                     <span
-                      className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap shrink-0"
+                      className="inline-flex items-center text-caption px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap shrink-0"
                       style={{
                         border: "1px dashed var(--color-ink-muted)",
                         opacity: 0.85,
@@ -668,7 +668,7 @@ export function RedheadStakes({
                     {/* 置信度徽章（刻意非朱砂，免得跟核验态撞色） */}
                     {hasText(s.confidence) && (
                       <span
-                        className="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+                        className="text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
                         style={{ color: cf.fg, background: cf.bg }}
                       >
                         置信 {s.confidence}
@@ -678,7 +678,7 @@ export function RedheadStakes({
 
                   {/* 研判出的方向（评估层的结论，墨字但不盖印） */}
                   <p
-                    className="text-[15px] leading-7 text-[var(--color-ink)]"
+                    className="text-body leading-7 text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {hasText(s.direction) ? s.direction : "（这条没研判出方向）"}
@@ -692,7 +692,7 @@ export function RedheadStakes({
                         onClick={() =>
                           setOpenBasis((cur) => ({ ...cur, [i]: !cur[i] }))
                         }
-                        className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                        className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                       >
                         {isOpen
                           ? "收起原文基础"
@@ -703,14 +703,14 @@ export function RedheadStakes({
                           {basis.map((b, bi) => (
                             <li
                               key={bi}
-                              className="text-[13px] leading-relaxed text-[var(--color-ink-muted)] pl-3"
+                              className="text-body-sm leading-relaxed text-[var(--color-ink-muted)] pl-3"
                               style={{
                                 fontFamily: "var(--font-display)",
                                 borderLeft: "1px dashed var(--color-rule)",
                               }}
                             >
                               <span
-                                className="text-[10px] mr-1.5 align-top text-[var(--color-ink-muted)]"
+                                className="text-caption mr-1.5 align-top text-[var(--color-ink-muted)]"
                                 style={{ opacity: 0.7 }}
                               >
                                 引
@@ -816,7 +816,7 @@ function StakeCard({
 
       {/* 标题行：what（主体）+ 右上含金量徽章 + 时效小标 */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[15px] font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
+        <p className="text-body font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
           {hasText(what)
             ? what
             : kind === "opp"
@@ -831,7 +831,7 @@ function StakeCard({
 
       {/* why / cost：这条对你为何是机会 / 代价是什么 */}
       {hasText(detail) && (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+        <p className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink-muted)]">
           <span className="text-[var(--color-ink)]">{detailLabel}</span> ·{" "}
           {detail}
         </p>
@@ -839,9 +839,9 @@ function StakeCard({
 
       {/* action：可采取的动作（仅机会有）——朱砂细标领格，是「能去争取」的落点 */}
       {hasText(action) && (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+        <p className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)]">
           <span
-            className="text-[11px] mr-1.5 align-top"
+            className="text-caption mr-1.5 align-top"
             style={{ color: "var(--color-seal)" }}
           >
             可争取
@@ -852,7 +852,7 @@ function StakeCard({
 
       {/* 含金量凭据：凭哪些 marker 判的（锚原文里的约束词/时限/主体/罚则）——评级也要有据 */}
       {hasText(substanceReason) && (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-ink-muted)] italic">
+        <p className="mt-1.5 text-caption leading-relaxed text-[var(--color-ink-muted)] italic">
           含金量凭据 · {substanceReason}
         </p>
       )}
@@ -866,7 +866,7 @@ function StakeCard({
               <button
                 type="button"
                 onClick={onToggle}
-                className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
               >
                 {open ? "收起原文" : "看原文出处"}
               </button>
@@ -881,14 +881,14 @@ function StakeCard({
         )}
         {canOpen && open && (
           <p
-            className="mt-2 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+            className="mt-2 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
             style={{
               fontFamily: "var(--font-display)",
               borderColor: "var(--color-seal)",
             }}
           >
             <span
-              className="text-[11px] mr-1.5 align-top"
+              className="text-caption mr-1.5 align-top"
               style={{ color: "var(--color-seal)" }}
             >
               原文
@@ -929,10 +929,10 @@ function RelatedClauseRow({
       />
       {/* 标题行：条次 + 事项（主体）+ 右上 bearing 朱签 */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[15px] font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
+        <p className="text-body font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
           {typeof clause.chapter === "number" && (
             <span
-              className="text-[12px] mr-1.5 align-top tabular-nums"
+              className="text-caption mr-1.5 align-top tabular-nums"
               style={{ color: "var(--color-seal)" }}
             >
               第{clause.chapter}条
@@ -942,12 +942,12 @@ function RelatedClauseRow({
         </p>
         <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
           {!strong && (
-            <span className="text-[10px] text-[var(--color-ink-muted)] whitespace-nowrap">
+            <span className="text-caption text-[var(--color-ink-muted)] whitespace-nowrap">
               间接相关
             </span>
           )}
           <span
-            className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap"
+            className="inline-flex items-center text-caption px-2 py-0.5 rounded-full whitespace-nowrap"
             title={BEARING_HINT[clause.bearing] ?? ""}
             style={{
               color: "var(--color-seal)",
@@ -962,7 +962,7 @@ function RelatedClauseRow({
 
       {/* 「对你」一句人话 */}
       {hasText(clause.note) && (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+        <p className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink-muted)]">
           <span className="text-[var(--color-ink)]">对你</span> · {clause.note}
         </p>
       )}
@@ -976,7 +976,7 @@ function RelatedClauseRow({
               <button
                 type="button"
                 onClick={onToggle}
-                className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
               >
                 {open ? "收起原文" : "看原文出处"}
               </button>
@@ -989,14 +989,14 @@ function RelatedClauseRow({
         )}
         {canOpen && open && (
           <p
-            className="mt-2 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+            className="mt-2 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
             style={{
               fontFamily: "var(--font-display)",
               borderColor: "var(--color-seal)",
             }}
           >
             <span
-              className="text-[11px] mr-1.5 align-top"
+              className="text-caption mr-1.5 align-top"
               style={{ color: "var(--color-seal)" }}
             >
               原文

@@ -660,7 +660,7 @@ function EdgeDetail({
         </button>
       </div>
       {hasText(edge.note) && (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+        <p className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)]">
           {edge.note}
         </p>
       )}
@@ -685,7 +685,7 @@ function PostureBlock({ posture }: { posture: EdgePosture }) {
     >
       <div className="flex items-center gap-2 flex-wrap">
         <span
-          className="text-[11px] px-1.5 py-0.5 rounded-full"
+          className="text-caption px-1.5 py-0.5 rounded-full"
           style={{ color: ps.fg, border: `0.5px solid ${ps.fg}` }}
         >
           研判·博弈姿态
@@ -698,7 +698,7 @@ function PostureBlock({ posture }: { posture: EdgePosture }) {
         </span>
       </div>
       {hasText(posture.basis) && (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+        <p className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)]">
           {posture.basis}
         </p>
       )}
@@ -729,13 +729,13 @@ function PostureQuote({
   return (
     <div className="flex items-start gap-2">
       <span
-        className="text-[11px] px-1 py-0.5 rounded shrink-0 mt-0.5"
+        className="text-caption px-1 py-0.5 rounded shrink-0 mt-0.5"
         style={{ color: accent, border: `0.5px solid ${accent}`, fontFamily: "var(--font-display)" }}
       >
         {rank}
       </span>
       <p
-        className="text-[12.5px] leading-relaxed text-[var(--color-ink-muted)] border-l-2 pl-2"
+        className="text-caption leading-relaxed text-[var(--color-ink-muted)] border-l-2 pl-2"
         style={{
           borderColor: "color-mix(in oklch, var(--color-seal) 35%, transparent)",
           fontFamily: "var(--font-display)",

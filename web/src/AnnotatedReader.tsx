@@ -594,7 +594,7 @@ function ApproxNotes({
               key={i}
               type="button"
               onClick={() => onSelect(selected === i ? null : i)}
-              className="text-[11px] px-2 py-0.5 rounded border transition-colors"
+              className="text-caption px-2 py-0.5 rounded border transition-colors"
               style={
                 selected === i
                   ? {
@@ -639,7 +639,7 @@ function ParaMarks({
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="inline-flex items-center align-middle ml-1 px-1.5 py-0.5 rounded text-[11px]"
+        className="inline-flex items-center align-middle ml-1 px-1.5 py-0.5 rounded text-caption"
         style={{
           background: "var(--color-seal-soft)",
           color: "var(--color-seal)",
@@ -714,7 +714,7 @@ function AnnotationCard({
         <SealMark size={15} title="原文已核验" />
       </div>
       <p
-        className="text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-2.5 py-0.5"
+        className="text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-2.5 py-0.5"
         style={{ borderColor: "var(--color-seal)", fontFamily: "var(--font-display)" }}
       >
         {ann.snippet}
@@ -736,7 +736,7 @@ function AnnotationCard({
             </button>
           </div>
           <p
-            className="text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-2.5 py-0.5"
+            className="text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-2.5 py-0.5"
             style={{ borderColor: "var(--color-ink-muted)", fontFamily: "var(--font-display)" }}
           >
             {ann.target_snippet}

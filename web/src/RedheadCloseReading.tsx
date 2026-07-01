@@ -357,14 +357,14 @@ export function RedheadCloseReading({
                 {/* 大白话——精读笺主体。纯表态条款(方针/原则)不摆成带鉴印的"翻译"——那是复读;
                     老实标它是方向、淡化呈现,鉴印只留给下面「对原文」(WP-redhead-substance-vs-slogan §3.4)。 */}
                 {it.clause_kind === "pure_statement" ? (
-                  <p className="text-[13px] leading-relaxed text-[var(--color-ink-muted)] italic">
+                  <p className="text-body-sm leading-relaxed text-[var(--color-ink-muted)] italic">
                     {it.plain}
                   </p>
                 ) : (
                   <div className="flex items-start gap-2">
                     {verified && <SealMark size={18} title="原文已核验" />}
                     <p
-                      className="text-[15px] leading-7 text-[var(--color-ink)]"
+                      className="text-body leading-7 text-[var(--color-ink)]"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {it.plain || "（这条没翻出大白话）"}
@@ -426,7 +426,7 @@ export function RedheadCloseReading({
                             <span style={{ fontFamily: "var(--font-display)" }}>
                               {t.term}
                             </span>
-                            <span className="text-[10px] opacity-70">
+                            <span className="text-caption opacity-70">
                               {topen ? "收" : "释"}
                             </span>
                           </button>
@@ -434,7 +434,7 @@ export function RedheadCloseReading({
                             <div className="mt-1 pl-2 border-l-2 border-[var(--color-seal)]/40">
                               {hasText(t.explanation) && (
                                 <p
-                                  className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                                  className="text-body-sm leading-relaxed text-[var(--color-ink)]"
                                   style={{ fontFamily: "var(--font-display)" }}
                                 >
                                   {t.explanation}
@@ -442,11 +442,11 @@ export function RedheadCloseReading({
                               )}
                               {hasText(t.context_meaning) && (
                                 <p
-                                  className="mt-1 text-[13px] leading-relaxed text-[var(--color-ink)]"
+                                  className="mt-1 text-body-sm leading-relaxed text-[var(--color-ink)]"
                                   style={{ fontFamily: "var(--font-display)" }}
                                 >
                                   <span
-                                    className="text-[11px] mr-1.5 align-top whitespace-nowrap"
+                                    className="text-caption mr-1.5 align-top whitespace-nowrap"
                                     style={{ color: "var(--color-seal)" }}
                                   >
                                     本文件指
@@ -463,7 +463,7 @@ export function RedheadCloseReading({
                                   }}
                                 >
                                   <span
-                                    className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap mb-1"
+                                    className="inline-flex items-center text-caption px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap mb-1"
                                     style={{
                                       border: "1px dashed var(--color-ink-muted)",
                                       opacity: 0.85,
@@ -471,7 +471,7 @@ export function RedheadCloseReading({
                                   >
                                     政策意图 · 研判
                                   </span>
-                                  <p className="text-[12px] leading-relaxed text-[var(--color-ink-muted)]">
+                                  <p className="text-caption leading-relaxed text-[var(--color-ink-muted)]">
                                     {t.policy_intent}
                                   </p>
                                 </div>
@@ -528,7 +528,7 @@ export function RedheadCloseReading({
                       onClick={() =>
                         setOpenOrigin((cur) => ({ ...cur, [i]: !cur[i] }))
                       }
-                      className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                      className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                     >
                       {isOpen ? "收起原文" : "对原文"}
                     </button>
@@ -541,11 +541,11 @@ export function RedheadCloseReading({
                           style={{ background: "var(--color-seal)", opacity: 0.3 }}
                         />
                         <p
-                          className="text-[13px] leading-relaxed text-[var(--color-ink-muted)]"
+                          className="text-body-sm leading-relaxed text-[var(--color-ink-muted)]"
                           style={{ fontFamily: "var(--font-display)" }}
                         >
                           <span
-                            className="text-[11px] mr-1.5 align-top"
+                            className="text-caption mr-1.5 align-top"
                             style={{ color: "var(--color-seal)" }}
                           >
                             原文

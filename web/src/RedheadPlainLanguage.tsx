@@ -321,7 +321,7 @@ export function RedheadPlainLanguage({
                 <div className="flex items-start gap-2">
                   {verified && <SealMark size={18} title="原文已核验" />}
                   <p
-                    className="text-[15px] leading-7 text-[var(--color-ink)]"
+                    className="text-body leading-7 text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {it.plain || "（这条没翻出大白话）"}
@@ -375,7 +375,7 @@ export function RedheadPlainLanguage({
                       onClick={() =>
                         setOpenOrigin((cur) => ({ ...cur, [i]: !cur[i] }))
                       }
-                      className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                      className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                     >
                       {isOpen ? "收起原文" : "对原文"}
                     </button>
@@ -391,11 +391,11 @@ export function RedheadPlainLanguage({
                           }}
                         />
                         <p
-                          className="text-[13px] leading-relaxed text-[var(--color-ink-muted)]"
+                          className="text-body-sm leading-relaxed text-[var(--color-ink-muted)]"
                           style={{ fontFamily: "var(--font-display)" }}
                         >
                           <span
-                            className="text-[11px] mr-1.5 align-top"
+                            className="text-caption mr-1.5 align-top"
                             style={{ color: "var(--color-seal)" }}
                           >
                             原文

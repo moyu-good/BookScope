@@ -300,7 +300,7 @@ export function RedheadPolicyEvolution({
                     }}
                   >
                     <span
-                      className="text-[11.5px] font-bold tabular-nums break-all"
+                      className="text-caption font-bold tabular-nums break-all"
                       style={{ color: "var(--color-seal)" }}
                     >
                       {hasText(s.doc) ? s.doc : `第 ${s.order ?? i + 1} 阶段`}
@@ -344,7 +344,7 @@ export function RedheadPolicyEvolution({
                   <div className="flex items-start gap-2">
                     {verified && <SealMark size={17} title="原文已核验" />}
                     <p
-                      className="text-[15px] leading-7 text-[var(--color-ink)]"
+                      className="text-body leading-7 text-[var(--color-ink)]"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {hasText(s.change)
@@ -368,13 +368,13 @@ export function RedheadPolicyEvolution({
                         onClick={() =>
                           setOpenOrigin((cur) => ({ ...cur, [i]: !cur[i] }))
                         }
-                        className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                        className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                       >
                         {isOpen ? "收起原文" : "看原文出处"}
                       </button>
                       {isOpen && (
                         <p
-                          className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+                          className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
                           style={{
                             borderColor:
                               "color-mix(in oklch, var(--color-seal) 40%, transparent)",
@@ -458,7 +458,7 @@ function DiffCard({ diff }: { diff: PolicyDiff }) {
         <DirectionBadge direction={diff.direction} style={ds} />
         {hasText(diff.topic_point) && (
           <span
-            className="text-[13px] font-bold text-[var(--color-ink)]"
+            className="text-body-sm font-bold text-[var(--color-ink)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {diff.topic_point}
@@ -507,7 +507,7 @@ function DirectionBadge({
   return (
     <span
       title={style.hint || undefined}
-      className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded font-bold shrink-0"
+      className="inline-flex items-center text-caption px-1.5 py-0.5 rounded font-bold shrink-0"
       style={{
         fontFamily: "var(--font-display)",
         color: style.fill ? "var(--color-paper)" : accent,
@@ -534,7 +534,7 @@ function WordingLine({
   return (
     <div className="flex items-start gap-2">
       <span
-        className="text-[10px] mt-1 px-1 rounded shrink-0 leading-tight"
+        className="text-caption mt-1 px-1 rounded shrink-0 leading-tight"
         style={{
           color: "var(--color-ink-muted)",
           border: "0.5px solid var(--color-rule)",
@@ -546,7 +546,7 @@ function WordingLine({
       <SealMark size={15} title="原文逐字已核验" className="mt-0.5" />
       <div className="min-w-0">
         <span
-          className="text-[13.5px] leading-relaxed"
+          className="text-body-sm leading-relaxed"
           style={{
             fontFamily: "var(--font-display)",
             color:
@@ -556,7 +556,7 @@ function WordingLine({
           {text}
         </span>
         {hasText(doc) && (
-          <span className="ml-2 text-[11px] text-[var(--color-ink-muted)] tabular-nums break-all">
+          <span className="ml-2 text-caption text-[var(--color-ink-muted)] tabular-nums break-all">
             — {doc}
           </span>
         )}

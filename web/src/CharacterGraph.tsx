@@ -725,7 +725,7 @@ export function CharacterGraph({
           >
             展开剩下 {rendered.hiddenCount} 个次要{noun}
           </button>
-          <span className="ml-2 text-[11px] text-[var(--color-ink-muted)] opacity-70">
+          <span className="ml-2 text-caption text-[var(--color-ink-muted)] opacity-70">
             全量节点多，力学会慢一点。
           </span>
         </div>

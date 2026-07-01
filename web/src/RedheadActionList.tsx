@@ -527,7 +527,7 @@ export function RedheadActionList({
                       <div className="mt-2 flex items-start gap-2">
                         <SealMark size={17} title="原文已核验" />
                         <p
-                          className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                          className="text-body-sm leading-relaxed text-[var(--color-ink)]"
                           style={{ fontFamily: "var(--font-display)" }}
                         >
                           {c.evidence}
@@ -565,7 +565,7 @@ export function RedheadActionList({
               {pureStatements.map(({ c, idx }) => (
                 <li
                   key={idx}
-                  className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-[13px] leading-relaxed text-[var(--color-ink-muted)]"
+                  className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-body-sm leading-relaxed text-[var(--color-ink-muted)]"
                 >
                   {c.matter || c.evidence}
                 </li>

@@ -317,7 +317,7 @@ export function RedheadHardFacts({
         </p>
         <div className="mt-1.5 flex items-center justify-center gap-2">
           <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
-          <span className="text-[11px] text-[var(--color-ink-muted)] tabular-nums">
+          <span className="text-caption text-[var(--color-ink-muted)] tabular-nums">
             硬信息 {total} 条 · 原文核验 {verifiedCount}/{total}
           </span>
           <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
@@ -339,7 +339,7 @@ export function RedheadHardFacts({
                   className="h-4 w-[3px] rounded-full bg-[var(--color-seal)] opacity-80"
                   aria-hidden="true"
                 />
-                <span className="text-[15px] font-bold text-[var(--color-seal)]">
+                <span className="text-body font-bold text-[var(--color-seal)]">
                   {g.kind}
                 </span>
               </span>
@@ -377,7 +377,7 @@ export function RedheadHardFacts({
                     {/* value 当目：大宋体，是读者扫表第一眼抓的；核过的角上盖印 */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
-                        className="text-[15px] font-bold text-[var(--color-ink)] leading-snug"
+                        className="text-body font-bold text-[var(--color-ink)] leading-snug"
                         style={{ fontFamily: "var(--font-display)" }}
                       >
                         {f.value}
@@ -388,7 +388,7 @@ export function RedheadHardFacts({
                         if (!bs) return null;
                         return (
                           <span
-                            className="text-[11px] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+                            className="text-caption px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
                             style={{ color: bs.fg, background: bs.bg }}
                             title={f.binding_reason || undefined}
                           >
@@ -399,7 +399,7 @@ export function RedheadHardFacts({
                       {verifiedOrigin ? (
                         <SealMark size={16} title="原文已核验" />
                       ) : (
-                        <span className="text-[11px] text-[var(--color-ink-muted)]">
+                        <span className="text-caption text-[var(--color-ink-muted)]">
                           未在原文比对命中·仅供参考
                         </span>
                       )}
@@ -411,7 +411,7 @@ export function RedheadHardFacts({
                               cur === factKey ? null : factKey,
                             )
                           }
-                          className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                          className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                         >
                           {isOpen ? "收起原文" : "看原文出处"}
                         </button>
@@ -426,7 +426,7 @@ export function RedheadHardFacts({
                     {/* 点开的原文出处：宋体引文留白 */}
                     {canOpen && isOpen && (
                       <p
-                        className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 border-[var(--color-seal)]/40 pl-3"
+                        className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 border-[var(--color-seal)]/40 pl-3"
                         style={{ fontFamily: "var(--font-display)" }}
                       >
                         {f.evidence}
@@ -555,7 +555,7 @@ function HardFactsTimeline({
                     }}
                   >
                     <span
-                      className="text-[12.5px] font-bold"
+                      className="text-caption font-bold"
                       style={{ color: "var(--color-seal)" }}
                     >
                       {f.value}
@@ -585,7 +585,7 @@ function HardFactsTimeline({
                   <div className="flex items-start gap-2 flex-wrap">
                     {verified && <SealMark size={17} title="原文已核验" />}
                     <p
-                      className="text-[15px] leading-7 text-[var(--color-ink)]"
+                      className="text-body leading-7 text-[var(--color-ink)]"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {hasValue(f.context) ? f.context : f.value}
@@ -593,7 +593,7 @@ function HardFactsTimeline({
                     {/* 约束力签：硬指标（咬人的硬期限）vs 参考值（软目标）。悬停看判据 */}
                     {bs && (
                       <span
-                        className="self-center text-[11px] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+                        className="self-center text-caption px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
                         style={{ color: bs.fg, background: bs.bg }}
                         title={f.binding_reason || undefined}
                       >
@@ -621,13 +621,13 @@ function HardFactsTimeline({
                             cur === factKey ? null : factKey,
                           )
                         }
-                        className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                        className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                       >
                         {isOpen ? "收起原文" : "看原文出处"}
                       </button>
                       {isOpen && (
                         <p
-                          className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+                          className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
                           style={{
                             borderColor:
                               "color-mix(in oklch, var(--color-seal) 40%, transparent)",

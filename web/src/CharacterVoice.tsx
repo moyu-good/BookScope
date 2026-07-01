@@ -188,7 +188,7 @@ export function CharacterVoice({
           {features.length > 0 && (
             <section className="mb-7">
               <h3
-                className="text-[15px] mb-3 text-[var(--color-ink)]"
+                className="text-body mb-3 text-[var(--color-ink)]"
                 style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
               >
                 「{queried}」的声口
@@ -205,7 +205,7 @@ export function CharacterVoice({
                     }}
                   >
                     <div
-                      className="text-[14px] leading-relaxed text-[var(--color-ink)] flex items-center gap-1.5"
+                      className="text-body leading-relaxed text-[var(--color-ink)] flex items-center gap-1.5"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       <span>{f.trait}</span>
@@ -213,7 +213,7 @@ export function CharacterVoice({
                     </div>
                     {f.evidence && (
                       <div
-                        className="mt-2 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-[13px] leading-relaxed text-[var(--color-ink-muted)]"
+                        className="mt-2 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-body-sm leading-relaxed text-[var(--color-ink-muted)]"
                         style={{ fontFamily: "var(--font-display)" }}
                       >
                         “{f.evidence}”
@@ -233,7 +233,7 @@ export function CharacterVoice({
           {/* 下半：voice drift 提示 */}
           <section>
             <h3
-              className="text-[15px] mb-1.5 text-[var(--color-ink)]"
+              className="text-body mb-1.5 text-[var(--color-ink)]"
               style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
             >
               「这句不像他说的」
@@ -260,7 +260,7 @@ export function CharacterVoice({
                       className="text-left w-full"
                     >
                       <div
-                        className="text-[14px] leading-relaxed text-[var(--color-ink)]"
+                        className="text-body leading-relaxed text-[var(--color-ink)]"
                         style={{ fontFamily: "var(--font-display)" }}
                       >
                         {d.reason || "（疑似不符）"}
@@ -275,7 +275,7 @@ export function CharacterVoice({
                     </button>
                     {openIdx === i && d.quote && (
                       <div
-                        className="mt-1.5 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-[13px] leading-relaxed text-[var(--color-ink)]"
+                        className="mt-1.5 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-body-sm leading-relaxed text-[var(--color-ink)]"
                         style={{ fontFamily: "var(--font-display)" }}
                       >
                         “{d.quote}”

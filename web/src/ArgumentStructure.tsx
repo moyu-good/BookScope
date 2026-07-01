@@ -129,14 +129,14 @@ export function ArgumentStructure({
             >
               {/* 脉络节点：朱砂序号圈坐在脊线上,论证一脉相承 */}
               <span
-                className="absolute top-3 w-6 h-6 rounded-full flex items-center justify-center text-[11px]"
+                className="absolute top-3 w-6 h-6 rounded-full flex items-center justify-center text-caption"
                 style={{ left: "-2.45rem", background: "var(--color-seal)", color: "var(--color-paper)" }}
                 aria-hidden
               >
                 {c.order}
               </span>
               <div
-                className="text-[15px] leading-relaxed text-[var(--color-ink)] mb-2"
+                className="text-body leading-relaxed text-[var(--color-ink)] mb-2"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 {c.claim}
@@ -148,7 +148,7 @@ export function ArgumentStructure({
                     {c.verified && <SealMark size={17} title="原文已核验" />}
                   </div>
                   <div
-                    className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                    className="text-body-sm leading-relaxed text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {c.evidence}

@@ -183,7 +183,7 @@ export function ForeshadowArcs({
               >
                 全书没有挂得上原文的伏笔
               </p>
-              <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+              <p className="mt-0.5 text-body-sm leading-relaxed text-[var(--color-ink)]">
                 读了全书，没找到前埋后收的伏笔线索。这是个确定的结果——不是没扫到。
               </p>
             </div>
