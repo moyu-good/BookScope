@@ -49,6 +49,7 @@ export function AnnotatedProse({
   fg,
   onPickAnnotation,
   onSelect,
+  aiNotes,
 }: {
   text: string;
   paraGapRem: number;
@@ -68,6 +69,8 @@ export function AnnotatedProse({
     selEnd: number;
     rect: DOMRect;
   }) => void;
+  /** #9 中间版：这一章的 AI 分层批注（章末朱批列出，跟手动墨批分色）。不传则不显。 */
+  aiNotes?: AiNote[];
 }) {
   const paras = useMemo(() => splitParas(text), [text]);
 
@@ -166,6 +169,8 @@ export function AnnotatedProse({
           onPickAnnotation={onPickAnnotation}
         />
       )}
+      {/* #9 中间版：这一章的 AI 分层批注（章末朱批，跟手动墨批分色共存于同一阅读页） */}
+      {aiNotes && aiNotes.length > 0 && <AiChapterNotes notes={aiNotes} />}
     </div>
   );
 }
@@ -384,6 +389,63 @@ function ChapterLevelNotes({
               <span className="opacity-80">— {pl.ann.note_text}</span>
             )}
           </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// #9 中间版：AI 分层批注（伏笔 / 矛盾 / 母题 / 人物）章末朱批
+//
+// AI 批注是分析洞察（有 summary、锚原文 snippet），跟用户手动标注是两类东西——朱（AI）vs
+// 墨（手动）分色。这版先在**章末**列出（低风险，不动 sliceByMarks 的行内定位手术，那是完整版
+// task #9）。BE 已滤掉 verified=false 的，挂上来的都锚得到原文。
+// ---------------------------------------------------------------------------
+
+export interface AiNote {
+  layer: string; // foreshadow / contradiction / motif / entity
+  summary: string;
+  snippet: string;
+}
+
+const _AI_LAYER_LABEL: Record<string, string> = {
+  foreshadow: "伏笔",
+  contradiction: "矛盾",
+  motif: "母题",
+  entity: "人物",
+};
+
+function AiChapterNotes({ notes }: { notes: AiNote[] }) {
+  return (
+    <div
+      className="mt-8 pt-4 rounded-md px-3 py-3"
+      style={{
+        borderTop: "0.5px solid var(--color-seal)",
+        background: "var(--color-seal-soft)",
+      }}
+    >
+      <div className="text-xs mb-2" style={{ color: "var(--color-seal)" }}>
+        AI 批注 · 这一章 {notes.length} 条（分析洞察，朱批；跟你手写的墨批分色）
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {notes.map((n, i) => (
+          <div
+            key={i}
+            className="text-xs leading-relaxed rounded px-2 py-1.5"
+            style={{ border: "0.5px solid var(--color-seal)" }}
+          >
+            <span
+              className="text-[10.5px] px-1.5 py-0.5 rounded mr-1.5"
+              style={{ color: "var(--color-seal)", background: "var(--color-paper)" }}
+            >
+              {_AI_LAYER_LABEL[n.layer] ?? n.layer}
+            </span>
+            <span className="opacity-90">{n.summary}</span>
+            {n.snippet?.trim() && (
+              <span className="opacity-55 block mt-0.5">「{n.snippet.slice(0, 40)}」</span>
+            )}
+          </div>
         ))}
       </div>
     </div>

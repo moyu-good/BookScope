@@ -207,6 +207,59 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
   const [piOpen, setPiOpen] = useState(false); // 「批」总览抽屉
   const [chromeShown, setChromeShown] = useState(true);
 
+  // #9 中间版：AI 分层批注（伏笔 + 矛盾，无输入层）。开关一次拉全书，按当前章过滤显章末朱批。
+  const [aiOn, setAiOn] = useState(false);
+  const [aiRaw, setAiRaw] = useState<
+    { layer: string; summary: string; snippet: string; chapter: number }[] | null
+  >(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  async function toggleAi() {
+    if (aiOn) {
+      setAiOn(false);
+      return;
+    }
+    setAiOn(true);
+    if (aiRaw !== null || aiLoading) return; // 拉过 / 拉取中不重复
+    setAiLoading(true);
+    try {
+      const body: Record<string, unknown> = {
+        book_session_id: sessionId,
+        layers: ["foreshadow", "contradiction"],
+        provider,
+        api_key: apiKey,
+      };
+      if (model) body.model = model;
+      if (baseUrl) body.base_url = baseUrl;
+      const resp = await fetch("/api/agent/annotations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      const data = (await resp.json()) as {
+        annotations?: {
+          layer: string;
+          summary: string;
+          snippet: string;
+          chapter: number;
+        }[];
+      };
+      setAiRaw(
+        (data.annotations ?? []).map((a) => ({
+          layer: a.layer,
+          summary: a.summary,
+          snippet: a.snippet,
+          chapter: a.chapter,
+        })),
+      );
+    } catch {
+      setAiRaw([]); // 失败置空、不阻断阅读（AI 批注是增值层，挂了照常读）
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   // ── 标注层（WP-reading-workspace Phase A，纯本地 / 不调 LLM）──
   // 本书全部标注；划词工具条 / 笔记框 / 已有标注的编辑卡都从这套状态长出来。
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -541,8 +594,19 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
               </span>
             )}
           </button>
-          {/* AI批注:去「精读」看 AI 编排的分层朱批(整合 round2 C 中间版,读↔精读不割裂) */}
-          {onGoAnnotate && <ChromeBtn onClick={onGoAnnotate} label="AI批注" />}
+          {/* AI批：就地拉 AI 分层批注（伏笔+矛盾），在正文章末浮朱批（#9 中间版，读批不割裂）。
+              「精读」去完整 AI 精读视图（AnnotatedReader，全书连读 + 分层选项）。 */}
+          <button
+            type="button"
+            onClick={toggleAi}
+            className="text-xs px-3 py-1 rounded-full border opacity-80 hover:opacity-100 disabled:opacity-50"
+            style={aiOn ? { borderColor: "var(--color-seal)", color: "var(--color-seal)" } : { borderColor: "currentColor" }}
+            disabled={aiLoading}
+            title="AI 分层批注（伏笔 / 矛盾），朱批浮在正文章末"
+          >
+            {aiLoading ? "AI…" : "AI批"}
+          </button>
+          {onGoAnnotate && <ChromeBtn onClick={onGoAnnotate} label="精读" />}
           <button type="button" onClick={() => setJianOpen(true)} className="text-xs px-3 py-1 rounded-full text-white hover:brightness-110" style={{ background: "var(--color-seal)" }}>
             鉴
           </button>
@@ -591,6 +655,17 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
                 fg={theme.fg}
                 onPickAnnotation={(ann) => setActiveAnn(ann)}
                 onSelect={(sel) => setPendingSel(sel)}
+                aiNotes={
+                  aiOn && aiRaw
+                    ? aiRaw
+                        .filter((a) => a.chapter === chapter.chapter)
+                        .map((a) => ({
+                          layer: a.layer,
+                          summary: a.summary,
+                          snippet: a.snippet,
+                        }))
+                    : undefined
+                }
               />
               <div className="mt-12 pt-6 flex items-center justify-between" style={{ borderTop: `0.5px solid ${theme.faint}` }}>
                 <ChapterNavBtn disabled={!hasPrev} onClick={goPrev} label="上一章" fg={theme.fg} faint={theme.faint} />
