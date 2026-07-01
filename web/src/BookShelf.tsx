@@ -422,14 +422,14 @@ function BookRow(props: {
           </div>
         </div>
 
-        {/* 行内动作：两个门 + 删除 */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* 行内动作：两个门 + 删除。移动端竖排铺满、桌面端横排贴右 */}
+        <div className="flex flex-col items-stretch gap-2 shrink-0 sm:flex-row sm:items-center">
           <button
             type="button"
             onClick={onRead}
             aria-pressed={isActive}
             title={`读《${session.book_title}》`}
-            className="text-xs px-3 py-1 rounded-full bg-[var(--color-seal)] text-white hover:brightness-110 transition"
+            className="text-xs px-3 py-1 rounded-full bg-[var(--color-seal)] text-white hover:brightness-110 transition flex-1 sm:flex-none"
             style={{ fontFamily: "var(--font-display)" }}
           >
             读
@@ -438,7 +438,7 @@ function BookRow(props: {
             type="button"
             onClick={onSelect}
             title={`在分析台分析《${session.book_title}》`}
-            className="text-xs px-3 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+            className="text-xs px-3 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors flex-1 sm:flex-none"
           >
             进分析台
           </button>

@@ -286,7 +286,7 @@ export function AnnotatedReader({
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
             {/* 原文阅读区 */}
             <div
-              className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] p-4 max-h-[640px] overflow-y-auto"
+              className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] p-4 lg:max-h-[640px] lg:overflow-y-auto"
             >
               {chapters.map((c) => (
                 <div
