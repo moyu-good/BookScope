@@ -18,6 +18,8 @@ export interface AuthUser {
   id: string;
   email: string;
   phone: string | null;
+  /** 邮箱是否已验证（后端 UserPublic.email_verified）。「我的案头」据此显验证态。 */
+  email_verified: boolean;
   created_at: string;
 }
 

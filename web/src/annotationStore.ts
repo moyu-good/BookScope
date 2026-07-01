@@ -303,6 +303,35 @@ export interface AnnotationStore {
   remove(id: string): void;
   /** 跨书汇总「我写过的所有标注」（Phase B「我的案头」用）。 */
   listAllForUser(): Annotation[];
+  /**
+   * 订阅标注变化，返回退订函数。
+   *
+   * Local 形态每次增删改后 emit；Hosted 形态在异步预热到位 / 写入落定后 emit。
+   * Reader 等同步消费方靠它在「异步预热完成」时重渲染——同步调用形态一字不改。
+   */
+  subscribe(cb: () => void): () => void;
+}
+
+/** 一个极简发布订阅：给两个实现复用，emit 时逐个回调，回调抛错不连累其它订阅者。 */
+class Emitter {
+  private subs = new Set<() => void>();
+
+  subscribe(cb: () => void): () => void {
+    this.subs.add(cb);
+    return () => {
+      this.subs.delete(cb);
+    };
+  }
+
+  emit(): void {
+    for (const cb of [...this.subs]) {
+      try {
+        cb();
+      } catch {
+        // 某个订阅者的重渲染抛错，不连累其它订阅者
+      }
+    }
+  }
 }
 
 // ── localStorage 实现 ──────────────────────────────────────────────────
@@ -386,6 +415,8 @@ function saveMap(data: AnnotationMap): void {
 }
 
 export class LocalAnnotationStore implements AnnotationStore {
+  private emitter = new Emitter();
+
   list(bookSessionId: string): Annotation[] {
     if (!bookSessionId) return [];
     return loadMap()[bookSessionId] ?? [];
@@ -397,6 +428,7 @@ export class LocalAnnotationStore implements AnnotationStore {
     const data = loadMap();
     const bucket = data[book_session_id] ?? [];
     saveMap({ ...data, [book_session_id]: [...bucket, annotation] });
+    this.emitter.emit();
     return annotation;
   }
 
@@ -412,7 +444,10 @@ export class LocalAnnotationStore implements AnnotationStore {
         return updated;
       });
     }
-    if (updated) saveMap(next);
+    if (updated) {
+      saveMap(next);
+      this.emitter.emit();
+    }
     return updated;
   }
 
@@ -426,7 +461,10 @@ export class LocalAnnotationStore implements AnnotationStore {
       if (filtered.length !== bucket.length) changed = true;
       if (filtered.length > 0) next[key] = filtered;
     }
-    if (changed) saveMap(next);
+    if (changed) {
+      saveMap(next);
+      this.emitter.emit();
+    }
   }
 
   listAllForUser(): Annotation[] {
@@ -434,6 +472,10 @@ export class LocalAnnotationStore implements AnnotationStore {
     const all: Annotation[] = [];
     for (const bucket of Object.values(data)) all.push(...bucket);
     return all;
+  }
+
+  subscribe(cb: () => void): () => void {
+    return this.emitter.subscribe(cb);
   }
 }
 
@@ -450,5 +492,242 @@ export function newAnnotationId(): string {
   return `anno_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Phase A 全局只用 local 这一支；Phase C 据部署形态在这里改注入 Hosted。 */
-export const annotationStore: AnnotationStore = new LocalAnnotationStore();
+// ---------------------------------------------------------------------------
+// Hosted 实现 —— 走 /api/annotations（账号 DB），令牌由 authClient.installAuthFetch
+// 自动挂 Bearer，这里不手动加头（WP-reading-workspace Phase C）。
+//
+// 难点：AnnotationStore 接口是同步的（Reader 同步用 list），但 /api/annotations 是
+// 异步的。解法 = 内存缓存 + 乐观更新：
+//   - 登录后从 GET /api/annotations/mine 异步预热整份缓存，预热完 emit 一次让 UI 重渲染；
+//   - list / listAllForUser 从缓存同步过滤返回；
+//   - add / update / remove 先改内存缓存（UI 立刻反映）+ 同步返回，再异步落库；
+//     异步失败回滚缓存 + console.warn（不做花哨错误 UI，但绝不静默丢数据）。
+//
+// 这条链全程不碰 LLM、不传 key——读书 / 标注是纯数据（设计稿红线，免费守住）。
+// ---------------------------------------------------------------------------
+
+/** 后端 /api/annotations 列表响应（对齐 annotation_schemas.AnnotationListResponse）。 */
+interface AnnotationListPayload {
+  annotations: Annotation[];
+}
+
+export class HostedAnnotationStore implements AnnotationStore {
+  private emitter = new Emitter();
+  /** 内存缓存：所有标注一把抓在数组里，list 按 book_session_id 同步过滤。 */
+  private cache: Annotation[] = [];
+  private warmed = false;
+
+  constructor() {
+    void this.warm();
+  }
+
+  /** 从 /api/annotations/mine 拉全量预热缓存。失败保持空缓存 + warn，不抛。 */
+  private async warm(): Promise<void> {
+    try {
+      const resp = await fetch("/api/annotations/mine");
+      if (!resp.ok) {
+        console.warn(`[annotations] 预热失败：HTTP ${resp.status}`);
+        return;
+      }
+      const data = (await resp.json()) as AnnotationListPayload;
+      this.cache = Array.isArray(data.annotations) ? data.annotations : [];
+      this.warmed = true;
+      this.emitter.emit();
+    } catch (err) {
+      console.warn("[annotations] 预热出错，缓存暂空", err);
+    }
+  }
+
+  list(bookSessionId: string): Annotation[] {
+    if (!bookSessionId) return [];
+    return this.cache.filter((a) => a.book_session_id === bookSessionId);
+  }
+
+  listAllForUser(): Annotation[] {
+    return [...this.cache];
+  }
+
+  add(annotation: Annotation): Annotation {
+    // 乐观：先进缓存让 UI 立刻反映，再异步落库。
+    this.cache = [...this.cache, annotation];
+    this.emitter.emit();
+    void this.postCreate(annotation);
+    return annotation;
+  }
+
+  private async postCreate(annotation: Annotation): Promise<void> {
+    try {
+      const resp = await fetch("/api/annotations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          book_session_id: annotation.book_session_id,
+          kind: annotation.kind,
+          anchor: annotation.anchor,
+          note_text: annotation.note_text,
+          color: annotation.color,
+        }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      // 后端发的是权威记录（id / 时间戳以它为准）——用它替换本地乐观那条。
+      const saved = (await resp.json()) as Annotation;
+      this.cache = this.cache.map((a) => (a.id === annotation.id ? saved : a));
+      this.emitter.emit();
+    } catch (err) {
+      // 落库失败：回滚这条乐观插入，绝不静默留一条没存住的标注。
+      console.warn("[annotations] 新增落库失败，已回滚", err);
+      this.cache = this.cache.filter((a) => a.id !== annotation.id);
+      this.emitter.emit();
+    }
+  }
+
+  update(id: string, patch: AnnotationPatch): Annotation | null {
+    if (!id) return null;
+    const before = this.cache.find((a) => a.id === id);
+    if (!before) return null;
+    const updated: Annotation = {
+      ...before,
+      ...patch,
+      updated_at: new Date().toISOString(),
+    };
+    this.cache = this.cache.map((a) => (a.id === id ? updated : a));
+    this.emitter.emit();
+    void this.patchRemote(id, patch, before);
+    return updated;
+  }
+
+  private async patchRemote(
+    id: string,
+    patch: AnnotationPatch,
+    before: Annotation,
+  ): Promise<void> {
+    try {
+      const resp = await fetch(`/api/annotations/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const saved = (await resp.json()) as Annotation;
+      this.cache = this.cache.map((a) => (a.id === id ? saved : a));
+      this.emitter.emit();
+    } catch (err) {
+      console.warn("[annotations] 改动落库失败，已回滚", err);
+      this.cache = this.cache.map((a) => (a.id === id ? before : a));
+      this.emitter.emit();
+    }
+  }
+
+  remove(id: string): void {
+    if (!id) return;
+    const before = this.cache.find((a) => a.id === id);
+    if (!before) return;
+    this.cache = this.cache.filter((a) => a.id !== id);
+    this.emitter.emit();
+    void this.deleteRemote(id, before);
+  }
+
+  private async deleteRemote(id: string, before: Annotation): Promise<void> {
+    try {
+      const resp = await fetch(`/api/annotations/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      // 204 删成功；404 = 后端早没了，本地删掉即对齐，不算失败。
+      if (resp.status === 204 || resp.status === 404) return;
+      throw new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+      console.warn("[annotations] 删除落库失败，已回滚", err);
+      this.cache = [...this.cache, before];
+      this.emitter.emit();
+    }
+  }
+
+  subscribe(cb: () => void): () => void {
+    return this.emitter.subscribe(cb);
+  }
+
+  /** 是否已成功预热过一次（给调用方判断空列表是「真没有」还是「还没拉到」）。 */
+  isWarmed(): boolean {
+    return this.warmed;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 注入点 —— 一个委托包装，内部 target 可切换，但导出名 annotationStore 不变。
+//
+// Reader 等导入方一字不改（仍 import { annotationStore }）。App 据部署形态在
+// setAnnotationBackend 里切 target：hosted 且已登录 → Hosted；其余（local /
+// hosted 未登录）→ Local。订阅在切换时一并转挂到新 target 上，订阅者无感。
+//
+// local 形态永远是 Local（红线：local 逐字节零变化，没有任何 hosted 代码路径激活）。
+// ---------------------------------------------------------------------------
+
+class DelegatingAnnotationStore implements AnnotationStore {
+  private target: AnnotationStore;
+  private emitter = new Emitter();
+  private unsubTarget: () => void;
+
+  constructor(initial: AnnotationStore) {
+    this.target = initial;
+    // 把自己的订阅者转挂到当前 target：target emit → 本包装 emit。
+    this.unsubTarget = this.target.subscribe(() => this.emitter.emit());
+  }
+
+  /** 切底层实现。换 target 后转挂订阅并 emit 一次，让订阅者按新 target 重渲染。 */
+  setTarget(next: AnnotationStore): void {
+    if (next === this.target) return;
+    this.unsubTarget();
+    this.target = next;
+    this.unsubTarget = this.target.subscribe(() => this.emitter.emit());
+    this.emitter.emit();
+  }
+
+  list(bookSessionId: string): Annotation[] {
+    return this.target.list(bookSessionId);
+  }
+  add(annotation: Annotation): Annotation {
+    return this.target.add(annotation);
+  }
+  update(id: string, patch: AnnotationPatch): Annotation | null {
+    return this.target.update(id, patch);
+  }
+  remove(id: string): void {
+    this.target.remove(id);
+  }
+  listAllForUser(): Annotation[] {
+    return this.target.listAllForUser();
+  }
+  subscribe(cb: () => void): () => void {
+    return this.emitter.subscribe(cb);
+  }
+}
+
+const localStore = new LocalAnnotationStore();
+const delegating = new DelegatingAnnotationStore(localStore);
+
+/** 全局标注仓储。导出名固定，底层据部署形态切换（见 setAnnotationBackend）。 */
+export const annotationStore: AnnotationStore = delegating;
+
+/** 当前注入的后端档：local（含 hosted 未登录）/ hosted（已登录）。 */
+export type AnnotationBackend = "local" | "hosted";
+
+let hostedStore: HostedAnnotationStore | null = null;
+
+/**
+ * 据部署形态 + 登录态切底层标注仓储。App 在 deploymentMode / authUser 变化时调：
+ *   - "hosted"（hosted 且已登录）→ 切到 HostedAnnotationStore（新建即异步预热缓存）；
+ *   - "local"（local 模式 / hosted 未登录）→ 切回 LocalAnnotationStore，并清掉
+ *     Hosted 缓存（登出时不留上一个账号的标注在内存里）。
+ *
+ * local 模式永远只会被调成 "local"，HostedAnnotationStore 根本不实例化。
+ */
+export function setAnnotationBackend(backend: AnnotationBackend): void {
+  if (backend === "hosted") {
+    if (!hostedStore) hostedStore = new HostedAnnotationStore();
+    delegating.setTarget(hostedStore);
+  } else {
+    delegating.setTarget(localStore);
+    // 登出 / 切回 local：丢弃 Hosted 缓存，下次登录重新预热，不串账号。
+    hostedStore = null;
+  }
+}

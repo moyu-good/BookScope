@@ -29,7 +29,9 @@ import { HistoryPanel } from "./HistoryPanel";
 import { MotifTracking } from "./MotifTracking";
 import { appendEntry, newEntryId } from "./historyStorage";
 import type { QAEntry } from "./historyStorage";
+import { setAnnotationBackend } from "./annotationStore";
 import { AccountStrip, AuthModal } from "./AuthGate";
+import { MyDesk } from "./MyDesk";
 import type { AuthUser, DeploymentMode } from "./authClient";
 import {
   clearAuthToken,
@@ -830,6 +832,7 @@ export function App() {
   // app-shell 当前主画布显示哪一件事（左栏导航切换）
   const [mode, setMode] = useState<
     | "library"
+    | "account"
     | "ask"
     | "annotate"
     | "graph"
@@ -911,6 +914,17 @@ export function App() {
     logoutToken();
     setAuthUser(null);
   }, []);
+
+  // 标注仓储据部署形态 + 登录态切底层（WP-reading-workspace Phase C-FE）：
+  // hosted 且已登录 → HostedAnnotationStore（走账号 DB、异步预热缓存）；
+  // 其余（local 模式 / hosted 未登录）→ LocalAnnotationStore（localStorage）。
+  // 登出会把 authUser 置空 → 这里切回 local 并清掉 Hosted 缓存，不串账号。
+  // local 模式 deploymentMode 恒为 "local" → 永远只切成 local，Hosted 根本不实例化。
+  useEffect(() => {
+    setAnnotationBackend(
+      deploymentMode === "hosted" && authUser !== null ? "hosted" : "local",
+    );
+  }, [deploymentMode, authUser]);
 
   // 只有 hosted + 验过身份 + 没登录,才挂登录弹窗。
   const needsAuth =
@@ -1210,6 +1224,22 @@ export function App() {
 
   const handleAutoSelected = useCallback(() => {
     setPendingAutoSelectId(null);
+  }, []);
+
+  // 注销账号（WP-reading-workspace Phase B）：DELETE /api/auth/me（CASCADE 连带删
+  // 名下文档 + 标注，不可逆，二次确认在 MyDesk 里）。成功后清令牌 + 回未登录态 + 退回书库。
+  // 失败抛出去给 MyDesk 显错。删完书柜数据也没了，顺手触发一次刷新。
+  const handleDeleteAccount = useCallback(async () => {
+    const resp = await fetch("/api/auth/me", { method: "DELETE" });
+    // 204 删成功；404 = 账号早没了，也当成功（本地清干净对齐）。
+    if (resp.status !== 204 && resp.status !== 404) {
+      throw new Error(`注销失败（HTTP ${resp.status}）`);
+    }
+    clearAuthToken();
+    setAuthUser(null);
+    setCurrentSession(null);
+    setMode("library");
+    setShelfRefresh((n) => n + 1);
   }, []);
 
   // drill-into：agent 编排某个 step → 跳进该功能的完整视图。要参数的功能（实体 / 概念 /
@@ -1619,7 +1649,17 @@ export function App() {
           )}
 
           {/* 主画布：一次只显示一件事 */}
-          {(mode === "library" || !currentSession) && (
+          {mode === "account" && (
+            <MyDesk
+              deploymentMode={deploymentMode}
+              authUser={authUser}
+              onDeleteAccount={handleDeleteAccount}
+              onOpenBook={handleSelectShelfBook}
+              onReadBook={openReader}
+            />
+          )}
+
+          {(mode === "library" || (!currentSession && mode !== "account")) && (
             <section>
               <CanvasHeader
                 title="选一本书"
@@ -2292,6 +2332,7 @@ export function App() {
 
 type Mode =
   | "library"
+  | "account"
   | "ask"
   | "annotate"
   | "graph"
@@ -3157,12 +3198,17 @@ function Sidebar(props: {
       {/* 底部：账号条(hosted 已登录才显) + 书库 + 设置 一行 */}
       <div className="mt-auto">
       {authUser && onLogout && (
-        <AccountStrip user={authUser} onLogout={onLogout} />
+        <AccountStrip
+          user={authUser}
+          onLogout={onLogout}
+          onOpen={() => onMode("account")}
+        />
       )}
       <div
         className="px-3 py-3.5 flex items-center justify-between"
         style={{ borderTop: "1px solid var(--color-rule)" }}
       >
+        <div className="flex items-center gap-0.5">
         <button
           type="button"
           onClick={() => onMode("library")}
@@ -3189,6 +3235,34 @@ function Sidebar(props: {
           </svg>
           书库
         </button>
+        {/* 「我的案头」常驻入口:local / hosted 都有(WP-reading-workspace 待拍点①)。 */}
+        <button
+          type="button"
+          onClick={() => onMode("account")}
+          className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors"
+          style={
+            mode === "account"
+              ? { color: "var(--color-seal)" }
+              : { color: "var(--color-ink-muted)" }
+          }
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="8" r="3.2" />
+            <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+          </svg>
+          我的
+        </button>
+        </div>
         <div className="flex items-center gap-1">
           {/* §五:清分析缓存挪到这里(显眼小入口),不再埋设置抽屉底部 */}
           <ClearCacheButton />

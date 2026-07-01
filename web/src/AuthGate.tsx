@@ -234,31 +234,40 @@ function Field({
   );
 }
 
-/** 左栏底部账号条:显示当前邮箱 + 退出。只在 hosted 且已登录时挂。 */
+/** 左栏底部账号条:显示当前邮箱 + 退出。只在 hosted 且已登录时挂。
+ *  账号信息区可点进「我的案头」(onOpen);退出键单独,不误触。 */
 export function AccountStrip({
   user,
   onLogout,
+  onOpen,
 }: {
   user: AuthUser;
   onLogout: () => void;
+  /** 点账号信息区进「我的案头」。不传就不可点(纯展示)。 */
+  onOpen?: () => void;
 }) {
   return (
     <div
       className="px-3 py-3 flex items-center justify-between gap-2"
       style={{ borderTop: "1px solid var(--color-rule)" }}
     >
-      <div className="min-w-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!onOpen}
+        title="进我的案头"
+        className="min-w-0 text-left rounded transition-colors enabled:hover:text-[var(--color-seal)] disabled:cursor-default"
+      >
         <div className="text-[10.5px] tracking-wider text-[var(--color-ink-muted)]">
           当前账号
         </div>
         <div
           className="text-[13px] text-[var(--color-ink)] truncate"
-          title={user.email}
           style={{ fontFamily: "var(--font-display)" }}
         >
           {user.email}
         </div>
-      </div>
+      </button>
       <button
         type="button"
         onClick={onLogout}
