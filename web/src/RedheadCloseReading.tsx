@@ -76,6 +76,8 @@ interface RedheadCloseReadingProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  // 整合 round2 A：跳去公文结构看整份骨架 + 效力研判（鸟瞰 vs 这里的逐条钻）。不传则不显。
+  onJumpToStructure?: () => void;
 }
 
 function hasText(v: string | null | undefined): boolean {
@@ -108,6 +110,7 @@ export function RedheadCloseReading({
   apiKey,
   model,
   baseUrl,
+  onJumpToStructure,
 }: RedheadCloseReadingProps) {
   const [result, setResult] = useState<CloseReadingResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -284,6 +287,16 @@ export function RedheadCloseReading({
           <span className="text-xs tabular-nums" style={{ color: "var(--color-seal)" }}>
             弦外之音 {nuanceCount} 处
           </span>
+        )}
+        {/* 整合 round2 A：跳去公文结构看整份骨架 + 分量（鸟瞰 vs 这里逐条钻）。 */}
+        {onJumpToStructure && (
+          <button
+            type="button"
+            onClick={onJumpToStructure}
+            className="ml-auto text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+          >
+            看整份骨架与分量 →
+          </button>
         )}
       </div>
 

@@ -95,25 +95,8 @@ interface RedheadDocStructureProps {
   apiKey: string;
   model: string;
   baseUrl: string;
-}
-
-// 指令类型 = 封闭集四标签，各配一个克制的色（不是打分，纯分类）。
-// 硬要求最有约束力 → 朱砂；软倡导 → 暖绿；信息告知 → 墨青；依据陈述 → 木褐。
-// 写死 hex（数据色，不跟主题走），fallback 走墨色避免未知标签炸掉。
-const INSTRUCTION_STYLE: Record<string, { fg: string; bg: string }> = {
-  硬要求: { fg: "#9a3a2e", bg: "rgba(154, 58, 46, 0.10)" },
-  软倡导: { fg: "#4f7a52", bg: "rgba(79, 122, 82, 0.10)" },
-  信息告知: { fg: "#3a6378", bg: "rgba(58, 99, 120, 0.10)" },
-  依据陈述: { fg: "#8a6b3f", bg: "rgba(138, 107, 63, 0.10)" },
-};
-
-function instructionStyle(type: string): { fg: string; bg: string } {
-  return (
-    INSTRUCTION_STYLE[type] ?? {
-      fg: "var(--color-ink-muted)",
-      bg: "var(--color-seal-soft)",
-    }
-  );
+  // 整合 round2 A：砍了逐条款层,给一句「逐条读这份 →」跳逐条精读。不传则不显。
+  onJumpToCloseReading?: () => void;
 }
 
 // 一条头要素是否真有内容（value 非空白才算抽到了）。
@@ -156,6 +139,7 @@ export function RedheadDocStructure({
   apiKey,
   model,
   baseUrl,
+  onJumpToCloseReading,
 }: RedheadDocStructureProps) {
   const [result, setResult] = useState<DocStructureResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -282,12 +266,10 @@ export function RedheadDocStructure({
   }
 
   const head = result.head ?? [];
-  const clauses = result.clauses ?? [];
   const headFilled = head.filter((h) => hasValue(h.value)).length;
   // 分母只数"本文种该有"的要素——法规本体没有发文字号/密级/签发人这些,标了 N/A 的不算分母,
   // 免得一份条例显"3/10"像抽坏了(其实适用的 4 项都抽到了 → 显"4/4")。
   const headApplicable = head.filter((h) => !h.not_applicable).length;
-  const clauseVerified = clauses.filter((c) => c.verified && c.evidence).length;
 
   // 版头意象：标题事由抽出来当版头大标题（公文版头正中那行），其余八项照常列在红线下。
   // 抽不到标题就不提，版头退成一道素净的红线 + 标签，绝不造假。
@@ -560,139 +542,25 @@ export function RedheadDocStructure({
         </div>
       )}
 
-      {/* ── 逐条款：案牍批注意象 ── */}
-      <div className="mt-6 mb-3 flex items-center gap-2.5">
-        {/* 版心朱砂短线起头，仿案牍页眉的领格 */}
-        <span className="h-3.5 w-[3px] rounded-full bg-[var(--color-seal)] opacity-70" />
-        <span
-          className="text-sm font-bold text-[var(--color-ink)]"
-          style={{ fontFamily: "var(--font-display)" }}
+      {/* 逐条款层砍了（跟逐条精读重叠、是它的更差子集，WP-consolidation-round2 A 块）。
+          公文结构专做「鸟瞰」：头要素 + 效力研判。逐条钻去逐条精读（大白话 + 术语 + 弦外
+          + 纯表态识别，完整体验）。这里给一个跳过去的交叉引用。 */}
+      {onJumpToCloseReading && (
+        <button
+          type="button"
+          onClick={onJumpToCloseReading}
+          className="mt-6 w-full text-left rounded border border-[var(--color-rule)] px-4 py-3 text-sm text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+          style={{ background: "var(--color-paper)" }}
         >
-          逐条款
-        </span>
-        <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
-          {clauses.length} 条
-        </span>
-        {clauses.length > 0 && (
-          <span className="ml-auto text-xs text-[var(--color-ink-muted)] tabular-nums">
-            原文核验 {clauseVerified}/{clauses.length}
-          </span>
-        )}
-      </div>
-
-      {clauses.length === 0 ? (
-        <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
-          头要素抽到了，但没拆出可逐条列的正文条款——这份正文可能偏叙述、不是分条式公文。
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {clauses.map((c, i) => {
-            const st = instructionStyle(c.instruction_type);
-            const showOrigin = c.verified && !!c.evidence;
-            return (
-              <div
-                key={i}
-                className="relative rounded border border-[var(--color-rule)] bg-white p-3 pl-4"
-              >
-                {/* 案牍批注线：卡左侧一道朱砂细脊（批注的领格），核过的深一点 */}
-                <span
-                  className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full"
-                  style={{
-                    background: "var(--color-seal)",
-                    opacity: showOrigin ? 0.45 : 0.18,
-                  }}
-                  aria-hidden="true"
-                />
-                {/* 标题行：朱砂墨钉序号 + 事项 + 指令类型标签 */}
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
-                    {/* 朱砂墨钉：圆印里白序号，仿案牍逐条的朱批编号 */}
-                    <span
-                      className="inline-flex items-center justify-center align-middle mr-2 tabular-nums shrink-0"
-                      style={{
-                        width: "18px",
-                        height: "18px",
-                        borderRadius: "3px",
-                        background: "var(--color-seal)",
-                        color: "var(--color-paper)",
-                        fontSize: "11px",
-                        lineHeight: 1,
-                        fontFamily: "var(--font-display)",
-                        transform: "rotate(-3deg)",
-                      }}
-                    >
-                      {i + 1}
-                    </span>
-                    {c.matter || "（这条没给主体事项）"}
-                  </p>
-                  {c.instruction_type && (
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
-                      style={{ color: st.fg, background: st.bg }}
-                    >
-                      {c.instruction_type}
-                    </span>
-                  )}
-                </div>
-
-                {/* 元信息：谁去做 / 期限 / 依据——有才显示，空的不占位 */}
-                {(c.actor || c.deadline || c.basis_ref) && (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-ink-muted)]">
-                    {c.actor && (
-                      <span>
-                        责任主体 ·{" "}
-                        <span className="text-[var(--color-ink)]">
-                          {c.actor}
-                        </span>
-                      </span>
-                    )}
-                    {c.deadline && (
-                      <span>
-                        期限 ·{" "}
-                        <span className="text-[var(--color-ink)]">
-                          {c.deadline}
-                        </span>
-                      </span>
-                    )}
-                    {c.basis_ref && (
-                      <span>
-                        依据 ·{" "}
-                        <span className="text-[var(--color-ink)]">
-                          {c.basis_ref}
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* 原文：核验通过且非空才当引文 + 盖印；否则老实标待核 */}
-                {showOrigin ? (
-                  <div className="mt-2 flex items-start gap-2">
-                    <SealMark size={17} title="原文已核验" />
-                    <p
-                      className="text-[13px] leading-relaxed text-[var(--color-ink)]"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      {c.evidence}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-xs text-[var(--color-ink-muted)] italic">
-                    {c.evidence
-                      ? "未在原文比对命中·仅供参考"
-                      : "暂无贴切原文（待核）"}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
+          想逐条吃透这份公文（每条给大白话 + 术语 + 弦外之意）→ 去
+          <span className="text-[var(--color-seal)]"> 逐条精读</span>
+        </button>
       )}
 
       {!loading && (
         <RunStats
           trace={trace}
-          note={`头要素 ${headFilled}/${head.length || 8} · 条款 ${clauses.length} 条`}
+          note={`头要素 ${headFilled}/${head.length || 8}`}
         />
       )}
     </div>

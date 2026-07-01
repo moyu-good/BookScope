@@ -2115,8 +2115,8 @@ export function App() {
 
               <div className={mode === "redhead" ? "" : "hidden"}>
                 <CanvasHeader
-                  title="公文结构解读"
-                  subtitle="把一份红头文件拆开看：先列发文字号、发文机关、成文日期等八项头要素，对照公文格式标准看缺没缺；再把正文逐条排开，标清这条管什么事、是硬要求还是软倡导、谁去做、什么期限、依据哪份上位文件，每条钉在原文。适合党政公文 / 红头文件。"
+                  title="公文结构"
+                  subtitle="整份公文的骨架鸟瞰：发文字号、发文机关、成文日期等头要素齐不齐（对照公文格式标准看缺项），再加这份公文多大分量、能管到谁、会不会被上位文件盖过的效力研判。想逐条吃透每一条，去「逐条精读」。适合党政公文 / 红头文件。"
                 />
                 <RedheadDocStructure
                   sessionId={currentSession.session_id}
@@ -2124,6 +2124,7 @@ export function App() {
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
+                  onJumpToCloseReading={() => setMode("redhead_plain")}
                 />
               </div>
 
@@ -2153,6 +2154,7 @@ export function App() {
                   apiKey={apiKey}
                   model={model}
                   baseUrl={effectiveBaseUrl()}
+                  onJumpToStructure={() => setMode("redhead")}
                 />
               </div>
 
