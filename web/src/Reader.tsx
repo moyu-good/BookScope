@@ -318,10 +318,16 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
     }
     window.addEventListener("mousemove", wake);
     window.addEventListener("keydown", wake);
+    // 触屏：mousemove 在手机上不触发，靠 touchstart/pointerdown 唤醒顶底栏，
+    // 否则 2.8s 后栏隐了、点触唤不回，目录/排版/翻章按钮够不到。
+    window.addEventListener("touchstart", wake, { passive: true });
+    window.addEventListener("pointerdown", wake);
     wake();
     return () => {
       window.removeEventListener("mousemove", wake);
       window.removeEventListener("keydown", wake);
+      window.removeEventListener("touchstart", wake);
+      window.removeEventListener("pointerdown", wake);
       if (chromeTimer.current) window.clearTimeout(chromeTimer.current);
     };
   }, []);

@@ -466,7 +466,7 @@ function BookRow(props: {
               type="button"
               onClick={onAskDelete}
               aria-label={`删除 ${session.book_title}`}
-              className="text-xs px-2 py-1 rounded text-[var(--color-ink-muted)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--color-seal)] transition-opacity"
+              className="text-xs px-2 py-1 rounded text-[var(--color-ink-muted)] opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 hover:text-[var(--color-seal)] transition-opacity"
             >
               删除
             </button>

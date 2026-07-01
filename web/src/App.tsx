@@ -949,6 +949,58 @@ export function App() {
     null,
   );
 
+  // 手机物理返回键：无路由库，靠状态派生 + 单哨兵 pushState 让返回键
+  // 先关最上层浮层（Reader→设置→侧栏→回书库），而不是直接退出站点。
+  // 纯增量：不碰任何现有 setter 调用点，只在 back 时额外调一次 setter。
+  const sentinelRef = useRef(false); // 当前是否持有一个哨兵历史条目
+  const suppressRef = useRef(false); // 自触发 history.back() 引起的 popstate 要忽略
+  const prevCountRef = useRef(0); // 上一轮活跃层数，用于检测开/关
+  const hasSession = !!currentSession;
+  useEffect(() => {
+    // 当前活跃"层"数：每层都该被返回键关掉一层
+    const activeCount =
+      (readerOpen ? 1 : 0) +
+      (settingsOpen ? 1 : 0) +
+      (sidebarOpen ? 1 : 0) +
+      (mode !== "library" && hasSession ? 1 : 0);
+
+    if (activeCount > prevCountRef.current && !sentinelRef.current) {
+      // 有层打开：压一个哨兵条目，返回键先消费它
+      history.pushState({ bs: 1 }, "");
+      sentinelRef.current = true;
+    } else if (
+      activeCount < prevCountRef.current &&
+      activeCount === 0 &&
+      sentinelRef.current
+    ) {
+      // UI 自己把所有层关了：主动 back 消费哨兵，保持历史栈平衡
+      suppressRef.current = true;
+      history.back();
+    }
+    prevCountRef.current = activeCount;
+  }, [readerOpen, settingsOpen, sidebarOpen, mode, hasSession]);
+
+  useEffect(() => {
+    function onPop() {
+      if (suppressRef.current) {
+        // 自己调 history.back() 触发的 popstate，别再关东西
+        suppressRef.current = false;
+        sentinelRef.current = false;
+        return;
+      }
+      if (!sentinelRef.current) return; // 没持哨兵，让浏览器默认行为走
+      sentinelRef.current = false;
+      // 按优先级关最上层
+      if (readerOpen) setReaderOpen(false);
+      else if (settingsOpen) setSettingsOpen(false);
+      else if (sidebarOpen) setSidebarOpen(false);
+      else if (mode !== "library") setMode("library");
+      // 关一层后 state 变 → 上一个 effect 重跑 → 仍有层则重新 push 哨兵
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [readerOpen, settingsOpen, sidebarOpen, mode]);
+
   // 卷宗（1.6 跨文件）：选进一组 session_id，三个跨文件视图共享。落 localStorage 刷新不丢。
   const [dossierIds, setDossierIds] = useState<string[]>(loadDossier);
   useEffect(() => {
