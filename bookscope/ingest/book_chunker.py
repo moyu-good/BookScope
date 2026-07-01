@@ -68,6 +68,11 @@ _CHAPTER_RE = re.compile(
     re.MULTILINE,
 )
 
+# 公文层级 fallback（research-notes/006 + exp-017）：层级式公文（意见 / 批复等）没有「第X章」，
+# 但有「一、」「二、」…（中文数字 + 、，行首）的顶层小标题。无章头时按它切段，让 doc_spine 条款维
+# 分段抽——否则整份落 1 章、一次吐整份所有层级要点、撞 max_tokens 截断（意见实测抽 0/17/141 随机）。
+_GONGWEN_SECTION_RE = re.compile(rf"^[{_CN_NUM_CLASS}]+、", re.MULTILINE)
+
 # Chinese sentence-ending / clause-ending punctuation for splitting
 # Includes full stops, exclamation, question, semicolons, colons, ellipsis, commas
 _CN_SENT_END = re.compile(r"(?<=[。！？；：…\u2026，、\n])")
@@ -323,6 +328,19 @@ def detect_chapters_with_stats(
         stats.pattern_hits[kind] = stats.pattern_hits.get(kind, 0) + 1
 
     if not heads:
+        # 无「第X章」——先试公文层级切分（意见 / 批复的「一、」顶层小标题）。切得成就按段返，
+        # 否则整份 1 章（原行为，novel / 散文照旧）。
+        gw = _detect_gongwen_sections(text)
+        if gw is not None:
+            body_lens = [len(b) for _, _, b in gw]
+            stats.chapters_detected = len(gw)
+            stats.parse_success_rate = 1.0
+            stats.avg_chapter_chars = (
+                sum(body_lens) / len(body_lens) if body_lens else float(len(text))
+            )
+            stats.max_chapter_chars = max(body_lens) if body_lens else len(text)
+            _apply_detection_warnings(stats, total_chars=len(text))
+            return gw, stats
         stats.avg_chapter_chars = float(len(text))
         stats.max_chapter_chars = len(text)
         _apply_detection_warnings(stats, total_chars=len(text))
@@ -399,6 +417,45 @@ def _apply_detection_warnings(stats: ChapterDetectionStats, *, total_chars: int)
         stats.warnings.append(WARN_TOO_COARSE)
     if stats.chapters_detected > OVERDETECTION_WARN_MAX_CHAPTERS:
         stats.warnings.append(WARN_OVERDETECTION)
+
+
+def _detect_gongwen_sections(
+    text: str,
+) -> list[tuple[int, str, str]] | None:
+    """公文层级 fallback：无「第X章」时，按顶层「一、」「二、」…（中文数字 + 、，行首）切段。
+
+    层级式公文（意见 / 批复等，research-notes/006 §3.2）没有章头，主检测会把整份当 1 章 →
+    doc_spine 条款维一次吐整份所有层级要点 → 撞 max_tokens 截断（exp-017 实测同一份意见抽
+    0 / 17 / 141 条随机）。按顶层「一、」切成段，每段一个序号 → 条款维分段抽、每段条数少、不截断。
+
+    保守：**只在有 ≥3 个行首顶层标记时才切**（真层级，不是正文里零星一句「一、」），且标记行不太长
+    （标题行长 < ``_MAX_HEADING_LINE_LEN``，避免把句中「一、二线城市」当小标题）。找不到强层级返
+    ``None``——回退整份 1 章，不硬切。只在主检测 0 章时被调，有「第X章」的书永远走不到这里。
+    """
+    marks: list[re.Match] = []
+    for m in _GONGWEN_SECTION_RE.finditer(text):
+        line_end = text.find("\n", m.start())
+        if line_end == -1:
+            line_end = len(text)
+        if line_end - m.start() < _MAX_HEADING_LINE_LEN:
+            marks.append(m)
+    if len(marks) < 3:
+        return None
+
+    sections: list[tuple[int, str, str]] = []
+    # 序：第一个「一、」前的抬头 / 引言（发文机关、成文缘由等），够长才单列
+    preamble = text[: marks[0].start()].strip()
+    if preamble and len(preamble) > CHUNK_CHAR_MIN:
+        sections.append((0, "序", preamble))
+    for i, m in enumerate(marks):
+        line_end = text.find("\n", m.start())
+        if line_end == -1:
+            line_end = len(text)
+        body_end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        title = text[m.start():line_end].strip()
+        body = text[line_end + 1 : body_end].strip()
+        sections.append((i + 1, title, body))
+    return sections
 
 
 # ---------------------------------------------------------------------------

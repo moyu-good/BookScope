@@ -20,6 +20,7 @@ from bookscope.ingest.book_chunker import (
     ChapterDetectionStats,
     chinese_numeral_to_int,
     chunk_book_with_stats,
+    detect_chapters,
     detect_chapters_with_stats,
 )
 from bookscope.models import BookText
@@ -263,3 +264,37 @@ def test_stats_to_dict_is_json_friendly() -> None:
         "volume_markers_found",
     }
     json.dumps(payload)  # 不抛即可
+
+
+# 公文层级 fallback（research-notes/006 + exp-017）：无「第X章」但有「一、」「二、」…顶层小标题
+# 时按它切段，免得意见整份落 1 章 → 条款维一次吐整份撞 token 上限（抽 0/17/141 随机）。
+class TestGongwenSectionFallback:
+    def test_gongwen_splits_by_top_level_sections(self):
+        text = (
+            "国务院办公厅关于加强X的意见\n各省人民政府：\n为加强X，现提出如下意见。\n"
+            f"一、总体要求\n{_BODY}\n"
+            f"二、主要任务\n{_BODY}\n"
+            f"三、保障措施\n{_BODY}\n"
+        )
+        chapters = detect_chapters(text)
+        # 三个顶层「一、」→ 三段（引言太短不单列序），章号 1/2/3、标题是「一、xxx」
+        assert len(chapters) == 3
+        assert [c[0] for c in chapters] == [1, 2, 3]
+        assert chapters[0][1] == "一、总体要求"
+
+    def test_no_top_level_marks_stays_one_chapter(self):
+        # 普通叙述、无章头也无顶层「一、」→ 整份 1 章（原行为，novel / 散文不受影响）
+        text = "这是一段没有章节也没有顶层数字标记的普通文字。" * 40
+        assert len(detect_chapters(text)) == 1
+
+    def test_fewer_than_three_marks_no_split(self):
+        # 只 1-2 个「一、」→ 不切（避免正文里零星一句被当小标题），回退整份 1 章
+        text = f"正文引子。\n一、就这一条\n{_BODY}\n二、还有一条\n{_BODY}\n"
+        assert len(detect_chapters(text)) == 1
+
+    def test_real_chapters_take_priority(self):
+        # 有「第X章」→ 走主检测，公文 fallback 根本不触发
+        text = f"第一章 开端\n{_BODY}\n第二章 风起\n{_BODY}\n"
+        chapters = detect_chapters(text)
+        assert len(chapters) == 2
+        assert [c[0] for c in chapters] == [1, 2]
