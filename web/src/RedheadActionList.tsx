@@ -95,6 +95,20 @@ function typeRank(type: string): number {
   return TYPE_ORDER[type] ?? 99;
 }
 
+// #5 复读根因（镜像后端 redhead_codebook.clause_is_pure_statement，判据一致别漂）：
+// 纯表态 = 方针部署 + 空头倡导 + 责任主体/时限/罚则三空，没有可执行内核、只是方向性号召。
+// 五条全命中才算，任一不满足即当实质（偏保守向实质，别把真要办的事误剔出待办）。
+// 这类不摆成待办，收进折叠的「方向性要求」区（WP-redhead-substance-vs-slogan §3.3）。
+function isPureStatement(c: Clause): boolean {
+  return (
+    c.instruction_type === "方针部署" &&
+    c.substance === "空头倡导" &&
+    !hasText(c.actor) &&
+    !hasText(c.deadline) &&
+    !hasText(c.penalty)
+  );
+}
+
 // 1.6.1 含金量：真金白银 > 有条件兑现 > 空头倡导 = 轻重缓急的排序权重（与后端 SUBSTANCE_LEVELS 一致）。
 const SUBSTANCE_ORDER: Record<string, number> = {
   真金白银: 0,
@@ -142,6 +156,7 @@ export function RedheadActionList({
   // 本地勾选态：clause 原始下标 → 勾没勾（只是阅读态，不回写后端）
   const [checked, setChecked] = useState<Record<number, boolean>>({});
   const [filter, setFilter] = useState<FilterKind>("all");
+  const [showStatements, setShowStatements] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -191,6 +206,17 @@ export function RedheadActionList({
       });
   }, [result]);
 
+  // #5：真办事 vs 纯表态分开——默认待办只列真有「谁做什么」的实质条款；
+  // 纯表态（方向性号召）不摆成待办、收进下面折叠区，诚实不假装它们是要办的事。
+  const actionable = useMemo(
+    () => sorted.filter((x) => !isPureStatement(x.c)),
+    [sorted],
+  );
+  const pureStatements = useMemo(
+    () => sorted.filter((x) => isPureStatement(x.c)),
+    [sorted],
+  );
+
   // 汇总数字：总数 / 真金白银 / 硬要求 / 有时限。真金白银是 1.6.1 加的——一眼看「真要办」几条。
   const summary = useMemo(() => {
     const clauses = result?.clauses ?? [];
@@ -208,19 +234,19 @@ export function RedheadActionList({
     [result],
   );
 
-  // 按筛子过滤
+  // 按筛子过滤（在 actionable 上过滤——纯表态已剔出，不进任何待办筛子）
   const shown = useMemo(() => {
     if (filter === "substance") {
-      return sorted.filter((x) => x.c.substance === "真金白银");
+      return actionable.filter((x) => x.c.substance === "真金白银");
     }
     if (filter === "hard") {
-      return sorted.filter((x) => x.c.instruction_type === "硬要求");
+      return actionable.filter((x) => x.c.instruction_type === "硬要求");
     }
     if (filter === "deadline") {
-      return sorted.filter((x) => hasText(x.c.deadline));
+      return actionable.filter((x) => hasText(x.c.deadline));
     }
-    return sorted;
-  }, [sorted, filter]);
+    return actionable;
+  }, [actionable, filter]);
 
   const scanned = !!result && result.scanned;
   const gotSomething = scanned && (result?.clauses ?? []).length > 0;
@@ -519,6 +545,33 @@ export function RedheadActionList({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* #5：方向性要求（纯表态条款）——是方向不是待办，折叠收着，点开能看。
+          诚实不假装不存在，只是不摆成「要办的事」误导用户去勾。 */}
+      {pureStatements.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-[var(--color-rule)]">
+          <button
+            type="button"
+            onClick={() => setShowStatements((v) => !v)}
+            className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+          >
+            {showStatements ? "▾" : "▸"} 这份文件的方向性要求（{pureStatements.length}{" "}
+            条 · 定方向、非具体待办）
+          </button>
+          {showStatements && (
+            <ul className="mt-2 space-y-1.5">
+              {pureStatements.map(({ c, idx }) => (
+                <li
+                  key={idx}
+                  className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-[13px] leading-relaxed text-[var(--color-ink-muted)]"
+                >
+                  {c.matter || c.evidence}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

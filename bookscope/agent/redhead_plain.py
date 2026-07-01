@@ -50,7 +50,11 @@ from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent._internal.loop_shared import read_openai_finish_reason
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
-from bookscope.agent.redhead_codebook import codebook_block, detect_nuances
+from bookscope.agent.redhead_codebook import (
+    clause_is_pure_statement,
+    codebook_block,
+    detect_nuances,
+)
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object,
     salvage_closed_objects,
@@ -91,21 +95,31 @@ DEFAULT_FULLTEXT_CHAR_BUDGET = 12000
 # 全文逐句:中文句末标点(含右引号/书名号收尾的情形),按句切段用。
 _SENTENCE_END_RE = re.compile(r"(?<=[。!?；…」』】）\n])")
 
-# 逐条改写的指令——不进上下文喂全文,只把这一条的「事项 + 原文」给模型,要它改写成大白话。
-# 死守三条:只转述不增减、不编原文没有的承诺/数字、口语化但别失真。
+# 纯表态条款(方针部署 + 空头倡导 + 主体/时限/罚则三空)的固定说明句——不调 LLM。
+# 这类没有可执行内核(「以X为导向」「坚持Y」),硬让模型翻只会复读或注水;老实标它是方向,
+# 比假装点石成金强(WP-redhead-substance-vs-slogan §3.2 / §4.3,接「读沉默」一个道理)。
+PURE_STATEMENT_PLAIN = "这条是方针 / 原则,定的是方向、不是具体要办的事。"
+
+# 实质条款的逐条改写指令——只喂这一条的「事项 + 原文」,要模型**解释这条要求谁做什么**、
+# 不是换词复读。纯表态条款不走这条(_rewrite_one 里直接给 PURE_STATEMENT_PLAIN)。
+# 命门是 evidence-first 的「解释 vs 编造」边界(第 3 条 + 对/错例),破了它就破立身之本。
 _INSTR_PLAIN = (
     "你是帮普通人读懂党政机关公文(红头文件)的助手。下面给你公文里的**一条**条款——"
-    "它的「事项」是这条在说什么事,「原文」是这条的逐字原文(公文体官话)。\n"
-    "请把这条的官话**改写成普通人一看就懂的大白话**,死守三条:\n"
-    "1. 只**转述**原文已经说的,不增不减——原文没写的承诺/数字/期限/对象,一个字都别加。\n"
-    "2. 别编。原文说「应当于30日内办结」就说「得在30天内办完」,别擅自改成「尽快」或加个"
-    "没有的「否则处罚」。\n"
-    "3. 口语化、短句、说人话,但意思必须跟原文一致;像在跟一个没读过公文的朋友解释这条在要求"
-    "什么。\n"
-    "4. **照原文的力度翻,别拉平**:原文「原则上不批」别翻成死的「不批」(它留了口子)、"
-    "「鼓励」别翻成「必须」(它是倡导不是命令)、「逐步推进」别翻成「马上推进」(它没给时间表)。"
-    "白话要把这层软硬分寸如实带出来。\n"
-    "只输出这一句大白话本身,别加引号、别加「这条的意思是」这类前缀、别加解释、别加 markdown。\n"
+    "「事项」是这条在说什么事,「原文」是这条的逐字原文(公文体官话)。\n"
+    "请把这条**讲给一个没读过公文的人听**——不是换几个词把原句重说一遍(那是复读、没用),"
+    "是**讲清楚这条到底在要求什么**:\n"
+    "1. **谁要动**:原文点了责任主体就说谁;没点就用原文口径(「相关单位」「各地」),别编具体部门。\n"
+    "2. **做什么、到什么标准或什么时候**:原文有数字 / 时限 / 门槛就带出来;没有就别硬加。\n"
+    "3. 原文若是方向性说法(如「以X为导向」),就**点破它落到实处意味着什么**——但只能说原文"
+    "逻辑里**必然包含**的意思。\n"
+    "**死守 evidence-first 边界(最重要)**:解释 = 把原文压缩、说明白,信息量不超过原文;"
+    "编造 = 往里加原文没有的承诺 / 数字 / 期限 / 对象 / 部门。宁可说得笼统,也绝不为具体去编。\n"
+    "  · 对:「以重度残疾人及其家庭需求为导向」→「做相关工作先看重度残疾人和家里最需要什么、"
+    "按需求安排,不一刀切」(是「导向」一词的语义展开,原文逻辑必含)。\n"
+    "  · 错:同一句 →「三年内为残疾人建100个服务点」(原文没说三年、没说100个、没说服务点,凭空造)。\n"
+    "4. **照原文的力度翻,别拉平**:「原则上不批」别翻成死的「不批」(留了口子)、「鼓励」别翻成"
+    "「必须」(是倡导不是命令)、「逐步推进」别翻成「马上推进」(没给时间表)——软硬分寸如实带出来。\n"
+    "只输出这一两句大白话本身,别加引号、别加「这条的意思是」这类前缀、别加 markdown。\n"
     + codebook_block()
 )
 
@@ -168,6 +182,10 @@ def _rewrite_one(
     用 ``build_longctx_system`` 拼(同站内其它功能,book-first 前缀也让这层吃缓存:同一条
     第二次改写命中)——这里「书」位置放的是这一条的事项 + 原文(很短)。
     """
+    # 纯表态条款(方针部署 + 空头倡导 + 主体/时限/罚则三空):没有可执行内核,老实给固定
+    # 说明句、不调 LLM——硬翻只会复读或注水(WP-redhead-substance-vs-slogan §3.2)。
+    if clause_is_pure_statement(clause):
+        return PURE_STATEMENT_PLAIN
     matter = str(clause.get("matter", "")).strip()
     evidence = str(clause.get("evidence", "")).strip()
     # 改写素材:有原文优先拿原文(逐字),没原文退事项——总得有东西给模型改。
@@ -482,7 +500,11 @@ def _clauses_mode(
             "chapter": clause.get("chapter"),
             "matter": matter,
             # 改写失败(空)→ 退回原事项,老实把官话原样摆出来,不假装翻好了。
+            # 纯表态 plain 已是 PURE_STATEMENT_PLAIN 说明句(_rewrite_one 直接给,没调 LLM)。
             "plain": plain or matter,
+            "clause_kind": (
+                "pure_statement" if clause_is_pure_statement(clause) else "substantive"
+            ),
             "evidence": evidence,
             "verified": False,
             "match_score": 0.0,

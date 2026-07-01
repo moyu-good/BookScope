@@ -72,6 +72,29 @@ def substance_rank(level: str) -> int:
     """含金量排序权重:真金白银=0 < 有条件兑现=1 < 空头倡导=2,未知排最后。轻重缓急的排序键。"""
     return _SUBSTANCE_RANK.get(level, len(SUBSTANCE_LEVELS))
 
+
+def clause_is_pure_statement(clause: dict[str, object]) -> bool:
+    """判一条条款是不是「纯表态」——方针部署 + 空头倡导 + 责任主体/时限/罚则三空,即没有可
+    执行内核、只是方向性号召(「以X为导向」「坚持Y」这类)。deterministic、不调 LLM。
+
+    大白话 / 逐条精读对这类只该老实标「这是方向不是办事」,不硬凑一句假大白话(硬凑=复读或
+    注水,正是作者反感的);办事清单该把它从默认待办剔出。有可执行内核的实质条款才走「解释」。
+
+    **组合判据**(不单看 instruction_type):研究笔记 006 §3.2 实测 instruction_type 在层级式
+    意见上抽取不稳,叠上 substance + actor/deadline/penalty 三个「空」的确定性字段判兜住偶尔
+    抽偏——一条真有 deadline/penalty 的条款,就算 instruction_type 被误标成方针部署,也不会被
+    当纯表态。**偏保守向实质倾斜**:五条全命中才判纯表态,任一不满足即当实质(宁可放一句口号
+    进实质区被解释,也别把真要办的事误标成表态漏掉——见 WP-redhead-substance-vs-slogan §6.3)。
+    组合阈值是自己拍的,须 probe 在真实公文语料上验准(接「算法依托真实」硬规则)。
+    """
+    return (
+        str(clause.get("instruction_type", "")).strip() == "方针部署"
+        and str(clause.get("substance", "")).strip() == "空头倡导"
+        and not str(clause.get("actor", "")).strip()
+        and not str(clause.get("deadline", "")).strip()
+        and not str(clause.get("penalty", "")).strip()
+    )
+
 # 措辞 → 弦外之意(注解层)。键是原文里**真出现**才点的 marker,值是这词的真实含义——
 # 大白话翻译命中 marker 时点这句"弦外之音",不只字面通顺。死守 evidence-first:nuance 只在
 # 原文里**确有**这个 marker 时才出(deterministic 串匹配,不靠 LLM 脑补隐含义),原文没这词就
@@ -172,4 +195,5 @@ __all__ = [
     "coerce_substance",
     "detect_nuances",
     "substance_rank",
+    "clause_is_pure_statement",
 ]

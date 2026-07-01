@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 
 from bookscope.agent import redhead_plain as rp
+from bookscope.agent.redhead_codebook import clause_is_pure_statement
 
 # ── 合成红头文件 ──────────────────────────────────────────────────────────────
 _HEAD = "市市场监管局文件 X监发〔2024〕7号 关于优化营商环境的通知。"
@@ -66,6 +67,79 @@ def _patch_spine(monkeypatch, clauses):
     def _fake(**_kw):  # noqa: ANN003, ANN202
         return {"head": [], "clauses": clauses}
     monkeypatch.setattr(rp, "get_or_build_doc_spine", _fake)
+
+
+# ── #5 复读根因:纯表态条款不复读、不调 LLM(WP-redhead-substance-vs-slogan) ──────
+
+def _clause(**kw):
+    """一条默认「纯表态」条款(方针部署 + 空头 + 三空);传 kw 覆盖某字段成实质。"""
+    base = {
+        "instruction_type": "方针部署",
+        "substance": "空头倡导",
+        "actor": "",
+        "deadline": "",
+        "penalty": "",
+        "matter": "以重度残疾人及其家庭需求为导向",
+        "evidence": "坚持以重度残疾人及其家庭需求为导向。",
+    }
+    base.update(kw)
+    return base
+
+
+class TestPureStatementJudge:
+    """clause_is_pure_statement 组合判据:五条全命中才纯表态,任一不满足即实质(偏保守)。"""
+
+    def test_all_five_met_is_pure_statement(self):
+        assert clause_is_pure_statement(_clause()) is True
+
+    def test_has_actor_is_substantive(self):
+        assert clause_is_pure_statement(_clause(actor="民政部")) is False
+
+    def test_has_deadline_is_substantive(self):
+        assert clause_is_pure_statement(_clause(deadline="2025年底前")) is False
+
+    def test_has_penalty_is_substantive(self):
+        assert clause_is_pure_statement(_clause(penalty="予以通报")) is False
+
+    def test_substance_not_hollow_is_substantive(self):
+        assert clause_is_pure_statement(_clause(substance="真金白银")) is False
+
+    def test_not_directive_type_is_substantive(self):
+        assert clause_is_pure_statement(_clause(instruction_type="硬要求")) is False
+
+
+class TestRewriteOnePureStatementBranch:
+    """_rewrite_one:纯表态直接给固定说明句、不调 LLM;实质条款才走改写。"""
+
+    def test_pure_statement_returns_template_without_llm(self, monkeypatch):
+        # invoke_client_cached 一被调用就炸——证纯表态分支根本没走 LLM。
+        def _boom(*_a, **_kw):  # noqa: ANN002, ANN003, ANN202
+            raise AssertionError("纯表态条款不该调 LLM")
+
+        monkeypatch.setattr(rp, "invoke_client_cached", _boom)
+        out = rp._rewrite_one(
+            _clause(),
+            llm_client=_FakeClient(),
+            model="x",
+            max_tokens=1200,
+            cache_enabled=False,
+        )
+        assert out == rp.PURE_STATEMENT_PLAIN
+
+    def test_substantive_clause_calls_llm(self, monkeypatch):
+        _patch_invoke(monkeypatch, "得在2025年底前把这事办成。")
+        out = rp._rewrite_one(
+            _clause(
+                instruction_type="硬要求",
+                substance="真金白银",
+                deadline="2025年底前",
+            ),
+            llm_client=_FakeClient(),
+            model="x",
+            max_tokens=1200,
+            cache_enabled=False,
+        )
+        assert out == "得在2025年底前把这事办成。"
 
 
 def _patch_finish_reason(monkeypatch, reason):

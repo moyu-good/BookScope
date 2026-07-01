@@ -53,7 +53,8 @@ interface StructureLabel {
 interface CloseReadingItem {
   chapter: number; // 条款序号
   matter: string; // 官话事项（旁注）
-  plain: string; // 大白话（改写失败退回 matter）
+  plain: string; // 大白话（改写失败退回 matter）；纯表态时是固定说明句、非翻译
+  clause_kind?: string; // #5：pure_statement=纯表态(方向不办事) / substantive=实质
   structure: StructureLabel;
   glossary: InlineTerm[]; // 内联术语（可空）
   evidence: string; // 逐字原文
@@ -340,16 +341,23 @@ export function RedheadCloseReading({
                   )}
                 </div>
 
-                {/* 大白话——精读笺主体，墨色、宋体、舒朗行距，醒目 */}
-                <div className="flex items-start gap-2">
-                  {verified && <SealMark size={18} title="原文已核验" />}
-                  <p
-                    className="text-[15px] leading-7 text-[var(--color-ink)]"
-                    style={{ fontFamily: "var(--font-display)" }}
-                  >
-                    {it.plain || "（这条没翻出大白话）"}
+                {/* 大白话——精读笺主体。纯表态条款(方针/原则)不摆成带鉴印的"翻译"——那是复读;
+                    老实标它是方向、淡化呈现,鉴印只留给下面「对原文」(WP-redhead-substance-vs-slogan §3.4)。 */}
+                {it.clause_kind === "pure_statement" ? (
+                  <p className="text-[13px] leading-relaxed text-[var(--color-ink-muted)] italic">
+                    {it.plain}
                   </p>
-                </div>
+                ) : (
+                  <div className="flex items-start gap-2">
+                    {verified && <SealMark size={18} title="原文已核验" />}
+                    <p
+                      className="text-[15px] leading-7 text-[var(--color-ink)]"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      {it.plain || "（这条没翻出大白话）"}
+                    </p>
+                  </div>
+                )}
 
                 {/* 结构标签（朱砂小签）——责任主体 / 时限 / 依据，有才显、空的不占位。
                     指令类型已提到编次行，这里只列另三项硬骨架。 */}

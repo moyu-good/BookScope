@@ -46,7 +46,7 @@ from bookscope.agent.citation_check import (
     normalize_text,
     verify_citations,
 )
-from bookscope.agent.redhead_codebook import detect_nuances
+from bookscope.agent.redhead_codebook import clause_is_pure_statement, detect_nuances
 from bookscope.agent.redhead_glossary import (
     DEFAULT_GLOSSARY_MAX_TOKENS,
     glossary_from_spine,
@@ -232,7 +232,13 @@ def close_reading_from_spine(
             "chapter": clause.get("chapter"),
             "matter": matter,
             # 改写失败(空)→ 退回原事项,老实把官话摆出来,不假装翻好了。
+            # 纯表态条款 plain 已是 PURE_STATEMENT_PLAIN 说明句(_rewrite_one 直接给,没调 LLM)。
             "plain": plain or matter,
+            # 纯表态 / 实质:前端据此把纯表态的「大白话」当诚实说明渲染、不当复读的翻译
+            # (WP-redhead-substance-vs-slogan §3.4)。
+            "clause_kind": (
+                "pure_statement" if clause_is_pure_statement(clause) else "substantive"
+            ),
             "structure": _structure_label(clause),
             "glossary": [],  # 内联术语下面挂;归不到的不挂
             "evidence": evidence,
