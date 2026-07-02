@@ -54,7 +54,7 @@ interface CloseReadingItem {
   chapter: number; // 条款序号
   matter: string; // 官话事项（旁注）
   plain: string; // 大白话（改写失败退回 matter）；纯表态时是固定说明句、非翻译
-  clause_kind?: string; // #5：pure_statement=纯表态(方向不办事) / substantive=实质
+  clause_kind?: string; // #41 四态:substantive 实质 / policy_signal 信号 / policy_direction 半信号 / policy_slogan 纯口号
   structure: StructureLabel;
   glossary: InlineTerm[]; // 内联术语（可空）
   evidence: string; // 逐字原文
@@ -397,12 +397,30 @@ export function RedheadCloseReading({
                   )}
                 </div>
 
-                {/* 大白话——精读笺主体。纯表态条款(方针/原则)不摆成带鉴印的"翻译"——那是复读;
-                    老实标它是方向、淡化呈现,鉴印只留给下面「对原文」(WP-redhead-substance-vs-slogan §3.4)。 */}
-                {it.clause_kind === "pure_statement" ? (
+                {/* 大白话——按方针四态分路呈现(WP-redhead-substance-vs-slogan §八):
+                    slogan 纯口号淡化标方向、direction 半信号轻墨简述、signal 朱砂点破弦外之意、
+                    substantive 实质才盖鉴印当逐字转述。方针类都不盖鉴印(那是复读/研判非逐字引)。 */}
+                {it.clause_kind === "policy_slogan" ? (
                   <p className="text-[13px] leading-relaxed text-[var(--color-ink-muted)] italic">
                     {it.plain}
                   </p>
+                ) : it.clause_kind === "policy_direction" ? (
+                  <p className="text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+                    {it.plain}
+                  </p>
+                ) : it.clause_kind === "policy_signal" ? (
+                  <div className="flex items-start gap-2">
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+                      style={{ color: "var(--color-seal)", background: "var(--color-seal-soft)" }}
+                      title="弦外之音——命中官腔 marker，点破真实含义"
+                    >
+                      弦外
+                    </span>
+                    <p className="text-[14px] leading-7" style={{ color: "var(--color-seal)" }}>
+                      {it.plain}
+                    </p>
+                  </div>
                 ) : (
                   <div className="flex items-start gap-2">
                     {verified && <SealMark size={18} title="原文已核验" />}

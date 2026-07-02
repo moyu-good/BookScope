@@ -96,14 +96,14 @@ function typeRank(type: string): number {
   return TYPE_ORDER[type] ?? 99;
 }
 
-// #5 复读根因（镜像后端 redhead_codebook.clause_is_pure_statement，判据一致别漂）：
-// 纯表态 = 方针部署 + 空头倡导 + 责任主体/时限/罚则三空，没有可执行内核、只是方向性号召。
-// 五条全命中才算，任一不满足即当实质（偏保守向实质，别把真要办的事误剔出待办）。
-// 这类不摆成待办，收进折叠的「方向性要求」区（WP-redhead-substance-vs-slogan §3.3）。
+// #41 非待办判定（镜像后端 redhead_codebook._is_policy_three_empty，判据一致别漂）：
+// 「方针类 + 三空」= 方针部署 + 责任主体/时限/罚则三空 = 没有可执行内核（谁做/到几号都没有）。
+// #41 放宽：不再叠 substance==空头倡导——有条件兑现的方针(半信号)也没 actor/deadline、同样不是
+// 待办，一并收进折叠「方向性要求」区（#5 旧版漏了它，成了标题==原文的复读摆件）。三空是硬门槛：
+// 抽到 actor/deadline/penalty 任一即当实质、留在待办（偏保守向实质，别误剔真要办的事）。
 function isPureStatement(c: Clause): boolean {
   return (
     c.instruction_type === "方针部署" &&
-    c.substance === "空头倡导" &&
     !hasText(c.actor) &&
     !hasText(c.deadline) &&
     !hasText(c.penalty)
@@ -138,6 +138,18 @@ function substanceStyle(substance?: string) {
 
 function hasText(v: string | undefined): boolean {
   return !!v && v.trim().length > 0;
+}
+
+// #41 E:标题(matter)跟原文(evidence)近乎一字不差时,原文区不再抄一遍(那是复读)——
+// 只留鉴印 +「原文同上」。归一:去首尾空白 + 末尾标点后比;短条款一方常是另一方的截断,
+// 够长(≥8 字)时一方含另一方也算同。核验凭据(鉴印)不丢,只是不重复正文。
+function sameAsTitle(matter: string, evidence: string): boolean {
+  const norm = (s: string) => s.trim().replace(/[。;；,，、\s]+$/u, "");
+  const m = norm(matter);
+  const e = norm(evidence);
+  if (!m || !e) return false;
+  if (m === e) return true;
+  return m.length >= 8 && (e.includes(m) || m.includes(e));
 }
 
 type FilterKind = "all" | "substance" | "hard" | "deadline";
@@ -522,17 +534,26 @@ export function RedheadActionList({
                       </p>
                     )}
 
-                    {/* 原文：核过盖印；核不过老实标待核 */}
+                    {/* 原文：核过盖印；核不过老实标待核。#41 E：标题==原文时不复读、只留鉴印 + 「原文同上」 */}
                     {showOrigin ? (
-                      <div className="mt-2 flex items-start gap-2">
-                        <SealMark size={17} title="原文已核验" />
-                        <p
-                          className="text-[13px] leading-relaxed text-[var(--color-ink)]"
-                          style={{ fontFamily: "var(--font-display)" }}
-                        >
-                          {c.evidence}
-                        </p>
-                      </div>
+                      sameAsTitle(c.matter, c.evidence) ? (
+                        <div className="mt-2 flex items-center gap-2">
+                          <SealMark size={17} title="原文已核验" />
+                          <span className="text-xs text-[var(--color-ink-muted)]">
+                            原文同上 · 已核
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex items-start gap-2">
+                          <SealMark size={17} title="原文已核验" />
+                          <p
+                            className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                            style={{ fontFamily: "var(--font-display)" }}
+                          >
+                            {c.evidence}
+                          </p>
+                        </div>
+                      )
                     ) : (
                       <p className="mt-2 text-xs text-[var(--color-ink-muted)] italic">
                         {hasText(c.evidence)
