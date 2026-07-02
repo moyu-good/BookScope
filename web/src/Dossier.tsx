@@ -33,6 +33,8 @@ interface DossierProps {
   refreshTrigger?: number;
   /** 选够 2 份后，从卷宗直接跳进某个跨文件视图（免得用户再回左栏找） */
   onOpenView: (view: "redhead_depgraph" | "redhead_policy" | "redhead_level") => void;
+  /** 去书库上传新公文——上传控件在书库那边，这里给个入口跳过去（不在卷宗重造上传） */
+  onGoUpload?: () => void;
 }
 
 // 选够 2 份后当场给的三个跨文件视图入口——卷宗选完一步进视图，不用回左栏找。
@@ -73,6 +75,7 @@ export function Dossier({
   onClear,
   refreshTrigger,
   onOpenView,
+  onGoUpload,
 }: DossierProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const selected = new Set(selectedIds);
@@ -118,9 +121,21 @@ export function Dossier({
 
   if (state.sessions.length === 0) {
     return (
-      <p className="text-sm text-[var(--color-ink-muted)] italic pt-2">
-        书库里还没有文档。先在「书库」上传几份公文（epub / txt / pdf），再回这里把相关的几份归进一份卷宗。
-      </p>
+      <div className="pt-2">
+        <p className="text-sm text-[var(--color-ink-muted)] italic">
+          书库里还没有文档。先上传几份公文（epub / txt / pdf），再回这里把相关的几份归进一份卷宗。
+        </p>
+        {onGoUpload && (
+          <button
+            type="button"
+            onClick={onGoUpload}
+            className="mt-3 text-sm px-4 py-2 rounded border transition-colors hover:bg-[var(--color-seal-soft)]"
+            style={{ color: "var(--color-seal)", borderColor: "var(--color-seal)" }}
+          >
+            ＋ 去书库上传公文
+          </button>
+        )}
+      </div>
     );
   }
 
@@ -153,6 +168,20 @@ export function Dossier({
         >
           本卷宗 · {count} 份公文
         </span>
+        {onGoUpload && (
+          <button
+            type="button"
+            onClick={onGoUpload}
+            title="去书库上传新公文（上传在书库那边，传完回卷宗就能选）"
+            className="text-xs px-2.5 py-0.5 rounded-full border transition-colors hover:bg-[var(--color-seal-soft)]"
+            style={{
+              color: "var(--color-seal)",
+              borderColor: "color-mix(in oklch, var(--color-seal) 45%, transparent)",
+            }}
+          >
+            ＋ 上传新公文
+          </button>
+        )}
         {count < 2 && (
           <span className="text-xs text-[var(--color-ink-muted)]">
             跨文件视图至少要选 2 份。勾上相关的几份（如一份上位规定 + 几份配套实施件）。

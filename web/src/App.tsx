@@ -2220,6 +2220,7 @@ export function App() {
               onClear={clearDossier}
               refreshTrigger={shelfRefresh}
               onOpenView={(v) => setMode(v)}
+              onGoUpload={() => setMode("library")}
             />
           </div>
 
