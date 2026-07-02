@@ -351,11 +351,11 @@ export function AccountStrip({
           title="账号"
           className="min-w-0 text-left rounded transition-colors hover:text-[var(--color-seal)]"
         >
-          <div className="text-[10.5px] tracking-wider text-[var(--color-ink-muted)]">
+          <div className="text-caption tracking-wider text-[var(--color-ink-muted)]">
             当前账号
           </div>
           <div
-            className="text-[13px] text-[var(--color-ink)] truncate"
+            className="text-body-sm text-[var(--color-ink)] truncate"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {user.email}

@@ -949,6 +949,58 @@ export function App() {
     null,
   );
 
+  // 手机物理返回键：无路由库，靠状态派生 + 单哨兵 pushState 让返回键
+  // 先关最上层浮层（Reader→设置→侧栏→回书库），而不是直接退出站点。
+  // 纯增量：不碰任何现有 setter 调用点，只在 back 时额外调一次 setter。
+  const sentinelRef = useRef(false); // 当前是否持有一个哨兵历史条目
+  const suppressRef = useRef(false); // 自触发 history.back() 引起的 popstate 要忽略
+  const prevCountRef = useRef(0); // 上一轮活跃层数，用于检测开/关
+  const hasSession = !!currentSession;
+  useEffect(() => {
+    // 当前活跃"层"数：每层都该被返回键关掉一层
+    const activeCount =
+      (readerOpen ? 1 : 0) +
+      (settingsOpen ? 1 : 0) +
+      (sidebarOpen ? 1 : 0) +
+      (mode !== "library" && hasSession ? 1 : 0);
+
+    if (activeCount > prevCountRef.current && !sentinelRef.current) {
+      // 有层打开：压一个哨兵条目，返回键先消费它
+      history.pushState({ bs: 1 }, "");
+      sentinelRef.current = true;
+    } else if (
+      activeCount < prevCountRef.current &&
+      activeCount === 0 &&
+      sentinelRef.current
+    ) {
+      // UI 自己把所有层关了：主动 back 消费哨兵，保持历史栈平衡
+      suppressRef.current = true;
+      history.back();
+    }
+    prevCountRef.current = activeCount;
+  }, [readerOpen, settingsOpen, sidebarOpen, mode, hasSession]);
+
+  useEffect(() => {
+    function onPop() {
+      if (suppressRef.current) {
+        // 自己调 history.back() 触发的 popstate，别再关东西
+        suppressRef.current = false;
+        sentinelRef.current = false;
+        return;
+      }
+      if (!sentinelRef.current) return; // 没持哨兵，让浏览器默认行为走
+      sentinelRef.current = false;
+      // 按优先级关最上层
+      if (readerOpen) setReaderOpen(false);
+      else if (settingsOpen) setSettingsOpen(false);
+      else if (sidebarOpen) setSidebarOpen(false);
+      else if (mode !== "library") setMode("library");
+      // 关一层后 state 变 → 上一个 effect 重跑 → 仍有层则重新 push 哨兵
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [readerOpen, settingsOpen, sidebarOpen, mode]);
+
   // 卷宗（1.6 跨文件）：选进一组 session_id，三个跨文件视图共享。落 localStorage 刷新不丢。
   const [dossierIds, setDossierIds] = useState<string[]>(loadDossier);
   useEffect(() => {
@@ -2969,7 +3021,7 @@ function Sidebar(props: {
         </span>
         {DEMO && (
           <span
-            className="mt-1 rounded-full px-2 py-0.5 text-[10px] tracking-wide"
+            className="mt-1 rounded-full px-2 py-0.5 text-caption tracking-wide"
             style={{
               background: "color-mix(in oklch, var(--color-seal) 13%, transparent)",
               color: "var(--color-seal)",
@@ -2982,7 +3034,7 @@ function Sidebar(props: {
 
       {/* 案上当前书 */}
       <div className="px-4 pb-4">
-        <div className="text-[10.5px] tracking-wider text-[var(--color-ink-muted)] mb-1.5 text-center">
+        <div className="text-caption tracking-wider text-[var(--color-ink-muted)] mb-1.5 text-center">
           案上
         </div>
         {currentBook ? (
@@ -3000,7 +3052,7 @@ function Sidebar(props: {
             >
               {currentBook.book_title}
             </div>
-            <div className="text-[10.5px] text-[var(--color-ink-muted)] mt-1 flex items-center justify-center gap-1.5">
+            <div className="text-caption text-[var(--color-ink-muted)] mt-1 flex items-center justify-center gap-1.5">
               <span>{currentBook.language}</span>
               {/* 题材可见化(#2):认出的类型亮出来,左栏就是据它显隐;没认出显未分类,不静默全显误导 */}
               {genre ? (
@@ -3029,7 +3081,7 @@ function Sidebar(props: {
           活动项朱砂左边线 + 淡底；题材突出的组标题描朱、不突出的默认收起。 */}
       <nav className="flex-1 px-2.5 overflow-y-auto">
         {!hasBook && (
-          <p className="px-2.5 py-3 text-[11px] text-[var(--color-ink-muted)] leading-relaxed">
+          <p className="px-2.5 py-3 text-caption text-[var(--color-ink-muted)] leading-relaxed">
             先从书柜挑一本书，这里就列出能对它做的分析。
           </p>
         )}
@@ -3055,7 +3107,7 @@ function Sidebar(props: {
                 aria-expanded={!collapsed}
               >
                 <span
-                  className="text-[11px] tracking-wider"
+                  className="text-caption tracking-wider"
                   style={{ fontWeight: featured ? 600 : 500 }}
                 >
                   {group.title}
@@ -3105,7 +3157,7 @@ function Sidebar(props: {
                       >
                         <NavIcon id="read" />
                         <span
-                          className="text-[13.5px]"
+                          className="text-body-sm"
                           style={{
                             fontFamily: "var(--font-display)",
                             fontWeight: readerActive ? 600 : 400,
@@ -3140,7 +3192,7 @@ function Sidebar(props: {
                         >
                           <NavIcon id={m.id} />
                           <span
-                            className="text-[13.5px]"
+                            className="text-body-sm"
                             style={{
                               fontFamily: "var(--font-display)",
                               fontWeight: active ? 600 : 400,
@@ -3175,7 +3227,7 @@ function Sidebar(props: {
         <button
           type="button"
           onClick={() => onMode("library")}
-          className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors"
+          className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-body-sm transition-colors"
           style={
             mode === "library"
               ? { color: "var(--color-seal)" }
@@ -3312,7 +3364,7 @@ function CanvasHeader({
           ❡
         </span>
         <h2
-          className="text-2xl md:text-[1.7rem] leading-tight text-[var(--color-ink)]"
+          className="text-2xl md:text-lead leading-tight text-[var(--color-ink)]"
           style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
         >
           {title}
@@ -3344,7 +3396,7 @@ function CanvasHeader({
             你会得到
           </div>
           <div
-            className="text-[14px] leading-relaxed text-[var(--color-ink)]"
+            className="text-body leading-relaxed text-[var(--color-ink)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {youGet}
@@ -3592,7 +3644,7 @@ function ProviderConfig(props: {
             className="w-full rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm"
           />
           {preset.keyHint && (
-            <p className="text-[11px] text-[var(--color-ink-muted)] mt-1 leading-relaxed">
+            <p className="text-caption text-[var(--color-ink-muted)] mt-1 leading-relaxed">
               {preset.keyHint}
             </p>
           )}
@@ -3626,7 +3678,7 @@ function ProviderConfig(props: {
               className="mt-2 w-full rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] px-3 py-2 text-sm font-mono"
             />
           )}
-          <p className="text-[11px] text-[var(--color-ink-muted)] mt-1">
+          <p className="text-caption text-[var(--color-ink-muted)] mt-1">
             {preset.id === "deepseek"
               ? "默认就是 deepseek-v4-flash（最便宜大众档）。模型名以官方最新为准，可选「自定义」改写。"
               : "模型名以该厂商官方最新公布为准，拿不准就选「自定义」自己填。"}
@@ -3647,7 +3699,7 @@ function ProviderConfig(props: {
         </div>
       )}
 
-      <p className="text-[11px] text-[var(--color-ink-muted)] leading-relaxed">
+      <p className="text-caption text-[var(--color-ink-muted)] leading-relaxed">
         BYOK，key 自带、直发你选的厂商，BookScope 不内置任何 key。除 Anthropic 外都走
         OpenAI 兼容接口（选厂商即自动填好官方 Base URL）。订阅制 coding plan（百炼 / 智谱）
         也是这条路，填套餐专属 key 即可。模型名以各厂商官方为准（核对日期 2026-06-26），
@@ -4334,7 +4386,7 @@ function buildSections(items: ProgressItem[]): TimelineSection[] {
 function ChapterBadge({ chapter }: { chapter: number }) {
   return (
     <span
-      className="inline-flex items-center px-1.5 py-0.5 text-[11px] rounded-sm text-white align-baseline"
+      className="inline-flex items-center px-1.5 py-0.5 text-caption rounded-sm text-white align-baseline"
       style={{
         backgroundColor: "var(--color-seal)",
         fontFamily: "var(--font-display)",
@@ -4465,7 +4517,7 @@ function ProgressTimeline({
               >
                 第 {section.iteration} 轮
                 {isMultiTool && (
-                  <span className="ml-2 normal-case text-[11px]">
+                  <span className="ml-2 normal-case text-caption">
                     · {section.tools.length} 个工具并发
                   </span>
                 )}
@@ -4568,7 +4620,7 @@ function AnswerBlock({ answer }: { answer: AskResponse }) {
           </button>
         </div>
         <div
-          className="whitespace-pre-wrap leading-[1.85] text-[15.5px] text-[var(--color-ink)]"
+          className="whitespace-pre-wrap leading-[1.85] text-body text-[var(--color-ink)]"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {answer.answer}
@@ -4615,7 +4667,7 @@ function AnswerBlock({ answer }: { answer: AskResponse }) {
                     )}
                     {c.claim_support === "weak" && (
                       <span
-                        className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                        className="px-1.5 py-0.5 rounded text-caption font-medium"
                         style={{
                           color: "var(--color-seal)",
                           border: "1px solid var(--color-seal)",
@@ -4627,7 +4679,7 @@ function AnswerBlock({ answer }: { answer: AskResponse }) {
                     )}
                   </div>
                   <div
-                    className="text-[14px] leading-relaxed text-[var(--color-ink)]"
+                    className="text-body leading-relaxed text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {c.snippet}
@@ -4678,7 +4730,7 @@ function ClearCacheButton() {
         disabled={clearing}
         aria-label="清分析缓存"
         title="清分析缓存：只清分析结果，下次重算会重新花 token，书和卷宗都不动"
-        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-body-sm text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
       >
         {/* 刷新 / 重算意象的小图标 */}
         <svg
@@ -4701,7 +4753,7 @@ function ClearCacheButton() {
       </button>
       {msg && (
         <span
-          className="absolute left-0 -top-5 whitespace-nowrap text-[11px] text-[var(--color-seal)]"
+          className="absolute left-0 -top-5 whitespace-nowrap text-caption text-[var(--color-seal)]"
           role="status"
         >
           {msg}

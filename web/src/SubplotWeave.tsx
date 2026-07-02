@@ -14,8 +14,9 @@
 // SVG）。进场逐泳道描画动画（带冷却，重出才再放），rAF 不参与——纯 CSS 动画一次性，绝不空转。
 // ---------------------------------------------------------------------------
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { usePanZoom } from "./usePanZoom";
 
 interface Subplot {
   name: string;
@@ -203,6 +204,11 @@ export function SubplotWeave({
   const H = PAD_TOP * 2 + LANE_H * subplots.length;
   const verifiedSp = subplots.filter((s) => s.verified).length;
 
+  // pan/zoom + 双指 pinch（移动端）：支线泳道多、章跨度大，手机上捏合才看得清。
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const { view, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onWheel, resetView } =
+    usePanZoom(svgRef, { width: W, height: H });
+
   // 交汇点按支线名定位到泳道 y（找到对应支线 index）
   const spIdxByName = new Map<string, number>();
   subplots.forEach((s, i) => spIdxByName.set(s.name, i));
@@ -256,15 +262,24 @@ export function SubplotWeave({
       </p>
 
       <svg
+        ref={svgRef}
         key={animKey}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full border border-[var(--color-rule)] rounded"
+        className="w-full border border-[var(--color-rule)] rounded touch-none"
         style={{ maxHeight: 560, background: "var(--color-paper)" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onPointerLeave={onPointerUp}
+        onWheel={onWheel}
       >
         <style>{`
           @keyframes sw-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
           .sw-run { animation: sw-grow 0.7s ease-out forwards; transform-origin: left center; }
         `}</style>
+        {/* 缩放平移层：泳道 + 活跃段 + 交汇点都在这个 <g> 里，整图能缩能拖、双指捏合看细节 */}
+        <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
 
         {/* 章号刻度（min / mid / max，避免百回级糊成一片） */}
         {[minCh, Math.round((minCh + maxCh) / 2), maxCh].map((ch, i) => (
@@ -436,7 +451,18 @@ export function SubplotWeave({
             </g>
           );
         })}
+        </g>
       </svg>
+
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={resetView}
+          className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+        >
+          重置视角
+        </button>
+      </div>
 
       {/* 图例 */}
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-ink-muted)]">

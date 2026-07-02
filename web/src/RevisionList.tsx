@@ -308,7 +308,7 @@ export function RevisionList({
                   {/* 问题描述 + 三态 + 删 */}
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <p
-                      className="text-[14px] leading-relaxed text-[var(--color-ink)]"
+                      className="text-body leading-relaxed text-[var(--color-ink)]"
                       style={{
                         fontFamily: "var(--font-display)",
                         textDecoration:
@@ -341,7 +341,7 @@ export function RevisionList({
                           key={opt.value}
                           type="button"
                           onClick={() => setStatus(it.id, opt.value)}
-                          className="text-[11px] px-2.5 py-1 transition-colors"
+                          className="text-caption px-2.5 py-1 transition-colors"
                           style={
                             active
                               ? {
@@ -377,7 +377,7 @@ export function RevisionList({
                           )}
                         </div>
                         <div
-                          className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                          className="text-body-sm leading-relaxed text-[var(--color-ink)]"
                           style={{ fontFamily: "var(--font-display)" }}
                         >
                           {ev.snippet}

@@ -13,6 +13,7 @@
 import { useMemo, useRef, useState } from "react";
 
 import { smoothLine } from "./vizCurve";
+import { usePanZoom } from "./usePanZoom";
 
 export interface ArcPoint {
   chapter: number;
@@ -119,15 +120,28 @@ export function HuaniaoArc({
   const { min, max, xAt, shown, total } = layout;
   const H = TOP + shown.length * BAND_H + 22;
 
+  // pan/zoom + 双指 pinch（移动端）：花鸟卷人多时弧线密，手机上捏合才看得清。
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const { view, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onWheel, resetView } =
+    usePanZoom(svgRef, { width: W, height: H });
+
   return (
     <div ref={wrapRef}>
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full border border-[var(--color-rule)] rounded"
+        className="w-full border border-[var(--color-rule)] rounded touch-none"
         style={{ background: "var(--color-paper)" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onPointerLeave={onPointerUp}
+        onWheel={onWheel}
       >
         <style>{`@keyframes hn-sweep{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}`}</style>
-
+        {/* 缩放平移层：花鸟弧线 + 命中圆 + hover 浮签都在这个 <g> 里，整图能缩能拖、双指捏合看细节 */}
+        <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
         <g style={{ animation: "hn-sweep .9s ease-out" }}>
           {shown.map((c, row) => {
             const color = charColor.get(c.name) ?? "var(--color-ink)";
@@ -239,7 +253,18 @@ export function HuaniaoArc({
               </text>
             );
           })()}
+        </g>
       </svg>
+
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={resetView}
+          className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+        >
+          重置视角
+        </button>
+      </div>
       {total > shown.length && !focusChar && (
         <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
           画了戏份最重的 {shown.length} 枝 / 全书 {total} 个角色（点上面的角色名只看一枝）。

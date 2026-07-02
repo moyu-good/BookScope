@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { NIGHT_SKY, StarNode, StarTwinkleStyle } from "./starSky";
+import { usePanZoom } from "./usePanZoom";
 
 export interface GraphEdge {
   source: string;
@@ -60,13 +61,6 @@ const MIN_SEP = 30;
 // 缩放上下限:太小看不清字、太大一颗星占满屏。
 const K_MIN = 0.3;
 const K_MAX = 4;
-
-// 视角:缩放比 k + 平移 tx/ty。边和节点都画进 translate(tx ty) scale(k) 的 <g> 里,整图能缩能拖。
-interface View {
-  k: number;
-  tx: number;
-  ty: number;
-}
 
 interface Node {
   x: number;
@@ -160,8 +154,6 @@ export function CharacterGraph({
     null,
   );
   const [unit, setUnit] = useState<"person" | "concept">("person");
-  // 视角:缩放 + 平移。默认无缩放无平移,等节点冷却后 fit 一次铺满。
-  const [view, setView] = useState<View>({ k: 1, tx: 0, ty: 0 });
   // 默认只渲染戏份前 TOP_N 个;点"展开次要人物"才全量。次要人物多才显示这个开关。
   const [expanded, setExpanded] = useState(false);
   // 鼠标悬停的节点名——人多时只给主要角色标名,hover 任意一颗也临时显名。
@@ -174,8 +166,6 @@ export function CharacterGraph({
   const dragRef = useRef<string | null>(null);
   // 已对当前这批数据做过 fit 没有——只 fit 一次,免得每帧重算抖。
   const fittedRef = useRef(false);
-  // 在空白背景按下拖动 = 平移整图;记起点的 SVG 坐标 + 按下那刻的 tx/ty。
-  const panRef = useRef<{ sx: number; sy: number; tx: number; ty: number } | null>(null);
   // 记录在某个节点上按下的起点——松手时若几乎没动（是「点」不是「拖」）就当点击，跳关系演变。
   const downRef = useRef<{ name: string; x: number; y: number; moved: boolean } | null>(null);
   const [, setFrame] = useState(0);
@@ -216,6 +206,20 @@ export function CharacterGraph({
 
   // 画布大小随节点数自适应(多就撑大、不糊团);社区发现给每个节点一个阵营 id。
   const { w: W, h: H } = useMemo(() => canvasSize(data?.nodes.length ?? 0), [data]);
+  // pan/zoom + 双指 pinch（移动端）：从自写逻辑提炼到 hook。节点拖拽靠 stopPropagation
+  // 与背景指隔离——两指在背景 pinch 整图、一指在星子拖星子。
+  const {
+    view,
+    setView,
+    onPointerDown: onBgDown,
+    onPointerMove: hookMove,
+    onPointerUp: hookUp,
+    onWheel,
+    zoomBy,
+    toSvg,
+    svgToLogical,
+    clampK,
+  } = usePanZoom(svgRef, { width: W, height: H, minK: K_MIN, maxK: K_MAX });
   const communities = useMemo(
     () => (data ? detectCommunities(data.nodes, data.edges) : new Map<string, number>()),
     [data],
@@ -446,24 +450,9 @@ export function CharacterGraph({
     return maxv;
   }
 
-  function toSvg(clientX: number, clientY: number): { x: number; y: number } {
-    const svg = svgRef.current;
-    if (!svg || !svg.getScreenCTM) return { x: 0, y: 0 };
-    const pt = svg.createSVGPoint();
-    pt.x = clientX;
-    pt.y = clientY;
-    const loc = pt.matrixTransform(svg.getScreenCTM()!.inverse());
-    return { x: loc.x, y: loc.y };
-  }
-
-  // SVG viewBox 坐标 → 节点逻辑坐标:节点画在 translate(tx ty) scale(k) 的 <g> 里,
-  // 屏幕(viewBox)坐标 = tx + k * 逻辑坐标,反推 逻辑 = (viewBox - t) / k。拖节点必须扣这步否则跟手错位。
-  function svgToLogical(sx: number, sy: number, v: View): { x: number; y: number } {
-    return { x: (sx - v.tx) / v.k, y: (sy - v.ty) / v.k };
-  }
-
   // 算所有节点的包围盒,设视角让它带 ~10% 余量铺满视口(viewBox W×H),再居中。
   // 一打开就铺满可读,不是缩成一小撮。节点没初始化好就跳过。
+  // 读 simRef（节点逻辑坐标）→ 算 bounds → 用 hook 的 setView/clampK 落地。
   function fitToBounds() {
     const sim = simRef.current;
     if (!sim || sim.size === 0) return;
@@ -481,8 +470,7 @@ export function CharacterGraph({
     const bw = Math.max(1, maxX - minX);
     const bh = Math.max(1, maxY - minY);
     // 0.9 = 留 10% 余量,别贴边
-    let k = Math.min(W / bw, H / bh) * 0.9;
-    k = Math.max(K_MIN, Math.min(K_MAX, k));
+    const k = clampK(Math.min(W / bw, H / bh) * 0.9);
     // 把盒中心摆到视口中心:viewport_center = t + k * box_center → t = vpCenter - k*boxCenter
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
@@ -499,16 +487,14 @@ export function CharacterGraph({
     if (rafRef.current == null) startSim();
   }
 
+  // 背景拖动（平移/pinch）交给 hook；节点拖拽（dragRef）自己处理。
+  // 节点的 onNodeDown 已 stopPropagation，背景指才会进 hook 的 pointersRef。
   function onMove(e: React.PointerEvent) {
-    // 在空白背景上按下拖动 = 平移整图(只改 tx/ty,不动任何节点)。
-    const pan = panRef.current;
-    if (pan) {
-      const { x: sx, y: sy } = toSvg(e.clientX, e.clientY);
-      setView((v) => ({ ...v, tx: pan.tx + (sx - pan.sx), ty: pan.ty + (sy - pan.sy) }));
+    const name = dragRef.current;
+    if (!name) {
+      hookMove(e);
       return;
     }
-    const name = dragRef.current;
-    if (!name) return;
     // 起点挪过 4px 就算真在拖（不是手抖的点），松手时不再触发跳转。
     const dn = downRef.current;
     if (dn && !dn.moved && Math.hypot(e.clientX - dn.x, e.clientY - dn.y) > 4) {
@@ -527,61 +513,25 @@ export function CharacterGraph({
     setFrame((f) => f + 1);
   }
 
-  function onUp() {
-    // 结束背景平移
-    if (panRef.current) {
-      panRef.current = null;
-      return;
-    }
+  function onUp(e: React.PointerEvent) {
     const name = dragRef.current;
     if (name) {
       const p = simRef.current.get(name);
       if (p) p.fixed = false;
+      // 在节点上按下、几乎没动就松手 = 点这个人 → 跳关系演变。拖过了不触发，不破坏拖动。
+      // 只对人物图开放：概念节点跳关系演变（讲的是人）没意义。
+      const dn = downRef.current;
+      if (dn && !dn.moved && dn.name === name && unit === "person" && onSelectPerson) {
+        onSelectPerson(dn.name);
+      }
+      downRef.current = null;
+      dragRef.current = null;
+      coolRef.current = 0;
+      if (rafRef.current == null) startSim();
+      return;
     }
-    // 在节点上按下、几乎没动就松手 = 点这个人 → 跳关系演变。拖过了不触发，不破坏拖动。
-    // 只对人物图开放：概念节点跳关系演变（讲的是人）没意义。
-    const dn = downRef.current;
-    if (dn && !dn.moved && dn.name === name && unit === "person" && onSelectPerson) {
-      onSelectPerson(dn.name);
-    }
-    downRef.current = null;
-    dragRef.current = null;
-    coolRef.current = 0;
-    if (rafRef.current == null) startSim();
-  }
-
-  // 滚轮缩放,朝光标缩:缩放后光标下那个点不动。cx/cy 是光标在 viewBox 里的位置。
-  // 经典式 newT = cx - (cx - t) * (newK/k),x/y 同理。k 夹在 K_MIN~K_MAX。
-  function onWheel(e: React.WheelEvent) {
-    e.preventDefault();
-    const { x: cx, y: cy } = toSvg(e.clientX, e.clientY);
-    setView((v) => {
-      const factor = Math.exp(-e.deltaY * 0.0015); // 上滚放大、下滚缩小,指数让缩放手感均匀
-      const newK = Math.max(K_MIN, Math.min(K_MAX, v.k * factor));
-      const ratio = newK / v.k;
-      return { k: newK, tx: cx - (cx - v.tx) * ratio, ty: cy - (cy - v.ty) * ratio };
-    });
-  }
-
-  // 在空白背景按下 = 准备平移。节点的 onNodeDown 已 stopPropagation,所以按在节点上收不到这个,正好分开。
-  function onBgDown(e: React.PointerEvent) {
-    const { x: sx, y: sy } = toSvg(e.clientX, e.clientY);
-    setView((v) => {
-      panRef.current = { sx, sy, tx: v.tx, ty: v.ty };
-      return v;
-    });
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-  }
-
-  // 围着光标按钮缩放(+/−):以视口中心为锚,跟滚轮一个算法。
-  function zoomBy(factor: number) {
-    const cx = W / 2;
-    const cy = H / 2;
-    setView((v) => {
-      const newK = Math.max(K_MIN, Math.min(K_MAX, v.k * factor));
-      const ratio = newK / v.k;
-      return { k: newK, tx: cx - (cx - v.tx) * ratio, ty: cy - (cy - v.ty) * ratio };
-    });
+    // 背景指释放交给 hook（清 pointersRef / pinch 态）
+    hookUp(e);
   }
 
   // 重置视角:重新按当前节点位置 fit 铺满(不是死板复位到 k=1,那样大图又缩成一小撮)。
@@ -775,7 +725,7 @@ export function CharacterGraph({
           >
             展开剩下 {rendered.hiddenCount} 个次要{noun}
           </button>
-          <span className="ml-2 text-[11px] text-[var(--color-ink-muted)] opacity-70">
+          <span className="ml-2 text-caption text-[var(--color-ink-muted)] opacity-70">
             全量节点多，力学会慢一点。
           </span>
         </div>

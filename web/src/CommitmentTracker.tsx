@@ -154,7 +154,7 @@ function StatusBadge({ status }: { status: string }) {
   const st = statusStyle(status);
   return (
     <span
-      className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+      className="inline-flex items-center text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
       title={STATUS_HINT[status as Status] ?? ""}
       style={{
         color: st.fg,
@@ -418,7 +418,7 @@ export function CommitmentTracker({
 
       {/* 时间线一条：这组会按时间排（让读者知道追的是哪几场会） */}
       {result.meetings.length > 0 && (
-        <div className="mb-5 flex items-center gap-1.5 flex-wrap text-[11px] text-[var(--color-ink-muted)]">
+        <div className="mb-5 flex items-center gap-1.5 flex-wrap text-caption text-[var(--color-ink-muted)]">
           {result.meetings.map((m, i) => (
             <span key={m.mid} className="inline-flex items-center gap-1.5">
               {i > 0 && <span aria-hidden>→</span>}
@@ -516,14 +516,14 @@ function CommitmentCard({
       />
       {/* 任务行 + 状态徽章 */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[15px] font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
+        <p className="text-body font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
           {hasText(item.task) ? item.task : "（这条没说清答应做什么）"}
         </p>
         <StatusBadge status={item.status} />
       </div>
 
       {/* 哪场会承诺的 · 时限 */}
-      <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+      <p className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink-muted)]">
         {hasText(item.from_meeting) && (
           <>
             <span className="text-[var(--color-ink)]">承诺于</span> · {item.from_meeting}
@@ -537,7 +537,7 @@ function CommitmentCard({
           </>
         ) : (
           <span
-            className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded-full ml-1"
+            className="inline-flex items-center text-caption px-1.5 py-0.5 rounded-full ml-1"
             style={{
               color: "var(--color-ink-muted)",
               border: "0.5px dashed var(--color-rule)",
@@ -550,14 +550,14 @@ function CommitmentCard({
 
       {/* 后端凭什么这么判（线索，非核过原文，老实标「研判」） */}
       {hasText(item.status_note) && (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-ink-muted)] italic">
+        <p className="mt-1.5 text-caption leading-relaxed text-[var(--color-ink-muted)] italic">
           研判 · {item.status_note}
         </p>
       )}
 
       {/* 坐实于哪场更晚的会（兑现 / 未兑现 / 进行中才有） */}
       {hasText(item.evidence_meeting) && (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-ink-muted)]">
+        <p className="mt-1.5 text-caption leading-relaxed text-[var(--color-ink-muted)]">
           <span className="text-[var(--color-ink)]">后续见于</span> · {item.evidence_meeting}
         </p>
       )}
@@ -568,7 +568,7 @@ function CommitmentCard({
           <button
             type="button"
             onClick={onToggle}
-            className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors flex items-center gap-1.5"
+            className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors flex items-center gap-1.5"
           >
             {(item.from_verified || item.evidence_verified) && (
               <SealMark size={15} title="原文已核验" />
@@ -619,23 +619,23 @@ function EvidenceLine({
 }) {
   return (
     <div
-      className="text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+      className="text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
       style={{
         fontFamily: "var(--font-display)",
         borderColor: "var(--color-seal)",
       }}
     >
       <div className="flex items-center gap-1.5 mb-0.5">
-        <span className="text-[11px]" style={{ color: "var(--color-seal)" }}>
+        <span className="text-caption" style={{ color: "var(--color-seal)" }}>
           {tag}
         </span>
         {hasText(meeting) && (
-          <span className="text-[11px] text-[var(--color-ink-muted)]">· {meeting}</span>
+          <span className="text-caption text-[var(--color-ink-muted)]">· {meeting}</span>
         )}
         {verified ? (
           <SealMark size={14} title="原文已核验" />
         ) : (
-          <span className="text-[10px] text-[var(--color-ink-muted)]">未核验</span>
+          <span className="text-caption text-[var(--color-ink-muted)]">未核验</span>
         )}
       </div>
       {text}

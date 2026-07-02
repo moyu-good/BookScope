@@ -143,7 +143,7 @@ export function ConsistencyScan({
             >
               全书自洽 · 没有前后矛盾
             </p>
-            <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+            <p className="mt-0.5 text-body-sm leading-relaxed text-[var(--color-ink)]">
               扫了全书的设定与人物，没发现前后打架的地方。这是个好消息——不是没扫到，是确实没有。
             </p>
           </div>
@@ -176,7 +176,7 @@ export function ConsistencyScan({
                       {side.verified && <SealMark size={17} title="原文已核验" />}
                     </div>
                     <div
-                      className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                      className="text-body-sm leading-relaxed text-[var(--color-ink)]"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {side.snippet}

@@ -403,7 +403,7 @@ export function AgentOrchestrate({
               >
                 <div className="min-w-0">
                   <div
-                    className="text-[14px] text-[var(--color-ink)]"
+                    className="text-body text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
                   >
                     {featureLabel(s.feature)}
@@ -444,7 +444,7 @@ export function AgentOrchestrate({
               </h3>
             </div>
             <div
-              className="whitespace-pre-wrap leading-[1.85] text-[15.5px] text-[var(--color-ink)]"
+              className="whitespace-pre-wrap leading-[1.85] text-body text-[var(--color-ink)]"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {synthesis.text}
@@ -476,7 +476,7 @@ export function AgentOrchestrate({
                       第 {c.chapter} 章
                     </div>
                     <div
-                      className="text-[14px] leading-relaxed text-[var(--color-ink)]"
+                      className="text-body leading-relaxed text-[var(--color-ink)]"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {c.snippet}

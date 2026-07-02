@@ -229,7 +229,7 @@ export function Dossier({
                     →
                   </span>
                 </div>
-                <div className="text-[11px] text-[var(--color-ink-muted)] mt-0.5 leading-snug">
+                <div className="text-caption text-[var(--color-ink-muted)] mt-0.5 leading-snug">
                   {v.hint}
                 </div>
               </button>
@@ -274,7 +274,7 @@ export function Dossier({
                   >
                     {s.book_title}
                   </div>
-                  <div className="text-[11px] text-[var(--color-ink-muted)] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                  <div className="text-caption text-[var(--color-ink-muted)] mt-0.5 flex items-center gap-1.5 flex-wrap">
                     {/* 体裁标（跟书库一致）：公文走朱砂调、其余走中性——跨文件视图是公文专属,
                         标出来用户一眼看清哪些是公文可选、哪些（小说等）跑不了这几个视图。 */}
                     {s.genre?.trim() && (

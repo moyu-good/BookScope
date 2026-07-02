@@ -167,7 +167,7 @@ export function EntityRecall({
             >
               全书未出现「{queried}」
             </p>
-            <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+            <p className="mt-0.5 text-body-sm leading-relaxed text-[var(--color-ink)]">
               回溯了全书每一章，这本书里确实没有「{queried}」。这是个确定的答案——不是没扫到。
               {confirmedAbsent ? "" : "（若怀疑是别名 / 别的写法，可换个说法再查。）"}
             </p>
@@ -194,7 +194,7 @@ export function EntityRecall({
                   className="text-left w-full"
                 >
                   <div
-                    className="text-[14px] leading-relaxed text-[var(--color-ink)]"
+                    className="text-body leading-relaxed text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {ap.what || "（出现）"}
@@ -209,7 +209,7 @@ export function EntityRecall({
                 </button>
                 {openIdx === i && ap.snippet && (
                   <div
-                    className="mt-1.5 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-[13px] leading-relaxed text-[var(--color-ink)]"
+                    className="mt-1.5 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-body-sm leading-relaxed text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {ap.snippet}

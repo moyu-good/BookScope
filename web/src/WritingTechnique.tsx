@@ -128,13 +128,13 @@ export function WritingTechnique({
               }}
             >
               <div
-                className="text-[15px] text-[var(--color-ink)] mb-1"
+                className="text-body text-[var(--color-ink)] mb-1"
                 style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
               >
                 {t.technique}
               </div>
               {t.how && (
-                <div className="text-[13px] text-[var(--color-ink-muted)] leading-relaxed mb-2">
+                <div className="text-body-sm text-[var(--color-ink-muted)] leading-relaxed mb-2">
                   {t.how}
                 </div>
               )}
@@ -145,7 +145,7 @@ export function WritingTechnique({
                     {t.verified && <SealMark size={17} title="原文已核验" />}
                   </div>
                   <div
-                    className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                    className="text-body-sm leading-relaxed text-[var(--color-ink)]"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {t.snippet}

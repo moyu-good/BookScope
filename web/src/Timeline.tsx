@@ -149,7 +149,7 @@ export function Timeline({
                   </div>
                 )}
                 <div
-                  className="text-[14px] leading-relaxed text-[var(--color-ink)]"
+                  className="text-body leading-relaxed text-[var(--color-ink)]"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
                   {ev.event}
@@ -164,7 +164,7 @@ export function Timeline({
               </button>
               {openIdx === i && ev.evidence && (
                 <div
-                  className="mt-1.5 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-[13px] leading-relaxed text-[var(--color-ink)]"
+                  className="mt-1.5 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-body-sm leading-relaxed text-[var(--color-ink)]"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
                   {ev.evidence}

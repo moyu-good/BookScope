@@ -218,7 +218,7 @@ function SubstanceBadge({ substance }: { substance: string }) {
   const st = substanceStyle(substance);
   return (
     <span
-      className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+      className="inline-flex items-center text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
       title={SUBSTANCE_HINT[substance as Substance] ?? ""}
       style={{
         color: st.fg,
@@ -238,7 +238,7 @@ function ReasonBadge({ reason }: { reason: string }) {
   const st = reasonStyle(reason);
   return (
     <span
-      className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+      className="inline-flex items-center text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
       title={OPEN_ISSUE_REASON_HINT[reason as OpenIssueReason] ?? ""}
       style={{
         color: st.fg,
@@ -265,7 +265,7 @@ function LooseEndTags({ owner, due }: { owner: string; due: string }) {
       {tags.map((t) => (
         <span
           key={t}
-          className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+          className="inline-flex items-center text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
           style={{
             color: "#9a3a2e",
             background: "rgba(154, 58, 46, 0.08)",
@@ -680,7 +680,7 @@ function HeadRow({ el }: { el: HeadElement }) {
               <SealMark size={15} title="原文已核验" />
             ) : (
               <span
-                className="text-[11px] text-[var(--color-ink-muted)]"
+                className="text-caption text-[var(--color-ink-muted)]"
                 title={el.evidence ? "未在原文比对命中" : undefined}
               >
                 未核验
@@ -723,9 +723,9 @@ function DecisionCard({
         aria-hidden="true"
       />
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[15px] font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
+        <p className="text-body font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
           <span
-            className="text-[11px] mr-1.5 align-top text-[var(--color-ink-muted)] tabular-nums"
+            className="text-caption mr-1.5 align-top text-[var(--color-ink-muted)] tabular-nums"
             aria-hidden="true"
           >
             {decision.chapter}
@@ -738,7 +738,7 @@ function DecisionCard({
       </div>
 
       {(hasText(decision.decided_by) || hasText(decision.background)) && (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+        <p className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink-muted)]">
           {hasText(decision.decided_by) && (
             <>
               <span className="text-[var(--color-ink)]">谁拍的</span> ·{" "}
@@ -756,7 +756,7 @@ function DecisionCard({
       )}
 
       {hasText(decision.substance_reason) && (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-ink-muted)] italic">
+        <p className="mt-1.5 text-caption leading-relaxed text-[var(--color-ink-muted)] italic">
           含金量凭据 · {decision.substance_reason}
         </p>
       )}
@@ -804,9 +804,9 @@ function ActionCard({
       />
       {/* 任务行 + 含金量徽章 */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[15px] font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
+        <p className="text-body font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
           <span
-            className="text-[11px] mr-1.5 align-top text-[var(--color-ink-muted)] tabular-nums"
+            className="text-caption mr-1.5 align-top text-[var(--color-ink-muted)] tabular-nums"
             aria-hidden="true"
           >
             {item.chapter}
@@ -817,7 +817,7 @@ function ActionCard({
       </div>
 
       {/* 负责人 / 时限：抽到了正常显示，空了显客观落空标——绝不替它编人编时间 */}
-      <div className="mt-2 flex items-center gap-2 flex-wrap text-[13px]">
+      <div className="mt-2 flex items-center gap-2 flex-wrap text-body-sm">
         {hasText(item.owner) ? (
           <span className="text-[var(--color-ink)]">
             <span className="text-[var(--color-ink-muted)]">负责人</span>{" "}
@@ -835,7 +835,7 @@ function ActionCard({
 
       {/* source / 落实哪条决议 */}
       {(hasText(item.source) || item.from_decision !== null) && (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-ink-muted)]">
+        <p className="mt-1.5 text-caption leading-relaxed text-[var(--color-ink-muted)]">
           {hasText(item.source) && (
             <>
               <span className="text-[var(--color-ink)]">谁交代的</span> ·{" "}
@@ -850,7 +850,7 @@ function ActionCard({
       )}
 
       {hasText(item.substance_reason) && (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-ink-muted)] italic">
+        <p className="mt-1.5 text-caption leading-relaxed text-[var(--color-ink-muted)] italic">
           含金量凭据 · {item.substance_reason}
         </p>
       )}
@@ -896,9 +896,9 @@ function OpenIssueCard({
       />
       {/* 议题行 + 为何悬着徽章 */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[15px] font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
+        <p className="text-body font-bold text-[var(--color-ink)] leading-snug flex-1 min-w-0">
           <span
-            className="text-[11px] mr-1.5 align-top text-[var(--color-ink-muted)] tabular-nums"
+            className="text-caption mr-1.5 align-top text-[var(--color-ink-muted)] tabular-nums"
             aria-hidden="true"
           >
             {item.chapter}
@@ -910,14 +910,14 @@ function OpenIssueCard({
 
       {/* 谁提的：抽到了显示，空了不替它编人 */}
       {hasText(item.raised_by) && (
-        <p className="mt-2 text-[13px] text-[var(--color-ink)]">
+        <p className="mt-2 text-body-sm text-[var(--color-ink)]">
           <span className="text-[var(--color-ink-muted)]">谁提的</span>{" "}
           {item.raised_by}
         </p>
       )}
 
       {hasText(item.background) && (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-ink-muted)]">
+        <p className="mt-1.5 text-caption leading-relaxed text-[var(--color-ink-muted)]">
           <span className="text-[var(--color-ink)]">卡在哪</span> ·{" "}
           {item.background}
         </p>
@@ -956,7 +956,7 @@ function EvidenceFoot({
           <button
             type="button"
             onClick={onToggle}
-            className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+            className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
           >
             {open ? "收起原文" : "看原文出处"}
           </button>
@@ -968,14 +968,14 @@ function EvidenceFoot({
       )}
       {canOpen && open && (
         <p
-          className="mt-2 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+          className="mt-2 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
           style={{
             fontFamily: "var(--font-display)",
             borderColor: "var(--color-seal)",
           }}
         >
           <span
-            className="text-[11px] mr-1.5 align-top"
+            className="text-caption mr-1.5 align-top"
             style={{ color: "var(--color-seal)" }}
           >
             原文

@@ -278,14 +278,14 @@ export function RedheadTimeline({
                       }}
                     >
                       <span
-                        className="text-[12.5px] font-bold tabular-nums"
+                        className="text-caption font-bold tabular-nums"
                         style={{ color: "var(--color-seal)" }}
                       >
                         {n.when}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-[11px] text-[var(--color-ink-muted)] italic">
+                    <span className="text-caption text-[var(--color-ink-muted)] italic">
                       时间待核
                     </span>
                   )}
@@ -329,7 +329,7 @@ export function RedheadTimeline({
                   <div className="flex items-start gap-2 flex-wrap">
                     {verified && <SealMark size={17} title="原文已核验" />}
                     <p
-                      className="text-[15px] leading-7 text-[var(--color-ink)]"
+                      className="text-body leading-7 text-[var(--color-ink)]"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {n.what || "（这个时间点没说要发生啥）"}
@@ -340,7 +340,7 @@ export function RedheadTimeline({
                       if (!ds) return null;
                       return (
                         <span
-                          className="self-center text-[11px] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
+                          className="self-center text-caption px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
                           style={{ color: ds.fg, background: ds.bg }}
                           title={n.deadline_reason || undefined}
                         >
@@ -374,13 +374,13 @@ export function RedheadTimeline({
                         onClick={() =>
                           setOpenOrigin((cur) => ({ ...cur, [i]: !cur[i] }))
                         }
-                        className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                        className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
                       >
                         {isOpen ? "收起原文" : "看原文出处"}
                       </button>
                       {isOpen && (
                         <p
-                          className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+                          className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
                           style={{
                             borderColor: "color-mix(in oklch, var(--color-seal) 40%, transparent)",
                             fontFamily: "var(--font-display)",

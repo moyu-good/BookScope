@@ -151,7 +151,7 @@ export function StyleIssues({
                       }}
                     >
                       <div
-                        className="text-[14px] leading-relaxed text-[var(--color-ink)] mb-2"
+                        className="text-body leading-relaxed text-[var(--color-ink)] mb-2"
                         style={{ fontFamily: "var(--font-display)" }}
                       >
                         {it.what}
@@ -162,7 +162,7 @@ export function StyleIssues({
                           {it.verified && <SealMark size={17} title="原文已核验" />}
                         </div>
                         <div
-                          className="text-[13px] leading-relaxed text-[var(--color-ink)]"
+                          className="text-body-sm leading-relaxed text-[var(--color-ink)]"
                           style={{ fontFamily: "var(--font-display)" }}
                         >
                           {it.snippet}

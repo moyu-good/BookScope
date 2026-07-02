@@ -12,9 +12,10 @@
 // 有"只看断弧"过滤 + 进场逐弧描画动画（带冷却，重出才再放）。
 // ---------------------------------------------------------------------------
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { Checkbox } from "./ui/FormControls";
+import { usePanZoom } from "./usePanZoom";
 
 interface Arc {
   description: string;
@@ -63,6 +64,11 @@ export function ForeshadowArcs({
   const [onlyDangling, setOnlyDangling] = useState(false);
   // 进场动画：load 成功后 key 变 → SVG path 重新触发描画；冷却期内不重复放
   const [animKey, setAnimKey] = useState(0);
+
+  // pan/zoom + 双指 pinch（移动端）：大书弧线密，手机上捏合才看得清。
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const { view, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onWheel, resetView } =
+    usePanZoom(svgRef, { width: W, height: H });
 
   async function load() {
     setLoading(true);
@@ -177,7 +183,7 @@ export function ForeshadowArcs({
               >
                 全书没有挂得上原文的伏笔
               </p>
-              <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--color-ink)]">
+              <p className="mt-0.5 text-body-sm leading-relaxed text-[var(--color-ink)]">
                 读了全书，没找到前埋后收的伏笔线索。这是个确定的结果——不是没扫到。
               </p>
             </div>
@@ -282,14 +288,23 @@ export function ForeshadowArcs({
       )}
 
       <svg
+        ref={svgRef}
         key={animKey}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full border border-[var(--color-rule)] rounded bg-white"
+        className="w-full border border-[var(--color-rule)] rounded bg-white touch-none"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onPointerLeave={onPointerUp}
+        onWheel={onWheel}
       >
         <style>{`
           @keyframes fa-draw { to { stroke-dashoffset: 0; } }
           .fa-arc { animation: fa-draw 1s ease-out forwards; }
         `}</style>
+        {/* 缩放平移层：弧线和节点都在这个 <g> 里，整图能缩能拖、双指捏合看细节 */}
+        <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
 
         {/* 章节基线 */}
         <line
@@ -380,10 +395,18 @@ export function ForeshadowArcs({
             </g>
           );
         })}
+        </g>
       </svg>
 
       {/* 图例 */}
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-ink-muted)]">
+        <button
+          type="button"
+          onClick={resetView}
+          className="text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+        >
+          重置视角
+        </button>
         <span className="flex items-center gap-1">
           <svg width="22" height="8" aria-hidden>
             <path d="M1 7 Q11 -3 21 7" fill="none" stroke="var(--color-seal)" strokeWidth={1.4} />

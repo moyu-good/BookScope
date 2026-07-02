@@ -318,10 +318,16 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
     }
     window.addEventListener("mousemove", wake);
     window.addEventListener("keydown", wake);
+    // 触屏：mousemove 在手机上不触发，靠 touchstart/pointerdown 唤醒顶底栏，
+    // 否则 2.8s 后栏隐了、点触唤不回，目录/排版/翻章按钮够不到。
+    window.addEventListener("touchstart", wake, { passive: true });
+    window.addEventListener("pointerdown", wake);
     wake();
     return () => {
       window.removeEventListener("mousemove", wake);
       window.removeEventListener("keydown", wake);
+      window.removeEventListener("touchstart", wake);
+      window.removeEventListener("pointerdown", wake);
       if (chromeTimer.current) window.clearTimeout(chromeTimer.current);
     };
   }, []);
@@ -567,13 +573,13 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
           borderBottom: `0.5px solid ${theme.faint}`,
         }}
       >
-        <button type="button" onClick={onExit} className="text-sm opacity-80 hover:opacity-100" style={{ fontFamily: "var(--font-display)" }}>
+        <button type="button" onClick={onExit} className="text-sm opacity-80 hover:opacity-100 shrink-0" style={{ fontFamily: "var(--font-display)" }}>
           ‹ 书架
         </button>
-        <span className="text-xs truncate max-w-[40%] opacity-60" title={bookTitle}>
+        <span className="text-xs truncate max-w-[40%] opacity-60 hidden sm:inline" title={bookTitle}>
           {bookTitle}
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <ChromeBtn onClick={() => setTocOpen(true)} label="目录" />
           <ChromeBtn onClick={() => setSettingsOpen((v) => !v)} label="排版" />
           {/* 批：用户标注总览抽屉（与目录左右对称、右滑）。有标注时角标记数。 */}
@@ -587,7 +593,7 @@ export function Reader({ sessionId, bookTitle, provider, apiKey, model, baseUrl,
             批
             {annotations.length > 0 && (
               <span
-                className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full text-[10px] leading-4 text-center text-white"
+                className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full text-caption leading-4 text-center text-white"
                 style={{ background: "var(--color-ink)" }}
               >
                 {annotations.length}

@@ -144,7 +144,7 @@ export function ChapterAsk({
             </p>
           ) : (
             <>
-              <p className="text-[15px] leading-relaxed text-[var(--color-ink)] whitespace-pre-wrap mb-3" style={{ fontFamily: "var(--font-display)" }}>
+              <p className="text-body leading-relaxed text-[var(--color-ink)] whitespace-pre-wrap mb-3" style={{ fontFamily: "var(--font-display)" }}>
                 {result.answer}
               </p>
               {result.citations.length > 0 && (
@@ -153,7 +153,7 @@ export function ChapterAsk({
                   {result.citations.map((c, i) => (
                     <div
                       key={i}
-                      className="text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-2.5 py-0.5 flex items-start gap-1.5"
+                      className="text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-2.5 py-0.5 flex items-start gap-1.5"
                       style={{ borderColor: "var(--color-seal)" }}
                     >
                       {c.verified && <SealMark size={15} className="mt-0.5" title="本章原文已核验" />}

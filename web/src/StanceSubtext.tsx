@@ -228,7 +228,7 @@ function PositionBadge({ position }: { position: string }) {
   const st = positionStyle(position);
   return (
     <span
-      className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+      className="inline-flex items-center text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
       title={POSITION_HINT[position as Position] ?? ""}
       style={{
         color: st.fg,
@@ -248,7 +248,7 @@ function SubstanceBadge({ substance }: { substance: string }) {
   const st = substanceStyle(substance);
   return (
     <span
-      className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+      className="inline-flex items-center text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
       title={SUBSTANCE_HINT[substance as Substance] ?? ""}
       style={{
         color: st.fg,
@@ -269,7 +269,7 @@ function ConfidenceBadge({ confidence }: { confidence: string }) {
   const cf = confidenceStyle(confidence);
   return (
     <span
-      className="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+      className="text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
       style={{ color: cf.fg, background: cf.bg }}
       title="这是研判的把握，不是核验过的事实"
     >
@@ -296,7 +296,7 @@ function BasisBlock({
       <button
         type="button"
         onClick={onToggle}
-        className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+        className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
       >
         {open ? "收起原话" : `看引的原话（${items.length}）`}
       </button>
@@ -305,14 +305,14 @@ function BasisBlock({
           {items.map((b, bi) => (
             <li
               key={bi}
-              className="text-[13px] leading-relaxed text-[var(--color-ink-muted)] pl-3"
+              className="text-body-sm leading-relaxed text-[var(--color-ink-muted)] pl-3"
               style={{
                 fontFamily: "var(--font-display)",
                 borderLeft: "1px dashed var(--color-rule)",
               }}
             >
               <span
-                className="text-[10px] mr-1.5 align-top text-[var(--color-ink-muted)]"
+                className="text-caption mr-1.5 align-top text-[var(--color-ink-muted)]"
                 style={{ opacity: 0.7 }}
               >
                 引
@@ -513,7 +513,7 @@ export function StanceSubtext({
       {/* 纪要降级提示：form_note 非空就整块走这条，不硬显空卡 */}
       {degraded && (
         <div
-          className="mb-5 rounded px-4 py-3 text-[13px] leading-relaxed text-[var(--color-ink)]"
+          className="mb-5 rounded px-4 py-3 text-body-sm leading-relaxed text-[var(--color-ink)]"
           style={{
             background: "var(--color-paper-sunken)",
             border: "1px dashed var(--color-rule)",
@@ -534,7 +534,7 @@ export function StanceSubtext({
         >
           {/* 总览签：右上一枚朱砂签，点破这是带立场的总览不是中立罗列 */}
           <span
-            className="absolute -top-2.5 left-4 inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded"
+            className="absolute -top-2.5 left-4 inline-flex items-center gap-1 px-2 py-0.5 text-caption font-bold rounded"
             style={{
               color: "var(--color-paper)",
               background: "var(--color-seal)",
@@ -545,7 +545,7 @@ export function StanceSubtext({
             总览 · 谁在推谁在拖
           </span>
           <p
-            className="text-[15px] leading-7 text-[var(--color-ink)] mt-1"
+            className="text-body leading-7 text-[var(--color-ink)] mt-1"
             style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
           >
             {result.summary}
@@ -615,7 +615,7 @@ function TopicSection({
       {/* 确证一致无弦外：笃定的好事，不能显得像系统漏读 */}
       {verdict === "确证一致无弦外" && stances.length === 0 && subtexts.length === 0 ? (
         <div
-          className="rounded px-4 py-3 text-[13px] leading-relaxed"
+          className="rounded px-4 py-3 text-body-sm leading-relaxed"
           style={{
             background: "rgba(63, 111, 74, 0.07)",
             border: "0.5px solid rgba(63, 111, 74, 0.35)",
@@ -627,7 +627,7 @@ function TopicSection({
       ) : verdict === "读不出（纪要/待核）" &&
         stances.length === 0 &&
         subtexts.length === 0 ? (
-        <p className="text-[13px] leading-relaxed text-[var(--color-ink-muted)] italic">
+        <p className="text-body-sm leading-relaxed text-[var(--color-ink-muted)] italic">
           这份是整理稿，读不出现场语气，立场与弦外要逐字稿才能判，建议传逐字稿。
         </p>
       ) : (
@@ -678,7 +678,7 @@ function StanceCard({
       {/* 顶行：研判标 + 把握徽章 */}
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <span
-          className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap shrink-0"
+          className="inline-flex items-center text-caption px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap shrink-0"
           style={{ border: "1px dashed var(--color-ink-muted)", opacity: 0.85 }}
         >
           研判 · 非核验
@@ -689,7 +689,7 @@ function StanceCard({
       {/* 谁 + 方向徽章 + 含金量徽章 */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span
-          className="text-[15px] font-bold text-[var(--color-ink)] leading-snug"
+          className="text-body font-bold text-[var(--color-ink)] leading-snug"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {hasText(stance.person) ? stance.person : "（没读出是谁）"}
@@ -703,7 +703,7 @@ function StanceCard({
       {/* 人话解读：他其实是… */}
       {hasText(stance.reading) && (
         <p
-          className="mt-2 text-[14px] leading-relaxed text-[var(--color-ink)]"
+          className="mt-2 text-body leading-relaxed text-[var(--color-ink)]"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {stance.reading}
@@ -712,7 +712,7 @@ function StanceCard({
 
       {/* 含金量凭据：凭原话里哪些 marker 判这档（有没有接活 / 给时限） */}
       {hasText(stance.substance_reason) && (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-ink-muted)] italic">
+        <p className="mt-1.5 text-caption leading-relaxed text-[var(--color-ink-muted)] italic">
           含金量凭据 · {stance.substance_reason}
         </p>
       )}
@@ -744,7 +744,7 @@ function SubtextCard({
       {/* 顶行：研判标 + 把握徽章 */}
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <span
-          className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap shrink-0"
+          className="inline-flex items-center text-caption px-1.5 py-0.5 rounded text-[var(--color-ink-muted)] whitespace-nowrap shrink-0"
           style={{ border: "1px dashed var(--color-ink-muted)", opacity: 0.85 }}
         >
           研判 · 非核验
@@ -755,7 +755,7 @@ function SubtextCard({
       {/* 弦外类别徽章（描朱提醒「这话有弦外」）+ 谁说的 */}
       <div className="flex items-center gap-2 flex-wrap">
         <span
-          className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+          className="inline-flex items-center text-caption px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
           title={SUBTEXT_HINT[subtext.kind as SubtextKind] ?? ""}
           style={{
             color: "#9a3a2e",
@@ -769,7 +769,7 @@ function SubtextCard({
         </span>
         {hasText(subtext.person) && (
           <span
-            className="text-[13px] text-[var(--color-ink)]"
+            className="text-body-sm text-[var(--color-ink)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {subtext.person}
@@ -780,7 +780,7 @@ function SubtextCard({
       {/* 言下之意：他这话真正想说的是… */}
       {hasText(subtext.subtext) && (
         <p
-          className="mt-2 text-[14px] leading-relaxed text-[var(--color-ink)]"
+          className="mt-2 text-body leading-relaxed text-[var(--color-ink)]"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {subtext.subtext}

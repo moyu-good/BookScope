@@ -265,21 +265,21 @@ export function RedheadFormatCheck({
       {/* ── 校勘单眉首：一道朱砂细规 + 国标出处 + 齐 N/总 + 朱钩/朱叉/朱问三态计数 ── */}
       <div className="text-center mb-1">
         <p
-          className="text-[13px] text-[var(--color-ink-muted)]"
+          className="text-body-sm text-[var(--color-ink-muted)]"
           style={{ fontFamily: "var(--font-display)" }}
         >
           对照 GB/T 9704《党政机关公文格式》
         </p>
         <div className="mt-2 flex items-center justify-center gap-2">
           <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
-          <span className="text-[11px] text-[var(--color-ink-muted)] tabular-nums">
+          <span className="text-caption text-[var(--color-ink-muted)] tabular-nums">
             {summary?.text ?? `齐 ${summary?.ok ?? 0}/${checks.length}`}
           </span>
           <span className="h-px w-8 bg-[var(--color-seal)] opacity-40" />
         </div>
         {/* 三态小计：朱钩 N · 朱叉 M · 朱问 K（各带自己的笔色） */}
         {summary && (
-          <div className="mt-2 flex items-center justify-center gap-3 text-[11px] tabular-nums">
+          <div className="mt-2 flex items-center justify-center gap-3 text-caption tabular-nums">
             <span style={{ color: STATUS_STYLE["齐"].fg }}>
               ✓ 齐 {summary.ok}
             </span>
@@ -296,7 +296,7 @@ export function RedheadFormatCheck({
       {/* 这次整体没抽好 → 顶上一条朱砂提醒：很多"存疑"是没抽到、不是公文缺 */}
       {!trustworthy && (
         <div
-          className="mt-3 mb-1 rounded border-l-2 px-3 py-2 text-[12px] leading-relaxed text-[var(--color-ink)]"
+          className="mt-3 mb-1 rounded border-l-2 px-3 py-2 text-caption leading-relaxed text-[var(--color-ink)]"
           style={{
             borderColor: "var(--color-seal)",
             background: "var(--color-seal-soft)",
@@ -356,7 +356,7 @@ export function RedheadFormatCheck({
                       {c.item}
                     </span>
                     <span
-                      className="text-[11px] px-1.5 py-0.5 rounded"
+                      className="text-caption px-1.5 py-0.5 rounded"
                       style={{ color: st.fg, background: st.bg }}
                     >
                       {c.status}
@@ -368,7 +368,7 @@ export function RedheadFormatCheck({
                         onClick={() =>
                           setOpenIdx((cur) => (cur === i ? null : i))
                         }
-                        className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors ml-auto"
+                        className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors ml-auto"
                       >
                         {isOpen ? "收起依据" : "看原文 / 国标依据"}
                       </button>
@@ -376,7 +376,7 @@ export function RedheadFormatCheck({
                   </div>
 
                   {/* 一句判定理由（说人话区分"真没有"和"没抽到"） */}
-                  <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+                  <p className="mt-1 text-body-sm leading-relaxed text-[var(--color-ink-muted)]">
                     {c.note}
                   </p>
 
@@ -388,12 +388,12 @@ export function RedheadFormatCheck({
                           {c.verified ? (
                             <SealMark size={16} title="原文已核验" />
                           ) : (
-                            <span className="text-[11px] text-[var(--color-ink-muted)] shrink-0 mt-0.5">
+                            <span className="text-caption text-[var(--color-ink-muted)] shrink-0 mt-0.5">
                               未核
                             </span>
                           )}
                           <p
-                            className="text-[13px] leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+                            className="text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
                             style={{
                               fontFamily: "var(--font-display)",
                               borderColor: "color-mix(in oklch, var(--color-seal) 40%, transparent)",
@@ -404,7 +404,7 @@ export function RedheadFormatCheck({
                         </div>
                       )}
                       {hasText(c.rule_note) && (
-                        <p className="text-[11px] leading-relaxed text-[var(--color-ink-muted)] italic">
+                        <p className="text-caption leading-relaxed text-[var(--color-ink-muted)] italic">
                           按规矩 · {c.rule_note}
                         </p>
                       )}

@@ -27,6 +27,19 @@
   /* 册页浮在案头上的厚影——比卡片影更深更扩散，给"摊开一本书"的实体感 */
   --shadow-folio: 0 2px 10px oklch(28% 0.04 40 / 0.08),
     0 24px 64px oklch(28% 0.04 40 / 0.2);
+
+  /* 语义字号——正文/导语用 clamp 流体（移动端 14→16px 可读，桌面取现状值 0 变化），
+     caption/display 固定（小 UI chrome / 印章字不闪烁）。不覆盖 Tailwind 默认 text-xs/sm/base。 */
+  --text-caption: 0.6875rem; /* 11px：10/10.5/11px 系列归这 */
+  --text-caption--line-height: 1.5;
+  --text-body-sm: 0.8125rem; /* 13/13.5px 系列 */
+  --text-body-sm--line-height: 1.55;
+  --text-body: clamp(0.875rem, 0.84rem + 0.15vw, 1rem); /* 正文 14→16px 流体 */
+  --text-body--line-height: 1.6;
+  --text-lead: clamp(0.95rem, 0.9rem + 0.2vw, 1.05rem); /* 版心副标题/导语 */
+  --text-lead--line-height: 1.5;
+  --text-display: 1.55rem; /* 印章「鑒」字，固定不流体 */
+  --text-display--line-height: 1.2;
 }
 
 /* ---------------------------------------------------------------------------
