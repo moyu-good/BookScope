@@ -851,6 +851,14 @@ class RedheadDocStructureRequest(BaseModel):
     api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
     model: str | None = Field(default=None)
     base_url: str | None = Field(default=None)
+    head_only: bool = Field(
+        default=False,
+        description=(
+            "只要头要素骨架（公文结构鸟瞰），跳过贵的条款维 map-reduce。True=公文结构视图"
+            "（秒出骨架：先 peek 缓存、没有才只建 head）；False=办事清单等需逐条款的视图"
+            "（照旧建/取完整文脉含条款）。默认 False 向后兼容。"
+        ),
+    )
 
 
 class RedheadDocStructureResponse(BaseModel):

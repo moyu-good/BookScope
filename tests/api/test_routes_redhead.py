@@ -134,6 +134,72 @@ def test_doc_structure_success_returns_head_and_clauses(
     assert "input_tokens" in body["trace"]
 
 
+def test_doc_structure_head_only_skips_clauses_when_uncached(
+    client_and_store: tuple[TestClient, BookSessionStore],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """head_only=true 且未缓存:只返 head 骨架(clauses 空)、绝不建条款 map-reduce(#43)。"""
+    client, store = client_and_store
+    _register(store, "d1")
+    monkeypatch.setattr(
+        agent_routes, "build_llm_client_from_params", lambda **_k: object()
+    )
+    monkeypatch.setattr(agent_routes, "peek_doc_spine_cache", lambda **_k: None)  # 未缓存
+    head_only_spine = {
+        "schema_version": "v1",
+        "head": _FAKE_SPINE["head"],
+        "clauses": [],
+        "head_only": True,
+        "structure_read": {"authority": {"doc_type": "通知"}, "signals": []},
+    }
+    monkeypatch.setattr(agent_routes, "build_doc_head_only", lambda **_k: head_only_spine)
+
+    def _boom(**_k: object) -> dict:
+        raise AssertionError("head_only 路径不该建完整文脉(条款 map-reduce 那两分钟)")
+
+    monkeypatch.setattr(agent_routes, "get_or_build_doc_spine", _boom)
+
+    resp = client.post(
+        "/api/agent/redhead/doc-structure",
+        json={**_BYOK, "book_session_id": "d1", "head_only": True},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["clauses"] == []  # 骨架:没条款
+    assert body["head"][0]["field"] == "发文字号"
+    assert body["scanned"] is True  # head 有值 → scanned 仍 true
+    assert body["structure_read"]["authority"]["doc_type"] == "通知"
+
+
+def test_doc_structure_head_only_uses_cached_full_spine(
+    client_and_store: tuple[TestClient, BookSessionStore],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """head_only=true 但完整文脉已缓存(逐条精读跑过)→ peek 命中直接用完整版(含条款)。"""
+    client, store = client_and_store
+    _register(store, "d1")
+    monkeypatch.setattr(
+        agent_routes, "build_llm_client_from_params", lambda **_k: object()
+    )
+    monkeypatch.setattr(
+        agent_routes, "peek_doc_spine_cache", lambda **_k: dict(_FAKE_SPINE)
+    )
+
+    def _boom(**_k: object) -> dict:
+        raise AssertionError("peek 命中就不该再建(骨架或完整都不该)")
+
+    monkeypatch.setattr(agent_routes, "build_doc_head_only", _boom)
+    monkeypatch.setattr(agent_routes, "get_or_build_doc_spine", _boom)
+
+    resp = client.post(
+        "/api/agent/redhead/doc-structure",
+        json={**_BYOK, "book_session_id": "d1", "head_only": True},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["clauses"][0]["instruction_type"] == "硬要求"  # 用了缓存的完整版
+
+
 def test_doc_structure_empty_spine_scanned_false(
     client_and_store: tuple[TestClient, BookSessionStore],
     monkeypatch: pytest.MonkeyPatch,

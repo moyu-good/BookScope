@@ -116,6 +116,43 @@ def test_builds_head_and_clauses(monkeypatch):
     assert [c["chapter"] for c in clauses] == [1, 2, 3]
 
 
+# ── 骨架鸟瞰:build_doc_head_only 只建 head，跳条款 map-reduce（#43 公文结构秒出）──
+def test_head_only_skips_clause_mapreduce(monkeypatch):
+    """公文结构骨架:只建 head + structure_read，绝不跑条款维 run_segments(那两分钟的活)。"""
+    _patch(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())
+
+    # 条款维走 run_segments;head-only 绝不该碰它——patch 成一炸,碰到即 fail。
+    def _boom(*_a, **_k):  # noqa: ANN002, ANN003, ANN202
+        raise AssertionError("build_doc_head_only 不该调 run_segments(条款 map-reduce)")
+
+    monkeypatch.setattr(ds, "run_segments", _boom)
+    spine = ds.build_doc_head_only(
+        chunks=_CHUNKS, llm_client=_FakeClient(), model="deepseek-v4-flash"
+    )
+    assert spine["clauses"] == []  # 没建任何条款
+    assert spine["head_only"] is True
+    # head 骨架齐(8 要素全出,同 build_doc_spine)
+    assert len(spine["head"]) == len(ds._HEAD_FIELDS)
+    # structure_read 从 head 推:authority 的 doc_type = 文种「通知」(不依赖条款)
+    assert spine.get("structure_read") is not None
+    assert spine["structure_read"]["authority"]["doc_type"] == "通知"
+
+
+def test_head_only_no_wenzhong_no_structure_read(monkeypatch):
+    """文种没抽到 → 没判层级的根基 → 无 structure_read（同 build_doc_spine，不硬造）。"""
+    head_no_wenzhong = _head_payload([
+        {"field": "发文机关", "value": "某局", "evidence": "某局文件"},
+    ])
+    _patch(monkeypatch, head_text=head_no_wenzhong, clause_text=_full_clauses())
+    monkeypatch.setattr(ds, "run_segments", lambda *_a, **_k: (_ for _ in ()).throw(
+        AssertionError("head-only 不该跑条款")))
+    spine = ds.build_doc_head_only(
+        chunks=_CHUNKS, llm_client=_FakeClient(), model="deepseek-v4-flash"
+    )
+    assert spine["clauses"] == []
+    assert "structure_read" not in spine  # 文种空,不硬造
+
+
 # ── 指令类型是带原文撑的封闭集标签,不是分数 ──────────────────────────────────
 def test_instruction_type_is_label_with_evidence(monkeypatch):
     spine = _run(monkeypatch, head_text=_full_head(), clause_text=_full_clauses())

@@ -161,6 +161,28 @@ def get_or_build_doc_spine(
     )
 
 
+def peek_doc_spine_cache(*, chunks: list[dict], model: str) -> dict | None:
+    """只**看**这份公文的完整文脉有没有缓存,有就返、没有返 None——**绝不构建**。
+
+    给「公文结构」骨架鸟瞰用:先 peek,命中(说明逐条精读 / 办事清单已建过完整文脉)就直接用
+    完整的(含条款,一并显示);miss 就退回只建 head 骨架(``build_doc_head_only``),把贵的条款
+    map-reduce 留给用户真点逐条精读时。缓存禁用 / 任何意外 → 返 None(当没缓存,调用方建骨架)。
+    """
+    if _is_cache_disabled():
+        return None
+    try:
+        cache = _get_cache()
+        key = _compute_doc_spine_cache_key(all_chunks=chunks, model=model)
+        cached = cache.get(key)
+        if cached is None:
+            return None
+        spine = json.loads(cached.decode("utf-8"))
+        return spine if isinstance(spine, dict) else None
+    except Exception as exc:  # noqa: BLE001 — peek 失败当没缓存,绝不 break
+        logger.warning("doc_spine_cache: peek raised %s: %s; 当无缓存", type(exc).__name__, exc)
+        return None
+
+
 def clear_doc_spine_cache() -> None:
     """清空整张文脉缓存表 + 重置 stats。给 CLI / 测试用。"""
     _get_cache().clear_all()
@@ -185,5 +207,6 @@ __all__ = [
     "clear_doc_spine_cache",
     "get_doc_spine_cache_stats",
     "get_or_build_doc_spine",
+    "peek_doc_spine_cache",
     "reset_doc_spine_cache_singleton_for_test",
 ]

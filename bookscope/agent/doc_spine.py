@@ -1094,6 +1094,59 @@ def build_doc_spine(
     return out
 
 
+def build_doc_head_only(
+    *,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    full_text: str | None = None,
+    max_tokens: int = DEFAULT_DOC_SPINE_MAX_TOKENS,
+    cache_enabled: bool = True,
+) -> dict[str, Any]:
+    """只建**头要素维 + 看结构维**的轻文脉——给「公文结构」骨架鸟瞰秒出用,跳过贵的条款维。
+
+    公文结构视图(1.8.0 收窄成骨架鸟瞰)只显头要素 + structure_read(权威刻度 + 结构信号),
+    不显逐条款(那是「逐条精读」的活)。但整套 ``build_doc_spine`` 的耗时大头是条款维
+    ``run_segments`` 分段并发 map-reduce(那两分多钟);头要素维只是一次抽取(秒级)。所以公文
+    结构若第一个被点、还没人建过完整文脉,没必要陪跑条款 map-reduce——只建 head 骨架即可,
+    那两分钟留给用户真点「逐条精读」时(要深读本就愿意等)。
+
+    **不写全文脉缓存**(调用方负责):本函数返的是 ``clauses: []`` 的轻文脉,绝不能落进
+    ``doc_spines`` 缓存的全文脉 key——否则「逐条精读」命中它会拿到空条款。调用侧的规矩是:
+    先 ``peek_doc_spine_cache`` 看有没有完整文脉,有就用完整的,没有才调本函数出骨架、且不缓存。
+
+    ``structure_read`` 用空 clauses 推:authority(权威刻度)纯从 head 的文种 + 发文机关算、
+    不依赖条款;条款相关信号(排序牵头 / 指令构成)在空 clauses 下自动跳过(``_build_structure_read``
+    对空 clauses 安全)。所以骨架的 structure_read 是「权威 + 缺席信号」齐、条款级信号缺——
+    正是骨架鸟瞰要的粒度。
+
+    Returns:
+        ``{"schema_version", "head", "clauses": [], "structure_read"?}``——与 ``build_doc_spine``
+        同形,只是 ``clauses`` 恒空。文种没抽到时无 ``structure_read``(同 build_doc_spine)。
+    """
+    head_full_text = full_text if (full_text and full_text.strip()) else "".join(
+        str(c.get("text", "")) for c in chunks
+    )
+    head = _build_head_elements(
+        full_text=head_full_text,
+        chunks=chunks,
+        llm_client=llm_client,
+        model=model,
+        max_tokens=max_tokens,
+        cache_enabled=cache_enabled,
+    )
+    structure_read = _build_structure_read(head, [])
+    out: dict[str, Any] = {
+        "schema_version": DOC_SPINE_SCHEMA_VERSION,
+        "head": head,
+        "clauses": [],
+        "head_only": True,  # 标记:这是轻文脉(没条款),前端 / 调用方可据此提示「深读点逐条精读」
+    }
+    if structure_read is not None:
+        out["structure_read"] = structure_read
+    return out
+
+
 __all__ = [
     "AGENCY_LEVEL_HIGH",
     "AGENCY_LEVEL_MID",
@@ -1106,5 +1159,6 @@ __all__ = [
     "HEAD_STATUS_UNVERIFIED",
     "INSTRUCTION_TYPES",
     "SUBSTANCE_LEVELS",
+    "build_doc_head_only",
     "build_doc_spine",
 ]

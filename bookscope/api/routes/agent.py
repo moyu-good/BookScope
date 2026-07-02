@@ -48,7 +48,10 @@ from bookscope.agent import (
     run_fast_path,
 )
 from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
-from bookscope.agent._internal.doc_spine_cache import get_or_build_doc_spine
+from bookscope.agent._internal.doc_spine_cache import (
+    get_or_build_doc_spine,
+    peek_doc_spine_cache,
+)
 from bookscope.agent._internal.empty_semantics import is_confirmed_empty
 from bookscope.agent.annotations import generate_annotations
 from bookscope.agent.argument_structure import generate_argument_structure_exhaustive
@@ -87,6 +90,7 @@ from bookscope.agent.cross_doc_views import (
     policy_evolution_from_spines,
     policy_wording_diff_from_spines,
 )
+from bookscope.agent.doc_spine import build_doc_head_only
 from bookscope.agent.entity_recall import generate_entity_recall
 from bookscope.agent.events import LoopEvent
 from bookscope.agent.genre_detect import (
@@ -3179,9 +3183,21 @@ async def agent_redhead_doc_structure(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    spine = get_or_build_doc_spine(
-        chunks=chunks, llm_client=rec, model=model, full_text=full_text
-    )
+    # 这个端点被两处共用:公文结构(骨架鸟瞰,只显头要素 + 权威/结构信号,不显条款)+ 办事清单
+    # (要条款当待办)。所以用 head_only 分流,别让公文结构陪跑那两分多钟的条款 map-reduce(#43):
+    #   · head_only=True(公文结构):先 peek 缓存——逐条精读/办事清单建过完整文脉就直接用(含条款);
+    #     没建过就只建 head 骨架秒出,那两分钟留给用户真点逐条精读时。
+    #   · head_only=False(办事清单,默认):照旧建/取完整文脉(含条款),向后兼容。
+    if request.head_only:
+        spine = peek_doc_spine_cache(chunks=chunks, model=model)
+        if spine is None:
+            spine = build_doc_head_only(
+                chunks=chunks, llm_client=rec, model=model, full_text=full_text
+            )
+    else:
+        spine = get_or_build_doc_spine(
+            chunks=chunks, llm_client=rec, model=model, full_text=full_text
+        )
     head = spine.get("head") or []
     clauses = spine.get("clauses") or []
     return RedheadDocStructureResponse(

@@ -157,6 +157,10 @@ export function RedheadDocStructure({
         book_session_id: sessionId,
         provider,
         api_key: apiKey,
+        // 公文结构只显头要素骨架 + 权威/结构信号，不显逐条款（那是「逐条精读」的活）。
+        // head_only 让后端跳过贵的条款 map-reduce（那两分多钟）：逐条精读/办事清单建过完整文脉
+        // 就秒出（peek 命中），没建过就只出 head 骨架、条款留给逐条精读时再建（#43）。
+        head_only: true,
       };
       if (model) body.model = model;
       if (baseUrl) body.base_url = baseUrl;

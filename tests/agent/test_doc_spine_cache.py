@@ -98,3 +98,30 @@ def test_get_or_build_doc_spine_builds_once_then_caches(monkeypatch, tmp_path) -
     out2 = dc.get_or_build_doc_spine(chunks=_CHUNKS, llm_client=object(), model="m")
     assert out1 == _SPINE and out2 == _SPINE
     assert calls["n"] == 1                       # facade 也走缓存:建一次,第二次命中
+
+
+# ── peek:只看不建(公文结构骨架用,#43)────────────────────────────────────────
+def test_peek_miss_returns_none_no_build(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    """没缓存时 peek 返 None,且绝不构建(公文结构据此退回只建 head 骨架)。"""
+    _setup_temp(monkeypatch, tmp_path)
+    assert dc.peek_doc_spine_cache(chunks=_CHUNKS, model="m") is None
+
+
+def test_peek_hit_returns_cached_spine(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    """完整文脉已缓存(逐条精读跑过)→ peek 命中返它,公文结构直接用含条款的完整版。"""
+    _setup_temp(monkeypatch, tmp_path)
+    build, _ = _counted(_SPINE)
+    _run(build)                                   # 建 + 写缓存
+    assert dc.peek_doc_spine_cache(chunks=_CHUNKS, model="m") == _SPINE
+    # 输入不同(别的 model)仍 miss,不误命中
+    assert dc.peek_doc_spine_cache(chunks=_CHUNKS, model="m2") is None
+
+
+def test_peek_disabled_returns_none(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    """缓存禁用 → peek 一律 None(调用方每次建骨架,不靠缓存)。"""
+    _setup_temp(monkeypatch, tmp_path)
+    build, _ = _counted(_SPINE)
+    _run(build)
+    monkeypatch.setenv(dc.ENV_DISABLED, "1")
+    dc.reset_doc_spine_cache_singleton_for_test()
+    assert dc.peek_doc_spine_cache(chunks=_CHUNKS, model="m") is None
