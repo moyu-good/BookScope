@@ -124,10 +124,20 @@ export function Dossier({
     );
   }
 
-  // 排序：最近用过的在前（跟书柜一致）
-  const sorted = [...state.sessions].sort((a, b) =>
-    b.last_accessed_at.localeCompare(a.last_accessed_at),
-  );
+  // 排序：最近用过的在前（跟书柜一致）；再按 book_title 去重——书库也这么折，卷宗之前没去重
+  // 导致同一本传了多份就列多行（作者截图 6 份三国）。留每个书名里最近用过的那份。
+  const sorted = (() => {
+    const byRecent = [...state.sessions].sort((a, b) =>
+      b.last_accessed_at.localeCompare(a.last_accessed_at),
+    );
+    const seen = new Set<string>();
+    return byRecent.filter((s) => {
+      const key = s.book_title.trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
   const count = selectedIds.length;
 
   return (
@@ -235,8 +245,27 @@ export function Dossier({
                   >
                     {s.book_title}
                   </div>
-                  <div className="text-[11px] text-[var(--color-ink-muted)] mt-0.5">
-                    {s.language} · {formatRelativeTime(s.last_accessed_at)}
+                  <div className="text-[11px] text-[var(--color-ink-muted)] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    {/* 体裁标（跟书库一致）：公文走朱砂调、其余走中性——跨文件视图是公文专属,
+                        标出来用户一眼看清哪些是公文可选、哪些（小说等）跑不了这几个视图。 */}
+                    {s.genre?.trim() && (
+                      <span
+                        className="px-1.5 py-px rounded"
+                        style={
+                          /(公文|红头)/.test(s.genre)
+                            ? { color: "var(--color-seal)", background: "var(--color-seal-soft)" }
+                            : {
+                                color: "var(--color-ink-muted)",
+                                background: "color-mix(in oklch, var(--color-ink) 6%, transparent)",
+                              }
+                        }
+                      >
+                        {s.genre.trim()}
+                      </span>
+                    )}
+                    <span>
+                      {s.language} · {formatRelativeTime(s.last_accessed_at)}
+                    </span>
                   </div>
                 </div>
               </label>
