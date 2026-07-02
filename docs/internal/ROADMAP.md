@@ -146,6 +146,38 @@
 
 **执行序（全走 design-first / probe，非即时小修）**：#8 白方框（机械先清）→ #5 复读（最伤价值）→ #6 整合 → #7 划词 → #4 分块层 bug。
 
+### 作者实测反馈批次（2026-07-02）· 方针信号vs废话 + 弦外筛选 + 公文结构慢 + 盖章按钮 + 办事清单复读
+
+> 作者在 live 站看 1.8.0 逐条精读 / 办事清单，甩来一批。**关键诚实点：#5（1.8.0 已发）没根治复读，反而在纯表态上留了新问题**——canned「这条是方针…」5 连显本身像废话，且没区分方针里的信号 vs 废话。守 [[feedback_issue_intake_workflow]] + [[feedback_global_not_single_case]]，1 和 5 是同根一起做。
+
+**A. 方针条款：信号 vs 废话未区分（design-first · 任务 #41）· 最核心**
+- 现象：逐条精读里第 6-10 条（加强规范管理 / 完善工作机制 / 强化数字赋能…）全是同一句 canned「这条是方针 / 原则，定的是方向、不是具体要办的事」——5 连显像废话复读。但第 50/51/58 条方针做得好（带真解释 + 第 58「结合实际」点出「给了自由裁量空间、松紧由执行者定」的弦外之音）。
+- 诊断（读码溯源，非个案）：`redhead_plain.py` 纯表态(clause_is_pure_statement)直接返 `PURE_STATEMENT_PLAIN` 固定句、不区分。而 `detect_nuances` 弦外之音其实**算了**，只是空方针（无 marker）只剩 canned 句。根 = **方针不是铁板一块**：有的带弦外之音（信号：口子 / 没时间表 / 真规则在别处）、有的纯口号（废话）。当前二元「纯表态→canned / 实质→解释」太糙。
+- take：方针分三态——① 带弦外之音的方针（信号，`detect_nuances` 命中）→ 点破它释放的信号；② 有条件兑现但空泛的（半信号）→ 简述方向；③ 纯口号无 marker（真废话）→ 才给「定方向非待办」的老实标，且**同类合并折叠、不 5 连显**。弦外之音解释「准 + 好」是硬约束（接 [[feedback_algorithm_provenance_real_grounding]]，不准的弦外之音比不点更糟）。
+- 验收：走 design-first（扩 `WP-redhead-substance-vs-slogan`）；逐条精读里方针条款按信号量分层呈现、废话不刷屏；弦外之音在真语料上抽验准确率（probe，别 cry-wolf）。
+
+**B. 逐条精读加「弦外之音」筛选（小改 · 任务 #42）**
+- 作者要：「专门想看弦外之音的直接点这个选项」。`RedheadCloseReading` 有 `nuanceCount` 显在题署、但**没筛选 UI**（`RedheadActionList` 已有 FilterTab 可抄）。
+- 验收：逐条精读加筛子（全部 / 只看弦外之音 / 只看硬要求），点了只留对应条；空筛子给「换全部」提示。
+
+**C. 公文结构跑 2 分钟只出一页 = 白等（UX + perf · 任务 #43）**
+- 现象：点公文结构跑了 2+ 分钟，虽有精读内容，但窗口只出一页 → 觉得白等这么久。
+- 诊断：#6-A（1.8.0）把公文结构收窄成骨架鸟瞰 + 跳逐条精读链，但它仍是一次慢 LLM 调用（走文脉），产出信息量少、跟等待时长不匹配。
+- take：三选一——① 骨架从文脉缓存秒出（若逐条精读 / 大白话已跑过、文脉在缓存，这里应命中秒出，查为何仍 2min：是否没命中缓存 / 白跑一遍）；② 加载态给真进度（在读第几章 / 已抽几条），别干等；③ 若骨架本就轻，考虑不单独一趟、并进逐条精读的顶部概览。验收：要么秒出、要么等待有实时反馈且产出配得上时长。
+
+**D. 盖章 / 钤印按钮 + 动画（新交互 primitive，轻 design-first · 任务 #44）**
+- 作者问 ui-ux-pro-max 有没有盖章按钮 / 动画。答：该 skill 是通用规则库、**无现成中式钤印组件**，但确认了交互原则（点击即时 active 反馈 / 异步 loading-button 禁用 + loading 态 / 只用 transform·opacity 动画省 CPU / 尊重 prefers-reduced-motion / 不做装饰性永动动画）。盖章设计是自家的，接现有 `SealMark` 朱印 + `--color-seal`。
+- take：做一个 `SealButton` primitive——点击时朱印下压（scale + 轻微 rotate 偏移）+ 印泥晕开（opacity / 微 blur 落定）+ 落定留印记；触发 1-2min 分析时按住 loading 态。用在公文触发按钮 + 结论核验盖「鉴」处。reduced-motion 下退成即时状态切换、不动画。
+- 验收：`SealButton` 组件 + 关键帧；接 ≥1 个真实触发点（如办事清单 / 公文结构）；CPU 跑、无 GPU；prefers-reduced-motion 尊重。
+
+**E. 办事清单仍大量重复解释（跟 A 同根 · 任务 #41 一并）**
+- 现象：办事清单里很多条，标题（matter）跟下面盖印的原文（evidence）几乎一字不差 = 读两遍。
+- 诊断：`RedheadActionList` 每条渲染 `matter`（标题）+ `evidence`（原文）。短条款 matter≈evidence → 显两遍像复读。且 `isPureStatement` 只筛「方针部署 + 空头倡导 + 三空」，**漏「方针部署 + 有条件兑现」**——这类留在待办、又无 actor/deadline，成标题==原文的复读摆件。
+- take：① matter 与 evidence 近乎相同时不显两遍（原文那行只在跟标题有实质差异时才出，或标题退淡、原文为主）；② 放宽非待办判定，把「方针部署 + 无 actor/deadline/penalty」也收进折叠「方向性要求」（含 有条件兑现 档），别混进要勾的待办。跟 A 一体设计。
+- 验收：办事清单里的条目不再标题==原文重复；纯 / 半方针不占待办主列。
+
+**版本规划**：B / D / E-①（dedup）是小改，可挂下一个 patch；A（+E 的分层）走 design-first 扩 `WP-redhead-substance-vs-slogan` + probe；C 先查缓存为何没秒出（可能只是 bug）。**执行序**：先查 C 缓存（可能小 bug）+ 做 B 筛子 + E-① dedup（机械）→ D 盖章 primitive → A（方针三态，最核心、design-first + probe）。
+
 ### 跨功能底座 · evidence-first 空语义 + 分量研判（溯源，非单一垂直）
 
 > 作者 2026-06-29 拿国办发〔2020〕24 号实测公文结构，撞出两个**看着像公文 bug、其实是底座问题**的根。守 [[feedback_global_not_single_case]]：公文头要素只是触发实例，根在所有 evidence-first 功能共用的语义，**不是公文垂直的个案**。先验小样本（公文 + 至少一个书侧功能）证根成立，再统一回填。
