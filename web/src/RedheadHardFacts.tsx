@@ -81,6 +81,10 @@ const KIND_HINT: Record<string, string> = {
 // 时间类硬事实（整合 4：吸收自原关键时间轴）——时序视图只排这两类。
 const TIME_KINDS: ReadonlySet<string> = new Set(["时限", "生效废止"]);
 
+// #45 真硬指标 = 时限 + 数字指标 + 生效废止（可钉死的量/时/起止）。适用范围、责任主体是框架
+// 泛信息、不算「要点」——全无真硬指标时老实说破这份以方针为主(见 research-notes/007)。
+const HARD_INDICATOR_KINDS: ReadonlySet<string> = new Set(["时限", "数字指标", "生效废止"]);
+
 // 两种视图：要目（按五类分栏的速查表）/ 时序（时间类硬事实排成编年线）。
 type ViewMode = "table" | "timeline";
 
@@ -247,6 +251,11 @@ export function RedheadHardFacts({
   const groups = groupByKind(facts);
   const total = groups.reduce((n, g) => n + g.items.length, 0);
   const verifiedCount = facts.filter((f) => f.verified && f.evidence).length;
+  // #45:真硬指标(时限/数字指标/生效废止)——排除适用范围/责任主体这类泛框架。全无但又抽到了
+  // 别的(total>0)= 这份以方针为主、可钉死硬指标稀,老实说破,别让泛信息冒充「要点」。
+  const hardIndicatorCount = facts.filter(
+    (f) => HARD_INDICATOR_KINDS.has(f.kind) && hasValue(f.value),
+  ).length;
 
   // 整合 4：时间类硬事实（时限 / 生效废止）——时序视图排这些，按后端给的顺序（同类内已保抽取序）。
   const timeFacts = facts.filter((f) => TIME_KINDS.has(f.kind) && hasValue(f.value));
@@ -274,6 +283,14 @@ export function RedheadHardFacts({
           {loading ? "重出中…" : "重新生成"}
         </button>
       </div>
+
+      {/* #45 硬指标稀：真硬指标(时限/数字/起止)全无、只抽到框架泛信息时,老实说破这份以方针为主
+          ——evidence-first 空值三态(确证稀 ≠ 没抽到),别让「适用范围/责任主体」冒充「要点」。 */}
+      {hardIndicatorCount === 0 && total > 0 && (
+        <p className="mb-3 text-[13px] leading-relaxed rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-[var(--color-ink-muted)]">
+          这份没有可钉死的硬指标（办结时限 / 达标比例 / 金额门槛这类）——它以方针部署为主，硬要求本就稀，不是没抽到。下面列的是适用范围、责任主体这类框架信息；要看逐条要求，去「逐条精读」。
+        </p>
+      )}
 
       {/* 视图切换：要目（按五类分栏速查）/ 时序（时间类排成编年线）。只有抽到时间类硬事实才给时序入口。 */}
       {hasTimeline && (
