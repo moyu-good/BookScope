@@ -185,6 +185,48 @@ body {
   animation: seal-in 0.6s cubic-bezier(0.34, 1.4, 0.5, 1) both;
 }
 
+/* 钤印触发按钮（SealButton）：点击像盖下一枚朱砂印——下压（scale 收）+ 手不正的轻微旋转
+   偏移 + 弹回落定。reduced-motion 由下方全局 @media 兜（时长归零、按钮照常可用）。*/
+@keyframes seal-press {
+  0% {
+    transform: scale(1) rotate(0);
+  }
+  35% {
+    transform: scale(0.93) rotate(-2.5deg);
+  }
+  62% {
+    transform: scale(0.985) rotate(1.2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+.seal-button--stamping {
+  animation: seal-press 0.4s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+/* loading 时的朱砂扫光（复用 run-sweep，只表示「在跑」、不伪造进度） */
+.seal-button__sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.seal-button__sweep::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--color-seal) 20%, transparent),
+    transparent
+  );
+  animation: run-sweep 1.2s ease-in-out infinite;
+}
+
 /* 通用：可交互元素的顺滑过渡（hover/focus 不再生硬）*/
 a,
 button {

@@ -24,6 +24,7 @@
 
 import { useMemo, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { SealButton } from "./SealButton";
 import { SealMark } from "./SealMark";
 import { Checkbox } from "./ui/FormControls";
 
@@ -269,14 +270,13 @@ export function RedheadActionList({
         <p className="text-sm text-[var(--color-ink-muted)] mb-3">
           把一份红头文件拆成一张能勾的待办清单——每条说清做什么、谁去做、到几号、凭哪份上位文件，还标出这条是真金白银要办还是做做样子的空头、不办有什么代价，真金白银排最前，每条钉在原文。读完一份公文，照着这张表挨条办就行。适合党政公文 / 红头文件。
         </p>
-        <button
-          type="button"
+        <SealButton
           onClick={load}
-          disabled={loading || !apiKey}
-          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "读这份公文拆清单中（约 1 分钟）…" : "生成办事清单"}
-        </button>
+          loading={loading}
+          disabled={!apiKey}
+          label="生成办事清单"
+          loadingLabel="读这份公文拆清单中（约 1 分钟）…"
+        />
         {error && (
           <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
             {error}
