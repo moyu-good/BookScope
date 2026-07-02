@@ -29,8 +29,8 @@ from bookscope.agent.redhead_codebook import clause_is_pure_statement
 _HEAD = "市市场监管局文件 X监发〔2024〕7号 关于优化营商环境的通知。"
 # 硬约束句(无 marker,nuance 该为空)。
 _HARD = "各区局应当于2024年9月30日前为新登记个体户减免登记费每户200元。"
-# 留口子句(命中「原则上」)。
-_LOOPHOLE = "新设企业原则上不再要求提交纸质材料。"
+# 留口子句(命中「结合实际」)。
+_LOOPHOLE = "各地结合实际简化新设企业材料要求。"
 # 搁置句(命中「逐步」)。
 _SHELVE = "鼓励各地逐步推广电子证照应用。"
 
@@ -191,10 +191,10 @@ def test_clauses_rewrite_failure_falls_back_to_matter(monkeypatch):
 
 
 def test_clauses_nuance_attached_on_marker_hit(monkeypatch):
-    """条款原文命中「原则上」→ 挂 nuance;命中「逐步」的另一条也挂;硬约束句不挂。"""
+    """条款原文命中「结合实际」→ 挂 nuance;命中「逐步」的另一条也挂;硬约束句不挂。"""
     _patch_spine(monkeypatch, [
         {"chapter": 1, "matter": "硬约束", "evidence": _HARD},        # 无 marker
-        {"chapter": 2, "matter": "材料", "evidence": _LOOPHOLE},      # 原则上
+        {"chapter": 2, "matter": "材料", "evidence": _LOOPHOLE},      # 结合实际
         {"chapter": 3, "matter": "证照", "evidence": _SHELVE},        # 逐步
     ])
     _patch_invoke(monkeypatch, "白话")
@@ -204,8 +204,8 @@ def test_clauses_nuance_attached_on_marker_hit(monkeypatch):
     items = out["items"]
     # 第一条无 marker → 不挂 nuance 字段
     assert "nuance" not in items[0]
-    # 第二条命中原则上
-    assert items[1]["nuance"][0]["marker"] == "原则上"
+    # 第二条命中结合实际
+    assert items[1]["nuance"][0]["marker"] == "结合实际"
     # 第三条命中逐步
     assert items[2]["nuance"][0]["marker"] == "逐步"
 
@@ -232,7 +232,7 @@ def _fulltext_pairs_payload() -> str:
              "plain": "这是市市场监管局发的关于优化营商环境的通知。"},
             {"original": "各区局应当于2024年9月30日前为新登记个体户减免登记费每户200元。",
              "plain": "各区局得在2024年9月30日前给新登记个体户每户减免200元登记费。"},
-            {"original": "新设企业原则上不再要求提交纸质材料。",
+            {"original": "各地结合实际简化新设企业材料要求。",
              "plain": "新设企业一般不用再交纸质材料了。"},
             {"original": "鼓励各地逐步推广电子证照应用。",
              "plain": "鼓励各地慢慢推开电子证照。"},
@@ -273,8 +273,8 @@ def test_fulltext_verified_and_nuance(monkeypatch):
     # 第1、2句无 marker → 不挂
     assert "nuance" not in items[0]
     assert "nuance" not in items[1]
-    # 第3句命中「原则上」
-    assert items[2]["nuance"][0]["marker"] == "原则上"
+    # 第3句命中「结合实际」
+    assert items[2]["nuance"][0]["marker"] == "结合实际"
     # 第4句命中「逐步」
     assert items[3]["nuance"][0]["marker"] == "逐步"
 

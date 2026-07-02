@@ -33,8 +33,8 @@ from bookscope.agent import redhead_close_reading as cr
 _HEAD = "市市场监管局文件 X监发〔2024〕7号 关于优化营商环境的通知。"
 # 硬约束句(无 marker,nuance 该为空)。含术语「证照分离」。
 _HARD = "各区局应当于2024年9月30日前全面推行证照分离改革。"
-# 留口子句(命中「原则上」)。
-_LOOPHOLE = "新设企业原则上不再要求提交纸质材料。"
+# 自由裁量句(命中「结合实际」)。
+_LOOPHOLE = "各地结合实际简化新设企业材料要求。"
 # 搁置句(命中「逐步」)。含术语「放管服」。
 _SHELVE = "鼓励各地逐步推广放管服改革。"
 
@@ -244,15 +244,15 @@ def test_fabricated_evidence_not_verified(monkeypatch):
 # nuance:命中措辞刻度才挂
 # ════════════════════════════════════════════════════════════════════════════
 def test_nuance_attached_when_marker_in_evidence(monkeypatch):
-    """条款原文命中「原则上」→ 挂 nuance 点弦外之意。"""
+    """条款原文命中「结合实际」→ 挂 nuance 点弦外之意。"""
     out = _run(
         monkeypatch,
         clauses=[_clause(1, matter="纸质材料", evidence=_LOOPHOLE)],
-        rewrites={1: "新设企业一般不用交纸质材料了。"},
+        rewrites={1: "各地按本地情况简化新设企业的材料要求。"},
     )
     it = out["items"][0]
     assert "nuance" in it
-    assert any(n["marker"] == "原则上" for n in it["nuance"])
+    assert any(n["marker"] == "结合实际" for n in it["nuance"])
 
 
 def test_no_nuance_when_no_marker(monkeypatch):

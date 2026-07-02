@@ -59,8 +59,8 @@ def test_policy_slogan_empty_no_marker() -> None:
 
 # ── 边界 ─────────────────────────────────────────────────────────────────────
 def test_signal_beats_substance_when_marker_present() -> None:
-    # 即便 substance=空头倡导,只要命中 marker(「原则上」)就是 signal，不是 slogan——有信号优先
-    c = _clause(substance="空头倡导", evidence="原则上不新增编制。")
+    # 即便 substance=空头倡导,只要命中 marker(「结合实际」)就是 signal，不是 slogan——有信号优先
+    c = _clause(substance="空头倡导", evidence="各地结合实际制定具体办法。")
     assert classify_policy_clause(c) == "policy_signal"
 
 
@@ -75,7 +75,7 @@ def test_real_money_three_empty_defaults_direction_not_slogan() -> None:
 def test_pure_statement_wrapper_is_slogan_only() -> None:
     assert clause_is_pure_statement(_clause()) is True  # slogan
     # 带 marker 的（signal）不再算 pure_statement（旧逻辑会误判 True）
-    assert clause_is_pure_statement(_clause(evidence="原则上不新增编制。")) is False
+    assert clause_is_pure_statement(_clause(evidence="各地结合实际制定具体办法。")) is False
     # 有条件兑现（direction）也不是 slogan
     assert clause_is_pure_statement(_clause(substance="有条件兑现")) is False
     # 实质不是 slogan
