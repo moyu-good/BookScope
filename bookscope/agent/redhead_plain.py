@@ -51,7 +51,7 @@ from bookscope.agent._internal.longctx_system import build_longctx_system
 from bookscope.agent._internal.loop_shared import read_openai_finish_reason
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
 from bookscope.agent.redhead_codebook import (
-    clause_is_pure_statement,
+    classify_policy_clause,
     codebook_block,
     detect_nuances,
 )
@@ -99,6 +99,31 @@ _SENTENCE_END_RE = re.compile(r"(?<=[。!?；…」』】）\n])")
 # 这类没有可执行内核(「以X为导向」「坚持Y」),硬让模型翻只会复读或注水;老实标它是方向,
 # 比假装点石成金强(WP-redhead-substance-vs-slogan §3.2 / §4.3,接「读沉默」一个道理)。
 PURE_STATEMENT_PLAIN = "这条是方针 / 原则,定的是方向、不是具体要办的事。"
+
+
+def _signal_plain(clause: dict[str, Any]) -> str:
+    """方针类里带弦外之音的(policy_signal):把命中的 marker 的真实含义提为大白话主体、点破信号。
+
+    nuance 由 detect_nuances(原文)串匹配出(evidence-first:原文确有该词才点),这里拼成一句
+    「这词=什么弦外之意」当白话——比 canned「这是方向」有用得多(WP-redhead-substance-vs-slogan §八)。
+    命不中(不该发生,signal 态定义就是命中了)退空串、上层兜回 canned。
+    """
+    nuances = detect_nuances(str(clause.get("evidence", "")).strip())
+    if not nuances:
+        return ""
+    return "；".join(f"「{n['marker']}」{n['meaning']}" for n in nuances)
+
+
+def _direction_plain(clause: dict[str, Any]) -> str:
+    """方针类里无 marker 的半信号(policy_direction,有条件兑现):半模板一句简述方向,不调 LLM。
+
+    态②按作者拍板走半模板(意见里这类量大,逐条调 LLM 不划算)。只拼 clause 已抽的 matter,
+    不新增信息、不编——照 evidence-first。
+    """
+    matter = str(clause.get("matter", "")).strip()
+    if matter:
+        return f"这条定了个方向:{matter};有方向、但没细化到谁做、到几号(看后续怎么落实)。"
+    return "这条定了个方向,但没细化到谁做、到几号(看后续怎么落实)。"
 
 # 实质条款的逐条改写指令——只喂这一条的「事项 + 原文」,要模型**解释这条要求谁做什么**、
 # 不是换词复读。纯表态条款不走这条(_rewrite_one 里直接给 PURE_STATEMENT_PLAIN)。
@@ -182,10 +207,16 @@ def _rewrite_one(
     用 ``build_longctx_system`` 拼(同站内其它功能,book-first 前缀也让这层吃缓存:同一条
     第二次改写命中)——这里「书」位置放的是这一条的事项 + 原文(很短)。
     """
-    # 纯表态条款(方针部署 + 空头倡导 + 主体/时限/罚则三空):没有可执行内核,老实给固定
-    # 说明句、不调 LLM——硬翻只会复读或注水(WP-redhead-substance-vs-slogan §3.2)。
-    if clause_is_pure_statement(clause):
+    # 方针类条款按四态分路(WP-redhead-substance-vs-slogan §八),不硬翻成复读:
+    #   signal → 点破弦外之意；direction → 半模板简述方向；slogan → canned 老实标;
+    #   前三态都 deterministic、不调 LLM。只有 substantive(有可执行内核)才走下面 LLM 解释。
+    kind = classify_policy_clause(clause)
+    if kind == "policy_slogan":
         return PURE_STATEMENT_PLAIN
+    if kind == "policy_signal":
+        return _signal_plain(clause) or PURE_STATEMENT_PLAIN  # 保险:命不中退 canned
+    if kind == "policy_direction":
+        return _direction_plain(clause)
     matter = str(clause.get("matter", "")).strip()
     evidence = str(clause.get("evidence", "")).strip()
     # 改写素材:有原文优先拿原文(逐字),没原文退事项——总得有东西给模型改。
@@ -500,11 +531,9 @@ def _clauses_mode(
             "chapter": clause.get("chapter"),
             "matter": matter,
             # 改写失败(空)→ 退回原事项,老实把官话原样摆出来,不假装翻好了。
-            # 纯表态 plain 已是 PURE_STATEMENT_PLAIN 说明句(_rewrite_one 直接给,没调 LLM)。
+            # 方针类三态的 plain 已由 _rewrite_one 按态给(deterministic、没调 LLM)。
             "plain": plain or matter,
-            "clause_kind": (
-                "pure_statement" if clause_is_pure_statement(clause) else "substantive"
-            ),
+            "clause_kind": classify_policy_clause(clause),
             "evidence": evidence,
             "verified": False,
             "match_score": 0.0,

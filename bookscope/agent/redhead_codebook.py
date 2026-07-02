@@ -73,27 +73,65 @@ def substance_rank(level: str) -> int:
     return _SUBSTANCE_RANK.get(level, len(SUBSTANCE_LEVELS))
 
 
-def clause_is_pure_statement(clause: dict[str, object]) -> bool:
-    """判一条条款是不是「纯表态」——方针部署 + 空头倡导 + 责任主体/时限/罚则三空,即没有可
-    执行内核、只是方向性号召(「以X为导向」「坚持Y」这类)。deterministic、不调 LLM。
+# 条款四态(封闭集,WP-redhead-substance-vs-slogan §八)——「方针类 + 三空」大桶再劈三态 +
+# 桶外的实质态。全 deterministic,不加 LLM、不加阈值:建在现成 grounded 信号上(instruction_type
+# + 三空 + detect_nuances + substance)。三功能(逐条精读 / 办事清单 / 大白话)一处定义、分路消费。
+POLICY_CLAUSE_KINDS: tuple[str, ...] = (
+    "substantive",       # 有可执行内核(非方针部署,或有主体/时限/罚则其一)→ 该解释
+    "policy_signal",     # 方针类+三空 且 命中弦外 marker → 有信号,点破口子/没时间表
+    "policy_direction",  # 方针类+三空 无 marker 有条件兑现 → 半信号,简述方向
+    "policy_slogan",     # 方针类+三空 无 marker 空头倡导 → 纯口号废话,老实标 + 折叠
+)
 
-    大白话 / 逐条精读对这类只该老实标「这是方向不是办事」,不硬凑一句假大白话(硬凑=复读或
-    注水,正是作者反感的);办事清单该把它从默认待办剔出。有可执行内核的实质条款才走「解释」。
 
-    **组合判据**(不单看 instruction_type):研究笔记 006 §3.2 实测 instruction_type 在层级式
-    意见上抽取不稳,叠上 substance + actor/deadline/penalty 三个「空」的确定性字段判兜住偶尔
-    抽偏——一条真有 deadline/penalty 的条款,就算 instruction_type 被误标成方针部署,也不会被
-    当纯表态。**偏保守向实质倾斜**:五条全命中才判纯表态,任一不满足即当实质(宁可放一句口号
-    进实质区被解释,也别把真要办的事误标成表态漏掉——见 WP-redhead-substance-vs-slogan §6.3)。
-    组合阈值是自己拍的,须 probe 在真实公文语料上验准(接「算法依托真实」硬规则)。
+def _is_policy_three_empty(clause: dict[str, object]) -> bool:
+    """「方针类」大桶的门:方针部署 + 责任主体/时限/罚则三空。
+
+    不看 substance(比旧 clause_is_pure_statement 宽——空头倡导、有条件兑现都进桶,再按下面分态)。
+    三空是硬门槛:抽到 actor/deadline/penalty 任一 = 有可执行内核 = 出桶算实质(宁放口号进实质区
+    被解释,也别把真要办的事误标成方针,见 §6.3 保守向实质)。
     """
     return (
         str(clause.get("instruction_type", "")).strip() == "方针部署"
-        and str(clause.get("substance", "")).strip() == "空头倡导"
         and not str(clause.get("actor", "")).strip()
         and not str(clause.get("deadline", "")).strip()
         and not str(clause.get("penalty", "")).strip()
     )
+
+
+def classify_policy_clause(clause: dict[str, object]) -> str:
+    """把一条条款分四态(:data:`POLICY_CLAUSE_KINDS`,WP-redhead-substance-vs-slogan §八)。
+
+    1.8.0 的 #5 把「纯表态」拍成一个开关(命中就一律 canned),上线后 canned 又滑成新一轮复读
+    (五连显刷屏),还把「有弦外之音的方针」和「纯口号」压成同一档。这里在「方针类 + 三空」大桶
+    内部再劈三态,让有信号的点破、有方向的简述、纯口号的才折叠:
+
+    - **substantive**:出桶(有可执行内核)→ 逐条精读走 LLM 解释、办事清单当真待办。
+    - **policy_signal**:桶内 + ``detect_nuances(evidence)`` 命中 ≥1 marker → 把弦外之意点破。
+    - **policy_direction**:桶内 + 无 marker + 有条件兑现 → 半信号,简述方向(半模板、不调 LLM)。
+    - **policy_slogan**:桶内 + 无 marker + 空头倡导 → 纯口号,老实标 + 同类合并折叠、不 N 连显。
+
+    全 deterministic(串匹配 + 封闭集字段),不调 LLM、不加新阈值——判据全建在现成 grounded 信号上。
+    真金白银 + 三空是矛盾组合(真金白银本需主体+时限+罚则),``coerce_substance`` 兜底退有条件兑现,
+    落进 policy_direction(中性),不误判成废话。弦外之音映射本身的准确率靠 §九 probe 验(假阳性≤20%)。
+    """
+    if not _is_policy_three_empty(clause):
+        return "substantive"
+    if detect_nuances(str(clause.get("evidence", ""))):
+        return "policy_signal"
+    if coerce_substance(clause.get("substance")) == "空头倡导":
+        return "policy_slogan"
+    return "policy_direction"
+
+
+def clause_is_pure_statement(clause: dict[str, object]) -> bool:
+    """判一条条款是不是「纯口号废话」(= :func:`classify_policy_clause` 的 ``policy_slogan``)。
+
+    保留此薄包装向后兼容(旧调用方判「要不要给 canned / 要不要剔出待办」)。**注意语义收窄**:
+    现在它只对应四态里的 slogan 那一档;「方针类非待办」的完整集合(signal + direction + slogan)
+    请用 ``classify_policy_clause(clause) != "substantive"`` 判,别再拿这个函数当「所有方针」。
+    """
+    return classify_policy_clause(clause) == "policy_slogan"
 
 # 措辞 → 弦外之意(注解层)。键是原文里**真出现**才点的 marker,值是这词的真实含义——
 # 大白话翻译命中 marker 时点这句"弦外之音",不只字面通顺。死守 evidence-first:nuance 只在
@@ -187,13 +225,15 @@ __all__ = [
     "DISCRETION_WORDS",
     "LOOPHOLE_WORDS",
     "NUANCE_MARKERS",
+    "POLICY_CLAUSE_KINDS",
     "PRIORITY_WORDS",
     "SHELVING_WORDS",
     "SUBSTANCE_LEVELS",
     "SUBSTANCE_RUBRIC",
+    "classify_policy_clause",
+    "clause_is_pure_statement",
     "codebook_block",
     "coerce_substance",
     "detect_nuances",
     "substance_rank",
-    "clause_is_pure_statement",
 ]
