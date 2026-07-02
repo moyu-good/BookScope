@@ -120,12 +120,15 @@ export function RedheadCloseReading({
   const [openOrigin, setOpenOrigin] = useState<Record<number, boolean>>({});
   // 点开的术语角标（"条索引-词索引" → 开/合），点词头出释义
   const [openTerm, setOpenTerm] = useState<Record<string, boolean>>({});
+  // 筛子（作者要：专门想看弦外之音的直接点）——纯前端过滤，不重新请求
+  const [filter, setFilter] = useState<"all" | "nuance" | "hard">("all");
 
   async function load() {
     setLoading(true);
     setError(null);
     setOpenOrigin({});
     setOpenTerm({});
+    setFilter("all");
     try {
       const body: Record<string, unknown> = {
         book_session_id: sessionId,
@@ -170,6 +173,21 @@ export function RedheadCloseReading({
     () => items.reduce((n, it) => n + (it.glossary?.length ?? 0), 0),
     [items],
   );
+  const hardCount = useMemo(
+    () => items.filter((it) => it.structure?.instruction_type === "硬要求").length,
+    [items],
+  );
+  // 按筛子过滤——保留原始下标 idx 给 openOrigin / key（别用过滤后的位置，否则展开态错位）。
+  const shown = useMemo(() => {
+    const withIdx = items.map((it, idx) => ({ it, idx }));
+    if (filter === "nuance") {
+      return withIdx.filter((x) => (x.it.nuance?.length ?? 0) > 0);
+    }
+    if (filter === "hard") {
+      return withIdx.filter((x) => x.it.structure?.instruction_type === "硬要求");
+    }
+    return withIdx;
+  }, [items, filter]);
 
   // ---- 未生成：入口卡片 ----
   if (!result) {
@@ -300,9 +318,34 @@ export function RedheadCloseReading({
         )}
       </div>
 
+      {/* 筛子（作者要：专门想看弦外之音的直接点）——纯前端过滤，只在有对应条时才出那个筛子。 */}
+      {(nuanceCount > 0 || hardCount > 0) && (
+        <div className="mb-3 flex items-center gap-2 flex-wrap">
+          <CloseReadingFilterTab
+            active={filter === "all"}
+            onClick={() => setFilter("all")}
+            label={`全部 ${items.length}`}
+          />
+          {nuanceCount > 0 && (
+            <CloseReadingFilterTab
+              active={filter === "nuance"}
+              onClick={() => setFilter("nuance")}
+              label={`只看弦外之音 ${nuanceCount}`}
+            />
+          )}
+          {hardCount > 0 && (
+            <CloseReadingFilterTab
+              active={filter === "hard"}
+              onClick={() => setFilter("hard")}
+              label={`只看硬要求 ${hardCount}`}
+            />
+          )}
+        </div>
+      )}
+
       {/* 精读笺：一条 = 一张卡。大白话主体（墨）+ 结构标签（朱签）+ 术语角标 + 对原文（折叠）。 */}
       <div className="space-y-4">
-        {items.map((it, i) => {
+        {shown.map(({ it, idx: i }) => {
           const verified = it.verified && hasText(it.evidence);
           const isOpen = !!openOrigin[i];
           const canOpenOrigin = hasText(it.evidence);
@@ -571,5 +614,39 @@ export function RedheadCloseReading({
         />
       )}
     </div>
+  );
+}
+
+// 筛子按钮——选中走朱印描边、未选普通描边（同办事清单 FilterTab 的样式）。
+function CloseReadingFilterTab({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-xs px-3 py-1 rounded-full border transition-colors"
+      style={
+        active
+          ? {
+              color: "var(--color-seal)",
+              borderColor: "var(--color-seal)",
+              background: "var(--color-seal-soft)",
+            }
+          : {
+              color: "var(--color-ink-muted)",
+              borderColor: "var(--color-rule)",
+              background: "white",
+            }
+      }
+    >
+      {label}
+    </button>
   );
 }
