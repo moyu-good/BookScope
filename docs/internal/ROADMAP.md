@@ -188,7 +188,13 @@
 - take：Dossier 对齐 BookShelf——① 补体裁角标（复用 `spineColor` / genre 徽章）；② 按 book_title 去重（镜像 BookShelf 的 dedupe）；③ 加上传入口（或跳书库上传）。跨文件视图是公文专属，体裁标出后用户一眼分清哪些是公文可选。都是 FE、低风险。
 - 验收：卷宗每行显体裁标；同名文档只列一次（跟书库一致）；能从卷宗上传 / 或有清晰的去书库上传入口。
 
-**版本规划**：B（#42✓）/ C（#43✓）已修；D / E-①（dedup）/ G（卷宗对齐）是小改可挂下一个 patch；A（+E 的分层）+ F 走 design-first / 先诊断，扩 `WP-redhead-substance-vs-slogan` + probe。**执行序（更新）**：~~B 筛子 ✓ / C 缓存 ✓~~ → G 卷宗对齐（FE 机械，快）→ D 盖章 primitive → F 要点提取诊断 → A 方针三态（最核心、design-first + probe，E 一体）。
+**H. 论点结构也复读 + 论点太多太杂（任务 #47）· 三次实测追加 07-02**
+- 现象：理论书（如《好好思考》）论点结构，① 每条主张（claim）跟下面「原文为证」（evidence）几乎一字不差 = 复读（跟办事清单 E 同根）；② 论点太多太杂（截图 14+ 条），不少是原句照搬、没提炼成「论点」。作者：「能不能根据书的情况精简或者改变表达方式？」
+- 诊断（读码）：`ArgumentStructure` 渲染 `c.claim`（主张标题）+ `c.evidence`（原文为证）。**claim ≈ evidence 时显两遍**（同 #41 E 的 matter==evidence 根）。「太多太杂」是**抽取粒度**问题——argument-mining prompt 把每句 claim-like 的话都逐句捞出、且 claim 常是 evidence 原句的复述而非提炼，理论书claim 密、就堆一大列。
+- take：① **复读**：claim≈evidence 时不显两遍（复用办事清单 `sameAsTitle` 那套，或 claim 提炼得跟原句有实质差异时才两栏）；② **太多太杂**：调 prompt 让它**提炼 + 精简**（抽核心论点、按书情况控制条数、claim 是综括不是原句复述），argument mining 方向有学术依托（research-notes/005）、但输出粒度可调；可能题材自适应（理论书 claim 密→挑主干论点）。
+- 验收：论点结构里 claim 不再==原文重复；论点是提炼过的主干（条数合理、表达是综括不是照抄原句）。① 是 FE 小改（同 E），② 是 prompt 调 + 可能 probe（提炼质量）。
+
+**版本规划**：B（#42✓）/ C（#43✓）/ G（#46✓）/ D（#44✓）/ F（#45✓）/ A+E（#41✓ 后端FE全实现）都已做并随 **1.8.1** 发版；弦外之音 probe（#41 §九）验出假阳性 63%、两轮 empirical 收紧到 7.5%（commit 8325c53，待发 1.8.2）。**新增 H（#47 论点结构复读+太杂）**：① 复读同 E 的 FE 小改、② 精简是 prompt 调 + probe，排下一批。**剩**：#41 slogan 完整折叠（缓）、H、下轮补验 6 个 0 命中 marker。
 
 ### 跨功能底座 · evidence-first 空语义 + 分量研判（溯源，非单一垂直）
 
