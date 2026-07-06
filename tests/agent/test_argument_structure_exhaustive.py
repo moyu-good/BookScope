@@ -87,3 +87,16 @@ def test_theory_genre_runs_normally(monkeypatch):
         chunks=_CHUNKS, llm_client=object(), model="m", genre="theory"
     )
     assert out is not None and len(out) == 1
+
+
+def test_dedup_near_claims_collapses_near_duplicates():
+    # #47 ②:merge_by_key 只去完全相同;近似(标点差 / 一方是另一方子串)由 _dedup_near_claims 收,
+    # 留先出现的那条,不同论点保留。
+    claims = [
+        _cl(1, "辩论的目的是说服观众", 1, "e1"),
+        _cl(2, "辩论的目的，是说服观众。", 2, "e2"),         # 仅标点差 → 归一后相等
+        _cl(3, "辩论的目的是说服观众而不是对方", 3, "e3"),   # 含前者(够长)→ 近似重复
+        _cl(4, "系统由要素和连接关系构成", 4, "e4"),          # 不同论点 → 保留
+    ]
+    kept = [c["claim"] for c in ar._dedup_near_claims(claims)]
+    assert kept == ["辩论的目的是说服观众", "系统由要素和连接关系构成"]

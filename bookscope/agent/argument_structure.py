@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from bookscope.agent._internal.exhaustive import merge_by_key, run_segments
@@ -48,14 +49,19 @@ def is_argument_genre(genre: str | None) -> bool:
     return genre in _ARGUMENT_GENRES
 
 _SYSTEM_INSTRUCTION = (
-    "你是 BookScope 的论点梳理助手。"
-    "请梳理这本书的主要论点结构——作者主张了什么、靠什么撑。按论证推进顺序排，"
-    "每条给：主张（一句）、所在章节、一句原文逐字证据。只据原文、不编。\n"
-    "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
-    '{"claims": [{"order": 序号整数, "claim": "主张一句", '
+    "你是 BookScope 的论点梳理助手。请梳理这段原文里作者的**主干论点**——他主张什么、靠什么撑。"
+    "死守两条(#47):\n"
+    "1. **claim 用你自己的话把这条论点综括出来**(一句、点明主张),别照抄或原样复述原文那句"
+    "——照抄不是梳理、是复读。综括**不等于编造**:只能说这段原文**确实在主张**的意思,信息量不超过"
+    "原文,绝不添原文没有的论点/结论。\n"
+    "2. **evidence 是原文里逐字出现的句子**(要拿去跟原文比对核验,改一个字都核不上),跟 claim 分开:"
+    "claim 是你综括的话、evidence 是原文原话,两者不该一模一样。\n"
+    "只抽**本段的主干论点**,通常就几条(约 3-6 条),别把每一句都拎出来当论点;这段若只是叙事 / "
+    "铺陈 / 过渡、没有论证主张,就返空 claims(宁缺毋滥,别硬凑)。\n"
+    "严格输出 JSON(不要别的话、不要 markdown 代码围栏):\n"
+    '{"claims": [{"order": 序号整数, "claim": "你综括的主张一句", '
     '"chapter": 章号整数, "evidence": "原文逐字片段"}]}\n'
-    "order 从 1 起递增。只列书里真有的主要论点（最多约 20 条），"
-    "evidence 必须是原文里逐字出现的句子。"
+    "order 从 1 起递增。"
 )
 
 
@@ -205,6 +211,39 @@ def generate_argument_structure(
     return None
 
 
+_CLAIM_NORM_RE = re.compile(r"[。;；,，、\s\"「」“”'']+")
+
+
+def _norm_claim(s: str) -> str:
+    """归一 claim 文本(去标点/空白/引号)做近似比对。跟 FE claimEchoesEvidence 一套判据。"""
+    return _CLAIM_NORM_RE.sub("", (s or "").strip())
+
+
+def _dedup_near_claims(claims: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """去**近似**重复的 claim(#47 ②)——``merge_by_key`` 只去完全相同文本,跨段抽到的同一论点
+    表述略异(标点差、一方是另一方截断)就漏网、堆成一大列。这里补一道纯字符近似:归一后相等,
+    或都够长(≥8 字)且一方是另一方子串,就当同一条,留先出现的(段序靠前 = 文中靠前)。
+
+    纯字符(不引 embedding,同 [[project_retrieval_direction]] 本地 embedding 已否决 + 延迟考量)。
+    claim 综括后表述差异大时字面重叠低、近似重复可能漏网——这是字符近似的固有局限,靠 exp probe
+    看漏网率、必要时再加弱判据(见 WP-argument-structure-refine 开放点 2)。
+    """
+    kept: list[dict[str, Any]] = []
+    kept_norms: list[str] = []
+    for c in claims:
+        n = _norm_claim(str(c.get("claim", "")))
+        if not n:
+            continue
+        if any(
+            n == kn or (min(len(n), len(kn)) >= 8 and (n in kn or kn in n))
+            for kn in kept_norms
+        ):
+            continue
+        kept.append(c)
+        kept_norms.append(n)
+    return kept
+
+
 def generate_argument_structure_exhaustive(
     *,
     chunks: list[dict[str, Any]],
@@ -242,6 +281,9 @@ def generate_argument_structure_exhaustive(
     merged = merge_by_key(outs, key_fn=lambda c: c.get("claim"))
     if not merged:
         return None
+    # #47 ②:merge_by_key 只去完全相同文本;再去一道近似重复(跨段同一论点表述略异),
+    # 收编碎论点。claim 综括后按主干合并 + 这道去重 = 论点自然精简(不砍死 top-N)。
+    merged = _dedup_near_claims(merged)
     merged.sort(key=lambda c: c["chapter"])  # 段内 order 跨段会重复，按章号重排
     for i, c in enumerate(merged, 1):
         c["order"] = i  # 重排后重新编号 1..N
