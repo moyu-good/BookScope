@@ -25,6 +25,18 @@ interface ArgumentStructureProps {
   baseUrl: string;
 }
 
+// #47 复读:主张(claim)跟「原文为证」(evidence)近乎一字不差时,原文区不再抄一遍——
+// 只留章号 + 鉴印(核验凭据不丢)。跟办事清单 sameAsTitle 同一套判据:去首尾标点/空白后比,
+// 够长(≥8 字)时一方含另一方也算同。(argument-mining 抽的 claim 常是原句复述,故常命中。)
+function claimEchoesEvidence(claim: string, evidence: string): boolean {
+  const norm = (s: string) => s.trim().replace(/[。;；,，、"「」""'']+/gu, "");
+  const c = norm(claim);
+  const e = norm(evidence);
+  if (!c || !e) return false;
+  if (c === e) return true;
+  return c.length >= 8 && (e.includes(c) || c.includes(e));
+}
+
 export function ArgumentStructure({
   sessionId,
   provider,
@@ -144,15 +156,21 @@ export function ArgumentStructure({
               {c.evidence && (
                 <div className="relative border-l-2 border-[var(--color-seal)]/40 pl-3 py-1">
                   <div className="text-xs text-[var(--color-ink-muted)] mb-1 flex items-center gap-1.5">
-                    <span>第 {c.chapter} 章 · 原文为证</span>
+                    {/* claim≈原文 → 标「原文同上」不复读;不同 → 「原文为证」显全文 */}
+                    <span>
+                      第 {c.chapter} 章 ·{" "}
+                      {claimEchoesEvidence(c.claim, c.evidence) ? "原文同上" : "原文为证"}
+                    </span>
                     {c.verified && <SealMark size={17} title="原文已核验" />}
                   </div>
-                  <div
-                    className="text-body-sm leading-relaxed text-[var(--color-ink)]"
-                    style={{ fontFamily: "var(--font-display)" }}
-                  >
-                    {c.evidence}
-                  </div>
+                  {!claimEchoesEvidence(c.claim, c.evidence) && (
+                    <div
+                      className="text-body-sm leading-relaxed text-[var(--color-ink)]"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      {c.evidence}
+                    </div>
+                  )}
                 </div>
               )}
             </li>
