@@ -59,16 +59,33 @@ function hasText(v: string): boolean {
   return !!v && v.trim().length > 0;
 }
 
-// 时点性质小签：真deadline = 逾期咬人的死线（朱砂实签）、软目标 = 力争性时点（淡墨虚签）。
-// 只在后端给了合法 deadline_type 时画；老缓存没这字段就不画（向后兼容、不吓唬用户）。
-const DEADLINE_STYLE: Record<string, { fg: string; bg: string; label: string }> = {
-  真deadline: { fg: "#9a3a2e", bg: "rgba(154, 58, 46, 0.10)", label: "真死线" },
-  软目标: { fg: "var(--color-ink-muted)", bg: "var(--color-seal-soft)", label: "软目标" },
+// 时点性质两档（后端封闭集 DEADLINE_TYPES，1.6.1 约束力层）：真deadline = 逾期咬人的死线、
+// 软目标 = 力争性时点。这两档现在是**分轨的依据**——硬期限归一轨、软目标归另一轨，让用户一眼
+// 分清哪些逾期真咬人、哪些只是号召。label 是轨头短名，blurb 是轨头下那行说清两者差别的小字。
+const DEADLINE_STYLE: Record<
+  string,
+  { fg: string; bg: string; label: string; blurb: string }
+> = {
+  真deadline: {
+    fg: "#9a3a2e",
+    bg: "rgba(154, 58, 46, 0.10)",
+    label: "硬期限",
+    blurb: "逾期有罚则、考核或失权，过了真咬人",
+  },
+  软目标: {
+    fg: "var(--color-ink-muted)",
+    bg: "var(--color-seal-soft)",
+    label: "软目标",
+    blurb: "力争性、阶段性时点，逾期没硬后果",
+  },
 };
 
-function deadlineStyle(t?: string) {
-  if (!t) return null;
-  return DEADLINE_STYLE[t] ?? null;
+// 分轨顺序：硬期限在前（最要紧、逾期咬人），软目标在后。老缓存缺 deadline_type 的节点，
+// 后端 _coerce_deadline_type 一律兜成「软目标」；前端再兜一层，缺字段就归软目标轨，绝不丢节点。
+const TRACK_ORDER = ["真deadline", "软目标"] as const;
+
+function trackKey(t?: string): (typeof TRACK_ORDER)[number] {
+  return t === "真deadline" ? "真deadline" : "软目标";
 }
 
 export function RedheadTimeline({
@@ -125,6 +142,18 @@ export function RedheadTimeline({
     () => nodes.filter((n) => n.verified && hasText(n.evidence)).length,
     [nodes],
   );
+
+  // 按 deadline_type 分轨：硬期限一轨、软目标一轨。带上原数组下标（openOrigin 用 index 记开合，
+  // 分轨后不能重新编号，得沿用原下标）。后端已按时间排好序，filter 保序，各轨内仍是时序。
+  // 空轨不进结果——只有软目标的公文就只显一轨。
+  const tracks = useMemo(() => {
+    const indexed = nodes.map((n, i) => ({ node: n, i }));
+    return TRACK_ORDER.map((key) => ({
+      key,
+      style: DEADLINE_STYLE[key],
+      items: indexed.filter(({ node }) => trackKey(node.deadline_type) === key),
+    })).filter((t) => t.items.length > 0);
+  }, [nodes]);
 
   // ---- 未生成：入口卡片 ----
   if (!result) {
@@ -241,161 +270,174 @@ export function RedheadTimeline({
         </span>
       </div>
 
-      {/* ── 编年时序：一道竖直朱砂时轴贯穿全程，每个节点一枚年轮墨钉钉在轴上 ── */}
-      {/* 时轴：左侧一条贯通的朱砂竖线（案牍编年的纪年线）。顶「起」底「讫」两道横规收束。 */}
-      <div className="relative pl-1">
-        {/* 贯通竖轴——从首节点到末节点，居于左栏年轮的中线上（left = 日晷牌区宽度 + 年轮半径） */}
-        <div
-          aria-hidden
-          className="absolute top-0 bottom-0"
-          style={{
-            left: "calc(5.5rem + 7px)",
-            width: "2px",
-            background:
-              "linear-gradient(to bottom, transparent, var(--color-seal) 6%, var(--color-seal) 94%, transparent)",
-            opacity: 0.5,
-          }}
-        />
+      {/* ── 按约束力分轨：硬期限一轨、软目标一轨，各自一道朱砂时轴贯通 ── */}
+      {/* 每一轨是一段自成时序的编年：轨头一行说清这轨是啥，下面一道竖轴 + 起 / 讫两道横规收束， */}
+      {/* 节点按时间先后从上往下钉在本轨的轴上。分开摆，用户一眼分清哪些逾期真咬人、哪些是号召。 */}
+      <div className="space-y-6">
+        {tracks.map(({ key, style, items }) => (
+          <section key={key}>
+            {/* 轨头：短名（硬期限 / 软目标）+ 一行小字点破两者差别 + 本轨几个节点 */}
+            <div className="mb-2.5 flex items-baseline gap-2 flex-wrap">
+              <span
+                className="text-caption font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ color: style.fg, background: style.bg }}
+              >
+                {style.label}
+              </span>
+              <span className="text-xs text-[var(--color-ink-muted)]">
+                {style.blurb}
+              </span>
+              <span className="text-xs text-[var(--color-ink-muted)] tabular-nums ml-auto">
+                {items.length} 个
+              </span>
+            </div>
 
-        <ol className="space-y-5">
-          {nodes.map((n, i) => {
-            const verified = n.verified && hasText(n.evidence);
-            const isOpen = !!openOrigin[i];
-            const canOpenOrigin = hasText(n.evidence);
-            const first = i === 0;
-            const last = i === nodes.length - 1;
-            return (
-              <li key={i} className="relative flex items-stretch gap-0">
-                {/* 左栏：日晷牌——朱砂描边小牌摆「时间」（纪时牌），案头记事的站位 */}
-                <div className="shrink-0 pt-0.5" style={{ width: "5.5rem" }}>
-                  {hasText(n.when) ? (
-                    <div
-                      className="inline-flex flex-col items-end text-right rounded px-2 py-1 leading-tight"
-                      style={{
-                        border: "0.5px solid var(--color-seal)",
-                        background: "var(--color-seal-soft)",
-                        fontFamily: "var(--font-display)",
-                      }}
-                    >
-                      <span
-                        className="text-caption font-bold tabular-nums"
-                        style={{ color: "var(--color-seal)" }}
-                      >
-                        {n.when}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-caption text-[var(--color-ink-muted)] italic">
-                      时间待核
-                    </span>
-                  )}
-                </div>
+            {/* 本轨时轴：左侧一条贯通的朱砂竖线（案牍编年的纪年线），顶「起」底「讫」两道横规收束。 */}
+            <div className="relative pl-1">
+              {/* 贯通竖轴——居于左栏年轮的中线上（left = 日晷牌区宽度 + 年轮半径） */}
+              <div
+                aria-hidden
+                className="absolute top-0 bottom-0"
+                style={{
+                  left: "calc(5.5rem + 7px)",
+                  width: "2px",
+                  background:
+                    "linear-gradient(to bottom, transparent, var(--color-seal) 6%, var(--color-seal) 94%, transparent)",
+                  opacity: 0.5,
+                }}
+              />
 
-                {/* 中栏：年轮墨钉——钉在竖轴上的朱砂圆印（编年的纪年点）。起 / 讫两端加横规。 */}
-                <div className="w-4 shrink-0 flex flex-col items-center relative">
-                  {/* 起讫横规：首节点上加一道「起」横线，末节点下加一道「讫」横线 */}
-                  {first && (
-                    <span
-                      aria-hidden
-                      className="absolute -top-1 h-px w-3"
-                      style={{ background: "var(--color-seal)", opacity: 0.6 }}
-                    />
-                  )}
-                  <span
-                    aria-hidden
-                    className="mt-1 rounded-full shrink-0 z-10"
-                    style={{
-                      width: "12px",
-                      height: "12px",
-                      // 核过的实心朱砂年轮；核不过的空心年轮（描边不填色）——状态从纪年点上一眼看出
-                      background: verified
-                        ? "var(--color-seal)"
-                        : "var(--color-paper)",
-                      border: "2px solid var(--color-seal)",
-                      opacity: verified ? 1 : 0.55,
-                    }}
-                  />
-                  {last && (
-                    <span
-                      aria-hidden
-                      className="absolute -bottom-1 h-px w-3"
-                      style={{ background: "var(--color-seal)", opacity: 0.6 }}
-                    />
-                  )}
-                </div>
+              <ol className="space-y-5">
+                {items.map(({ node: n, i }, pos) => {
+                  const verified = n.verified && hasText(n.evidence);
+                  const isOpen = !!openOrigin[i];
+                  const canOpenOrigin = hasText(n.evidence);
+                  const first = pos === 0;
+                  const last = pos === items.length - 1;
+                  return (
+                    <li key={i} className="relative flex items-stretch gap-0">
+                      {/* 左栏：日晷牌——朱砂描边小牌摆「时间」（纪时牌），案头记事的站位。 */}
+                      {/* 悬停看这个时点凭哪个词判成硬期限 / 软目标（deadline_reason，锚原文）。 */}
+                      <div className="shrink-0 pt-0.5" style={{ width: "5.5rem" }}>
+                        {hasText(n.when) ? (
+                          <div
+                            className="inline-flex flex-col items-end text-right rounded px-2 py-1 leading-tight"
+                            style={{
+                              border: "0.5px solid var(--color-seal)",
+                              background: "var(--color-seal-soft)",
+                              fontFamily: "var(--font-display)",
+                            }}
+                            title={n.deadline_reason || undefined}
+                          >
+                            <span
+                              className="text-caption font-bold tabular-nums"
+                              style={{ color: "var(--color-seal)" }}
+                            >
+                              {n.when}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-caption text-[var(--color-ink-muted)] italic">
+                            时间待核
+                          </span>
+                        )}
+                      </div>
 
-                {/* 右栏：事项——墨色宋体主体 + 时点性质签 + 元信息（第几条）+ 原文（默认收起） */}
-                <div className="flex-1 min-w-0 pl-3 pb-1">
-                  <div className="flex items-start gap-2 flex-wrap">
-                    {verified && <SealMark size={17} title="原文已核验" />}
-                    <p
-                      className="text-body leading-7 text-[var(--color-ink)]"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      {n.what || "（这个时间点没说要发生啥）"}
-                    </p>
-                    {/* 时点性质签：真死线（逾期咬人）vs 软目标。鼠标悬停看判据 */}
-                    {(() => {
-                      const ds = deadlineStyle(n.deadline_type);
-                      if (!ds) return null;
-                      return (
+                      {/* 中栏：年轮墨钉——钉在竖轴上的朱砂圆印（编年的纪年点）。起 / 讫两端加横规。 */}
+                      <div className="w-4 shrink-0 flex flex-col items-center relative">
+                        {/* 起讫横规：本轨首节点上加一道「起」横线，末节点下加一道「讫」横线 */}
+                        {first && (
+                          <span
+                            aria-hidden
+                            className="absolute -top-1 h-px w-3"
+                            style={{ background: "var(--color-seal)", opacity: 0.6 }}
+                          />
+                        )}
                         <span
-                          className="self-center text-caption px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap"
-                          style={{ color: ds.fg, background: ds.bg }}
-                          title={n.deadline_reason || undefined}
-                        >
-                          {ds.label}
-                        </span>
-                      );
-                    })()}
-                  </div>
-
-                  {/* 元信息：来自第几条——有才显示 */}
-                  {typeof n.chapter === "number" && (
-                    <p className="mt-1 text-xs text-[var(--color-ink-muted)] tabular-nums">
-                      出自 第 {n.chapter} 条
-                    </p>
-                  )}
-
-                  {/* 核不过老实标一行，绝不假装这个日期有原文撑 */}
-                  {!verified && (
-                    <p className="mt-1 text-xs text-[var(--color-ink-muted)] italic">
-                      {hasText(n.evidence)
-                        ? "未在原文比对命中·仅供参考"
-                        : "暂无贴切原文（待核）"}
-                    </p>
-                  )}
-
-                  {/* 原文——撑这个时间的那句，默认收起。点「看原文」展开，朱砂细规一隔，淡墨小字。 */}
-                  {canOpenOrigin && (
-                    <div className="mt-1.5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpenOrigin((cur) => ({ ...cur, [i]: !cur[i] }))
-                        }
-                        className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
-                      >
-                        {isOpen ? "收起原文" : "看原文出处"}
-                      </button>
-                      {isOpen && (
-                        <p
-                          className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+                          aria-hidden
+                          className="mt-1 rounded-full shrink-0 z-10"
                           style={{
-                            borderColor: "color-mix(in oklch, var(--color-seal) 40%, transparent)",
-                            fontFamily: "var(--font-display)",
+                            width: "12px",
+                            height: "12px",
+                            // 核过的实心朱砂年轮；核不过的空心年轮（描边不填色）——状态从纪年点上一眼看出
+                            background: verified
+                              ? "var(--color-seal)"
+                              : "var(--color-paper)",
+                            border: "2px solid var(--color-seal)",
+                            opacity: verified ? 1 : 0.55,
                           }}
-                        >
-                          {n.evidence}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+                        />
+                        {last && (
+                          <span
+                            aria-hidden
+                            className="absolute -bottom-1 h-px w-3"
+                            style={{ background: "var(--color-seal)", opacity: 0.6 }}
+                          />
+                        )}
+                      </div>
+
+                      {/* 右栏：事项——墨色宋体主体 + 元信息（第几条）+ 原文（默认收起）。 */}
+                      {/* 时点性质不再逐条挂签，改由上面的轨头统一标——同一轨里全是同一档，不重复贴。 */}
+                      <div className="flex-1 min-w-0 pl-3 pb-1">
+                        <div className="flex items-start gap-2 flex-wrap">
+                          {verified && <SealMark size={17} title="原文已核验" />}
+                          <p
+                            className="text-body leading-7 text-[var(--color-ink)]"
+                            style={{ fontFamily: "var(--font-display)" }}
+                          >
+                            {n.what || "（这个时间点没说要发生啥）"}
+                          </p>
+                        </div>
+
+                        {/* 元信息：来自第几条——有才显示 */}
+                        {typeof n.chapter === "number" && (
+                          <p className="mt-1 text-xs text-[var(--color-ink-muted)] tabular-nums">
+                            出自 第 {n.chapter} 条
+                          </p>
+                        )}
+
+                        {/* 核不过老实标一行，绝不假装这个日期有原文撑 */}
+                        {!verified && (
+                          <p className="mt-1 text-xs text-[var(--color-ink-muted)] italic">
+                            {hasText(n.evidence)
+                              ? "未在原文比对命中·仅供参考"
+                              : "暂无贴切原文（待核）"}
+                          </p>
+                        )}
+
+                        {/* 原文——撑这个时间的那句，默认收起。点「看原文」展开，朱砂细规一隔，淡墨小字。 */}
+                        {canOpenOrigin && (
+                          <div className="mt-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenOrigin((cur) => ({ ...cur, [i]: !cur[i] }))
+                              }
+                              className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                            >
+                              {isOpen ? "收起原文" : "看原文出处"}
+                            </button>
+                            {isOpen && (
+                              <p
+                                className="mt-1.5 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
+                                style={{
+                                  borderColor: "color-mix(in oklch, var(--color-seal) 40%, transparent)",
+                                  fontFamily: "var(--font-display)",
+                                }}
+                              >
+                                {n.evidence}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          </section>
+        ))}
       </div>
 
       {!loading && (
