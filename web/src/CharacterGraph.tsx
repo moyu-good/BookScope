@@ -8,9 +8,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
-import { NIGHT_SKY, StarNode, StarTwinkleStyle } from "./starSky";
+import { GRAPH_BG, StarNode } from "./starSky";
 import { usePanZoom } from "./usePanZoom";
 import { useVizFocus } from "./viz/vizFocus";
+import { vizTokens } from "./viz/vizTokens";
 import { useSvgExport } from "./viz/useSvgExport";
 import { ExportButton } from "./ExportButton";
 import { EvidenceBadge, type EvidenceStrength } from "./viz/EvidenceBadge";
@@ -38,7 +39,7 @@ interface CharacterGraphProps {
   apiKey: string;
   model: string;
   baseUrl: string;
-  // 点一个人物星子 → 跳到关系演变看他的关系（可选，不传则只能拖动，行为跟以前一样）。
+  // 点一个人物节点 → 广播选中给别的镜头(可选,不传则只能拖动,行为跟以前一样)。
   onSelectPerson?: (name: string) => void;
 }
 
@@ -48,19 +49,12 @@ const PAD = 46;
 // 按 degree 取前 N，剩下的折成"还有 N 个次要人物"按钮，点开才全量。力学只算渲染的这些。
 const TOP_N = 70;
 
-// 星子按阵营(社区发现)上色。detectCommunities 早算好了群、以前只喂布局没喂颜色(旧「颜色方案 A」
-// 一律墨色,整张图看着一片平)。夜空底深,阵营色都取偏亮的暖调星色——才在夜空里发得出光、又彼此分得开。
-// 最大的群(id 0)拿朱砂星,呼应善本朱砂;id 循环取色。数据现成,一上色魏蜀吴就一眼三色。
-const FACTION_STAR_COLORS = [
-  "#E0A08C", // 朱砂星——最大的群
-  "#E6C879", // 金
-  "#8FC9A9", // 青玉
-  "#8FB4E0", // 靛
-  "#C6A8DE", // 藤
-  "#D8CFB8", // 星白(小群 / 兜底)
-];
+// 节点按阵营(社区发现)上色。detectCommunities 早算好了群。改成浅底后,旧那套给黑底调的亮色
+// (#E0A08C 等)在浅纸上会发虚,换成 vizTokens 的分类盘——那套本就是给浅底设计的低饱和暖调
+// (朱砂/墨/青绿/赭黄/靛/藤…),彼此分得开、跟善本调性搭。最大的群(id 0)拿朱砂,呼应善本;id 循环取色。
 function factionColor(communityId: number): string {
-  return FACTION_STAR_COLORS[communityId % FACTION_STAR_COLORS.length];
+  const p = vizTokens.categoricalPalette;
+  return p[communityId % p.length];
 }
 
 // 画布按节点数自适应——几百号人挤在小画布会糊成一团，节点多就把画布撑大（给力学更多铺开空间）。
@@ -588,14 +582,12 @@ export function CharacterGraph({
     if (name) {
       const p = simRef.current.get(name);
       if (p) p.fixed = false;
-      // 在节点上按下、几乎没动就松手 = 点这个人 → 广播到联动总线,顺带把关系演变镜头顶到前面。
-      // 拖过了不触发，不破坏拖动。只对人物图开放:概念节点跳关系演变(讲的是人)没意义。
+      // 在节点上按下、几乎没动就松手 = 点这个人 → 原地选中并广播到联动总线,别的已打开的镜头会跟着高亮,
+      // 但不强制切视图(强制跳走太霸道,用户可能只想选一下)。拖过了不触发,不破坏拖动。
+      // 只对人物图开放:概念节点讲的不是人,广播没意义。
       const dn = downRef.current;
       if (dn && !dn.moved && dn.name === name && unit === "person") {
-        setFocus(
-          { kind: "person", id: dn.name, label: dn.name, bookSessionId: sessionId },
-          { switchTo: "reltime" },
-        );
+        setFocus({ kind: "person", id: dn.name, label: dn.name, bookSessionId: sessionId });
         // 过渡期:App 若还传着 onSelectPerson 就一并调,两边都不炸;主 Claude 之后会停传它。
         onSelectPerson?.(dn.name);
       }
@@ -802,7 +794,7 @@ export function CharacterGraph({
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
         {data.nodes.length} 个{noun}、{data.edges.length} 条关系
         {rendered.hiddenCount > 0 && `（先画戏份最重的 ${rendered.nodes.length} 个）`}
-        。星图：每个{noun}是一颗星、戏份越重星越大；连线=关系（敌红、亲绿、一般灰，越粗越亲密）；滚轮缩放、空白处拖动平移、拖星子挪位、点连线看那一章的原文出处（点开现取）。把鼠标停在一颗星上，只亮它和跟它相连的一圈；点下面图例某类关系，只看这一类。
+。每个{noun}是一个点、戏份越重点越大，颜色按阵营分群；连线=关系（敌红、亲绿、一般灰，越粗越亲密）；滚轮缩放、空白处拖动平移、拖节点挪位、点连线看那一章的原文出处（点开现取）。把鼠标停在一个点上，只亮它和跟它相连的一圈；点下面图例某类关系，只看这一类。
       </p>
       {/* 图例:关系类型可点筛选(点一类只看这一类,可多选,再点取消);节点统一墨色、大小=戏份那条只作说明不可点。 */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
@@ -840,14 +832,14 @@ export function CharacterGraph({
         )}
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-flex items-center gap-0.5">
-            {FACTION_STAR_COLORS.slice(0, 4).map((c) => (
+            {vizTokens.categoricalPalette.slice(0, 4).map((c) => (
               <span
                 key={c}
                 style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: c }}
               />
             ))}
           </span>
-          颜色 = 阵营（自动分群）· 星越大 = 戏份
+          颜色 = 阵营（自动分群）· 点越大 = 戏份
         </span>
       </div>
       {rendered.hiddenCount > 0 && (
@@ -884,16 +876,14 @@ export function CharacterGraph({
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full border border-[var(--color-rule)] rounded touch-none"
-        style={{ maxHeight: 560, background: NIGHT_SKY, cursor: "grab" }}
+        style={{ maxHeight: 560, background: GRAPH_BG, cursor: "grab" }}
         onPointerDown={onBgDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerLeave={onUp}
         onWheel={onWheel}
       >
-        {/* 星图：夜空底 + 人物=星(亮度按戏份)+ 阵营=星色 + 关系=星座连线。闪烁用纯 CSS,不靠 rAF。 */}
-        {/* StarTwinkleStyle 是 <style> 不能进 transform 的 <g>(否则被当图形元素),留在外层。 */}
-        <StarTwinkleStyle />
+        {/* 浅底网络图：节点=实心圆点(大小按戏份)+ 阵营=点色 + 关系=连线。静止不闪。 */}
         {/* 缩放平移层:边和节点都在这个 <g> 里,整图能缩能拖。defs / style 留在外面。 */}
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
         {/* 边：星座连线。只画渲染子集里的边;selected 仍是 data.edges 里的原索引,保证证据查询对得上。
@@ -911,8 +901,9 @@ export function CharacterGraph({
           // hover 高亮:悬停某节点时,不跟它相连的边算"无关",压暗;相连的加粗高亮。
           const isNeighborEdge = !!hoverFocus && hoverFocus.edgeIdx.has(origIdx);
           const dimByHover = !!hoverFocus && !isNeighborEdge && !active;
-          // 基础不透明度:未核验的边本来就更淡(虚线);再叠筛选/hover 的压暗。
-          const baseOp = active ? 1 : e.evidence && !e.verified ? 0.4 : 0.72;
+          // 基础不透明度:未核验的边本来就更淡(虚线);已核验的边在浅底上稍压低一点点(0.72→0.6)
+          // 让画面更静、留白更透,颜色语义(敌红/亲绿/中灰)不动。再叠筛选/hover 的压暗。
+          const baseOp = active ? 1 : e.evidence && !e.verified ? 0.4 : 0.6;
           const opacity = filteredOut ? 0.1 : dimByHover ? 0.15 : baseOp;
           // 相连的边加粗高亮(用朱砂 --color-seal),让"谁跟悬停这人一伙"一眼可见。
           const stroke = active || isNeighborEdge ? "var(--color-seal)" : EDGE_COLOR[kind];
@@ -966,7 +957,6 @@ export function CharacterGraph({
           const showLabel =
             (rendered.nodes.length <= 60 || deg >= 4 || view.k >= 1.6 || isHovered) &&
             !(dimByHover || dimByFilter);
-          const dur = 2.4 + (deg % 4) * 0.7; // 错开闪烁,别齐刷刷
           return (
             <g
               key={`n-${name}`}
@@ -976,21 +966,21 @@ export function CharacterGraph({
               onPointerLeave={() => setHovered((h) => (h === name ? null : h))}
             >
               {unit === "person" && onSelectPerson && (
-                <title>{`点 ${name} 看他的关系演变（拖动可挪位）`}</title>
+                <title>{`${name}（点选·拖动挪位）`}</title>
               )}
               {/* 加大点击 / hover 命中区:透明大圈,半径比星子大一截,小星子也好点中、好 hover。
                   透明圈单独放在淡化 <g> 外面——淡化只是视觉,命中区不受影响,淡下去的星照样能拖能点能 hover。 */}
               <circle cx={p.x} cy={p.y} r={Math.max(r + 12, 18)} fill="transparent" />
               {/* 星子本体 + 名字包在一个 <g> 里统一压暗;悬停的星 opacity=1 最醒目。 */}
               <g opacity={nodeOpacity}>
-                <StarNode cx={p.x} cy={p.y} r={isHovered ? r + 1.5 : r} color={factionColor(communities.get(name) ?? 0)} twinkleDur={dur} />
+                <StarNode cx={p.x} cy={p.y} r={isHovered ? r + 1.5 : r} color={factionColor(communities.get(name) ?? 0)} />
                 {showLabel && (
                   <text
                     x={p.x}
                     y={p.y - r - 5}
                     textAnchor="middle"
                     fontSize={isHovered ? 14 : deg >= 6 ? 13 : 11}
-                    fill="#f0e8d4"
+                    fill="var(--color-ink)"
                     fontWeight={isHovered ? 700 : 400}
                     style={{ fontFamily: "var(--font-display)", pointerEvents: "none" }}
                   >
