@@ -52,6 +52,7 @@ import { RedheadCloseReading } from "./RedheadCloseReading";
 import { RedheadFormatCheck } from "./RedheadFormatCheck";
 import { RedheadHardFacts } from "./RedheadHardFacts";
 import { RedheadStakes } from "./RedheadStakes";
+import { RedheadDocPanorama } from "./RedheadDocPanorama";
 import { RelationshipTimeline } from "./RelationshipTimeline";
 import { RevisionList } from "./RevisionList";
 import type {
@@ -859,6 +860,7 @@ export function App() {
     | "redhead_stakes"
     | "redhead_hardfacts"
     | "redhead_formatcheck"
+    | "redhead_panorama"
     | "redhead_depgraph"
     | "redhead_policy"
     | "redhead_level"
@@ -2143,6 +2145,22 @@ export function App() {
                 />
               </div>
 
+              {/* 单份公文全景:把读懂一份公文的几件事合成一个镜头(集合整合,1.6.x)。
+                  下面那 6 个 redhead 单份 mode-div 暂留(可逆),导航已收成这一个「公文全景」入口。 */}
+              <div className={mode === "redhead_panorama" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="公文全景"
+                  subtitle="读懂一份红头文件不用在几件功能间来回跳:结构、逐条精读、利害与风向、要点、办事清单、规范性自检顺着往下读,顶部点一下跳到那段。每段各自点「生成」,不一次全跑。"
+                />
+                <RedheadDocPanorama
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "redhead" ? "" : "hidden"}>
                 <CanvasHeader
                   title="公文结构"
@@ -2384,6 +2402,7 @@ type Mode =
   | "redhead_stakes"
   | "redhead_hardfacts"
   | "redhead_formatcheck"
+  | "redhead_panorama"
   | "redhead_depgraph"
   | "redhead_policy"
   | "redhead_level"
@@ -2470,20 +2489,11 @@ const NAV_GROUPS: NavGroup[] = [
   // 公文 12 功能按和"书"一样的意图标准分三组:读懂这份 / 抓重点办事 / 多份比对(卷宗+跨文件)。
   {
     key: "redhead_read",
-    title: "公文 · 读懂这份",
+    title: "公文 · 读这份",
     modes: [
-      { id: "redhead", label: "公文结构" },
-      { id: "redhead_plain", label: "逐条精读" },
-      { id: "redhead_formatcheck", label: "规范性自检" },
-    ],
-  },
-  {
-    key: "redhead_act",
-    title: "公文 · 抓重点办事",
-    modes: [
-      { id: "redhead_stakes", label: "利害与风向" },
-      { id: "redhead_actions", label: "办事清单" },
-      { id: "redhead_hardfacts", label: "要点提取" },
+      // 集合整合:原来「读懂这份 + 抓重点办事」六个平铺功能(结构 / 逐条精读 / 规范性自检 /
+      // 利害 / 办事 / 要点)收成一个「公文全景」镜头,进去分段各自读、各自生成。跨文件的另算(下面一组)。
+      { id: "redhead_panorama", label: "公文全景" },
     ],
   },
   {
@@ -2530,7 +2540,7 @@ function genreHighlightGroups(genre: string | undefined | null): Set<string> | n
   }
   // 公文:只亮问&读 + 三个公文组,人物/情节/思想/质量这些"书"的维度收起。
   if (/(公文|红头)/.test(g)) {
-    return new Set(["read", "redhead_read", "redhead_act", "redhead_cross"]);
+    return new Set(["read", "redhead_read", "redhead_cross"]);
   }
   // 会议(1.7):只亮问&读 + 会议组,书 / 公文的维度收起。
   if (/(会议|纪要|meeting)/.test(g)) {
@@ -2557,7 +2567,6 @@ function genreVisibleGroups(genre: string | undefined | null): Set<string> | nul
     return new Set([
       "read",
       "redhead_read",
-      "redhead_act",
       "redhead_cross",
     ]);
   }
