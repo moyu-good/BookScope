@@ -952,7 +952,8 @@ export function CharacterGraph({
           const p = sim.get(name);
           if (!p) return null;
           const deg = degree.get(name) ?? 0;
-          const r = 6 + Math.min(9, deg * 1.5);
+          // 重要度=戏份(degree):主角的星明显更大,一眼拎出来(范围约 6~20,拉开到约 3 倍)。
+          const r = 6 + Math.min(14, deg * 2);
           // 聚焦态(hover 或总线广播过来的同一个人):放大 + 加粗标名,跟高亮邻居保持一致。
           const isHovered = focusedName === name;
           // 淡化判断:hover 高亮时,不在「悬停节点+其邻居」集合里的压暗;图例筛选时,不连着过筛边的压暗。
@@ -988,7 +989,7 @@ export function CharacterGraph({
                     x={p.x}
                     y={p.y - r - 5}
                     textAnchor="middle"
-                    fontSize={isHovered ? 13 : 12}
+                    fontSize={isHovered ? 14 : deg >= 6 ? 13 : 11}
                     fill="#f0e8d4"
                     fontWeight={isHovered ? 700 : 400}
                     style={{ fontFamily: "var(--font-display)", pointerEvents: "none" }}
