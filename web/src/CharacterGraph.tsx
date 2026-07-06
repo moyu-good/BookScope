@@ -10,6 +10,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { NIGHT_SKY, StarNode, StarTwinkleStyle } from "./starSky";
 import { usePanZoom } from "./usePanZoom";
+import { useVizFocus } from "./viz/vizFocus";
+import { useSvgExport } from "./viz/useSvgExport";
+import { ExportButton } from "./ExportButton";
+import { EvidenceBadge, type EvidenceStrength } from "./viz/EvidenceBadge";
 
 export interface GraphEdge {
   source: string;
@@ -161,6 +165,8 @@ export function CharacterGraph({
   const [hovered, setHovered] = useState<string | null>(null);
   // 图例筛选:选中哪几类边只看哪几类(可多选)。空 = 全部都看。复用 relationKind 分类。
   const [edgeKinds, setEdgeKinds] = useState<Set<RelKind>>(new Set());
+  // 联动总线:点人物星子时广播"选中这个人"(见 onUp),别的镜头也能把选中的人广播过来让本图高亮。
+  const { focus, setFocus } = useVizFocus();
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const simRef = useRef<Map<string, Node>>(new Map());
@@ -227,6 +233,13 @@ export function CharacterGraph({
     () => (data ? detectCommunities(data.nodes, data.edges) : new Map<string, number>()),
     [data],
   );
+
+  // 存图:把当前这张关系网导出成 PNG(带标题/来源/水印)。落款现取,人物/概念图各自命名。
+  const { onExport } = useSvgExport(svgRef, () => ({
+    title: `${unit === "concept" ? "概念" : "人物"}关系网`,
+    source: `共 ${data?.nodes.length ?? 0} 个${unit === "concept" ? "概念" : "人物"}、${data?.edges.length ?? 0} 条关系`,
+    filename: `${unit === "concept" ? "概念" : "人物"}关系图`,
+  }));
 
   async function load(u: "person" | "concept") {
     setUnit(u);
@@ -301,25 +314,30 @@ export function CharacterGraph({
     return { nodes: keep, nodeSet, edges, hiddenCount: all.length - keep.length };
   }, [data, expanded, degree]);
 
-  // hover 高亮邻居:悬停一个节点时,算出「它 + 它的直接邻居」名字集合,和「跟它相连的边」的原始索引集合。
+  // 有效聚焦的人:鼠标 hover 优先(即时),没 hover 时看总线——别的镜头广播了一个人、
+  // 且这人正画在图里,就聚焦他。这样 hover 和跨镜头联动共用同一套高亮/淡化。
+  const focusedName =
+    hovered ?? (focus?.kind === "person" && rendered.nodeSet.has(focus.id) ? focus.id : null);
+
+  // 高亮邻居:聚焦一个节点时,算出「它 + 它的直接邻居」名字集合,和「跟它相连的边」的原始索引集合。
   // 渲染时不在集合里的节点/边压暗、相连的边加粗高亮。纯前端 O(edges)。
-  // 只按 hovered 算,拖拽的门放到用下面(见 hoverFocus)——dragRef 是 ref 进不了 memo 依赖,
+  // 只按 focusedName 算,拖拽的门放到用下面(见 hoverFocus)——dragRef 是 ref 进不了 memo 依赖,
   // 在这里判会拿旧缓存,得在渲染时读 dragRef.current 现值才准。
   const hoverFocusRaw = useMemo(() => {
-    if (!hovered || !rendered.nodeSet.has(hovered)) return null;
-    const names = new Set<string>([hovered]);
+    if (!focusedName || !rendered.nodeSet.has(focusedName)) return null;
+    const names = new Set<string>([focusedName]);
     const edgeIdx = new Set<number>();
     for (const e of rendered.edges) {
-      if (e.source === hovered) {
+      if (e.source === focusedName) {
         names.add(e.target);
         edgeIdx.add(data!.edges.indexOf(e));
-      } else if (e.target === hovered) {
+      } else if (e.target === focusedName) {
         names.add(e.source);
         edgeIdx.add(data!.edges.indexOf(e));
       }
     }
     return { names, edgeIdx };
-  }, [hovered, rendered, data]);
+  }, [focusedName, rendered, data]);
   // 拖拽进行中(dragRef 非空)就不做高亮淡化,免得跟拖拽打架。渲染每帧都跑到这,读的是 dragRef 现值。
   const hoverFocus = dragRef.current ? null : hoverFocusRaw;
 
@@ -559,11 +577,16 @@ export function CharacterGraph({
     if (name) {
       const p = simRef.current.get(name);
       if (p) p.fixed = false;
-      // 在节点上按下、几乎没动就松手 = 点这个人 → 跳关系演变。拖过了不触发，不破坏拖动。
-      // 只对人物图开放：概念节点跳关系演变（讲的是人）没意义。
+      // 在节点上按下、几乎没动就松手 = 点这个人 → 广播到联动总线,顺带把关系演变镜头顶到前面。
+      // 拖过了不触发，不破坏拖动。只对人物图开放:概念节点跳关系演变(讲的是人)没意义。
       const dn = downRef.current;
-      if (dn && !dn.moved && dn.name === name && unit === "person" && onSelectPerson) {
-        onSelectPerson(dn.name);
+      if (dn && !dn.moved && dn.name === name && unit === "person") {
+        setFocus(
+          { kind: "person", id: dn.name, label: dn.name, bookSessionId: sessionId },
+          { switchTo: "reltime" },
+        );
+        // 过渡期:App 若还传着 onSelectPerson 就一并调,两边都不炸;主 Claude 之后会停传它。
+        onSelectPerson?.(dn.name);
       }
       downRef.current = null;
       dragRef.current = null;
@@ -686,6 +709,21 @@ export function CharacterGraph({
   }
 
   const sel = selected != null ? data.edges[selected] : null;
+  // 这条边的证据强度:让"原文撑得硬不硬"一眼可见(EvidenceBadge 四态)。
+  //   强锚 = 核验过 + 贴合度 match_score≥0.6;弱锚 = 核验过但贴合弱(<0.6);
+  //   部分 = 有原文但没核验过(含按需现取到的那句,只知道找到、没打分);待核 = 没原文/取不到。
+  // 边自带证据(概念图/旧路径)用边上的 verified/match_score 判;按需现取的(selEv)只知 found,归"部分"。
+  const selStrength: EvidenceStrength | null = !sel
+    ? null
+    : sel.evidence
+      ? sel.verified
+        ? sel.match_score >= 0.6
+          ? "strong"
+          : "weak"
+        : "partial"
+      : selEv?.found
+        ? "partial"
+        : "unverified";
   const noun = unit === "concept" ? "概念" : "人物";
   const title = unit === "concept" ? "概念关系图" : "人物关系图";
   const otherUnit = unit === "concept" ? "person" : "concept";
@@ -746,6 +784,7 @@ export function CharacterGraph({
           >
             重置视角
           </button>
+          <ExportButton onExport={onExport} disabled={loading || !data} />
         </div>
       </div>
 
@@ -896,7 +935,8 @@ export function CharacterGraph({
           if (!p) return null;
           const deg = degree.get(name) ?? 0;
           const r = 6 + Math.min(9, deg * 1.5);
-          const isHovered = hovered === name;
+          // 聚焦态(hover 或总线广播过来的同一个人):放大 + 加粗标名,跟高亮邻居保持一致。
+          const isHovered = focusedName === name;
           // 淡化判断:hover 高亮时,不在「悬停节点+其邻居」集合里的压暗;图例筛选时,不连着过筛边的压暗。
           // 悬停的节点本身永远最亮。两层各自算,取更暗的那个(都命中就叠加最狠)。
           const dimByHover = !!hoverFocus && !hoverFocus.names.has(name);
@@ -953,6 +993,10 @@ export function CharacterGraph({
               {sel.strength >= 4 ? "紧密" : sel.strength >= 2 ? "一般" : "疏离"}
               <span className="text-[var(--color-ink-muted)]">（模型判读）</span>
             </span>
+            {/* 证据强度:这条关系原文撑得硬不硬。现取中先不摆态,等取完再显(免得闪一下待核)。 */}
+            {selStrength && !selEv?.loading && (
+              <EvidenceBadge strength={selStrength} className="ml-2" />
+            )}
           </p>
           <p className="mt-1 text-sm text-[var(--color-ink)] leading-relaxed">
             {selEv?.loading

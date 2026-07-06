@@ -16,6 +16,7 @@ import { ArgumentStructure } from "./ArgumentStructure";
 import { CharacterArc } from "./CharacterArc";
 import { CharacterFlow } from "./CharacterFlow";
 import { CharacterGraph } from "./CharacterGraph";
+import { VizFocusProvider } from "./viz/vizFocus";
 import { CharacterVoice } from "./CharacterVoice";
 import { ConsistencyScan } from "./ConsistencyScan";
 import { RecallHub } from "./RecallHub";
@@ -1657,6 +1658,11 @@ export function App() {
         onDeleteAccount={handleDeleteAccount}
       />
 
+      {/* 联动总线:分析台所有镜头包进 VizFocusProvider——一个镜头选中一个对象就广播,
+          别的镜头订阅到、认得就聚焦/高亮(镜头互相说话)。onSwitchMode=setMode 让 setFocus 的
+          switchTo 能把目标镜头顶到前面(如关系图点人→自动切到关系演变)。switchTo 是通用 string,
+          setMode 要的是 mode 联合类型,cast 一层。Sidebar 在外层、用不着总线。 */}
+      <VizFocusProvider onSwitchMode={(m) => setMode(m as typeof mode)}>
       <main className="flex-1 min-w-0 px-5 sm:px-8 lg:px-14 pt-[4.5rem] md:pt-12 pb-16">
         <div className="stagger max-w-4xl mx-auto">
           {settingsOpen && (
@@ -2337,6 +2343,7 @@ export function App() {
           <Footer />
         </div>
       </main>
+      </VizFocusProvider>
       </div>
     </div>
   );

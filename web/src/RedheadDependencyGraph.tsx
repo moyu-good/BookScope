@@ -24,6 +24,10 @@
 import { useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { usePanZoom } from "./usePanZoom";
+import { useVizFocus } from "./viz/vizFocus";
+import { useSvgExport } from "./viz/useSvgExport";
+import { ExportButton } from "./ExportButton";
+import { EvidenceBadge, type EvidenceStrength } from "./viz/EvidenceBadge";
 
 // ---- 后端契约（对着 /api/agent/redhead/dependency-graph 写，别改后端） ----
 
@@ -111,6 +115,26 @@ function postureStyle(label: string): { fg: string; bg: string } {
 
 function hasText(v: string | null | undefined): boolean {
   return !!v && v.trim().length > 0;
+}
+
+// 一条边的证据强度：按后端真实字段推，不硬造 match_score（后端边上根本没有这个数）。
+// 后端给的证据线索只有两样：edge.chapter_anchor（这条关系锚到的真实条款序号，是「有原文」的凭据）
+// 和 edge.posture（研判姿态，它的 from_snippet / to_snippet 是各自文脉里已核过的上下位原话，
+// posture.verified 恒为 true）。据此对到 EvidenceBadge 四态：
+//   strong  —— 有 posture 且上下位原话两条都锚到了（双侧已核对照，最硬）
+//   weak    —— 有 posture 但只锚到一侧原话（有核验但覆盖弱）
+//   partial —— 没 posture，但边锚到了真实条款（有出处、只是没到双侧原话那步）
+//   unverified —— 既没锚条款、也没 posture（编不出出处，老实标待核）
+function edgeStrength(e: GraphEdge): EvidenceStrength {
+  const p = e.posture;
+  if (p) {
+    const from = hasText(p.from_snippet);
+    const to = hasText(p.to_snippet);
+    if (from && to) return "strong";
+    if (from || to) return "weak";
+  }
+  if (typeof e.chapter_anchor === "number") return "partial";
+  return "unverified";
 }
 
 // ---- 分层布局：纯计算，把 nodes 排成「机关一带 + 文件按依据深度分层往下」 ----
@@ -212,6 +236,9 @@ export function RedheadDependencyGraph({
   const [hoverNode, setHoverNode] = useState<string | null>(null);
   // 图例里勾掉的边类型（藏起这些边，一眼看清剩下的作废链等）。默认全看。
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set());
+  // 联动总线：点节点时广播「选中这条条款」（见节点 onClick）；别的公文镜头广播一条条款过来时，
+  // 若它正画在本图里就把对应节点点亮（见下方 litNode）。公文这几个视图暂不接 switchTo，只广播不跳视图。
+  const { focus, setFocus } = useVizFocus();
 
   const canRun = bookSessionIds.length >= 2 && !!apiKey;
 
@@ -278,6 +305,13 @@ export function RedheadDependencyGraph({
   const { view, pointersCount, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onWheel, resetView } =
     usePanZoom(svgRef, { width: 1000, height: viewH });
 
+  // 存图：把这张依据链网导出成 PNG（带标题 / 来源 / 水印）。落款现取，来源报节点数与关系数。
+  const { onExport } = useSvgExport(svgRef, () => ({
+    title: "公文依据链网",
+    source: `${nodes.length} 个节点、${edges.length} 条关系`,
+    filename: "公文依据链网",
+  }));
+
   // ---- 未生成：入口卡片 ----
   if (!result) {
     return (
@@ -336,9 +370,14 @@ export function RedheadDependencyGraph({
     );
   }
 
-  // 真正点亮的节点：click 锁定优先，没锁定才吃 hover 预览。pan/pinch 中不吃 hover（拖图
-  // 时手指扫过节点不该乱闪），靠 usePanZoom 给的 pointersCount gate。
-  const litNode = activeNode ?? (pointersCount === 0 ? hoverNode : null);
+  // 总线焦点落到本图的节点：别的公文镜头广播一条条款（kind==="clause"）过来，且这条正画在
+  // 本图里（id 命中某节点），就把它当点亮节点。取不到 / 不是本图的就没有。
+  const focusNode =
+    focus?.kind === "clause" && posById.has(focus.id) ? focus.id : null;
+
+  // 真正点亮的节点：本地 click 锁定优先，其次总线 focus（别的镜头广播的条款），再次 hover 预览。
+  // pan/pinch 中不吃 hover（拖图时手指扫过节点不该乱闪），靠 usePanZoom 给的 pointersCount gate。
+  const litNode = activeNode ?? focusNode ?? (pointersCount === 0 ? hoverNode : null);
 
   // 边类型被勾掉了没：勾掉的整类边藏起来（大幅淡化），一眼看清剩下的（如只留废止 + 修改看作废链）。
   // 图例只列 e.kind 非空的类型，所以空 kind 的边不会有开关、也永远藏不掉，符合预期。
@@ -390,11 +429,14 @@ export function RedheadDependencyGraph({
           <button
             type="button"
             onClick={() => setActiveNode(null)}
-            className="ml-auto text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+            className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
           >
             清除高亮
           </button>
         )}
+        <span className="ml-auto">
+          <ExportButton onExport={onExport} disabled={!gotSomething} />
+        </span>
       </div>
 
       {/* ── 有向关联网 SVG ── */}
@@ -533,9 +575,18 @@ export function RedheadDependencyGraph({
                 transform={`translate(${pos.x - w / 2}, ${pos.y - h / 2})`}
                 opacity={lit ? 1 : 0.22}
                 style={{ cursor: "pointer" }}
-                onClick={() =>
-                  setActiveNode((cur) => (cur === node.id ? null : node.id))
-                }
+                onClick={() => {
+                  setActiveNode((cur) => (cur === node.id ? null : node.id));
+                  // 同时往联动总线广播这条条款（kind:"clause"）。公文这几个视图暂不跳视图，
+                  // 只广播——将来别的公文镜头广播同一条时本图能亮同一个节点（见 focusNode）。
+                  // 节点没带自己的 session 字段（跨文件图），退用卷宗第一份。
+                  setFocus({
+                    kind: "clause",
+                    id: node.id,
+                    label: node.label || node.机关 || node.id,
+                    bookSessionId: bookSessionIds[0] ?? "",
+                  });
+                }}
                 onPointerEnter={() => setHoverNode(node.id)}
                 onPointerLeave={() =>
                   setHoverNode((cur) => (cur === node.id ? null : cur))
@@ -706,6 +757,8 @@ function EdgeDetail({
             ——{st.label}→
           </span>
           <span className="font-bold">{tgt?.label ?? edge.target}</span>
+          {/* 证据强度标：按这条边有没有锚到条款 / 双侧原话推四态（见 edgeStrength）。 */}
+          <EvidenceBadge strength={edgeStrength(edge)} className="ml-2" />
         </p>
         <button
           type="button"

@@ -13,6 +13,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { useVizFocus } from "./viz/vizFocus";
+import { EvidencePopover } from "./viz/EvidencePopover";
 
 // ---- 新接口契约 ----
 interface Verdict {
@@ -121,8 +123,15 @@ export function RelationshipTimeline({
   const beatRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const [flashCh, setFlashCh] = useState<number | null>(null);
 
-  // 从关系网点过来的人：记住已处理过的那次点击（按对象引用），免得 pairs/effect 重跑时重复聚焦。
-  const handledFocusRef = useRef<{ name: string } | null>(null);
+  // 联动总线：也订阅它，从关系图点一个人这里就跟着聚焦。
+  const { focus } = useVizFocus();
+  // 有效聚焦人 = 总线优先、prop 兜底。总线上是 person 就取它的 label 当人名。
+  const effectiveFocus =
+    (focus?.kind === "person" ? { name: focus.label } : null) ?? focusPerson;
+
+  // 记住已处理过的那次聚焦，免得 pairs/effect 重跑时重复触发。
+  // 总线的 focus 每次渲染是新对象，所以按名字（值）去重，不按对象引用。
+  const handledFocusRef = useRef<string | null>(null);
 
   function reqBody(extra?: Record<string, unknown>): Record<string, unknown> {
     const body: Record<string, unknown> = {
@@ -225,12 +234,13 @@ export function RelationshipTimeline({
 
   const cur = selKey ? chronicles[selKey] ?? null : null;
 
-  // 从关系网点了某个人跳过来：先确保有清单（没拉过就拉一次），
+  // 从关系图点了某个人跳过来（走总线，或旧的 focusPerson prop）：先确保有清单（没拉过就拉一次），
   // 再把搜索框填成他的名字（列表立刻只剩含他的对）。若含他的对里有明显最重的一对，顺手下钻。
   useEffect(() => {
-    if (!focusPerson) return;
-    // 同一次点击（同一对象引用）只处理一次
-    if (handledFocusRef.current === focusPerson) return;
+    if (!effectiveFocus) return;
+    const name = effectiveFocus.name;
+    // 同一个人只处理一次（按名字去重，总线的 focus 对象每渲染都新）。
+    if (handledFocusRef.current === name) return;
 
     // 还没拉清单：拉一次（会先按全局 top 自动选一对），等 pairs 到了 effect 会重跑再聚焦。
     if (!pairs) {
@@ -238,8 +248,7 @@ export function RelationshipTimeline({
       return; // 先别标已处理——等 pairs 回来重跑这个 effect 才真正聚焦
     }
 
-    handledFocusRef.current = focusPerson;
-    const name = focusPerson.name;
+    handledFocusRef.current = name;
     setQuery(name);
 
     // 含这个人的所有对里挑 count 最高的下钻（pairs 已按 count 降序，第一个命中即最重）。
@@ -248,9 +257,9 @@ export function RelationshipTimeline({
       const k = pairKey(hit.a, hit.b);
       void loadChronicle(hit.a, hit.b, k);
     }
-    // loadPairs / loadChronicle 是稳定闭包，pairs / focusPerson 变化才需重跑
+    // loadPairs / loadChronicle 是稳定闭包，effectiveFocus 的名字 / pairs 变化才需重跑
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusPerson, pairs]);
+  }, [effectiveFocus?.name, pairs]);
 
   function scrollToBeat(ch: number) {
     const el = beatRefs.current[ch];
@@ -516,7 +525,6 @@ function Chronicle({
       <div className="mt-4">
         {beats.map((bt, idx) => {
           const color = valenceColor(bt.valence);
-          const showOrigin = bt.verified && !!bt.evidence;
           const flash = flashCh === bt.chapter;
           const isLast = idx === beats.length - 1;
           return (
@@ -578,19 +586,25 @@ function Chronicle({
                     )}
                   </div>
 
-                  {/* 原文：核验通过且非空才当引文；否则老实标待核 */}
-                  {showOrigin ? (
-                    <p
-                      className="mt-2 text-sm text-[var(--color-ink)] leading-relaxed"
-                      style={{ fontFamily: "var(--font-display)" }}
+                  {/* 原文收进浮层：hover / 聚焦「原文」二字才浮出引文 + 章号 + 证据强度徽记。
+                      没原文时浮层自己显「待核」，evidence-first 那条不丢。幕卡里只留一个紧凑触发签。 */}
+                  <div className="mt-2">
+                    <EvidencePopover
+                      quote={bt.evidence}
+                      chapter={bt.chapter}
+                      verified={bt.verified}
+                      matchScore={bt.match_score}
                     >
-                      “{bt.evidence}”
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-xs text-[var(--color-ink-muted)] italic">
-                      暂无贴切原文（待核）
-                    </p>
-                  )}
+                      <span
+                        className="text-xs cursor-help text-[var(--color-ink-muted)]"
+                        style={{
+                          borderBottom: "1px dotted var(--color-rule)",
+                        }}
+                      >
+                        原文
+                      </span>
+                    </EvidencePopover>
+                  </div>
                 </div>
               </div>
             </div>
