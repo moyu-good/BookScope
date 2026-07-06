@@ -175,6 +175,31 @@ def test_salvages_truncated_json(monkeypatch):
     assert "丙" in r.nodes  # 端点补进 nodes
 
 
+def test_edge_carries_polarity(monkeypatch):
+    """边带 polarity：模型给的三选一原样保留，缺失/非法落「中」（宁可漏不可错报）。"""
+    graph_json = json.dumps({
+        "nodes": ["唐肃宗", "郭子仪", "安禄山", "史思明", "甲", "乙"],
+        "edges": [
+            # 君臣但原文亲善 → 友（身份≠立场，这正是要修的君臣误判）
+            {"source": "唐肃宗", "target": "郭子仪", "relation": "君臣",
+             "polarity": "友", "evidence": "唐玄宗对他极为宠信"},
+            {"source": "安禄山", "target": "史思明", "relation": "政敌",
+             "polarity": "敌", "evidence": "杨国忠多次进言唐玄宗，请求严查安禄山谋反"},
+            {"source": "甲", "target": "乙", "relation": "同僚",
+             "evidence": "x"},  # 缺 polarity → 中
+            {"source": "乙", "target": "甲", "relation": "亲族",
+             "polarity": "暧昧", "evidence": "y"},  # 非三选一 → 中
+        ],
+    }, ensure_ascii=False)
+    _patch_invoke(monkeypatch)
+    r = cg.extract_character_graph(
+        full_text="x", chunks=_CHUNKS, llm_client=_FakeClient(graph_json), model="m",
+    )
+    assert r is not None
+    pol = [e["polarity"] for e in r.edges]
+    assert pol == ["友", "敌", "中", "中"]
+
+
 def test_malformed_edge_dropped(monkeypatch):
     """缺 source/target/relation 的边丢弃；齐全的保留。"""
     graph_json = json.dumps({

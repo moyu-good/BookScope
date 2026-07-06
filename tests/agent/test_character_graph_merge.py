@@ -91,6 +91,32 @@ def test_merge_safety_cap_truncates_by_strength() -> None:
     assert any(e["relation"] == "强" for e in edges)
 
 
+def test_merge_preserves_polarity_and_defaults_missing() -> None:
+    """polarity 跟 relation 同层保留；缺失落「中」；换成有 evidence 的边时 polarity 跟着走。"""
+    segs = [
+        # 有 polarity
+        (["唐肃宗", "郭子仪"],
+         [{"source": "唐肃宗", "target": "郭子仪", "relation": "君臣",
+           "strength": 4, "polarity": "友", "evidence": "宠信"}]),
+        # 缺 polarity → 中
+        (["甲", "乙"], [_edge("甲", "乙", "同僚", strength=2)]),
+        # 同 key：先来的无 evidence，后来的有 evidence 且 polarity=敌 → 整条换掉，polarity 跟着走
+        (["丙", "丁"],
+         [{"source": "丙", "target": "丁", "relation": "政敌",
+           "strength": 3, "polarity": "友", "evidence": ""}]),
+        (["丙", "丁"],
+         [{"source": "丙", "target": "丁", "relation": "政敌",
+           "strength": 1, "polarity": "敌", "evidence": "真片段"}]),
+    ]
+    _, edges = _merge_graph_segments(segs)
+    pol = {(e["source"], e["target"]): e["polarity"] for e in edges}
+    assert pol[("唐肃宗", "郭子仪")] == "友"
+    assert pol[("甲", "乙")] == "中"  # 缺失落中
+    # 换成有 evidence 的那条 → polarity 与 evidence 一致
+    dc = next(e for e in edges if e["source"] == "丙")
+    assert dc["evidence"] == "真片段" and dc["polarity"] == "敌"
+
+
 def test_merge_drops_incomplete_edges() -> None:
     segs = [([], [{"source": "甲", "target": "", "relation": "x"}, _edge("甲", "乙", "同僚")])]
     _, edges = _merge_graph_segments(segs)
