@@ -47,6 +47,10 @@ inject_mingchao.py
 scripts/_tmp_*
 scripts/_shot_*
 
+# 深做 A bond probe：脚本内嵌受版权保护的书籍原文片段（逐字），仅本地跑、绝不入库。
+# 将来改成从本地 epub 现读原文（不硬编码）后可解禁入库。
+scripts/probe_character_flow_bond.py
+
 # 1.6 红头文件垂直语料：本地采集的党政公文，纯测试语料，绝不入库
 tests/file/redhead_corpus/
 
