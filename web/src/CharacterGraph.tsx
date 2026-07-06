@@ -88,7 +88,9 @@ const edgeWidth = (s: number) => 1.2 + Math.max(1, Math.min(5, s)) * 0.55;
 type RelKind = "foe" | "kin" | "neutral";
 function relationKind(relation: string): RelKind {
   const r = relation || "";
-  if (/敌|政敌|对手|对立|仇|宿敌|交锋|争|叛|反目/.test(r)) return "foe";
+  // 只认明确的敌对(政敌/宿敌/死敌/敌对/仇/反目/叛)。旧正则含「争 / 交锋 / 对立 / 对手 / 裸敌」太宽,
+  // 会把君臣间的「兵权之争 / 猜忌」误判成敌对——唐肃宗和郭子仪就是被 /争/ 误成敌红的。宁可漏不可错报。
+  if (/政敌|宿敌|死敌|敌对|仇|反目|叛/.test(r)) return "foe";
   if (/盟|结义|亲|族|父|母|子|女|夫|妻|兄|弟|姐|妹|君臣|主仆|师徒|师|徒|友|挚|同袍|姻/.test(r)) return "kin";
   return "neutral";
 }
