@@ -53,6 +53,9 @@ import { RedheadFormatCheck } from "./RedheadFormatCheck";
 import { RedheadHardFacts } from "./RedheadHardFacts";
 import { RedheadStakes } from "./RedheadStakes";
 import { RedheadDocPanorama } from "./RedheadDocPanorama";
+import { RedheadDossierPanorama } from "./RedheadDossierPanorama";
+import { CharacterPanorama } from "./CharacterPanorama";
+import { NarrativePanorama } from "./NarrativePanorama";
 import { RelationshipTimeline } from "./RelationshipTimeline";
 import { RevisionList } from "./RevisionList";
 import type {
@@ -861,6 +864,9 @@ export function App() {
     | "redhead_hardfacts"
     | "redhead_formatcheck"
     | "redhead_panorama"
+    | "redhead_dossier_panorama"
+    | "char_panorama"
+    | "plot_panorama"
     | "redhead_depgraph"
     | "redhead_policy"
     | "redhead_level"
@@ -1891,6 +1897,37 @@ export function App() {
                 />
               </div>
 
+              {/* 集合整合:人物那组(关系图/关系演变/人物弧线/声口)合成一个镜头;
+                  下面 graph/reltime/chararc/charvoice 的 mode-div 暂留、可逆,导航已收成一个「人物」入口。 */}
+              <div className={mode === "char_panorama" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="人物"
+                  subtitle="读一本书的人:全局关系图点一个人,下面关系演变自动聚焦他,再往下人物弧线、声口。一个镜头顺着看,每段各自点生成。"
+                />
+                <CharacterPanorama
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
+              {/* 集合整合:情节脉络那组(叙事曲线/叙事流/时间线/支线/伏笔)合成一个镜头(下面各 mode-div 暂留、可逆)。 */}
+              <div className={mode === "plot_panorama" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="情节脉络"
+                  subtitle="一本书的脉络:叙事曲线看节奏起伏,叙事流看人物线穿全书,时间线排关键事件,再到支线、伏笔。一个镜头顺着看,每段各自点生成。"
+                />
+                <NarrativePanorama
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "graph" ? "" : "hidden"}>
                 <CanvasHeader
                   title="关系图"
@@ -2300,6 +2337,22 @@ export function App() {
             />
           </div>
 
+          {/* 集合整合:跨文件三视图(依据链网/政策演变/上下级)合成一个「卷宗全景」镜头
+              (下面各 mode-div 暂留、可逆)。先在「卷宗」选一组≥2份再进。 */}
+          <div className={mode === "redhead_dossier_panorama" ? "" : "hidden"}>
+            <CanvasHeader
+              title="卷宗全景"
+              subtitle="一卷宗多份公文看关系:依据链网看谁依据谁,政策演变按时间看怎么改,上下级一致性勘对上下位。一个镜头顺着看,每段各自点生成。先在「卷宗」选一组(≥2 份)。"
+            />
+            <RedheadDossierPanorama
+              bookSessionIds={dossierIds}
+              provider={provider}
+              apiKey={apiKey}
+              model={model}
+              baseUrl={effectiveBaseUrl()}
+            />
+          </div>
+
           <div className={mode === "redhead_depgraph" ? "" : "hidden"}>
             <CanvasHeader
               title="依据链网"
@@ -2403,6 +2456,9 @@ type Mode =
   | "redhead_hardfacts"
   | "redhead_formatcheck"
   | "redhead_panorama"
+  | "redhead_dossier_panorama"
+  | "char_panorama"
+  | "plot_panorama"
   | "redhead_depgraph"
   | "redhead_policy"
   | "redhead_level"
@@ -2449,21 +2505,16 @@ const NAV_GROUPS: NavGroup[] = [
     key: "character",
     title: "人物",
     modes: [
-      { id: "graph", label: "关系图" },
-      { id: "reltime", label: "关系演变" },
-      { id: "chararc", label: "人物弧线" },
-      { id: "charvoice", label: "声口一致" },
+      // 集合整合:关系图 / 关系演变 / 人物弧线 / 声口 收成一个「人物」镜头(点一人总线联动出各面)。
+      { id: "char_panorama", label: "人物" },
     ],
   },
   {
     key: "plot",
     title: "情节脉络",
     modes: [
-      { id: "narrative", label: "叙事曲线" },
-      { id: "flow", label: "叙事流" },
-      { id: "timeline", label: "时间线" },
-      { id: "subplot", label: "支线编织" },
-      { id: "foreshadow", label: "伏笔回收" },
+      // 集合整合:叙事曲线 / 叙事流 / 时间线 / 支线 / 伏笔 收成一个「情节脉络」镜头。
+      { id: "plot_panorama", label: "情节脉络" },
     ],
   },
   {
@@ -2501,9 +2552,8 @@ const NAV_GROUPS: NavGroup[] = [
     title: "公文 · 多份比对",
     modes: [
       { id: "dossier", label: "卷宗" },
-      { id: "redhead_depgraph", label: "依据链网" },
-      { id: "redhead_policy", label: "政策演变" },
-      { id: "redhead_level", label: "上下级一致性" },
+      // 集合整合:依据链网 / 政策演变 / 上下级 收成一个「卷宗全景」镜头(先选卷宗≥2份再进)。
+      { id: "redhead_dossier_panorama", label: "卷宗全景" },
     ],
   },
   // 1.7 会议垂直·首炮。会议题材已进后端 genre_detect：genre=会议 时这组自动显示 +
