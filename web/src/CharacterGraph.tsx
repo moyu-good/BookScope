@@ -48,9 +48,20 @@ const PAD = 46;
 // 按 degree 取前 N，剩下的折成"还有 N 个次要人物"按钮，点开才全量。力学只算渲染的这些。
 const TOP_N = 70;
 
-// 颜色方案 A：节点一律墨色单色，大小=戏份（degree），不再按共现群组多色。
-// 夜空底是深色，真墨色（--color-ink）会糊进背景看不见，所以星子用偏暖的星白当"墨色"在夜空里的对应。
-const STAR_COLOR = "#d8cfb8";
+// 星子按阵营(社区发现)上色。detectCommunities 早算好了群、以前只喂布局没喂颜色(旧「颜色方案 A」
+// 一律墨色,整张图看着一片平)。夜空底深,阵营色都取偏亮的暖调星色——才在夜空里发得出光、又彼此分得开。
+// 最大的群(id 0)拿朱砂星,呼应善本朱砂;id 循环取色。数据现成,一上色魏蜀吴就一眼三色。
+const FACTION_STAR_COLORS = [
+  "#E0A08C", // 朱砂星——最大的群
+  "#E6C879", // 金
+  "#8FC9A9", // 青玉
+  "#8FB4E0", // 靛
+  "#C6A8DE", // 藤
+  "#D8CFB8", // 星白(小群 / 兜底)
+];
+function factionColor(communityId: number): string {
+  return FACTION_STAR_COLORS[communityId % FACTION_STAR_COLORS.length];
+}
 
 // 画布按节点数自适应——几百号人挤在小画布会糊成一团，节点多就把画布撑大（给力学更多铺开空间）。
 // 上限放到 2400:三国 348 人也铺得开;SVG 按容器宽缩放,逻辑空间大=结构(阵营/主次)散得开。
@@ -828,8 +839,15 @@ export function CharacterGraph({
           </button>
         )}
         <span className="inline-flex items-center gap-1.5">
-          <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: STAR_COLOR }} />
-          星越大 = 戏份越重
+          <span className="inline-flex items-center gap-0.5">
+            {FACTION_STAR_COLORS.slice(0, 4).map((c) => (
+              <span
+                key={c}
+                style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: c }}
+              />
+            ))}
+          </span>
+          颜色 = 阵营（自动分群）· 星越大 = 戏份
         </span>
       </div>
       {rendered.hiddenCount > 0 && (
@@ -964,7 +982,7 @@ export function CharacterGraph({
               <circle cx={p.x} cy={p.y} r={Math.max(r + 12, 18)} fill="transparent" />
               {/* 星子本体 + 名字包在一个 <g> 里统一压暗;悬停的星 opacity=1 最醒目。 */}
               <g opacity={nodeOpacity}>
-                <StarNode cx={p.x} cy={p.y} r={isHovered ? r + 1.5 : r} color={STAR_COLOR} twinkleDur={dur} />
+                <StarNode cx={p.x} cy={p.y} r={isHovered ? r + 1.5 : r} color={factionColor(communities.get(name) ?? 0)} twinkleDur={dur} />
                 {showLabel && (
                   <text
                     x={p.x}
