@@ -56,6 +56,7 @@ import { RedheadDocPanorama } from "./RedheadDocPanorama";
 import { RedheadDossierPanorama } from "./RedheadDossierPanorama";
 import { CharacterPanorama } from "./CharacterPanorama";
 import { NarrativePanorama } from "./NarrativePanorama";
+import { QualityPanorama } from "./QualityPanorama";
 import { RelationshipTimeline } from "./RelationshipTimeline";
 import { RevisionList } from "./RevisionList";
 import type {
@@ -867,6 +868,7 @@ export function App() {
     | "redhead_dossier_panorama"
     | "char_panorama"
     | "plot_panorama"
+    | "quality_panorama"
     | "redhead_depgraph"
     | "redhead_policy"
     | "redhead_level"
@@ -1928,6 +1930,22 @@ export function App() {
                 />
               </div>
 
+              {/* 集合整合:质量·写作那组(一致性 / 写作手法 / 文体体检 / 改稿清单 / 知识卡片)合成一个镜头(下面各 mode-div 暂留、可逆)。 */}
+              <div className={mode === "quality_panorama" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="质量 · 写作"
+                  subtitle="通读一遍写作质量:设定一致性、写作手法、文体体检各自扫问题,改稿清单收口带走,知识卡片沉淀。一个镜头顺着看,每段各自点生成。"
+                />
+                <QualityPanorama
+                  sessionId={currentSession.session_id}
+                  bookTitle={currentSession.book_title}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "graph" ? "" : "hidden"}>
                 <CanvasHeader
                   title="关系图"
@@ -2459,6 +2477,7 @@ type Mode =
   | "redhead_dossier_panorama"
   | "char_panorama"
   | "plot_panorama"
+  | "quality_panorama"
   | "redhead_depgraph"
   | "redhead_policy"
   | "redhead_level"
@@ -2528,11 +2547,8 @@ const NAV_GROUPS: NavGroup[] = [
     key: "quality",
     title: "质量 · 写作",
     modes: [
-      { id: "consistency", label: "一致性" },
-      { id: "technique", label: "写作手法" },
-      { id: "style", label: "文体体检" },
-      { id: "revision", label: "改稿清单" },
-      { id: "cards", label: "知识卡片" },
+      // 集合整合:一致性 / 写作手法 / 文体体检 / 改稿清单 / 知识卡片 收成一个「质量·写作」镜头。
+      { id: "quality_panorama", label: "质量 · 写作" },
     ],
   },
   // 1.6 公文组已解封（代码层不再藏）。注意:推到公开仓 = 正式对外亮出"公文"垂直,
