@@ -53,9 +53,16 @@ _PERSON_SYSTEM_INSTRUCTION = (
     '"edges": [{"source": "人物A", "target": "人物B", '
     '"relation": "关系类型（君臣/政敌/父子/同盟/同僚/亲族/师徒等）", '
     '"strength": 关系亲疏强度1到5的整数, '
+    '"polarity": "友或敌或中", '
     '"evidence": "证明这条关系的原文逐字片段，原样摘录不改写"}]}\n'
     "strength 按原文体现的亲疏判：5=最紧密（父子/生死同盟/夫妻），3=一般（同僚/君臣），"
     "1=最疏远（点头之交/远亲/敌对但少交集）。只据原文判，拿不准给 3。\n"
+    "polarity：这对关系的底色，只据原文明说的对抗或亲善判，三选一填「友」「敌」「中」。"
+    "史实身份本身不代表立场：君臣、同僚、上下级、父子这类身份不算敌对——"
+    "除非原文明写了冲突、背叛、夺权、相残、敌视，才判「敌」；"
+    "原文体现亲近、结盟、提携、情谊判「友」；"
+    "原文没明说对抗、或只是中性的身份、共事关系，判「中」。拿不准一律给「中」，宁可漏不可错报。"
+    "polarity 必须跟你给的 evidence 那句一致，evidence 支撑不了这个极性就给「中」。\n"
     "每条 edge 必须带 evidence，且 evidence 是原文里逐字出现的句子。"
     "source 和 target 必须是 nodes 里出现过的人物名。"
     "书里没有直接关系的人物之间不要硬连。"
@@ -130,6 +137,16 @@ def _coerce_nodes(raw_nodes: Any) -> list[str]:
     return names
 
 
+# 关系极性只三选一；模型给别的、缺失、拼错一律落「中」（宁可漏不可错报，同 prompt 的兜底）。
+_POLARITY_VALUES = frozenset({"友", "敌", "中"})
+
+
+def _coerce_polarity(raw: Any) -> str:
+    """把模型给的 polarity 归一成「友」「敌」「中」之一；非三选一 → 「中」。"""
+    value = str(raw).strip() if raw is not None else ""
+    return value if value in _POLARITY_VALUES else "中"
+
+
 def _coerce_edges(raw_edges: Any) -> list[dict[str, Any]]:
     """保留 source/target/relation 齐全的边；evidence 可缺（缺则 verified 自然 False）。"""
     edges: list[dict[str, Any]] = []
@@ -151,6 +168,7 @@ def _coerce_edges(raw_edges: Any) -> list[dict[str, Any]]:
             "target": target,
             "relation": relation,
             "strength": strength,
+            "polarity": _coerce_polarity(item.get("polarity")),
             "evidence": str(item.get("evidence", "")).strip(),
         })
     return edges
@@ -181,7 +199,9 @@ def _merge_graph_segments(
     - **节点**：并集，保序去重。
     - **边**：按规范化无向 key ``(min(s,t), max(s,t), relation)`` 去重——同一对人物的同一种
       关系只留一条；合并时保 ``strength`` 最大、优先留**有 evidence** 的那条（evidence 要逐字
-      核验，没 evidence 的边 verified 永远 False）。每条边保留它首次出现时带的 ``chapter``。
+      核验，没 evidence 的边 verified 永远 False）。``polarity`` 跟 relation 同层保留（换成有
+      evidence 的那条时 polarity 也跟着走，缺失/非三选一落「中」）。每条边保留它首次出现时带的
+      ``chapter``。
     - **不设 30 帽**（穷尽）；只留高位 ``max_edges`` 安全帽防爆，超了按 strength 降序截断。
 
     纯函数、不调 LLM——REDUCE 的正确性先在这里钉死，MAP（逐段 LLM 抽边）再往上接。
@@ -205,11 +225,16 @@ def _merge_graph_segments(
             key = (a, b, relation)
             existing = by_key.get(key)
             if existing is None:
-                by_key[key] = dict(raw)
+                stored = dict(raw)
+                stored["polarity"] = _coerce_polarity(raw.get("polarity"))  # 缺失/非三选一落「中」
+                by_key[key] = stored
                 continue
-            # 已有同 key 边：没 evidence 而新边有 → 整条换成有 evidence 的；否则保 strength 最大
+            # 已有同 key 边：没 evidence 而新边有 → 整条换成有 evidence 的（polarity 跟着这条走）；
+            # 否则保 strength 最大
             if not existing.get("evidence") and raw.get("evidence"):
-                by_key[key] = dict(raw)
+                stored = dict(raw)
+                stored["polarity"] = _coerce_polarity(raw.get("polarity"))
+                by_key[key] = stored
             else:
                 new_s = raw.get("strength", 3)
                 if isinstance(new_s, int) and new_s > existing.get("strength", 3):
@@ -399,11 +424,25 @@ def _verify_edges_against_chunks(
 
 def _build_segment_system(segment_text: str, known_names: list[str], unit: str) -> str:
     """逐段抽边的 system：已知人物清单 + 本段原文 + "本段内穷尽抽关系"指令。"""
-    word = "概念" if unit == "concept" else "人物"
+    is_concept = unit == "concept"
+    word = "概念" if is_concept else "人物"
     rel_hint = (
         "（定义/包含/对立/因果/递进/支撑等）"
-        if unit == "concept"
+        if is_concept
         else "（君臣/政敌/父子/同盟/同僚/亲族/师徒等）"
+    )
+    # 概念间没敌友，只有人物图才加 polarity；schema 与判据都跟静态指令保持一致。
+    polarity_field = "" if is_concept else '"polarity": "友或敌或中", '
+    polarity_rule = (
+        ""
+        if is_concept
+        else (
+            "polarity：这对关系的底色，只据本段原文明说的对抗或亲善判，三选一填「友」「敌」「中」。"
+            "君臣、同僚、上下级、父子这类身份本身不算敌对——除非本段原文明写了冲突、背叛、"
+            "夺权、相残、敌视，才判「敌」；本段原文体现亲近、结盟、提携、情谊判「友」；"
+            "没明说对抗或只是中性身份、共事关系，判「中」。拿不准一律给「中」，"
+            "且 polarity 要跟 evidence 那句一致。\n"
+        )
     )
     names = "、".join(known_names[:120]) if known_names else "（无预设清单，自行从本段识别）"
     return (
@@ -414,7 +453,9 @@ def _build_segment_system(segment_text: str, known_names: list[str], unit: str) 
         '{"edges": [{"source": "名A", "target": "名B", '
         f'"relation": "关系类型{rel_hint}", '
         '"strength": 关系亲疏1到5整数, '
+        f'{polarity_field}'
         '"evidence": "本段原文里逐字出现的句子，原样摘录不改写"}]}\n'
+        f"{polarity_rule}"
         f"source / target 尽量用上面清单里的名字。本段没有可依据原文的关系就返回 "
         '{"edges": []}。\n\n'
         f"=== 本段原文 ===\n{segment_text}"

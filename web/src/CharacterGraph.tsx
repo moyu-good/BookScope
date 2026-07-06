@@ -25,6 +25,8 @@ export interface GraphEdge {
   verified: boolean;
   chapter: number;
   match_score: number;
+  // 关系极性 友/敌/中——后端锚原文判(character_graph.py 的 polarity)。老数据可能没有 → 前端回落正则。
+  polarity?: string;
 }
 
 interface GraphData {
@@ -93,6 +95,14 @@ function relationKind(relation: string): RelKind {
   if (/政敌|宿敌|死敌|敌对|仇|反目|叛/.test(r)) return "foe";
   if (/盟|结义|亲|族|父|母|子|女|夫|妻|兄|弟|姐|妹|君臣|主仆|师徒|师|徒|友|挚|同袍|姻/.test(r)) return "kin";
   return "neutral";
+}
+// 边的敌友底色:优先用后端锚原文判的 polarity(友/敌/中);老数据没这字段才回落 relationKind 正则(保守)。
+// 这样敌友是证据来的、不是前端拿字符串猜的——唐肃宗郭子仪那类君臣不再被误判成敌对。
+function edgePolarity(e: GraphEdge): RelKind {
+  if (e.polarity === "敌") return "foe";
+  if (e.polarity === "友") return "kin";
+  if (e.polarity === "中") return "neutral";
+  return relationKind(e.relation); // 老数据(抽取时还没 polarity)兜底
 }
 const EDGE_COLOR: Record<RelKind, string> = {
   foe: "#C0392B", // 敌对 = 红
@@ -354,7 +364,7 @@ export function CharacterGraph({
     if (edgeKinds.size === 0) return null; // 全部都看,不筛
     const nodesWithEdge = new Set<string>();
     for (const e of rendered.edges) {
-      if (edgeKinds.has(relationKind(e.relation))) {
+      if (edgeKinds.has(edgePolarity(e))) {
         nodesWithEdge.add(e.source);
         nodesWithEdge.add(e.target);
       }
@@ -897,7 +907,7 @@ export function CharacterGraph({
           if (!a || !b) return null;
           const origIdx = data.edges.indexOf(e); // 原数组索引(证据 effect / sel 都按它取)
           const active = selected === origIdx;
-          const kind = relationKind(e.relation);
+          const kind = edgePolarity(e);
           // 图例筛选:开了筛选又不属于选中类 = 这条被筛掉,压到很暗、也不再接点击(免得抢命中)。
           const filteredOut = edgeKinds.size > 0 && !edgeKinds.has(kind);
           // hover 高亮:悬停某节点时,不跟它相连的边算"无关",压暗;相连的加粗高亮。
