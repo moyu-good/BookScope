@@ -156,8 +156,11 @@ export function CharacterGraph({
   const [unit, setUnit] = useState<"person" | "concept">("person");
   // 默认只渲染戏份前 TOP_N 个;点"展开次要人物"才全量。次要人物多才显示这个开关。
   const [expanded, setExpanded] = useState(false);
-  // 鼠标悬停的节点名——人多时只给主要角色标名,hover 任意一颗也临时显名。
+  // 鼠标悬停的节点名——人多时只给主要角色标名,hover 任意一颗也临时显名,
+  // 还用来高亮它的邻居、淡化无关(见下面 neighbor useMemo)。
   const [hovered, setHovered] = useState<string | null>(null);
+  // 图例筛选:选中哪几类边只看哪几类(可多选)。空 = 全部都看。复用 relationKind 分类。
+  const [edgeKinds, setEdgeKinds] = useState<Set<RelKind>>(new Set());
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const simRef = useRef<Map<string, Node>>(new Map());
@@ -298,6 +301,42 @@ export function CharacterGraph({
     return { nodes: keep, nodeSet, edges, hiddenCount: all.length - keep.length };
   }, [data, expanded, degree]);
 
+  // hover 高亮邻居:悬停一个节点时,算出「它 + 它的直接邻居」名字集合,和「跟它相连的边」的原始索引集合。
+  // 渲染时不在集合里的节点/边压暗、相连的边加粗高亮。纯前端 O(edges)。
+  // 只按 hovered 算,拖拽的门放到用下面(见 hoverFocus)——dragRef 是 ref 进不了 memo 依赖,
+  // 在这里判会拿旧缓存,得在渲染时读 dragRef.current 现值才准。
+  const hoverFocusRaw = useMemo(() => {
+    if (!hovered || !rendered.nodeSet.has(hovered)) return null;
+    const names = new Set<string>([hovered]);
+    const edgeIdx = new Set<number>();
+    for (const e of rendered.edges) {
+      if (e.source === hovered) {
+        names.add(e.target);
+        edgeIdx.add(data!.edges.indexOf(e));
+      } else if (e.target === hovered) {
+        names.add(e.source);
+        edgeIdx.add(data!.edges.indexOf(e));
+      }
+    }
+    return { names, edgeIdx };
+  }, [hovered, rendered, data]);
+  // 拖拽进行中(dragRef 非空)就不做高亮淡化,免得跟拖拽打架。渲染每帧都跑到这,读的是 dragRef 现值。
+  const hoverFocus = dragRef.current ? null : hoverFocusRaw;
+
+  // 图例筛选态:哪些边过筛(kind 命中)、哪些节点还连着过筛的边。空筛选 = 全过。
+  // 用来在开了筛选时把不相干的边隐藏、把没有过筛边的节点压暗(方便只看某一派)。
+  const kindFilter = useMemo(() => {
+    if (edgeKinds.size === 0) return null; // 全部都看,不筛
+    const nodesWithEdge = new Set<string>();
+    for (const e of rendered.edges) {
+      if (edgeKinds.has(relationKind(e.relation))) {
+        nodesWithEdge.add(e.source);
+        nodesWithEdge.add(e.target);
+      }
+    }
+    return { nodesWithEdge };
+  }, [edgeKinds, rendered]);
+
   // 初始化节点（圆周）+ 启动动画模拟。
   // 依赖 rendered:换数据 或 展开/收起次要人物 都重排一次。展开时已有的节点保留原位(不抖),
   // 新冒出来的次要人物按圆周补进来,再让力学收一次。
@@ -331,9 +370,11 @@ export function CharacterGraph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rendered]);
 
-  // 换数据(不只是展开/收起)时复位视角,免得拿上一批的缩放看新图。展开/收起不复位,保住用户当前视角。
+  // 换数据(不只是展开/收起)时复位视角 + 清图例筛选,免得拿上一批的缩放/筛选看新图。
+  // 展开/收起不复位,保住用户当前视角。
   useEffect(() => {
     setExpanded(false);
+    setEdgeKinds(new Set());
     setView({ k: 1, tx: 0, ty: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
@@ -539,6 +580,16 @@ export function CharacterGraph({
     fitToBounds();
   }
 
+  // 点图例里某类边 → 切换只看这一类(可多选)。已选再点取消。空集 = 全部都看。
+  function toggleEdgeKind(k: RelKind) {
+    setEdgeKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }
+
   if (!data) {
     const cardCls =
       "flex flex-col items-start gap-1.5 p-4 rounded-lg border text-left transition-colors " +
@@ -701,16 +752,42 @@ export function CharacterGraph({
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
         {data.nodes.length} 个{noun}、{data.edges.length} 条关系
         {rendered.hiddenCount > 0 && `（先画戏份最重的 ${rendered.nodes.length} 个）`}
-        。星图：每个{noun}是一颗星、戏份越重星越大；连线=关系（敌红、亲绿、一般灰，越粗越亲密）；滚轮缩放、空白处拖动平移、拖星子挪位、点连线看那一章的原文出处（点开现取）。
+        。星图：每个{noun}是一颗星、戏份越重星越大；连线=关系（敌红、亲绿、一般灰，越粗越亲密）；滚轮缩放、空白处拖动平移、拖星子挪位、点连线看那一章的原文出处（点开现取）。把鼠标停在一颗星上，只亮它和跟它相连的一圈；点下面图例某类关系，只看这一类。
       </p>
-      {/* 图例:只剩关系类型(颜色方案 A 弃掉了按群上色,节点统一墨色、大小=戏份) */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
-        {(["foe", "kin", "neutral"] as RelKind[]).map((k) => (
-          <span key={k} className="inline-flex items-center gap-1.5">
-            <span style={{ display: "inline-block", width: 16, borderTop: `3px solid ${EDGE_COLOR[k]}` }} />
-            {EDGE_KIND_LABEL[k]}
-          </span>
-        ))}
+      {/* 图例:关系类型可点筛选(点一类只看这一类,可多选,再点取消);节点统一墨色、大小=戏份那条只作说明不可点。 */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
+        {(["foe", "kin", "neutral"] as RelKind[]).map((k) => {
+          const on = edgeKinds.has(k);
+          const dimmed = edgeKinds.size > 0 && !on; // 开了筛选、又没选中这类 = 淡掉,让选中项更显眼
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => toggleEdgeKind(k)}
+              title={on ? `取消,不再单看${EDGE_KIND_LABEL[k]}` : `只看${EDGE_KIND_LABEL[k]}的关系`}
+              className={
+                "inline-flex items-center gap-1.5 px-2 py-0.5 rounded border cursor-pointer transition-colors " +
+                (on
+                  ? "border-[var(--color-seal)] bg-[var(--color-seal-soft)] text-[var(--color-ink)]"
+                  : "border-transparent hover:border-[var(--color-rule)]")
+              }
+              style={{ opacity: dimmed ? 0.45 : 1 }}
+            >
+              <span style={{ display: "inline-block", width: 16, borderTop: `3px solid ${EDGE_COLOR[k]}` }} />
+              {EDGE_KIND_LABEL[k]}
+            </button>
+          );
+        })}
+        {edgeKinds.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setEdgeKinds(new Set())}
+            title="取消筛选,看全部关系"
+            className="px-2 py-0.5 rounded border border-[var(--color-rule)] bg-white cursor-pointer hover:border-[var(--color-seal)] transition-colors text-[var(--color-ink)]"
+          >
+            看全部
+          </button>
+        )}
         <span className="inline-flex items-center gap-1.5">
           <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: STAR_COLOR }} />
           星越大 = 戏份越重
@@ -762,13 +839,28 @@ export function CharacterGraph({
         <StarTwinkleStyle />
         {/* 缩放平移层:边和节点都在这个 <g> 里,整图能缩能拖。defs / style 留在外面。 */}
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
-        {/* 边：星座连线。只画渲染子集里的边;selected 仍是 data.edges 里的原索引,保证证据查询对得上。 */}
+        {/* 边：星座连线。只画渲染子集里的边;selected 仍是 data.edges 里的原索引,保证证据查询对得上。
+            两层叠加:图例筛选(kindFilter)先把不看的这类边压到很暗且不接点击;hover 高亮(hoverFocus)再把
+            跟悬停节点无关的边压暗、相连的边加粗高亮。selected(点开取证据的那条)始终最显眼,不被这两层盖掉。 */}
         {rendered.edges.map((e) => {
           const a = sim.get(e.source);
           const b = sim.get(e.target);
           if (!a || !b) return null;
           const origIdx = data.edges.indexOf(e); // 原数组索引(证据 effect / sel 都按它取)
           const active = selected === origIdx;
+          const kind = relationKind(e.relation);
+          // 图例筛选:开了筛选又不属于选中类 = 这条被筛掉,压到很暗、也不再接点击(免得抢命中)。
+          const filteredOut = edgeKinds.size > 0 && !edgeKinds.has(kind);
+          // hover 高亮:悬停某节点时,不跟它相连的边算"无关",压暗;相连的加粗高亮。
+          const isNeighborEdge = !!hoverFocus && hoverFocus.edgeIdx.has(origIdx);
+          const dimByHover = !!hoverFocus && !isNeighborEdge && !active;
+          // 基础不透明度:未核验的边本来就更淡(虚线);再叠筛选/hover 的压暗。
+          const baseOp = active ? 1 : e.evidence && !e.verified ? 0.4 : 0.72;
+          const opacity = filteredOut ? 0.1 : dimByHover ? 0.15 : baseOp;
+          // 相连的边加粗高亮(用朱砂 --color-seal),让"谁跟悬停这人一伙"一眼可见。
+          const stroke = active || isNeighborEdge ? "var(--color-seal)" : EDGE_COLOR[kind];
+          const strokeWidth =
+            active || isNeighborEdge ? edgeWidth(e.strength) + 1.5 : edgeWidth(e.strength);
           return (
             <g key={`e-${origIdx}`}>
               <line
@@ -776,22 +868,25 @@ export function CharacterGraph({
                 y1={a.y}
                 x2={b.x}
                 y2={b.y}
-                stroke={active ? "var(--color-seal)" : EDGE_COLOR[relationKind(e.relation)]}
-                strokeWidth={active ? edgeWidth(e.strength) + 1.5 : edgeWidth(e.strength)}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
                 strokeLinecap="round"
                 strokeDasharray={e.evidence && !e.verified ? "4 3" : undefined}
-                opacity={active ? 1 : e.evidence && !e.verified ? 0.4 : 0.72}
+                opacity={opacity}
               />
-              <line
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke="transparent"
-                strokeWidth={14}
-                style={{ cursor: "pointer" }}
-                onClick={() => setSelected(origIdx)}
-              />
+              {/* 被筛掉的边不接点击,免得从暗线上抢走命中区。 */}
+              {!filteredOut && (
+                <line
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke="transparent"
+                  strokeWidth={14}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setSelected(origIdx)}
+                />
+              )}
             </g>
           );
         })}
@@ -801,10 +896,17 @@ export function CharacterGraph({
           if (!p) return null;
           const deg = degree.get(name) ?? 0;
           const r = 6 + Math.min(9, deg * 1.5);
+          const isHovered = hovered === name;
+          // 淡化判断:hover 高亮时,不在「悬停节点+其邻居」集合里的压暗;图例筛选时,不连着过筛边的压暗。
+          // 悬停的节点本身永远最亮。两层各自算,取更暗的那个(都命中就叠加最狠)。
+          const dimByHover = !!hoverFocus && !hoverFocus.names.has(name);
+          const dimByFilter = !!kindFilter && !kindFilter.nodesWithEdge.has(name);
+          const nodeOpacity = dimByHover || dimByFilter ? 0.15 : 1;
           // 标名规则:节点少 / 戏份重(deg≥4) / 放大到一定程度 / 正悬停在它上面——任一满足就标。
-          // 人多时缩着看不糊,放大或 hover 任意一颗都看得见名字。
+          // 人多时缩着看不糊,放大或 hover 任意一颗都看得见名字。淡化掉的节点不标名,免得暗图上飘一堆字。
           const showLabel =
-            rendered.nodes.length <= 60 || deg >= 4 || view.k >= 1.6 || hovered === name;
+            (rendered.nodes.length <= 60 || deg >= 4 || view.k >= 1.6 || isHovered) &&
+            !(dimByHover || dimByFilter);
           const dur = 2.4 + (deg % 4) * 0.7; // 错开闪烁,别齐刷刷
           return (
             <g
@@ -817,22 +919,26 @@ export function CharacterGraph({
               {unit === "person" && onSelectPerson && (
                 <title>{`点 ${name} 看他的关系演变（拖动可挪位）`}</title>
               )}
-              {/* 加大点击 / hover 命中区:透明大圈,半径比星子大一截,小星子也好点中、好 hover。 */}
+              {/* 加大点击 / hover 命中区:透明大圈,半径比星子大一截,小星子也好点中、好 hover。
+                  透明圈单独放在淡化 <g> 外面——淡化只是视觉,命中区不受影响,淡下去的星照样能拖能点能 hover。 */}
               <circle cx={p.x} cy={p.y} r={Math.max(r + 12, 18)} fill="transparent" />
-              <StarNode cx={p.x} cy={p.y} r={r} color={STAR_COLOR} twinkleDur={dur} />
-              {showLabel && (
-                <text
-                  x={p.x}
-                  y={p.y - r - 5}
-                  textAnchor="middle"
-                  fontSize={hovered === name ? 13 : 12}
-                  fill="#f0e8d4"
-                  fontWeight={hovered === name ? 700 : 400}
-                  style={{ fontFamily: "var(--font-display)", pointerEvents: "none" }}
-                >
-                  {name}
-                </text>
-              )}
+              {/* 星子本体 + 名字包在一个 <g> 里统一压暗;悬停的星 opacity=1 最醒目。 */}
+              <g opacity={nodeOpacity}>
+                <StarNode cx={p.x} cy={p.y} r={isHovered ? r + 1.5 : r} color={STAR_COLOR} twinkleDur={dur} />
+                {showLabel && (
+                  <text
+                    x={p.x}
+                    y={p.y - r - 5}
+                    textAnchor="middle"
+                    fontSize={isHovered ? 13 : 12}
+                    fill="#f0e8d4"
+                    fontWeight={isHovered ? 700 : 400}
+                    style={{ fontFamily: "var(--font-display)", pointerEvents: "none" }}
+                  >
+                    {name}
+                  </text>
+                )}
+              </g>
             </g>
           );
         })}
