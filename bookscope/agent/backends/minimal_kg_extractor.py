@@ -39,6 +39,7 @@ from typing import Any
 
 from bookscope.agent._internal.kg_book_cache import extract_book_kg_cached
 from bookscope.agent._internal.kg_cache import extract_batch_cached
+from bookscope.agent._internal.loop_shared import read_openai_finish_reason
 from bookscope.agent.adapters import LLMClient
 from bookscope.agent.errors import (
     ContentFiltered,
@@ -74,8 +75,19 @@ _EXTRACTION_TEMPERATURE: float = 0.0
 """KG 抽取温度。DeepSeek 官方调教表：代码/数据类任务用 0.0 求确定性。
 抽实体是结构化任务，低温让同一批 chunk 的角色抽取结果更可复现。"""
 
-DEFAULT_MAX_TOKENS: int = 4000
-"""单次 LLM 调用的 ``max_tokens``。保守值，角色 JSON 通常几百 token 即可。"""
+DEFAULT_MAX_TOKENS: int = 8000
+"""单次 LLM 调用的 ``max_tokens``。
+
+原为 4000（按 non-reasoning model 估：角色 JSON 通常几百 token 就够）。但默认模型
+``deepseek-v4-flash`` 是 reasoning model——它先在 ``reasoning_content`` 里想一大段，
+这段**算进 ``max_tokens`` 预算**，预算不够时 ``content`` 直接返空、``finish_reason``
+是 ``length``（exp008 / article-02 第七节实测过同款：output_tokens 上百、净 content 却
+只剩几个字）。一个 60-chunk 的 batch（~9 万字符输入）让 flash 先想一轮再列几十个人名，
+4000 会被 reasoning 挤空 content → ``_parse_characters_json`` 抛
+``LLMFormatError("LLM text was empty")`` → 整批降级 jieba，而且是**每批**都白跑一次
+LLM 才掉链子，整本 ingest 拖几分钟。提到 8000 给 reasoning + JSON 留够空间，跟全书
+map-reduce 的其它功能（character_graph / chapter_spine / narrative_curve / timeline
+等）一致的量级。"""
 
 DEFAULT_MAX_CHUNKS_PER_BATCH: int = 60
 """单批 chunk 上限；超过则走 map-reduce。
@@ -500,19 +512,30 @@ class MinimalKGExtractor:
             # 出结果（无人名时 entries 为空，再真降级 0 角色）。
             jieba_entries = _jieba_extract_names(batch)
             exc_type = type(last_exc).__name__ if last_exc else "unknown"
+            # finish_reason=length 的空 content 是 reasoning 挤爆 max_tokens 的信号
+            # （不是模型真没抽到），跟破 JSON 的 format error 是两回事。把它单独点出来，
+            # 别让"预算不够"伪装成"输出格式错"——排查时先看这个再动别的（article-02 清单）。
+            fr = read_openai_finish_reason(response) if response is not None else None
+            cause = (
+                "（finish_reason=length，疑似 reasoning 挤爆 max_tokens）"
+                if fr == "length"
+                else ""
+            )
             if jieba_entries:
                 logger.warning(
-                    "kg_batch %d LLM 兜底失败（%s），jieba 救回 %d 人名: %s",
+                    "kg_batch %d LLM 兜底失败（%s%s），jieba 救回 %d 人名: %s",
                     batch_index,
                     exc_type,
+                    cause,
                     len(jieba_entries),
                     last_exc,
                 )
                 return jieba_entries
             logger.warning(
-                "kg_batch %d LLM 兜底失败（%s）/ jieba 也无人名 / 降级 0 角色: %s",
+                "kg_batch %d LLM 兜底失败（%s%s）/ jieba 也无人名 / 降级 0 角色: %s",
                 batch_index,
                 exc_type,
+                cause,
                 last_exc,
             )
             return []
