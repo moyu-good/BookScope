@@ -207,6 +207,11 @@ export function RedheadDependencyGraph({
   // 选中的边（看 note + 来源条款）；选中的节点（高亮它牵连的边）
   const [activeEdge, setActiveEdge] = useState<number | null>(null);
   const [activeNode, setActiveNode] = useState<string | null>(null);
+  // hover 到哪个节点（预览高亮它牵连的边；移开就没）。click 锁定、hover 预览，两者共存：
+  // 真正拿来点亮的节点 = 锁定优先，没锁定才看 hover（见下方 litNode）。
+  const [hoverNode, setHoverNode] = useState<string | null>(null);
+  // 图例里勾掉的边类型（藏起这些边，一眼看清剩下的作废链等）。默认全看。
+  const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set());
 
   const canRun = bookSessionIds.length >= 2 && !!apiKey;
 
@@ -216,6 +221,7 @@ export function RedheadDependencyGraph({
     setError(null);
     setActiveEdge(null);
     setActiveNode(null);
+    setHoverNode(null);
     try {
       const body: Record<string, unknown> = {
         book_session_ids: bookSessionIds,
@@ -269,7 +275,7 @@ export function RedheadDependencyGraph({
 
   // pan/zoom + 双指 pinch（移动端）：公文依据网节点小、文字密，手机上不捏合看不清。
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const { view, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onWheel, resetView } =
+  const { view, pointersCount, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onWheel, resetView } =
     usePanZoom(svgRef, { width: 1000, height: viewH });
 
   // ---- 未生成：入口卡片 ----
@@ -330,18 +336,28 @@ export function RedheadDependencyGraph({
     );
   }
 
-  // 高亮：选中节点时，跟它直接相连的边亮、其余暗
+  // 真正点亮的节点：click 锁定优先，没锁定才吃 hover 预览。pan/pinch 中不吃 hover（拖图
+  // 时手指扫过节点不该乱闪），靠 usePanZoom 给的 pointersCount gate。
+  const litNode = activeNode ?? (pointersCount === 0 ? hoverNode : null);
+
+  // 边类型被勾掉了没：勾掉的整类边藏起来（大幅淡化），一眼看清剩下的（如只留废止 + 修改看作废链）。
+  // 图例只列 e.kind 非空的类型，所以空 kind 的边不会有开关、也永远藏不掉，符合预期。
+  const isKindHidden = (kind: string): boolean => hiddenKinds.has(kind);
+
+  // 高亮：点亮/hover 某节点时，跟它直接相连的边亮、其余暗。勾掉的类型永远不算亮。
   const isEdgeLit = (e: GraphEdge): boolean => {
-    if (activeNode === null) return true;
-    return e.source === activeNode || e.target === activeNode;
+    if (isKindHidden(e.kind)) return false;
+    if (litNode === null) return true;
+    return e.source === litNode || e.target === litNode;
   };
+  // 节点亮不亮只看它跟点亮节点的连接，不受边类型勾选影响（节点本身不是边，藏边不藏节点）。
   const isNodeLit = (id: string): boolean => {
-    if (activeNode === null) return true;
-    if (id === activeNode) return true;
+    if (litNode === null) return true;
+    if (id === litNode) return true;
     return edges.some(
       (e) =>
-        (e.source === activeNode && e.target === id) ||
-        (e.target === activeNode && e.source === id),
+        (e.source === litNode && e.target === id) ||
+        (e.target === litNode && e.source === id),
     );
   };
 
@@ -434,6 +450,7 @@ export function RedheadDependencyGraph({
             const b = posById.get(e.target);
             if (!a || !b) return null;
             const st = edgeStyle(e.kind);
+            const hidden = isKindHidden(e.kind);
             const lit = isEdgeLit(e);
             const sel = activeEdge === i;
             const markerId = EDGE_STYLE[e.kind] ? `arrow-${e.kind}` : "arrow-fallback";
@@ -443,17 +460,18 @@ export function RedheadDependencyGraph({
             const dx = b.x - a.x;
             const cx = mx + (Math.abs(dx) < 40 ? 60 : 0); // 同列上下时往右拱一下
             const d = `M ${a.x} ${a.y} Q ${cx} ${my} ${b.x} ${b.y}`;
+            // 勾掉的类型压到几乎看不见（0.05），比"没点亮但没勾掉"的 0.16 更淡，作废链一眼跳出来。
             return (
-              <g key={i} opacity={lit ? 1 : 0.16}>
+              <g key={i} opacity={hidden ? 0.05 : lit ? 1 : 0.16}>
                 <path
                   d={d}
                   fill="none"
                   stroke={st.color}
                   strokeWidth={sel ? 2.6 : 1.6}
                   strokeDasharray={st.dash || undefined}
-                  markerEnd={`url(#${markerId})`}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => setActiveEdge((cur) => (cur === i ? null : i))}
+                  markerEnd={hidden ? undefined : `url(#${markerId})`}
+                  style={{ cursor: hidden ? "default" : "pointer" }}
+                  onClick={hidden ? undefined : () => setActiveEdge((cur) => (cur === i ? null : i))}
                 />
                 {/* 边上的关系标签：一枚小牌摆在中点（依据 / 落实 …） */}
                 {lit && (
@@ -518,6 +536,10 @@ export function RedheadDependencyGraph({
                 onClick={() =>
                   setActiveNode((cur) => (cur === node.id ? null : node.id))
                 }
+                onPointerEnter={() => setHoverNode(node.id)}
+                onPointerLeave={() =>
+                  setHoverNode((cur) => (cur === node.id ? null : cur))
+                }
               >
                 <rect
                   width={w}
@@ -570,35 +592,69 @@ export function RedheadDependencyGraph({
         </svg>
       </div>
 
-      {/* 图例 + 提示 */}
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--color-ink-muted)]">
-        <span>
-          点节点看牵连的关系 · 点边看依据原文
-          {edges.some((e) => e.posture?.label)
-            ? " · 〈…〉是博弈姿态（研判，点边看依据）"
-            : ""}
-        </span>
-        <span className="flex items-center gap-3 flex-wrap">
+      {/* 图例（可勾选筛边）+ 提示 */}
+      <div className="mt-2.5 flex flex-col gap-1.5 text-xs text-[var(--color-ink-muted)]">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <span>
+            划过或点节点看牵连的关系 · 点边看依据原文 · 点下面的边类型可只看某几类
+            {edges.some((e) => e.posture?.label)
+              ? " · 〈…〉是博弈姿态（研判，点边看依据）"
+              : ""}
+          </span>
+        </div>
+        {/* 边类型开关：点一下藏起这类边（大幅淡化），再点回来。典型用途是只留废止 + 修改看作废链。 */}
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
           {usedEdgeKinds(edges).map((k) => {
             const s = edgeStyle(k);
+            const off = hiddenKinds.has(k);
             return (
-              <span key={k} className="inline-flex items-center gap-1">
+              <button
+                key={k}
+                type="button"
+                onClick={() =>
+                  setHiddenKinds((cur) => {
+                    const next = new Set(cur);
+                    if (next.has(k)) next.delete(k);
+                    else next.add(k);
+                    return next;
+                  })
+                }
+                aria-pressed={!off}
+                title={off ? `点亮「${s.label}」这类边` : `藏起「${s.label}」这类边`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border transition-colors"
+                style={{
+                  borderColor: off ? "var(--color-rule)" : s.color,
+                  color: off ? "var(--color-ink-muted)" : s.color,
+                  opacity: off ? 0.5 : 1,
+                }}
+              >
                 <svg width="22" height="8" aria-hidden>
                   <line
                     x1="1"
                     y1="4"
                     x2="21"
                     y2="4"
-                    stroke={s.color}
+                    stroke={off ? "var(--color-rule)" : s.color}
                     strokeWidth="1.6"
                     strokeDasharray={s.dash || undefined}
                   />
                 </svg>
-                {s.label}
-              </span>
+                <span style={off ? { textDecoration: "line-through" } : undefined}>
+                  {s.label}
+                </span>
+              </button>
             );
           })}
-        </span>
+          {hiddenKinds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setHiddenKinds(new Set())}
+              className="text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors underline decoration-dotted"
+            >
+              全部看
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 选中边的明细：note + 来源条款 */}
