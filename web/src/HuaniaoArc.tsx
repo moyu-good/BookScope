@@ -42,6 +42,8 @@ interface FateLineArcProps {
   focusChar: string | null;
   selected: { name: string; chapter: number } | null;
   onSelect: (name: string, chapter: number) => void;
+  // 聚焦单人时点「← 看全部」退回小多图（由 CharacterArc 清 focusChar / selected）
+  onClearFocus?: () => void;
 }
 
 // 单格 mini 命运线的画布尺寸（viewBox 内部坐标，外层用 CSS 自适应宽度）
@@ -83,6 +85,28 @@ function fortuneWord(f: number): string {
   return "处境平";
 }
 
+// 把一条命运线切成"实线段 / 虚线段"。
+// 角色只在部分章活跃是正常的：后端只给出场章的点，presence=0 的点是模型明说的"这章隐没/一笔带过"。
+// 规则：相邻两点里只要有一头 presence=0，这一段就当"离场期"画虚线跨过去；两头都在场（presence>0）画实线。
+// 这样残缺跨度读起来是"离场又回来"，不是线莫名断了。返回一串 { d, dashed }，每段各画一条 path。
+//
+// 只认 presence=0 这个模型明说的离场信号，不拿"两点章号跳得大"猜离场——点本就是稀疏采样的
+// （模型宁可少而准、每人最多约 40 点），章号密度又各书不同，按章距硬猜会把正常稀疏当成离场
+// （凭空造一个原文没有的"离场"，破 evidence-first）。登场/退场两端已标清"活跃于第 X–Y 章"。
+function splitFateSegments(
+  linePts: [number, number][],
+  pts: ArcPoint[],
+): { d: string; dashed: boolean }[] {
+  if (linePts.length < 2) return [];
+  const segs: { d: string; dashed: boolean }[] = [];
+  for (let i = 0; i < linePts.length - 1; i++) {
+    const dashed = pts[i].presence === 0 || pts[i + 1].presence === 0;
+    // 单段就两点，直接连直线（smoothLine 两点即直线），dash 样式再叠上去
+    segs.push({ d: smoothLine([linePts[i], linePts[i + 1]]), dashed });
+  }
+  return segs;
+}
+
 // 单格：一个角色的 mini 命运线
 function FateCell({
   c,
@@ -116,9 +140,16 @@ function FateCell({
   };
 
   const linePts = pts.map((p) => [xAt(p.chapter), yAt(p.fortune)] as [number, number]);
-  const d = smoothLine(linePts);
   const zeroY = yAt(0);
+  // hooks 一律在任何 return 之前无条件调用（SubplotWeave 踩过 hooks-after-return 白屏）
   const turns = useMemo(() => findTurns(pts), [pts]);
+  // 命运线切段：在场段实线、离场期虚线（分段各画一条 path，见 splitFateSegments）。
+  // 依赖钉在稳定输入（pts + 横轴范围）上，不钉每次新建的 linePts 数组，免得白 memo。
+  const segments = useMemo(
+    () => splitFateSegments(pts.map((p) => [xAt(p.chapter), yAt(p.fortune)] as [number, number]), pts),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pts, globalMin, globalSpan],
+  );
 
   // 描画动画：给足够长的 dash 让整条线"抽"出来。长度取包围盒对角线的粗估，够用。
   const pathLen = Math.max(PLOT_W, 1) * 1.6;
@@ -183,21 +214,37 @@ function FateCell({
           opacity={0.6}
         />
 
-        {/* 命运线本体：纯 CSS 描画（dash 从满到零，一次性；默认完全可见靠 forwards 收尾） */}
-        {linePts.length >= 2 && (
-          <path
-            d={d}
-            fill="none"
-            stroke={color}
-            strokeWidth={vizTokens.strokeWidth.base}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{
-              strokeDasharray: pathLen,
-              strokeDashoffset: pathLen,
-              animation: `fate-draw 900ms ${vizTokens.motion.easing} ${delayMs}ms forwards`,
-            }}
-          />
+        {/* 命运线本体：分段画。
+            · 在场段（两头都在）= 实线，纯 CSS 描画（dash 从满到零，一次性，forwards 收尾默认全可见）。
+            · 离场期段（有一头 presence=0）= 淡虚线跨过去，读成"这人这段离场了"，不是线断了。 */}
+        {segments.map((seg, si) =>
+          seg.dashed ? (
+            <path
+              key={`seg-${c.name}-${si}`}
+              d={seg.d}
+              fill="none"
+              stroke={color}
+              strokeWidth={vizTokens.strokeWidth.hairline}
+              strokeLinecap="round"
+              strokeDasharray="3 4"
+              opacity={0.4}
+            />
+          ) : (
+            <path
+              key={`seg-${c.name}-${si}`}
+              d={seg.d}
+              fill="none"
+              stroke={color}
+              strokeWidth={vizTokens.strokeWidth.base}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                strokeDasharray: pathLen,
+                strokeDashoffset: pathLen,
+                animation: `fate-draw 900ms ${vizTokens.motion.easing} ${delayMs}ms forwards`,
+              }}
+            />
+          ),
         )}
         {/* 单点角色兜底：只有一章时画不出线，落一个点 */}
         {linePts.length === 1 && (
@@ -245,6 +292,53 @@ function FateCell({
             </g>
           );
         })}
+
+        {/* 登场 / 退场端点：角色只活跃在第 first–last 章，两端画清楚是"入场 / 退场"，
+            读成"这人活跃于第 X–Y 章"，不是线断了。空心小环 + 入/退小字（只在多于一点时分标）。 */}
+        {first && (
+          <g style={{ animation: `fate-fade 500ms ease-out ${delayMs + 600}ms both` }}>
+            <circle
+              cx={xAt(first.chapter)}
+              cy={yAt(first.fortune)}
+              r={3.6}
+              fill="var(--color-paper)"
+              stroke={color}
+              strokeWidth={1.4}
+            />
+            <text
+              x={xAt(first.chapter)}
+              y={yAt(first.fortune) + 13}
+              textAnchor="middle"
+              fontSize={vizTokens.fontSize.footnote}
+              fill="var(--color-ink-muted)"
+              style={{ fontFamily: vizTokens.fontFamily.display, pointerEvents: "none" }}
+            >
+              入
+            </text>
+          </g>
+        )}
+        {last && last.chapter !== first?.chapter && (
+          <g style={{ animation: `fate-fade 500ms ease-out ${delayMs + 600}ms both` }}>
+            <circle
+              cx={xAt(last.chapter)}
+              cy={yAt(last.fortune)}
+              r={3.6}
+              fill="var(--color-paper)"
+              stroke={color}
+              strokeWidth={1.4}
+            />
+            <text
+              x={xAt(last.chapter)}
+              y={yAt(last.fortune) + 13}
+              textAnchor="middle"
+              fontSize={vizTokens.fontSize.footnote}
+              fill="var(--color-ink-muted)"
+              style={{ fontFamily: vizTokens.fontFamily.display, pointerEvents: "none" }}
+            >
+              退
+            </text>
+          </g>
+        )}
 
         {/* 首尾章号刻度（只标两端，格子小不堆） */}
         {first && (
@@ -308,6 +402,7 @@ export function FateLineArc({
   focusChar,
   selected,
   onSelect,
+  onClearFocus,
 }: FateLineArcProps) {
   const [hover, setHover] = useState<{ name: string; chapter: number } | null>(null);
 
@@ -342,31 +437,61 @@ export function FateLineArc({
         @keyframes fate-fade { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
 
-      {/* 小多图网格：聚焦时单列大格，看全部时一排多格。窄屏自动落成单列。 */}
-      <div
-        className="grid gap-3"
-        style={{
-          gridTemplateColumns: focusChar
-            ? "1fr"
-            : "repeat(auto-fill, minmax(220px, 1fr))",
-        }}
-      >
-        {shown.map((c, i) => (
-          <FateCell
-            key={c.name}
-            c={c}
-            color={charColor.get(c.name) ?? "var(--color-ink)"}
-            uid={i}
-            globalMin={globalMin}
-            globalSpan={globalSpan}
-            selected={selected}
-            hover={hover}
-            onSelect={onSelect}
-            setHover={setHover}
-            delayMs={Math.min(i, 8) * 90}
-          />
-        ))}
-      </div>
+      {/* 聚焦单人时给一个明显的「← 看全部」，退回小多图 */}
+      {focusChar && onClearFocus && (
+        <button
+          type="button"
+          onClick={onClearFocus}
+          className="mb-2 inline-flex items-center gap-1 text-sm text-[var(--color-seal)] hover:opacity-80 transition-opacity"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          <span aria-hidden>←</span> 看全部
+        </button>
+      )}
+
+      {focusChar ? (
+        // 聚焦单人：一格居中、适中尺寸（≈640×324，跟 viewBox 260:132 同比），不撑满一屏。
+        // 从小多图切过来只是这一格放大到适中，不突然铺满，过渡舒服。
+        <div className="mx-auto w-full" style={{ maxWidth: 640 }}>
+          {shown.map((c, i) => (
+            <FateCell
+              key={c.name}
+              c={c}
+              color={charColor.get(c.name) ?? "var(--color-ink)"}
+              uid={i}
+              globalMin={globalMin}
+              globalSpan={globalSpan}
+              selected={selected}
+              hover={hover}
+              onSelect={onSelect}
+              setHover={setHover}
+              delayMs={0}
+            />
+          ))}
+        </div>
+      ) : (
+        // 看全部：一排多格小多图，窄屏自动落单列。
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
+        >
+          {shown.map((c, i) => (
+            <FateCell
+              key={c.name}
+              c={c}
+              color={charColor.get(c.name) ?? "var(--color-ink)"}
+              uid={i}
+              globalMin={globalMin}
+              globalSpan={globalSpan}
+              selected={selected}
+              hover={hover}
+              onSelect={onSelect}
+              setHover={setHover}
+              delayMs={Math.min(i, 8) * 90}
+            />
+          ))}
+        </div>
+      )}
 
       {characters.length > shown.length && !focusChar && (
         <p className="mt-2 text-xs text-[var(--color-ink-muted)]">
@@ -374,7 +499,7 @@ export function FateLineArc({
         </p>
       )}
       <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-        朱砂点是命运转折的章（旁标章号）；线只画相对起落、不标精确刻度（模型判读，抖）；点转折看那章原文。
+        朱砂点是命运转折的章（旁标章号）；两端「入 / 退」是这人登场 / 退场的章（活跃于这一段）；虚线是离场期跨过去；线只画相对起落、不标精确刻度（模型判读，抖）；点任一点看那章原文。
       </p>
     </div>
   );

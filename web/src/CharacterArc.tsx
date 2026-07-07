@@ -165,11 +165,14 @@ export function CharacterArc({
     );
   }
 
-  const sel = selected
-    ? characters
-        .find((c) => c.name === selected.name)
-        ?.points.find((p) => p.chapter === selected.chapter)
+  // 要展开档案的角色：优先点中的那个点所属角色，其次聚焦的那个角色。
+  // 这样点一个转折 → 出这个人的整份命运档案（不只那一句），聚焦一个人也直接出档案。
+  const profileName = selected?.name ?? focusChar;
+  const profileChar = profileName
+    ? characters.find((c) => c.name === profileName) ?? null
     : null;
+  // 档案里列出这个人所有点，按章序；有原文的正常列，没原文的标"待核"（不编）。
+  const profilePoints = profileChar ? profileChar.points : [];
 
   return (
     <div className="pt-4">
@@ -288,26 +291,72 @@ export function CharacterArc({
         focusChar={focusChar}
         selected={selected}
         onSelect={(name, chapter) => setSelected({ name, chapter })}
+        onClearFocus={() => {
+          setFocusChar(null);
+          setSelected(null);
+        }}
       />
 
-      {sel && selected && (
-        <div className="mt-3 p-3 rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)]">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-bold text-[var(--color-ink)]">
-              「{selected.name}」· 第 {sel.chapter} 章 · {fortuneWord(sel.fortune)}
-              <span className="font-normal text-[var(--color-ink-muted)]">（这章处境，模型判读）</span>
+      {/* 人物命运档案：点一个转折 / 聚焦一个人，就在这里铺开这个人的多个命运时刻——
+          每个点一条（原文 + 钤印核验），按章序，像一份小人物志（接 CBDB 人物志的厚度），
+          不是只显最后点那一句。没原文的标"待核"，不编。 */}
+      {profileChar && profilePoints.length > 0 && (
+        <div className="mt-3 rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] overflow-hidden">
+          {/* 档案抬头：谁 · 活跃于第 X–Y 章 · 共几个命运时刻 · 核验计数 */}
+          <div className="px-3 py-2.5 border-b border-[var(--color-rule)] bg-[var(--color-paper)]">
+            <p
+              className="text-sm font-bold text-[var(--color-ink)]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              「{profileChar.name}」命运档案
             </p>
-            {sel.verified && sel.evidence ? (
-              <SealMark size={22} title="原文已核验" />
-            ) : null}
+            <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
+              活跃于第 {profilePoints[0].chapter}–{profilePoints[profilePoints.length - 1].chapter} 章
+              {" · "}
+              {profilePoints.length} 个命运时刻
+              {(() => {
+                const ok = profilePoints.filter((p) => p.verified && p.evidence).length;
+                return ok > 0 ? ` · ${ok} 处原文已核验` : "";
+              })()}
+            </p>
           </div>
-          <p className="mt-1 text-sm text-[var(--color-ink)] leading-relaxed">
-            {sel.evidence || "（这章没给出原文依据）"}
-          </p>
-          <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-            {sel.verified && sel.evidence
-              ? "上面这段原文已在书中比对核验，盖印为证"
-              : "原文未在书中比对命中，这点仅供参考（待核）"}
+
+          {/* 逐个命运时刻：章号 + 处境一句 + 原文 + 钤印/待核。点中的那个高亮。 */}
+          <ul className="max-h-96 overflow-y-auto divide-y divide-[var(--color-rule)]">
+            {profilePoints.map((p) => {
+              const active = selected?.name === profileChar.name && selected.chapter === p.chapter;
+              const verified = p.verified && !!p.evidence;
+              return (
+                <li
+                  key={`prof-${p.chapter}`}
+                  className="px-3 py-2.5"
+                  style={active ? { background: "var(--color-seal-soft)" } : undefined}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm text-[var(--color-ink)]">
+                      <span className="font-bold" style={{ fontFamily: "var(--font-display)" }}>
+                        第 {p.chapter} 章
+                      </span>
+                      <span className="text-[var(--color-ink-muted)]"> · {fortuneWord(p.fortune)}</span>
+                    </p>
+                    {verified ? (
+                      <SealMark size={20} title="原文已核验" />
+                    ) : (
+                      <span className="shrink-0 text-xs text-[var(--color-ink-muted)] px-1.5 py-0.5 rounded border border-[var(--color-rule)]">
+                        待核
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-[var(--color-ink)] leading-relaxed">
+                    {p.evidence || "（这章没给出原文依据）"}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+
+          <p className="px-3 py-2 text-xs text-[var(--color-ink-muted)] border-t border-[var(--color-rule)]">
+            盖「鉴」印的原文已在书中逐字比对核验；标「待核」的没在书里比对命中，仅供参考。
           </p>
         </div>
       )}
