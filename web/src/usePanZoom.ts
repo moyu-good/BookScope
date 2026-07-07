@@ -99,22 +99,33 @@ export function usePanZoom(
     });
   }, [minK, maxK]);
 
-  // 滚轮缩放（桌面）：朝光标缩。
-  // ⚠ 必须用**原生非 passive** 监听:React 合成 onWheel 默认 passive,里面 e.preventDefault() 被浏览器
-  // 忽略,于是缩放图时页面也跟着滚(作者反馈"上下滚轮两边都动、难操作")。addEventListener(passive:false)
-  // 才拦得住页面滚动。
+  // 滚轮缩放:必须原生非 passive 才能 preventDefault 拦住页面滚动(React 合成 onWheel 默认 passive、
+  // preventDefault 被忽略 → 缩放图时页面跟着滚)。但不能只在 mount 挂一次——很多图是"空态(无 SVG)
+  // → 生成后才出 SVG",mount 时 svgRef.current 还是 null,只挂一次会永远漏掉、滚轮就死了(作者反馈)。
+  // 所以:handler 存 ref 取最新闭包 + 一个无依赖 effect 每次 render 后检查,svg 元素变了就重挂监听。
+  const wheelHandlerRef = useRef<(e: WheelEvent) => void>(() => {});
+  wheelHandlerRef.current = (e: WheelEvent) => {
+    e.preventDefault(); // 只缩放图、不带动页面
+    const { x: cx, y: cy } = toSvg(e.clientX, e.clientY);
+    zoomAt(cx, cy, Math.exp(-e.deltaY * 0.0015)); // 上滚放大、下滚缩小,指数让手感均匀
+  };
+  // 稳定的分发函数(只建一次),add/remove 用同一个引用才配得上对
+  const wheelDispatchRef = useRef((e: WheelEvent) => wheelHandlerRef.current(e));
+  const wheelElRef = useRef<SVGSVGElement | null>(null);
   useEffect(() => {
+    // 无依赖数组:每次 render 后跑,才能捕捉到 svgRef.current 从 null→SVG(空态→生成)或元素重挂。
     const svg = svgRef.current;
-    if (!svg) return;
-    const handler = (e: WheelEvent) => {
-      e.preventDefault(); // 只缩放图、不带动页面
-      const { x: cx, y: cy } = toSvg(e.clientX, e.clientY);
-      const factor = Math.exp(-e.deltaY * 0.0015); // 上滚放大、下滚缩小,指数让手感均匀
-      zoomAt(cx, cy, factor);
-    };
-    svg.addEventListener("wheel", handler, { passive: false });
-    return () => svg.removeEventListener("wheel", handler);
-  }, [svgRef, toSvg, zoomAt]);
+    if (svg === wheelElRef.current) return; // 元素没变,不重复挂
+    wheelElRef.current?.removeEventListener("wheel", wheelDispatchRef.current);
+    wheelElRef.current = svg;
+    svg?.addEventListener("wheel", wheelDispatchRef.current, { passive: false });
+  });
+  useEffect(
+    () => () => {
+      wheelElRef.current?.removeEventListener("wheel", wheelDispatchRef.current);
+    },
+    [],
+  );
 
   // 给调用方 onWheel 属性留个 no-op:缩放已走上面的原生监听,这里再缩一次就成双重缩放了。
   const onWheel = useCallback((_e: React.WheelEvent) => {}, []);

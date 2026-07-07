@@ -599,9 +599,16 @@ export function CharacterGraph({
       // 只对人物图开放:概念节点讲的不是人,广播没意义。
       const dn = downRef.current;
       if (dn && !dn.moved && dn.name === name && unit === "person") {
-        setFocus({ kind: "person", id: dn.name, label: dn.name, bookSessionId: sessionId });
+        // 再点同一个人 = 取消选中(作者反馈"点了怎么都取消不了");点别人 = 选中并广播到联动总线。
+        // 不强制切视图(强制跳走太霸道,用户可能只想选一下)。
+        const already = focus?.kind === "person" && focus.id === dn.name;
+        setFocus(
+          already
+            ? null
+            : { kind: "person", id: dn.name, label: dn.name, bookSessionId: sessionId },
+        );
         // 过渡期:App 若还传着 onSelectPerson 就一并调,两边都不炸;主 Claude 之后会停传它。
-        onSelectPerson?.(dn.name);
+        if (!already) onSelectPerson?.(dn.name);
       }
       downRef.current = null;
       dragRef.current = null;
