@@ -15,6 +15,13 @@ import { SealMark } from "./SealMark";
 import { FeatureEntryCard } from "./FeatureEntryCard";
 import { SealButton } from "./SealButton";
 
+// 缩放区间：0.6 缩到能一屏看完几十上百条的全局，2.0 放大到看清单条局部。
+const ZOOM_MIN = 0.6;
+const ZOOM_MAX = 2;
+const ZOOM_STEP = 0.2;
+const clampZoom = (z: number) =>
+  Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 100) / 100;
+
 interface TimelineEvent {
   order: number;
   time: string;
@@ -98,6 +105,9 @@ export function Timeline({
   const [error, setError] = useState<string | null>(null);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [trace, setTrace] = useState<RunTrace | null>(null);
+  // 缩放倍率：长时间线缩小看全局、放大看局部。用 CSS transform: scale 作用在轴内容上，
+  // 外层套一个可滚动 wrapper（放大后内容变高就滚动看）。这里只是个纯数字 state。
+  const [zoom, setZoom] = useState(1);
 
   const placed = useMemo(() => (events ? placeEvents(events) : []), [events]);
   const dislocationCount = useMemo(
@@ -176,13 +186,20 @@ export function Timeline({
         >
           时间线
         </h3>
-        <SealButton
-          size="sm"
-          label="重新梳理"
-          loadingLabel="梳理中…"
-          loading={loading}
-          onClick={load}
-        />
+        <div className="flex items-center gap-2">
+          <ZoomControls
+            zoom={zoom}
+            onChange={(z) => setZoom(clampZoom(z))}
+            onReset={() => setZoom(1)}
+          />
+          <SealButton
+            size="sm"
+            label="重新梳理"
+            loadingLabel="梳理中…"
+            loading={loading}
+            onClick={load}
+          />
+        </div>
       </div>
       <p className="text-sm text-[var(--color-ink-muted)] mb-2">
         按故事真实先后排在一条主轴上；时期一变就拉开留白，看得出事件的疏密。
@@ -200,49 +217,61 @@ export function Timeline({
       {loading && <RunningProcess label="按时序梳理时间线" />}
 
       {events && (
+        // 可滚动 wrapper：给一个高度上限，放大后内容超出这层就在框里滚动看，
+        // 缩小后内容变矮不滚。缩放只改里面内容的视觉尺寸，这个"框"本身不缩。
         <div
-          className="rounded-md overflow-hidden"
-          style={{
-            background: "var(--color-paper-raised)",
-            border: "1px solid var(--color-folio-edge)",
-          }}
+          className="tl-scroll"
+          style={{ overflow: "auto", maxHeight: "min(72vh, 720px)" }}
         >
-          {/* 手卷上轴杆 */}
-          <div style={{ height: 7, background: "var(--color-ink)", opacity: 0.5 }} aria-hidden />
+          <div
+            className="rounded-md overflow-hidden"
+            style={{
+              background: "var(--color-paper-raised)",
+              border: "1px solid var(--color-folio-edge)",
+              // 缩放本体：锚在左上角，放大时顶边和左侧（时期刻度那列）都稳住不被裁掉，
+              // 内容朝右下方长出去，超出就靠外层 wrapper 滚动看。
+              transform: `scale(${zoom})`,
+              transformOrigin: "top left",
+              transition: "transform .18s ease",
+            }}
+          >
+            {/* 手卷上轴杆 */}
+            <div style={{ height: 7, background: "var(--color-ink)", opacity: 0.5 }} aria-hidden />
 
-          {/* 时间轴：一条竖主轴，事件按故事序自上而下；倒叙 / 预叙的事件从轴上错开标出来 */}
-          <div className="relative py-4 pr-3" style={{ paddingLeft: 92 }}>
-            <style>{TIMELINE_CSS}</style>
+            {/* 时间轴：一条竖主轴，事件按故事序自上而下；倒叙 / 预叙的事件从轴上错开标出来 */}
+            <div className="relative py-4 pr-3" style={{ paddingLeft: 92 }}>
+              <style>{TIMELINE_CSS}</style>
 
-            {/* 主轴竖线（朱砂淡），压在时期刻度与事件之间 */}
-            <div
-              className="absolute top-4 bottom-4"
-              style={{
-                left: 84,
-                width: 2,
-                background:
-                  "linear-gradient(var(--color-seal) 0%, color-mix(in srgb, var(--color-seal) 35%, transparent) 100%)",
-              }}
-              aria-hidden
-            />
+              {/* 主轴竖线（朱砂淡），压在时期刻度与事件之间 */}
+              <div
+                className="absolute top-4 bottom-4"
+                style={{
+                  left: 84,
+                  width: 2,
+                  background:
+                    "linear-gradient(var(--color-seal) 0%, color-mix(in srgb, var(--color-seal) 35%, transparent) 100%)",
+                }}
+                aria-hidden
+              />
 
-            <ol className="relative m-0 p-0 list-none tl-unroll">
-              {placed.map((p, i) => (
-                <TimelineRow
-                  key={p.idx}
-                  placed={p}
-                  animIndex={i}
-                  open={openIdx === p.idx}
-                  onToggle={() =>
-                    setOpenIdx(openIdx === p.idx ? null : p.idx)
-                  }
-                />
-              ))}
-            </ol>
+              <ol className="relative m-0 p-0 list-none tl-unroll">
+                {placed.map((p, i) => (
+                  <TimelineRow
+                    key={p.idx}
+                    placed={p}
+                    animIndex={i}
+                    open={openIdx === p.idx}
+                    onToggle={() =>
+                      setOpenIdx(openIdx === p.idx ? null : p.idx)
+                    }
+                  />
+                ))}
+              </ol>
+            </div>
+
+            {/* 手卷下轴杆 */}
+            <div style={{ height: 7, background: "var(--color-ink)", opacity: 0.5 }} aria-hidden />
           </div>
-
-          {/* 手卷下轴杆 */}
-          <div style={{ height: 7, background: "var(--color-ink)", opacity: 0.5 }} aria-hidden />
         </div>
       )}
 
@@ -256,6 +285,59 @@ export function Timeline({
           }
         />
       )}
+    </div>
+  );
+}
+
+// 缩放控件：一对克制的 − / + 加一个重置。数字善本风——细朱砂描边、小号、不喧宾夺主。
+function ZoomControls({
+  zoom,
+  onChange,
+  onReset,
+}: {
+  zoom: number;
+  onChange: (z: number) => void;
+  onReset: () => void;
+}) {
+  const atMin = zoom <= ZOOM_MIN + 0.001;
+  const atMax = zoom >= ZOOM_MAX - 0.001;
+  const atDefault = Math.abs(zoom - 1) < 0.001;
+  return (
+    <div
+      className="inline-flex items-center rounded-sm overflow-hidden tl-zoom"
+      style={{ border: "1px solid var(--color-folio-edge)" }}
+    >
+      <button
+        type="button"
+        className="tl-zoom-btn"
+        onClick={() => onChange(zoom - ZOOM_STEP)}
+        disabled={atMin}
+        aria-label="缩小"
+        title="缩小，看全局"
+      >
+        −
+      </button>
+      {/* 中间显示当前倍率，点一下回到 100%（等于重置） */}
+      <button
+        type="button"
+        className="tl-zoom-pct"
+        onClick={onReset}
+        disabled={atDefault}
+        aria-label="重置缩放"
+        title="重置到 100%"
+      >
+        {Math.round(zoom * 100)}%
+      </button>
+      <button
+        type="button"
+        className="tl-zoom-btn"
+        onClick={() => onChange(zoom + ZOOM_STEP)}
+        disabled={atMax}
+        aria-label="放大"
+        title="放大，看局部"
+      >
+        +
+      </button>
     </div>
   );
 }
@@ -330,8 +412,9 @@ function TimelineRow({
         </div>
       )}
 
-      {/* 轴上的节点：顺叙实心小圆点；倒叙实心大点；插叙空心菱形 */}
-      <TimelineNode dislocation={dislocation} />
+      {/* 轴上的节点：顺叙实心小圆点；倒叙实心大点；插叙空心菱形。
+          倒叙 / 插叙的节点 hover 出一个说明浮层，讲清这个记号的意思。 */}
+      <TimelineNode dislocation={dislocation} gapChapters={gapChapters} />
 
       {/* 错位事件的斜引线：从轴上节点连到错开的卡片，视觉上"拉出去" */}
       {isDislocated && (
@@ -400,8 +483,26 @@ function TimelineRow({
           ) : (
             <span className="opacity-60">待核</span>
           )}
-          <span className="ml-auto opacity-60">
+          {/* 展开提示：文字 + 会转的小箭头，明确"点这行能展开原文"，hover 时更亮 */}
+          <span className="tl-afford ml-auto inline-flex items-center gap-1">
             {open ? "收起原文" : "看原文"}
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              className="tl-chevron"
+              style={{ transform: open ? "rotate(180deg)" : "none" }}
+              aria-hidden
+            >
+              <path
+                d="M2 3.5 L5 6.5 L8 3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </span>
         </div>
       </button>
@@ -422,45 +523,62 @@ function TimelineRow({
 }
 
 // 轴上节点：三种形态对应顺叙 / 倒叙 / 插叙，光看节点就分得出脱序类型。
+// 倒叙 / 插叙的节点包一层 .tl-node-wrap，hover 出说明浮层（纯 CSS，不用 JS）。
 function TimelineNode({
   dislocation,
+  gapChapters,
 }: {
   dislocation: PlacedEvent["dislocation"];
+  gapChapters: number;
 }) {
   if (dislocation === "flashback") {
     // 倒叙：实心大朱砂点，最跳眼
     return (
-      <span
-        className="absolute rounded-full"
-        style={{
-          left: -8,
-          top: 3,
-          width: 13,
-          height: 13,
-          background: "var(--color-seal)",
-          boxShadow: "0 0 0 3px var(--color-paper-raised)",
-        }}
-        aria-hidden
-      />
+      <span className="tl-node-wrap absolute" style={{ left: -8, top: 3 }}>
+        <span
+          className="block rounded-full"
+          style={{
+            width: 13,
+            height: 13,
+            background: "var(--color-seal)",
+            boxShadow: "0 0 0 3px var(--color-paper-raised)",
+          }}
+        />
+        <NodeTip
+          label="倒叙"
+          desc={
+            gapChapters > 0
+              ? `故事上早发生，隔了 ${gapChapters} 章后面才讲。`
+              : "故事上早发生，后面章节才讲。"
+          }
+        />
+      </span>
     );
   }
   if (dislocation === "foreshadow") {
     // 插叙 / 预叙：空心菱形，跟倒叙区分开
     return (
-      <span
-        className="absolute"
-        style={{
-          left: -7,
-          top: 3,
-          width: 11,
-          height: 11,
-          border: "2px solid var(--color-seal)",
-          background: "var(--color-paper-raised)",
-          transform: "rotate(45deg)",
-          boxShadow: "0 0 0 2px var(--color-paper-raised)",
-        }}
-        aria-hidden
-      />
+      <span className="tl-node-wrap absolute" style={{ left: -7, top: 3 }}>
+        <span
+          className="block"
+          style={{
+            width: 11,
+            height: 11,
+            border: "2px solid var(--color-seal)",
+            background: "var(--color-paper-raised)",
+            transform: "rotate(45deg)",
+            boxShadow: "0 0 0 2px var(--color-paper-raised)",
+          }}
+        />
+        <NodeTip
+          label="插叙 / 预叙"
+          desc={
+            gapChapters > 0
+              ? `故事上后发生，却提前 ${gapChapters} 章先讲了。`
+              : "故事上后发生，却提前讲了。"
+          }
+        />
+      </span>
     );
   }
   // 顺叙：小实心点，贴着主轴
@@ -480,6 +598,21 @@ function TimelineNode({
   );
 }
 
+// 节点 hover 浮层：解释这个记号是倒叙还是插叙、错开了几章。默认藏起，父节点 hover 才浮出。
+function NodeTip({ label, desc }: { label: string; desc: string }) {
+  return (
+    <span className="tl-node-tip" role="tooltip">
+      <span
+        className="font-medium"
+        style={{ color: "var(--color-seal)", fontFamily: "var(--font-display)" }}
+      >
+        {label}
+      </span>
+      <span className="tl-node-tip-desc">{desc}</span>
+    </span>
+  );
+}
+
 // 入场动画全走 CSS：整卷从上展开一次 + 每行按 --tl-delay 依次浮入。
 // headless 预览把 rAF 节流，所以显示不依赖 JS 动画帧——纯 CSS keyframes。
 const TIMELINE_CSS = `
@@ -493,7 +626,49 @@ const TIMELINE_CSS = `
 .tl-card-off:hover { border-color: var(--color-seal); }
 @keyframes tl-quotein { from { opacity: 0; } to { opacity: 1; } }
 .tl-quote { animation: tl-quotein .25s ease-out both; }
+/* 展开提示：默认淡，整行 hover 时变朱砂、箭头微动，读者一眼知道能点开 */
+.tl-afford { color: var(--color-ink-muted); opacity: .6; transition: color .15s ease, opacity .15s ease; }
+.tl-card:hover .tl-afford, .tl-card-off:hover .tl-afford,
+button:hover > * .tl-afford, button:focus-visible .tl-afford { color: var(--color-seal); opacity: 1; }
+.tl-chevron { transition: transform .18s ease; }
+/* 节点 hover 浮层：默认藏起，鼠标移到倒叙 / 插叙节点上才浮出 */
+.tl-node-wrap { cursor: help; }
+.tl-node-tip {
+  position: absolute; left: 18px; top: -4px; z-index: 20;
+  display: flex; flex-direction: column; gap: 2px;
+  width: max-content; max-width: 220px;
+  padding: 6px 9px; border-radius: 4px;
+  background: var(--color-paper-raised);
+  border: 1px solid color-mix(in srgb, var(--color-seal) 40%, transparent);
+  box-shadow: 0 2px 10px rgba(0,0,0,.12);
+  font-size: .75rem; line-height: 1.35;
+  opacity: 0; visibility: hidden; transform: translateY(2px);
+  transition: opacity .15s ease, transform .15s ease, visibility .15s;
+  pointer-events: none;
+}
+.tl-node-wrap:hover .tl-node-tip, .tl-node-wrap:focus-within .tl-node-tip {
+  opacity: 1; visibility: visible; transform: none;
+}
+.tl-node-tip-desc { color: var(--color-ink-muted); }
+/* 缩放控件：细描边小按钮，朱砂 hover，禁用时变淡 */
+.tl-zoom-btn, .tl-zoom-pct {
+  background: var(--color-paper-raised); color: var(--color-ink-muted);
+  border: none; cursor: pointer; user-select: none;
+  transition: background .12s ease, color .12s ease;
+  font-family: var(--font-display);
+}
+.tl-zoom-btn { width: 26px; height: 24px; font-size: 15px; line-height: 1; }
+.tl-zoom-pct {
+  min-width: 42px; height: 24px; font-size: 11px;
+  border-left: 1px solid var(--color-folio-edge);
+  border-right: 1px solid var(--color-folio-edge);
+}
+.tl-zoom-btn:hover:not(:disabled), .tl-zoom-pct:hover:not(:disabled) {
+  background: var(--color-paper-sunken); color: var(--color-seal);
+}
+.tl-zoom-btn:disabled, .tl-zoom-pct:disabled { opacity: .35; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .tl-unroll, .tl-row, .tl-quote { animation: none; }
+  .tl-chevron, .tl-node-tip { transition: none; }
 }
 `;
