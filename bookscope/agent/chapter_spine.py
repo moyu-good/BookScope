@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from bookscope.agent._internal.exhaustive import (
@@ -331,9 +332,8 @@ def build_chapter_spine(
     if genre == "theory":
         dims.append(("concept", _INSTR_CONCEPT))
 
-    dim_lists: list[list[dict[str, Any]]] = []
-    for dim, instruction in dims:
-        # char/plot 重维收窄章闸 + 开续抽;concept 轻维走全局默认、不续抽。
+    # 抽一个维度(char/plot 重维收窄章闸 + 开续抽;concept 轻维走全局默认、不续抽)。
+    def _run_dim(dim: str, instruction: str) -> list[dict[str, Any]]:
         heavy = dim != "concept"
         dim_max_chapters = _SPINE_HEAVY_DIM_MAX_CHAPTERS if heavy else DEFAULT_MAX_CHAPTERS
         continue_fn = (
@@ -348,7 +348,7 @@ def build_chapter_spine(
             if heavy
             else None
         )
-        recs = mapreduce_per_chapter(
+        return mapreduce_per_chapter(
             chunks=chunks,
             instruction=instruction,
             user_msg=_USER_MSG,
@@ -363,7 +363,13 @@ def build_chapter_spine(
             continue_fn=continue_fn,
             sweep_missing_chapters=True,  # 1.5.2 兜底:缺章单章重抽,堵住所有截断丢章
         )
-        dim_lists.append(recs)
+
+    # 各维互不依赖、输入相同 → 并行跑,别再"一维扫完全本才轮下一维"(冷启动墙钟约减半:
+    # 原来 char 40 段跑完才开 plot 40 段,现在两维一起进池)。维内仍各自 map-reduce 并发;
+    # 并发底座已线程安全(维内本就多线程跑同一 client、_UsageRecorder 加锁、SQLite 每调用新 conn)。
+    # pool.map 按 dims 顺序收集结果,不影响 _merge_dimensions 的跨维 union。
+    with ThreadPoolExecutor(max_workers=len(dims)) as pool:
+        dim_lists = list(pool.map(lambda d: _run_dim(d[0], d[1]), dims))
 
     return _merge_dimensions(dim_lists)
 
