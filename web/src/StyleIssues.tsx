@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface Issue {
   type: string;
@@ -88,20 +90,39 @@ export function StyleIssues({
       }))
     : [];
 
+  // 空态（还没扫）：统一入口卡（视觉表现根治 · FeatureEntryCard）
+  if (!issues) {
+    return (
+      <FeatureEntryCard
+        title="文体体检"
+        lead="扫用词重复 / 视角越界 / 支线失踪，保守只报清楚的，每条钉原文，编的会被滤掉。"
+        actionLabel="扫文体毛病"
+        loadingLabel="扫全书中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书体检文体，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
+        {loading && <RunningProcess label="扫全书文体毛病" />}
+      </FeatureEntryCard>
+    );
+  }
+
   return (
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed pr-4">
           扫用词重复 / 视角越界 / 支线失踪，保守只报清楚的，每条钉原文，编的会被滤掉。
         </p>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新扫"
+          loadingLabel="扫全书中…"
+          loading={loading}
           onClick={load}
-          disabled={loading || !apiKey}
-          className="shrink-0 text-xs px-3 py-1.5 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "扫全书中（约 1 分钟）…" : issues ? "重新扫" : "扫文体毛病"}
-        </button>
+          className="shrink-0"
+        />
       </div>
 
       {error && (

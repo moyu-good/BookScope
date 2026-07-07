@@ -9,6 +9,8 @@
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface Side {
   snippet: string;
@@ -85,6 +87,25 @@ export function ConsistencyScan({
     }
   }
 
+  // 空态（还没扫）：统一入口卡（视觉表现根治 · FeatureEntryCard）
+  if (!result) {
+    return (
+      <FeatureEntryCard
+        title="设定一致性扫描"
+        lead="扫全书找设定/人物前后矛盾（如第 5 章左撇子、第 80 章用右手）。每条两处对照原文，编的矛盾会被滤掉。"
+        actionLabel="扫全书找矛盾"
+        loadingLabel="扫全书中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书找矛盾，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
+        {loading && <RunningProcess label="扫全书找设定矛盾" />}
+      </FeatureEntryCard>
+    );
+  }
+
   return (
     <div className="pt-4">
       <div className="flex items-center justify-between mb-1">
@@ -94,18 +115,13 @@ export function ConsistencyScan({
         >
           设定一致性扫描
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新扫"
+          loadingLabel="扫全书中…"
+          loading={loading}
           onClick={load}
-          disabled={loading || !apiKey}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading
-            ? "扫全书中（约 1 分钟）…"
-            : result
-              ? "重新扫"
-              : "扫全书找矛盾"}
-        </button>
+        />
       </div>
       <p className="text-sm text-[var(--color-ink-muted)] mb-3">
         扫全书找设定/人物前后矛盾（如第 5 章左撇子、第 80 章用右手）。每条两处对照原文，编的矛盾会被滤掉。

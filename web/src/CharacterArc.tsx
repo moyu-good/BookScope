@@ -13,6 +13,8 @@
 import { useMemo, useState } from "react";
 import { type ArcCharacter, HuaniaoArc } from "./HuaniaoArc";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface CharacterArcProps {
   sessionId: string;
@@ -143,39 +145,24 @@ export function CharacterArc({
 
   if (!characters) {
     return (
-      <div className="pt-4">
-        <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          人物弧线
-        </h3>
-        <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          给主要角色各画一枝，枝条上扬下垂是处境起落，着花疏密是戏份多寡。点一朵花看那章原文。
-        </p>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || !apiKey}
-          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "读全书出弧线中（约 1 分钟）…" : "生成人物弧线"}
-        </button>
-        {error && (
-          <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
-            {error}
-          </p>
-        )}
-        {!apiKey && (
-          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">填了 API key 才能生成。</p>
-        )}
+      <FeatureEntryCard
+        title="人物弧线"
+        lead="给主要角色各画一枝，枝条上扬下垂是处境起落，着花疏密是戏份多寡。点一朵花看那章原文。"
+        actionLabel="生成人物弧线"
+        loadingLabel="读全书出弧线中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书出章脉，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
         {loading && (
           <RunningProcess
             label="读全书出人物弧线"
             hint="整本书喂进模型，给主要角色逐章判戏份与处境，每个点都回原文核验，约 1 分钟。"
           />
         )}
-      </div>
+      </FeatureEntryCard>
     );
   }
 
@@ -194,14 +181,13 @@ export function CharacterArc({
         >
           人物弧线
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新生成"
+          loadingLabel="重出中…"
+          loading={loading}
           onClick={load}
-          disabled={loading}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "重出中…" : "重新生成"}
-        </button>
+        />
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">

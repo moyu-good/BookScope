@@ -15,6 +15,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { useVizFocus } from "./viz/vizFocus";
 import { EvidencePopover } from "./viz/EvidencePopover";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 // ---- 新接口契约 ----
 interface Verdict {
@@ -273,41 +275,24 @@ export function RelationshipTimeline({
   // ---- 未生成：入口卡片 ----
   if (!pairs) {
     return (
-      <div className="pt-4">
-        <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          关系演变
-        </h3>
-        <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          挑一对人，看他俩的关系一章章怎么走到今天，先给一句本质总判，再一幕幕排开：哪章发生了什么、此刻是敌是友、为什么变，每一笔都钉在原文。（谁和谁的整张关系网看「关系图」。）
-        </p>
-        <button
-          type="button"
-          onClick={loadPairs}
-          disabled={listLoading || !apiKey}
-          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {listLoading ? "扫全书人物来往中…" : "生成关系演变"}
-        </button>
-        {listError && (
-          <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
-            {listError}
-          </p>
-        )}
-        {!apiKey && (
-          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
-            填了 API key 才能生成。
-          </p>
-        )}
+      <FeatureEntryCard
+        title="关系演变"
+        lead="挑一对人，看他俩的关系一章章怎么走到今天，先给一句本质总判，再一幕幕排开：哪章发生了什么、此刻是敌是友、为什么变，每一笔都钉在原文。（谁和谁的整张关系网看「关系图」。）"
+        actionLabel="生成关系演变"
+        loadingLabel="扫全书人物来往中…"
+        onAction={loadPairs}
+        loading={listLoading}
+        disabled={!apiKey}
+        hint="先快扫一遍谁和谁有来往，不调模型、很快"
+        error={listError}
+      >
         {listLoading && (
           <RunningProcess
             label="扫全书人物来往"
             hint="先快扫一遍谁和谁有来往，列出全书所有人物对，这一步不调模型、很快。选定一对后再细读那对的关系编年。"
           />
         )}
-      </div>
+      </FeatureEntryCard>
     );
   }
 
@@ -321,8 +306,11 @@ export function RelationshipTimeline({
         >
           关系演变
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新生成"
+          loadingLabel="重出中…"
+          loading={listLoading}
           onClick={() => {
             setPairs(null);
             setSelKey(null);
@@ -331,11 +319,7 @@ export function RelationshipTimeline({
             setPairError(null);
             void loadPairs();
           }}
-          disabled={listLoading}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {listLoading ? "重出中…" : "重新生成"}
-        </button>
+        />
       </div>
 
       {!listLoading && (

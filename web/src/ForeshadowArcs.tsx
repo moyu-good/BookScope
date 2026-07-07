@@ -16,6 +16,8 @@ import { useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { Checkbox } from "./ui/FormControls";
 import { usePanZoom } from "./usePanZoom";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface Arc {
   description: string;
@@ -138,33 +140,24 @@ export function ForeshadowArcs({
   }, [arcs]);
 
   if (!arcs) {
+    // 空态（还没生成）：统一入口卡（视觉表现根治 · FeatureEntryCard）。
+    // 「确证全书没伏笔」这块笃定结果不是进度件，但它只在扫过全书后出现、和卡内的重新生成动作共存，
+    // 所以塞进 children 一起渲染（既不丢这层确证，也不用另起一块朴素空态）。
     return (
-      <div className="pt-4">
-        <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          伏笔回收
-        </h3>
-        <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          每条伏笔从埋点章拱到回收点章画一道弧，埋了没回收的画成灰虚线悬空，一眼挑出没填的坑。点弧线看两端原文。
-        </p>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || !apiKey}
-          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "读全书找伏笔中（约 1 分钟）…" : "生成伏笔回收图"}
-        </button>
-        {error && (
-          <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
-            {error}
-          </p>
-        )}
+      <FeatureEntryCard
+        title="伏笔回收"
+        lead="每条伏笔从埋点章拱到回收点章画一道弧，埋了没回收的画成灰虚线悬空，一眼挑出没填的坑。点弧线看两端原文。"
+        actionLabel="生成伏笔回收图"
+        loadingLabel="读全书找伏笔中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书抽伏笔配对，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
         {/* 确证全书没伏笔（空值三态 task #29）：扫过全书确实没埋伏笔——笃定答案，正面显示，
-            不是上面 error 那种像扫失败的红字。 */}
-        {confirmedNone && (
+            不是 error 那种像扫失败的红字。 */}
+        {confirmedNone && !loading && (
           <div
             className="mt-3 rounded-md px-3.5 py-3 flex items-start gap-2.5"
             style={{
@@ -189,18 +182,13 @@ export function ForeshadowArcs({
             </div>
           </div>
         )}
-        {!apiKey && (
-          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
-            填了 API key 才能生成。
-          </p>
-        )}
         {loading && (
           <RunningProcess
             label="读全书找伏笔回收"
             hint="整本书喂进模型抽伏笔配对，埋点和回收点都回原文核验，约 1 分钟。"
           />
         )}
-      </div>
+      </FeatureEntryCard>
     );
   }
 
@@ -256,14 +244,13 @@ export function ForeshadowArcs({
         >
           伏笔回收
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新生成"
+          loadingLabel="重出中…"
+          loading={loading}
           onClick={load}
-          disabled={loading}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "重出中…" : "重新生成"}
-        </button>
+        />
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">

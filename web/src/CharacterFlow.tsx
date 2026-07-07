@@ -13,6 +13,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { usePanZoom } from "./usePanZoom";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface FlowPair {
   a: string;
@@ -370,42 +372,26 @@ export function CharacterFlow({
   }
 
   if (!view || !layout) {
+    // 空态（还没生成）：统一入口卡（视觉表现根治 · FeatureEntryCard）
     return (
-      <div className="pt-4">
-        <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          人物叙事流
-        </h3>
-        <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          每个人一条横线穿过全书章节，同章同场聚成一束、各自行动分开、退场线止。一眼看见谁何时入场、哪几章是群戏。
-        </p>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || !apiKey}
-          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "读全书抽叙事流中（约 1 分钟）…" : "生成人物叙事流"}
-        </button>
-        {error && (
-          <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
-            {error}
-          </p>
-        )}
-        {!apiKey && (
-          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
-            填了 API key 才能生成。
-          </p>
-        )}
+      <FeatureEntryCard
+        title="人物叙事流"
+        lead="每个人一条横线穿过全书章节，同章同场聚成一束、各自行动分开、退场线止。一眼看见谁何时入场、哪几章是群戏。"
+        actionLabel="生成人物叙事流"
+        loadingLabel="读全书抽叙事流中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书抽同场结构，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
         {loading && (
           <RunningProcess
             label="读全书抽人物叙事流"
             hint="整本书喂进模型逐章抽同场结构，每条同场判定都回原文核验，约 1 分钟。"
           />
         )}
-      </div>
+      </FeatureEntryCard>
     );
   }
 
@@ -436,14 +422,13 @@ export function CharacterFlow({
         >
           人物叙事流
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新生成"
+          loadingLabel="重出中…"
+          loading={loading}
           onClick={load}
-          disabled={loading}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "重出中…" : "重新生成"}
-        </button>
+        />
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">

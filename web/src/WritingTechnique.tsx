@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface Technique {
   order: number;
@@ -76,24 +78,39 @@ export function WritingTechnique({
     }
   }
 
+  // 空态（还没分析）：统一入口卡（视觉表现根治 · FeatureEntryCard）
+  if (!techniques) {
+    return (
+      <FeatureEntryCard
+        title="写作手法"
+        lead="看作者怎么写：论证 / 结构 / 铺陈 / 用语的手法，每条配原文例子。学手艺。"
+        actionLabel="分析手法"
+        loadingLabel="分析中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书拆手法，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
+        {loading && <RunningProcess label="分析全书写作手法" />}
+      </FeatureEntryCard>
+    );
+  }
+
   return (
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed pr-4">
           看作者怎么写：论证 / 结构 / 铺陈 / 用语的手法，每条配原文例子。学手艺。
         </p>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新分析"
+          loadingLabel="分析中…"
+          loading={loading}
           onClick={load}
-          disabled={loading || !apiKey}
-          className="shrink-0 text-xs px-3 py-1.5 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading
-            ? "分析中（约 1 分钟）…"
-            : techniques
-              ? "重新分析"
-              : "分析手法"}
-        </button>
+          className="shrink-0"
+        />
       </div>
 
       {error && (

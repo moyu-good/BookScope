@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface Card {
   order: number;
@@ -88,20 +90,39 @@ export function StudyCards({
     });
   }
 
+  // 空态（还没出卡）：统一入口卡（视觉表现根治 · FeatureEntryCard）
+  if (!cards) {
+    return (
+      <FeatureEntryCard
+        title="知识卡片"
+        lead="据书出知识点卡，每张一道启发自测题，先自己想，再翻看解释和原文。"
+        actionLabel="出卡片"
+        loadingLabel="出卡中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书出卡，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
+        {loading && <RunningProcess label="据全书出知识点卡片" />}
+      </FeatureEntryCard>
+    );
+  }
+
   return (
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed pr-4">
           据书出知识点卡，每张一道启发自测题，先自己想，再翻看解释和原文。
         </p>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新出卡"
+          loadingLabel="出卡中…"
+          loading={loading}
           onClick={load}
-          disabled={loading || !apiKey}
-          className="shrink-0 text-xs px-3 py-1.5 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "出卡中（约 1 分钟）…" : cards ? "重新出卡" : "出卡片"}
-        </button>
+          className="shrink-0"
+        />
       </div>
 
       {error && (
