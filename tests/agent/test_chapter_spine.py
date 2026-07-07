@@ -174,9 +174,13 @@ def test_build_chapter_spine_per_dim_chapter_cap(monkeypatch) -> None:  # noqa: 
     assert has_continue["concept"] is False
 
 
-def test_spine_heavy_cap_smaller_than_global() -> None:
-    # 专用章闸必须比全局小才有意义;全局默认本身不被改动
-    assert cs._SPINE_HEAVY_DIM_MAX_CHAPTERS < cs.DEFAULT_MAX_CHAPTERS
+def test_spine_scale_params_match_probe_sweet_spot() -> None:
+    # probe_spine_scale(三国 732k 字冷启动、4 组对照)定案的超长文 sweet spot:段放大到
+    # 12 章 / 12 万字 + max_tokens 抬到 16000 → 冷启动快 3.3 倍、0 截断、完整度 1.0。
+    # 设计从"重维收窄章闸防截断"改成"大段配够 token 一次抽完"——这三个值是配套的,别单改一个。
+    assert cs._SPINE_HEAVY_DIM_MAX_CHAPTERS == 12
+    assert cs._SPINE_CHAR_BUDGET == 120000
+    assert cs.DEFAULT_SPINE_MAX_TOKENS == 16000
 
 
 # ── 1.5.2 方案 C：续抽把段截断丢的章补回来,章数对齐 ──────────────────────────

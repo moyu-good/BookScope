@@ -21,7 +21,6 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from bookscope.agent._internal.exhaustive import (
-    DEFAULT_CHAR_BUDGET,
     DEFAULT_MAX_CHAPTERS,
     mapreduce_per_chapter,
 )
@@ -36,18 +35,24 @@ from bookscope.agent.utils.json_parsing import strip_code_fence as _strip_code_f
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SPINE_MAX_TOKENS = 8000
-"""分维后单维输出比全维一趟小;配章闸够用,留 reasoning 头。"""
+DEFAULT_SPINE_MAX_TOKENS = 16000
+"""分维后单维输出比全维一趟小。probe(probe_spine_scale.py,三国 732k 字冷启动)实测:8000 配大段
+(12 章 / 12 万字)有 12.9% 截断 → 触发续抽 / 补抽拖慢;抬到 16000 后 0 截断、单维大段一次抽完,
+冷启动 649s→194s(快 3.3 倍)、完整度反升到 1.0。留够 flash 的 reasoning 头。"""
 
-# ── 章脉专用章闸(1.5.2 方案 B) ──────────────────────────────────────────────
-# 全局 DEFAULT_MAX_CHAPTERS=12 按"全维一趟"时代定,没复核分维后短章网文单维会不会爆。
-# 实测:char(present/relations/char_states 三数组)、plot(events/tension/sentiment/pov/
-# mainline/foreshadow 七字段)两个重维 12 章 × 每章带 evidence,加 flash 的 reasoning 一起
-# 冲爆 8000(probe 情节维 17 章已吃 5759 token content,reasoning 另算)。所以 char/plot 这
-# 两个重维用更小的专用章闸,让单段输出不爆;concept(每章只 claims 一数组,最轻)沿用全局 12。
-# 只给章脉这两维收窄,**不动 exhaustive 的全局默认**——人物图/实体表等别的穷尽化功能照旧 12。
-_SPINE_HEAVY_DIM_MAX_CHAPTERS = 6
-"""char/plot 重维每段章闸(收窄);concept 轻维不传、走全局 12。"""
+# ── 章脉专用段参数(超长文性能,probe_spine_scale 定案)──────────────────────────
+# 段越大 = 往返越少 = 冷启动越快,但一段塞更多章、输出越容易撞 max_tokens 截断(截断触发续抽 /
+# 补抽反而更慢)。原来靠"6 章封顶 + 8000 token"压截断,代价是段切得碎、往返多(三国 85 次调用)。
+# probe(probe_spine_scale.py,三国 732k 字冷启动、4 组对照)测出安全 sweet spot:
+#   段放大到 12 万字 / 12 章 + max_tokens 抬到 16000 → 截断率 12.9%→0、调用 85→42、
+#   墙钟 649s→194s(快 3.3 倍)、完整度 .992→1.0。放大不掉质量、反而更完整(给够 token 一次抽完)。
+# 所以 char/plot 两个重维用 12 章封顶 + 12 万字段预算(配 16000 token 不爆);concept 轻维沿用全局 12。
+# **不动 exhaustive 的全局默认**(DEFAULT_CHAR_BUDGET=40000)——人物图 / 实体表等别的穷尽化功能照旧。
+_SPINE_HEAVY_DIM_MAX_CHAPTERS = 12
+"""char/plot 重维每段章闸;12 章配 16000 token 实测不爆(probe_spine_scale)。concept 轻维走全局 12。"""
+
+_SPINE_CHAR_BUDGET = 120000
+"""章脉每段字符预算(probe 定的超长文 sweet spot);段大 = 往返少 = 冷启动快,不改 exhaustive 全局 4 万。"""
 
 _SPINE_CONTINUE_MAX_ROUNDS = 3
 """续抽最多补几轮——防止某段反复截断导致无限补抽,补满几轮还差就停(留 warning)。"""
@@ -313,7 +318,7 @@ def build_chapter_spine(
     model: str,
     genre: str = "fiction",
     max_tokens: int = DEFAULT_SPINE_MAX_TOKENS,
-    char_budget: int = DEFAULT_CHAR_BUDGET,
+    char_budget: int = _SPINE_CHAR_BUDGET,
     max_workers: int | None = None,
 ) -> list[dict[str, Any]]:
     """整本一次精读,出带证据的逐章章脉(ADR-010 单一事实源)。
