@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { usePanZoom } from "./usePanZoom";
+import { categoricalPalette } from "./viz/vizTokens";
 import { FeatureEntryCard } from "./FeatureEntryCard";
 import { SealButton } from "./SealButton";
 
@@ -495,6 +496,9 @@ export function CharacterFlow({
         {names.map((name) => {
           const a = firstIdx.get(name)!;
           const b = lastIdx.get(name)!;
+          // 每人一个分类色,不再全朱砂一个色(作者反馈"都是同一个颜色")。同一套浅底色板,跟关系图节点一致。
+          const laneColor =
+            categoricalPalette[Math.max(0, names.indexOf(name)) % categoricalPalette.length];
           const pts: string[] = [];
           for (let i = a; i <= b; i++) {
             // 不在 present 的中间章用基线 y 兜底（线不断，但 lane 回归基线）
@@ -517,7 +521,7 @@ export function CharacterFlow({
               <polyline
                 points={pts.join(" ")}
                 fill="none"
-                stroke="var(--color-seal)"
+                stroke={laneColor}
                 strokeWidth={lw}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -528,7 +532,7 @@ export function CharacterFlow({
                 cx={xAt(a)}
                 cy={yOf(name, a)}
                 r={2.4}
-                fill="var(--color-seal)"
+                fill={laneColor}
                 opacity={dimmed ? 0.2 : 0.9}
               />
               <text

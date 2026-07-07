@@ -264,7 +264,16 @@ export function ShanshuiCurve({ chapters, selected, onSelect }: ShanshuiCurvePro
         style={{ cursor: "pointer" }}
         onPointerMove={handleMove}
         onPointerLeave={() => setHover(null)}
-        onClick={() => hover != null && onSelect(hover)}
+        onClick={(e) => {
+          // 直接从点击位置算最近章再选,别依赖 hover 先被设——触屏 tap / 没先移光标时 hover 为 null,
+          // 旧写法 "hover != null && onSelect" 会让点击没反应(作者反馈"点击也没有")。
+          const svg = svgRef.current;
+          if (!svg) return;
+          const rect = svg.getBoundingClientRect();
+          const cx = ((e.clientX - rect.left) / rect.width) * W;
+          const i = Math.max(0, Math.min(n - 1, Math.round(((cx - PAD_L) / inner) * (n - 1))));
+          onSelect(chapters[i].chapter);
+        }}
       />
     </svg>
   );
