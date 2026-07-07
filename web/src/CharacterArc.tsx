@@ -1,20 +1,25 @@
 // ---------------------------------------------------------------------------
-// CharacterArc — 人物弧线（WP-character-arc-curves，probe GO）
+// CharacterArc — 人物命运线（WP-character-arc-curves，probe GO）
 //
 // 点生成 → 调 /api/agent/character-arc（整本进上下文给主要角色逐章抽戏份 + 处境）→ 画成
-// 「工笔花鸟」品读视图（见 HuaniaoArc）：每个角色一枝，枝条上扬下垂=处境起落、着花疏密=戏份，
-// 点一朵花看那章原文。可切「看全部 / 单个角色」。
+// 「命运线」品读视图（见 FateLineArc）：每个主要角色一格 mini 折线，横轴章节、纵轴处境高低，
+// 线随剧情起落，命运转折章用朱砂点钉在线上。点转折看那章原文。可切「看全部 / 单个角色」。
 //
-// 诚实呈现（probe 结论 + memory feedback_viz_algorithm_rigor）：presence/fortune 是模型逐章判读、
-// 绝对值会抖，所以只画相对形状（枝的起伏 + 花的疏密）、明细给相对档（戏重/有戏/少戏、得势/落难/平），
-// 不印"戏份 8/10"那种假精确。evidence-first：核不过的点画空心花苞、标低置信。
+// 换掉了旧的「工笔花鸟枝条」——那图好看但读不出这个人到底变没变、何时变。命运线只答一件事：
+// 这个主角变没变、何时变、往上走还是往下沉。
+//
+// 诚实呈现（probe 结论 + memory feedback_viz_algorithm_rigor）：fortune 是模型逐章判读、
+// 绝对值会抖，所以纵轴只画相对形状、不标精确刻度；只有转折点（锚原文）才是硬信息。明细给相对档
+// （得势/落难/平），不印"处境 8/10"那种假精确。evidence-first：核不过的点画空心、标低置信。
 // ---------------------------------------------------------------------------
 
 import { useMemo, useState } from "react";
-import { type ArcCharacter, HuaniaoArc } from "./HuaniaoArc";
+import { type ArcCharacter, FateLineArc } from "./HuaniaoArc";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { FeatureEntryCard } from "./FeatureEntryCard";
 import { SealButton } from "./SealButton";
+import { SealMark } from "./SealMark";
+import { categoricalPalette } from "./viz/vizTokens";
 
 interface CharacterArcProps {
   sessionId: string;
@@ -24,8 +29,8 @@ interface CharacterArcProps {
   baseUrl: string;
 }
 
-// 角色配色取一组克制的古籍色（不刺眼、可区分），循环用
-const ARC_PALETTE = ["#9a5b52", "#5f7a6b", "#8c6b4f", "#6b6f8c", "#8a7a4a", "#5b7d8a"];
+// 角色配色取分类盘（跟关系图 / 在场图同一套浅底色板），循环用——清爽不脏、彼此分得开
+const ARC_PALETTE = categoricalPalette;
 
 // 选择器默认只列戏份最重的前几个主要角色，剩下的折进"看全部"
 const MAIN_COUNT = 8;
@@ -33,12 +38,6 @@ const MAIN_COUNT = 8;
 interface SelectedPoint {
   name: string;
   chapter: number;
-}
-
-function presenceBand(p: number): string {
-  if (p >= 7) return "戏重";
-  if (p >= 3) return "有戏";
-  return "少戏";
 }
 
 function fortuneWord(f: number): string {
@@ -146,10 +145,10 @@ export function CharacterArc({
   if (!characters) {
     return (
       <FeatureEntryCard
-        title="人物弧线"
-        lead="给主要角色各画一枝，枝条上扬下垂是处境起落，着花疏密是戏份多寡。点一朵花看那章原文。"
-        actionLabel="生成人物弧线"
-        loadingLabel="读全书出弧线中（约 1 分钟）…"
+        title="人物命运线"
+        lead="给每个主要角色画一条命运线：横轴章节、纵轴处境高低，线随剧情起落，命运转折的章用朱砂点标出。点转折看那章原文。"
+        actionLabel="生成人物命运线"
+        loadingLabel="读全书出命运线中（约 1 分钟）…"
         onAction={load}
         loading={loading}
         disabled={!apiKey}
@@ -158,8 +157,8 @@ export function CharacterArc({
       >
         {loading && (
           <RunningProcess
-            label="读全书出人物弧线"
-            hint="整本书喂进模型，给主要角色逐章判戏份与处境，每个点都回原文核验，约 1 分钟。"
+            label="读全书出人物命运线"
+            hint="整本书喂进模型，给主要角色逐章判处境起落，每个点都回原文核验，约 1 分钟。"
           />
         )}
       </FeatureEntryCard>
@@ -179,7 +178,7 @@ export function CharacterArc({
           className="text-base font-bold text-[var(--color-ink)]"
           style={{ fontFamily: "var(--font-display)" }}
         >
-          人物弧线
+          人物命运线
         </h3>
         <SealButton
           size="sm"
@@ -191,7 +190,7 @@ export function CharacterArc({
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        每个角色一枝：枝条上扬=得势、下垂=落难，着花越繁=这章戏越重。点一朵花看那章原文；淡空心花=原文没核验上。处境/戏份只画相对起落（模型判读，不报精确分）。
+        每人一条命运线：线往上=得势、往下=落难，朱砂点是命运转折的章（旁标章号）。点转折看那章原文；空心点=原文没核验上。纵轴只画相对起落（模型判读，不报精确分）。
       </p>
 
       {/* ── 选择器：搜人名 + 按戏份排序的角色清单（几百号人也挑得动） ── */}
@@ -204,7 +203,7 @@ export function CharacterArc({
           className="w-full text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] focus:border-[var(--color-seal)] outline-none"
         />
         <div className="mt-2 max-h-44 overflow-y-auto rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)]">
-          {/* 看全部一枝不挑：回到全员小多图 */}
+          {/* 看全部：回到全员小多图 */}
           <button
             type="button"
             onClick={() => {
@@ -219,7 +218,7 @@ export function CharacterArc({
               className="text-sm"
               style={{ color: focusChar === null ? "var(--color-seal)" : "var(--color-ink)" }}
             >
-              看全部（戏份最重的几枝）
+              看全部（命运起落最大的几人）
             </span>
           </button>
 
@@ -283,7 +282,7 @@ export function CharacterArc({
         )}
       </div>
 
-      <HuaniaoArc
+      <FateLineArc
         characters={characters}
         charColor={charColor}
         focusChar={focusChar}
@@ -292,17 +291,23 @@ export function CharacterArc({
       />
 
       {sel && selected && (
-        <div className="mt-3 p-3 rounded border border-[var(--color-rule)] bg-white">
-          <p className="text-sm font-bold text-[var(--color-ink)]">
-            「{selected.name}」· 第 {sel.chapter} 章 · {presenceBand(sel.presence)} ·{" "}
-            {fortuneWord(sel.fortune)}
-            <span className="font-normal text-[var(--color-ink-muted)]">（模型判读）</span>
-          </p>
+        <div className="mt-3 p-3 rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)]">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-bold text-[var(--color-ink)]">
+              「{selected.name}」· 第 {sel.chapter} 章 · {fortuneWord(sel.fortune)}
+              <span className="font-normal text-[var(--color-ink-muted)]">（这章处境，模型判读）</span>
+            </p>
+            {sel.verified && sel.evidence ? (
+              <SealMark size={22} title="原文已核验" />
+            ) : null}
+          </div>
           <p className="mt-1 text-sm text-[var(--color-ink)] leading-relaxed">
             {sel.evidence || "（这章没给出原文依据）"}
           </p>
           <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-            {sel.verified ? "原文已核验" : "原文未在书中比对命中，这点仅供参考"}
+            {sel.verified && sel.evidence
+              ? "上面这段原文已在书中比对核验，盖印为证"
+              : "原文未在书中比对命中，这点仅供参考（待核）"}
           </p>
         </div>
       )}
