@@ -136,6 +136,31 @@ def get_or_build_spine(
     )
 
 
+def peek_spine_cache(
+    *, chunks: list[dict], model: str, genre: str = "fiction"
+) -> list[dict] | None:
+    """只**看**这本书的章脉有没有缓存,有就返、没有返 None——**绝不构建**。
+
+    给后台预建端点判"要不要建"用:命中说明章脉已建过(整本书功能会秒出),POST 直接返
+    cached、不派后台线程;miss 才起后台建。缓存禁用 / 任何意外 → 返 None(当没缓存,
+    调用方照常起后台建)。key 与 ``get_or_build_spine`` 完全同口径(chunks/model/genre),
+    探的就是那条 spine。
+    """
+    if _is_cache_disabled():
+        return None
+    try:
+        cache = _get_cache()
+        key = _compute_spine_cache_key(all_chunks=chunks, model=model, genre=genre)
+        cached = cache.get(key)
+        if cached is None:
+            return None
+        spine = json.loads(cached.decode("utf-8"))
+        return spine if isinstance(spine, list) else None
+    except Exception as exc:  # noqa: BLE001 — peek 失败当没缓存,绝不 break
+        logger.warning("spine_cache: peek raised %s: %s; 当无缓存", type(exc).__name__, exc)
+        return None
+
+
 def clear_spine_cache() -> None:
     """清空整张章脉缓存表 + 重置 stats。给 CLI / 测试用。"""
     _get_cache().clear_all()
@@ -160,5 +185,6 @@ __all__ = [
     "clear_spine_cache",
     "get_or_build_spine",
     "get_spine_cache_stats",
+    "peek_spine_cache",
     "reset_spine_cache_singleton_for_test",
 ]

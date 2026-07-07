@@ -535,6 +535,56 @@ class NarrativeCurveResponse(BaseModel):
     )
 
 
+class PrewarmSpineRequest(BaseModel):
+    """POST /api/agent/prewarm-spine 请求体（性能 Lever B 后端：进分析台就后台预建章脉）。
+
+    超长文第一次建章脉要整本 map-reduce（可能十几分钟）。一进分析台先打这个端点，
+    后台线程里预建、立刻返回；建好后所有整本书功能命中缓存秒出。body 跟别的整本书端点
+    一致（BYOK）。不带 genre——服务端固定用 fiction，跟叙事曲线/关系图/节奏/时间线等
+    默认整本书功能同一条 spine 缓存键，预建的正好是它们要的那条。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class PrewarmSpineResponse(BaseModel):
+    """POST /api/agent/prewarm-spine 响应体：立刻返回，不等构建。
+
+    ``status``：``cached`` 已缓存（不用建）；``building`` 已有一路在建（幂等，不重复起）；
+    ``started`` 本次刚起后台建。前端据此决定是否轮询 status 端点。
+    """
+
+    status: Literal["cached", "building", "started"] = Field(
+        ..., description="cached=已缓存无需建；building=已在建；started=本次刚起后台建。"
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+
+
+class PrewarmSpineStatusResponse(BaseModel):
+    """GET /api/agent/prewarm-spine/status 响应体：轮询后台预建进度。
+
+    ``idle`` 没建过也不在建；``building`` 后台正在建；``done`` 建好（缓存已就绪，
+    整本书功能会命中）；``error`` 后台建失败（``error`` 带原因）。``chapters`` 只在
+    done 时给章数。
+    """
+
+    status: Literal["idle", "building", "done", "error"] = Field(
+        ..., description="idle=未建/不在建；building=在建；done=建好缓存就绪；error=建失败。"
+    )
+    chapters: int | None = Field(
+        default=None, description="done 时的章脉章数；其它状态为 null。"
+    )
+    error: str | None = Field(
+        default=None, description="error 时的失败原因（type: message）；其它状态为 null。"
+    )
+
+
 class SpineEvidenceRequest(BaseModel):
     """POST /api/agent/spine-evidence 请求体（章脉章级锚视图"点开现取"那一句，ADR-010 出路 B）。
 
@@ -2149,6 +2199,9 @@ __all__ = [
     "PacingCurveRequest",
     "PacingCurveResponse",
     "PreviousReviewHint",
+    "PrewarmSpineRequest",
+    "PrewarmSpineResponse",
+    "PrewarmSpineStatusResponse",
     "RedheadCrossDocRequest",
     "RedheadDependencyGraphResponse",
     "RedheadDocStructureRequest",

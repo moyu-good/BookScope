@@ -25,6 +25,7 @@ import logging
 import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -47,7 +48,10 @@ from bookscope.agent import (
     route_question,
     run_fast_path,
 )
-from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
+from bookscope.agent._internal.chapter_spine_cache import (
+    get_or_build_spine,
+    peek_spine_cache,
+)
 from bookscope.agent._internal.doc_spine_cache import (
     get_or_build_doc_spine,
     peek_doc_spine_cache,
@@ -182,6 +186,9 @@ from bookscope.api.schemas import (
     PacingCurveRequest,
     PacingCurveResponse,
     PreviousReviewHint,
+    PrewarmSpineRequest,
+    PrewarmSpineResponse,
+    PrewarmSpineStatusResponse,
     RecapRequest,
     RecapResponse,
     RedheadCloseReadingResponse,
@@ -273,6 +280,180 @@ async def _verify_session_ownership(request: Request) -> None:
 agent_router = APIRouter(
     tags=["agent"], dependencies=[Depends(_verify_session_ownership)]
 )
+
+
+# ── 章脉后台预建(性能 Lever B 后端,只加端点不改构建逻辑)──────────────────────
+#
+# 超长文第一次建章脉要整本 map-reduce(可能十几分钟)。以前是"点第一个整本书功能 →
+# 干等"。这里让前端一进分析台就 POST /agent/prewarm-spine,后台线程里跑
+# get_or_build_spine、立刻返回;前端轮询 /agent/prewarm-spine/status,建好后
+# 叙事曲线/关系图/节奏/时间线等命中缓存秒出。
+#
+# genre 固定 fiction:12/13 个整本书 viz 端点都走 get_or_build_spine 的默认
+# genre="fiction",预建的正好是它们共享的那条 spine 缓存键(theory 概念图是另一条
+# 冷门 spine,不是"进台就点"的场景,不预建)。
+_PREWARM_GENRE = "fiction"
+
+# 进程内状态:键 = (book_session_id, model, genre),值 = {"status", "chapters", "error"}。
+# 单进程内存态,重启丢无妨(丢了顶多再建一次,缓存本身在 SQLite 里也还在)。加锁保线程安全。
+_PREWARM_STATE: dict[tuple[str, str, str], dict[str, Any]] = {}
+_PREWARM_LOCK = threading.Lock()
+# 后台建的线程池;别用会随请求结束就取消的机制(BackgroundTasks / 请求生命周期任务)。
+_PREWARM_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="prewarm-spine")
+
+
+def _prewarm_key(book_session_id: str, model: str) -> tuple[str, str, str]:
+    """预建状态键 = (book_session_id, model, genre)。
+
+    book_session_id 一对一定死这本书的 chunks(session 内 chunks 不变),等价于
+    spine 缓存键里的 chunks 文本维;model + genre 补齐另两维。genre 固定 fiction。
+    """
+    return (book_session_id, model, _PREWARM_GENRE)
+
+
+def _run_prewarm_build(
+    *,
+    key: tuple[str, str, str],
+    chunks: list[dict],
+    client: Any,
+    model: str,
+) -> None:
+    """后台线程体:调 get_or_build_spine 建章脉,把结果/错误写回状态。
+
+    构建逻辑一个字不改——就是照 viz 端点同参数(genre=fiction)调 get_or_build_spine。
+    命中缓存它立刻返、miss 才真建。失败记进状态(error),绝不静默吞。
+    """
+    try:
+        spine = get_or_build_spine(
+            chunks=chunks, llm_client=client, model=model, genre=_PREWARM_GENRE
+        )
+        with _PREWARM_LOCK:
+            _PREWARM_STATE[key] = {
+                "status": "done",
+                "chapters": len(spine),
+                "error": None,
+            }
+    except Exception as exc:  # noqa: BLE001 — 后台建失败要记进状态,不能静默吞
+        logger.warning(
+            "prewarm-spine: 后台建失败 key=%s: %s: %s",
+            key,
+            type(exc).__name__,
+            exc,
+        )
+        with _PREWARM_LOCK:
+            _PREWARM_STATE[key] = {
+                "status": "error",
+                "chapters": None,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
+
+@agent_router.post("/agent/prewarm-spine", response_model=PrewarmSpineResponse)
+async def agent_prewarm_spine(
+    request: PrewarmSpineRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> PrewarmSpineResponse:
+    """后台预建整本书章脉,立刻返回(不阻塞十几分钟的构建)。
+
+    幂等:同一本书(同 model/genre)正在建 → 不重复起,返 building;已在缓存里 →
+    返 cached(不用建);否则起后台线程建、返 started。前端拿到 building/started 后
+    轮询 /agent/prewarm-spine/status。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    key = _prewarm_key(request.book_session_id, model)
+    _full_text, chunks = _long_context_inputs(assembler)
+
+    # 幂等 1:缓存已命中 → 不用建,直接返 cached(不占 building 坑、不派线程)。
+    # peek 只**看**缓存、绝不触发构建,同 get_or_build_spine 口径(chunks/model/genre)。
+    cached = peek_spine_cache(chunks=chunks, model=model, genre=_PREWARM_GENRE)
+    if cached is not None:
+        with _PREWARM_LOCK:
+            _PREWARM_STATE[key] = {
+                "status": "done",
+                "chapters": len(cached),
+                "error": None,
+            }
+        return PrewarmSpineResponse(
+            status="cached", book_session_id=request.book_session_id
+        )
+
+    # 幂等 2:已有一路在建 → 不重复起。加锁下"看状态 + 占坑"要原子,否则两个并发
+    # POST 都看到 idle 会各起一路建同一本书(白建一次)。占 building 坑后再派线程。
+    with _PREWARM_LOCK:
+        cur = _PREWARM_STATE.get(key)
+        if cur is not None and cur["status"] == "building":
+            return PrewarmSpineResponse(
+                status="building", book_session_id=request.book_session_id
+            )
+        _PREWARM_STATE[key] = {"status": "building", "chapters": None, "error": None}
+
+    # 派后台线程建;别用会随请求结束就取消的机制(BackgroundTasks / 事件循环任务),
+    # 十几分钟的构建要独立于本 HTTP 请求活着。立刻返 started,前端轮询 status。
+    _PREWARM_EXECUTOR.submit(
+        _run_prewarm_build,
+        key=key,
+        chunks=chunks,
+        client=client,
+        model=model,
+    )
+    return PrewarmSpineResponse(
+        status="started", book_session_id=request.book_session_id
+    )
+
+
+@agent_router.get(
+    "/agent/prewarm-spine/status", response_model=PrewarmSpineStatusResponse
+)
+async def agent_prewarm_spine_status(
+    book_session_id: str,
+    model: str | None = None,
+    provider: str = "deepseek",
+) -> PrewarmSpineStatusResponse:
+    """轮询章脉后台预建进度。
+
+    status:idle(没建过/不在建) / building(在建) / done(建好缓存就绪) /
+    error(建失败,带 error)。model 不传就按 provider 推默认,和 POST 那边一致——
+    否则键对不上会永远 idle。归属守卫(_verify_session_ownership)对 GET 无 body
+    直接放行,查状态是读操作、无 LLM 调用,不额外鉴权。
+    """
+    resolved_model = model or default_model_for(provider)
+    key = _prewarm_key(book_session_id, resolved_model)
+    with _PREWARM_LOCK:
+        cur = _PREWARM_STATE.get(key)
+        if cur is None:
+            return PrewarmSpineStatusResponse(status="idle", chapters=None, error=None)
+        return PrewarmSpineStatusResponse(
+            status=cur["status"],
+            chapters=cur.get("chapters"),
+            error=cur.get("error"),
+        )
 
 
 @agent_router.post("/agent/ask", response_model=AgentAskResponse)
