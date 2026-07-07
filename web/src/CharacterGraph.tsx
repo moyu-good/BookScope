@@ -915,10 +915,13 @@ export function CharacterGraph({
           const dimByHover = !!hoverFocus && !isNeighborEdge && !active;
           // 基础不透明度:未核验的边本来就更淡(虚线);已核验的边在浅底上稍压低一点点(0.72→0.6)
           // 让画面更静、留白更透,颜色语义(敌红/亲绿/中灰)不动。再叠筛选/hover 的压暗。
+          // 高亮不改颜色:连线颜色始终走敌友语义(敌红 / 亲绿 / 中灰)。active / 邻居的强调只靠"更亮 + 更粗"。
+          // 之前 hover 把相连边全盖成朱砂一个色,同盟和敌对线就分不出了(作者反馈)——现在颜色专管敌友、
+          // 明暗粗细专管聚焦,两个通道各管各的:hover 一个人,一眼看清他跟谁是盟(绿)、跟谁是敌(红)。
           const baseOp = active ? 1 : e.evidence && !e.verified ? 0.4 : 0.6;
-          const opacity = filteredOut ? 0.1 : dimByHover ? 0.15 : baseOp;
-          // 相连的边加粗高亮(用朱砂 --color-seal),让"谁跟悬停这人一伙"一眼可见。
-          const stroke = active || isNeighborEdge ? "var(--color-seal)" : EDGE_COLOR[kind];
+          const emphOp = active ? 1 : isNeighborEdge ? 0.92 : baseOp;
+          const opacity = filteredOut ? 0.1 : dimByHover ? 0.15 : emphOp;
+          const stroke = EDGE_COLOR[kind];
           const strokeWidth =
             active || isNeighborEdge ? edgeWidth(e.strength) + 1.5 : edgeWidth(e.strength);
           return (
