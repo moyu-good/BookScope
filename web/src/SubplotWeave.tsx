@@ -162,6 +162,14 @@ export function SubplotWeave({
     return { minCh, maxCh, span, xAt, yOf, order };
   }, [subplots, intersections]);
 
+  // ⚠ hooks 必须在任何 early return 之前无条件调用(React Hooks 规则)。否则空态 return 后
+  // 这几个 hook 不跑、生成出支线后才跑,hook 数量在两次 render 间变化 → React 直接崩(白屏)。
+  // H 用 subplots?.length 兜底,空态也算得出(= PAD_TOP*2)。
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const H = PAD_TOP * 2 + LANE_H * (subplots?.length ?? 0);
+  const { view, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onWheel, resetView } =
+    usePanZoom(svgRef, { width: W, height: H });
+
   if (!subplots || !layout) {
     // 空态（还没生成）：统一入口卡（视觉表现根治 · FeatureEntryCard）
     return (
@@ -187,13 +195,7 @@ export function SubplotWeave({
   }
 
   const { minCh, maxCh, xAt, yOf, order } = layout;
-  const H = PAD_TOP * 2 + LANE_H * subplots.length;
   const verifiedSp = subplots.filter((s) => s.verified).length;
-
-  // pan/zoom + 双指 pinch（移动端）：支线泳道多、章跨度大，手机上捏合才看得清。
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const { view, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onWheel, resetView } =
-    usePanZoom(svgRef, { width: W, height: H });
 
   // 交汇点按支线名定位到泳道 y（找到对应支线 index）
   const spIdxByName = new Map<string, number>();

@@ -99,13 +99,25 @@ export function usePanZoom(
     });
   }, [minK, maxK]);
 
-  // 滚轮缩放（桌面）：朝光标缩
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const { x: cx, y: cy } = toSvg(e.clientX, e.clientY);
-    const factor = Math.exp(-e.deltaY * 0.0015); // 上滚放大、下滚缩小，指数让手感均匀
-    zoomAt(cx, cy, factor);
-  }, [toSvg, zoomAt]);
+  // 滚轮缩放（桌面）：朝光标缩。
+  // ⚠ 必须用**原生非 passive** 监听:React 合成 onWheel 默认 passive,里面 e.preventDefault() 被浏览器
+  // 忽略,于是缩放图时页面也跟着滚(作者反馈"上下滚轮两边都动、难操作")。addEventListener(passive:false)
+  // 才拦得住页面滚动。
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault(); // 只缩放图、不带动页面
+      const { x: cx, y: cy } = toSvg(e.clientX, e.clientY);
+      const factor = Math.exp(-e.deltaY * 0.0015); // 上滚放大、下滚缩小,指数让手感均匀
+      zoomAt(cx, cy, factor);
+    };
+    svg.addEventListener("wheel", handler, { passive: false });
+    return () => svg.removeEventListener("wheel", handler);
+  }, [svgRef, toSvg, zoomAt]);
+
+  // 给调用方 onWheel 属性留个 no-op:缩放已走上面的原生监听,这里再缩一次就成双重缩放了。
+  const onWheel = useCallback((_e: React.WheelEvent) => {}, []);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     const svg = svgRef.current;
