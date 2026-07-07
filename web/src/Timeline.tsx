@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface TimelineEvent {
   order: number;
@@ -82,6 +84,25 @@ export function Timeline({
     }
   }
 
+  // 空态（还没梳理）：统一入口卡（视觉表现根治 · FeatureEntryCard）
+  if (!events) {
+    return (
+      <FeatureEntryCard
+        title="时间线"
+        lead="把全书事件按真实时间先后理清（多线 / 倒叙也还原顺序）。点一条看原文出处。"
+        actionLabel="梳理时间线"
+        loadingLabel="按时序梳理中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书按时序梳理，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
+        {loading && <RunningProcess label="按时序梳理时间线" />}
+      </FeatureEntryCard>
+    );
+  }
+
   return (
     <div className="pt-4">
       <div className="flex items-center justify-between mb-1">
@@ -91,18 +112,13 @@ export function Timeline({
         >
           时间线
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新梳理"
+          loadingLabel="梳理中…"
+          loading={loading}
           onClick={load}
-          disabled={loading || !apiKey}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading
-            ? "按时序梳理中（约 1 分钟）…"
-            : events
-              ? "重新梳理"
-              : "梳理时间线"}
-        </button>
+        />
       </div>
       <p className="text-sm text-[var(--color-ink-muted)] mb-3">
         把全书事件按真实时间先后理清（多线/倒叙也还原顺序）。点一条看原文出处。

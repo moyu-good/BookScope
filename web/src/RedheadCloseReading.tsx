@@ -25,6 +25,8 @@
 import { useMemo, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 // ---- 后端契约（对着 redhead_close_reading.close_reading_from_spine 写） ----
 
@@ -189,45 +191,27 @@ export function RedheadCloseReading({
     return withIdx;
   }, [items, filter]);
 
-  // ---- 未生成：入口卡片 ----
+  // ---- 未生成：统一入口卡（视觉表现根治 · FeatureEntryCard） ----
   if (!result) {
     return (
-      <div className="pt-4">
-        <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          逐条精读
-        </h3>
-        <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          一条一条把红头文件吃透。每条三件事一次看全：大白话（这条人话什么意思，碰到「原则上」「研究」这类官腔还点破弦外之意）、结构标签（是硬要求还是软倡导、谁负责、到几号、依据哪份上位文件）、生词随手点开（这条里的政策黑话当场解释）。背后原文核得到的盖「鉴」印，只忠实转述、不替你脑补。适合党政公文
-          / 红头文件。
-        </p>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || !apiKey}
-          className="mt-3 text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "逐条精读中（约 1 分钟）…" : "逐条精读这份公文"}
-        </button>
-        {error && (
-          <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
-            {error}
-          </p>
-        )}
-        {!apiKey && (
-          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
-            填了 API key 才能生成。
-          </p>
-        )}
+      <FeatureEntryCard
+        title="逐条精读"
+        lead="一条一条把红头文件吃透。每条三件事一次看全：大白话（这条人话什么意思，碰到「原则上」「研究」这类官腔还点破弦外之意）、结构标签（是硬要求还是软倡导、谁负责、到几号、依据哪份上位文件）、生词随手点开（这条里的政策黑话当场解释）。背后原文核得到的盖「鉴」印，只忠实转述、不替你脑补。适合党政公文 / 红头文件。"
+        actionLabel="逐条精读这份公文"
+        loadingLabel="逐条精读中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="逐条精读整份公文，约 1 分钟；同份已读过秒出"
+        error={error}
+      >
         {loading && (
           <RunningProcess
             label="逐条精读"
             hint="整份公文喂进模型，逐条翻成人话、标出硬/软结构、挑出生词，每条回原文核验，约 1 分钟。"
           />
         )}
-      </div>
+      </FeatureEntryCard>
     );
   }
 
@@ -242,14 +226,13 @@ export function RedheadCloseReading({
           >
             逐条精读
           </h3>
-          <button
-            type="button"
+          <SealButton
+            size="sm"
+            label="重新生成"
+            loadingLabel="重出中…"
+            loading={loading}
             onClick={load}
-            disabled={loading}
-            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-          >
-            {loading ? "重出中…" : "重新生成"}
-          </button>
+          />
         </div>
         {loading ? (
           <RunningProcess label="逐条精读" />
@@ -272,14 +255,13 @@ export function RedheadCloseReading({
         >
           逐条精读
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新生成"
+          loadingLabel="重出中…"
+          loading={loading}
           onClick={load}
-          disabled={loading}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "重出中…" : "重新生成"}
-        </button>
+        />
       </div>
 
       {/* 题署一行：共几条 · 原文核验几条 · 内联术语几个 · 弦外之音几处。朱印描边小签。 */}

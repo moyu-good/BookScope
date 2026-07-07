@@ -24,6 +24,7 @@
 import { useMemo, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { SealButton } from "./SealButton";
 import { DossierHint } from "./RedheadDependencyGraph";
 
 // ---- 后端契约（对着 /api/agent/redhead/level-consistency 写，别改后端） ----
@@ -437,14 +438,13 @@ function ViewHeader({
       >
         {title}
       </h3>
-      <button
-        type="button"
+      <SealButton
+        size="sm"
+        label="重新生成"
+        loadingLabel="重出中…"
+        loading={loading}
         onClick={onReload}
-        disabled={loading}
-        className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-      >
-        {loading ? "重出中…" : "重新生成"}
-      </button>
+      />
     </div>
   );
 }

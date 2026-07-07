@@ -29,6 +29,8 @@
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 // ---- 后端契约（对着写，别改后端） ----
 
@@ -170,49 +172,27 @@ export function RedheadHardFacts({
     result.scanned &&
     (result.facts ?? []).some((f) => hasValue(f.value));
 
-  // ---- 未生成：入口卡片 ----
+  // ---- 未生成：统一入口卡（视觉表现根治 · FeatureEntryCard） ----
   if (!result) {
     return (
-      <div className="pt-4">
-        <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1 flex items-center gap-2"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          {/* 红头点缀：标题前一道朱砂短脊，预告这是红头公文视图 */}
-          <span
-            className="h-4 w-[3px] rounded-full bg-[var(--color-seal)]"
-            aria-hidden="true"
-          />
-          要点提取
-        </h3>
-        <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          一份红头文件里真正要照着办的硬信息——什么时候前办完、要达多少比例、管哪些单位、哪天生效哪天废止、谁来负责——往往散落在好几条款、好几页里。这功能把它们从全份里捞出来，聚成一张速查表，按五类分好，每条钉在原文。时间类的还能切到「时序视图」按先后排成一条线。适合党政公文 / 红头文件。
-        </p>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || !apiKey}
-          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "读这份公文捞要点中（约 1 分钟）…" : "生成要点提取"}
-        </button>
-        {error && (
-          <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
-            {error}
-          </p>
-        )}
-        {!apiKey && (
-          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
-            填了 API key 才能生成。
-          </p>
-        )}
+      <FeatureEntryCard
+        title="要点提取"
+        lead="一份红头文件里真正要照着办的硬信息——什么时候前办完、要达多少比例、管哪些单位、哪天生效哪天废止、谁来负责——往往散落在好几条款、好几页里。这功能把它们从全份里捞出来，聚成一张速查表，按五类分好，每条钉在原文。时间类的还能切到「时序视图」按先后排成一条线。适合党政公文 / 红头文件。"
+        actionLabel="生成要点提取"
+        loadingLabel="读这份公文捞要点中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读这份公文捞要点，约 1 分钟；同份已读过秒出"
+        error={error}
+      >
         {loading && (
           <RunningProcess
             label="读这份公文捞要点"
             hint="整份公文喂进模型，把时限 / 数字 / 范围 / 起止日 / 责任主体五类硬信息全捞出来，每条都回原文核验，约 1 分钟。"
           />
         )}
-      </div>
+      </FeatureEntryCard>
     );
   }
 
@@ -227,14 +207,13 @@ export function RedheadHardFacts({
           >
             要点提取
           </h3>
-          <button
-            type="button"
+          <SealButton
+            size="sm"
+            label="重新生成"
+            loadingLabel="重出中…"
+            loading={loading}
             onClick={load}
-            disabled={loading}
-            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-          >
-            {loading ? "重出中…" : "重新生成"}
-          </button>
+          />
         </div>
         {loading ? (
           <RunningProcess label="读这份公文捞要点" />
@@ -274,14 +253,13 @@ export function RedheadHardFacts({
         >
           要点提取
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新生成"
+          loadingLabel="重出中…"
+          loading={loading}
           onClick={load}
-          disabled={loading}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "重出中…" : "重新生成"}
-        </button>
+        />
       </div>
 
       {/* #45 硬指标稀：真硬指标(时限/数字/起止)全无、只抽到框架泛信息时,老实说破这份以方针为主

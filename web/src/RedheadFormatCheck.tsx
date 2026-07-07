@@ -26,6 +26,8 @@
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 // ---- 后端契约（对着 redhead_format_check.format_check_from_spine 写，别改后端） ----
 
@@ -162,48 +164,27 @@ export function RedheadFormatCheck({
   const gotSomething =
     !!result && result.scanned && (result.checks ?? []).length > 0;
 
-  // ---- 未生成：入口卡片 ----
+  // ---- 未生成：统一入口卡（视觉表现根治 · FeatureEntryCard） ----
   if (!result) {
     return (
-      <div className="pt-4">
-        <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1 flex items-center gap-2"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          <span
-            className="h-4 w-[3px] rounded-full bg-[var(--color-seal)]"
-            aria-hidden="true"
-          />
-          规范性自检
-        </h3>
-        <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          对照《党政机关公文格式》（GB/T 9704）逐项过一遍——发文字号、标题、成文日期、发文机关这些该有的要素齐没齐，文种用得对不对。这是有国标当尺子量出来的，不是凭感觉判。抽不到的要素老实区分"公文真没有"和"我们没抽到"，不冤枉一份其实规范的公文。
-        </p>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || !apiKey}
-          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "对着国标逐项校对中…" : "对照 GB/T 9704 自检"}
-        </button>
-        {error && (
-          <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
-            {error}
-          </p>
-        )}
-        {!apiKey && (
-          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
-            填了 API key 才能生成。
-          </p>
-        )}
+      <FeatureEntryCard
+        title="规范性自检"
+        lead={`对照《党政机关公文格式》（GB/T 9704）逐项过一遍——发文字号、标题、成文日期、发文机关这些该有的要素齐没齐，文种用得对不对。这是有国标当尺子量出来的，不是凭感觉判。抽不到的要素老实区分"公文真没有"和"我们没抽到"，不冤枉一份其实规范的公文。`}
+        actionLabel="对照 GB/T 9704 自检"
+        loadingLabel="对着国标逐项校对中…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="对照国标逐项校对；同份公文已读过秒出"
+        error={error}
+      >
         {loading && (
           <RunningProcess
             label="对照国标逐项校对"
             hint="拿这份公文的头要素，逐项对照 GB/T 9704 看齐没齐、文种对不对。同份公文已读过就秒出。"
           />
         )}
-      </div>
+      </FeatureEntryCard>
     );
   }
 
@@ -218,14 +199,13 @@ export function RedheadFormatCheck({
           >
             规范性自检
           </h3>
-          <button
-            type="button"
+          <SealButton
+            size="sm"
+            label="重新生成"
+            loadingLabel="重出中…"
+            loading={loading}
             onClick={load}
-            disabled={loading}
-            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-          >
-            {loading ? "重出中…" : "重新生成"}
-          </button>
+          />
         </div>
         {loading ? (
           <RunningProcess label="对照国标逐项校对" />
@@ -252,14 +232,13 @@ export function RedheadFormatCheck({
         >
           规范性自检
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新生成"
+          loadingLabel="重出中…"
+          loading={loading}
           onClick={load}
-          disabled={loading}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "重出中…" : "重新生成"}
-        </button>
+        />
       </div>
 
       {/* ── 校勘单眉首：一道朱砂细规 + 国标出处 + 齐 N/总 + 朱钩/朱叉/朱问三态计数 ── */}
