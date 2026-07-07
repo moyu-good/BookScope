@@ -1,13 +1,16 @@
 // ---------------------------------------------------------------------------
-// NarrativeCurve — 事件密度曲线（1.5.x 重做，作者拍板）
+// NarrativeCurve — 叙事曲线（重设计:转折落点，作者拍板）
 //
-// 砍三为二:旧的「节奏」(柱状画 tension)和「叙事曲线」(山水画 tension)画的是同一个东西、都吃
-// 模型糊出来的张力标量,合并成这一条。纵轴从"张力分"换成"能数的事"——每章高度 = 事件数 + 转折数
-// (从章脉 events / 伏笔回收数出来,每条能锚原文)。转折章标朱砂点,点一章 → 列出这章实际发生的
-// 几件事,每件能看原文。张力留在选中章明细里标"模型判读",绝不再当纵轴。
+// 这个功能只答一个问题:全书的转折 / 伏笔回收砸在哪几章。名字沿用"叙事曲线"(别破坏导航),
+// 但重心从"数量密度"挪到"转折在哪"。图里朱砂大点 = 转折章(伏笔在这章收掉),章号直接标在点边上,
+// 一眼看清转折落在哪几章、密还是疏;事件密度退成一层淡墨山形垫底,只给节奏感(见 ShanshuiCurve)。
 //
-// 点生成 → 调 /api/agent/narrative-curve(从共享章脉派生,命中缓存秒出)→ 画成事件密度长卷
-// (见 ShanshuiCurve)。evidence-first:这章没事件就标"平铺过渡"。
+// 点一个转折章 → 明细先列这章的转折(伏笔回收)每条 + 原文(核验过盖钤印、没命中标待核),再列这章
+// 发生的事;普通章至少列这章 events + 原文。每次点击都落到原文。张力只在明细里附带标"模型判读",
+// 绝不当纵轴(模型眼估的标量不可信)。
+//
+// 点生成 → 调 /api/agent/narrative-curve(从共享章脉派生,命中缓存秒出)。evidence-first:这章
+// 没事件就标"平铺过渡"。
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
@@ -15,6 +18,7 @@ import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { ShanshuiCurve, type CurveChapter } from "./ShanshuiCurve";
 import { FeatureEntryCard } from "./FeatureEntryCard";
 import { SealButton } from "./SealButton";
+import { SealMark } from "./SealMark";
 
 interface NarrativeCurveProps {
   sessionId: string;
@@ -96,7 +100,7 @@ export function NarrativeCurve({
     return (
       <FeatureEntryCard
         title="叙事曲线"
-        lead="逐章数能数的事：每章高度 = 事件数 + 转折数（伏笔回收），一眼看出整本书哪几章戏多、哪几章是转折。点一章列出这章实际发生的几件事，每件回原文核验。"
+        lead="看全书的转折和伏笔回收落在哪几章。转折章标成醒目的朱砂点、章号就印在点边上，一眼看清转折砸在哪几章、密还是疏；事件多少退成淡墨山形垫底，只给个节奏感。点一个转折章，看这章收了哪几条伏笔、每条回原文核验。"
         actionLabel="生成叙事曲线"
         loadingLabel="读全书出曲线中（约 1 分钟）…"
         onAction={load}
@@ -138,73 +142,90 @@ export function NarrativeCurve({
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        {n} 章 · 转折章 {turningN} 处（朱砂点）。山高 = 这章的事件数 + 转折数，都是从章脉数出来、每条能回原文的，不是模型眼估的张力。鼠标移过去吸附最近章、点看这章发生了什么。
+        全书 {n} 章，转折落在其中 <span style={{ color: "var(--color-seal)" }}>{turningN}</span> 章（朱砂点，章号标在点边；一章收多条伏笔的点更大）。淡墨山形是事件多少，只垫个节奏感、不是重点。鼠标移过去吸附最近章，点转折章看这章收了哪几条伏笔、回原文核验。
       </p>
 
       <ShanshuiCurve chapters={chapters} selected={selected} onSelect={setSelected} />
 
       {sel && (
         <div className="mt-3 p-3 rounded border border-[var(--color-rule)] bg-white">
-          <p className="text-sm font-bold text-[var(--color-ink)]">
-            第 {sel.chapter} 章 · {sel.event_count} 件事
-            {sel.turning_count > 0 && (
-              <span style={{ color: "var(--color-seal)" }}> · {sel.turning_count} 处转折</span>
+          {/* 标题：转折章朱砂标出来，先报转折处数（主角），事件数退成附注 */}
+          <p className="text-sm font-bold text-[var(--color-ink)] flex items-center gap-2">
+            <span>第 {sel.chapter} 章</span>
+            {sel.is_turning ? (
+              <span
+                className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-bold"
+                style={{ color: "var(--color-seal)", background: "var(--color-seal-soft)" }}
+              >
+                转折章 · 收 {sel.turning_count} 条伏笔
+              </span>
+            ) : (
+              <span className="text-xs font-normal text-[var(--color-ink-muted)]">
+                过渡章 · {sel.event_count} 件事
+              </span>
             )}
           </p>
 
-          {/* 这章实际发生的几件事，每件回原文核验 */}
-          {sel.events.length > 0 ? (
-            <ul className="mt-2 space-y-2">
-              {sel.events.map((ev, i) => (
-                <li key={`ev-${i}`} className="text-sm">
-                  <p className="text-[var(--color-ink)]">· {ev.text}</p>
-                  {ev.evidence ? (
-                    <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)] border-l-2 border-[var(--color-rule)] pl-2 leading-relaxed">
-                      {ev.evidence}
-                      <span className="ml-1" style={{ color: "var(--color-seal)" }} title="原文已核验">
-                        ✓核
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)]">
-                      原文未在书中比对命中，待核
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-              这章没数出关键事件，平铺过渡 / 待核。
-            </p>
-          )}
-
-          {/* 转折（伏笔回收）单列 */}
+          {/* 转折章：转折（伏笔回收）领衔——治"点了没料"，每条钉原文 */}
           {sel.turning_points.length > 0 && (
-            <div className="mt-3">
+            <div className="mt-2">
               <p className="text-xs font-bold" style={{ color: "var(--color-seal)" }}>
-                这章的转折（伏笔回收）
+                这章收掉的伏笔 / 转折
               </p>
-              <ul className="mt-1 space-y-2">
+              <ul className="mt-1.5 space-y-2.5">
                 {sel.turning_points.map((tp, i) => (
                   <li key={`tp-${i}`} className="text-sm">
-                    <p className="text-[var(--color-ink)]">· {tp.hook}</p>
+                    <p className="text-[var(--color-ink)] font-medium">· {tp.hook}</p>
                     {tp.evidence ? (
-                      <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)] border-l-2 pl-2 leading-relaxed" style={{ borderColor: "var(--color-seal)" }}>
-                        {tp.evidence}
-                        <span className="ml-1" style={{ color: "var(--color-seal)" }} title="原文已核验">
-                          ✓核
-                        </span>
-                      </p>
+                      <div className="mt-1 ml-3 flex items-start gap-1.5">
+                        <p className="flex-1 text-xs text-[var(--color-ink-muted)] border-l-2 pl-2 leading-relaxed" style={{ borderColor: "var(--color-seal)" }}>
+                          {tp.evidence}
+                        </p>
+                        <SealMark size={22} title="原文已逐字核验" className="mt-0.5" />
+                      </div>
                     ) : (
-                      <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)]">
-                        原文未命中，待核
+                      <p className="mt-1 ml-3 text-xs text-[var(--color-ink-muted)] italic">
+                        原文未在书中比对命中，待核
                       </p>
                     )}
                   </li>
                 ))}
               </ul>
             </div>
+          )}
+
+          {/* 这章发生的事：转折章里退为次级列表，普通章里就是主要内容 */}
+          {sel.events.length > 0 ? (
+            <div className={sel.turning_points.length > 0 ? "mt-3 pt-2 border-t border-[var(--color-rule)]" : "mt-2"}>
+              {sel.turning_points.length > 0 && (
+                <p className="text-xs font-bold text-[var(--color-ink-muted)]">这章发生的事</p>
+              )}
+              <ul className={sel.turning_points.length > 0 ? "mt-1.5 space-y-2" : "space-y-2"}>
+                {sel.events.map((ev, i) => (
+                  <li key={`ev-${i}`} className="text-sm">
+                    <p className="text-[var(--color-ink)]">· {ev.text}</p>
+                    {ev.evidence ? (
+                      <div className="mt-0.5 ml-3 flex items-start gap-1.5">
+                        <p className="flex-1 text-xs text-[var(--color-ink-muted)] border-l-2 border-[var(--color-rule)] pl-2 leading-relaxed">
+                          {ev.evidence}
+                        </p>
+                        <SealMark size={20} title="原文已逐字核验" className="mt-0.5" />
+                      </div>
+                    ) : (
+                      <p className="mt-0.5 ml-3 text-xs text-[var(--color-ink-muted)] italic">
+                        原文未在书中比对命中，待核
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            sel.turning_points.length === 0 && (
+              <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
+                这章没数出关键事件，平铺过渡 / 待核。
+              </p>
+            )
           )}
 
           {/* 张力等四维：只附带，标"模型判读"，不当纵轴 */}

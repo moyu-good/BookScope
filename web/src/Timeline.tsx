@@ -1,11 +1,15 @@
 // ---------------------------------------------------------------------------
 // Timeline — 时间线 / 事件梳理（读者发明区）
 //
-// 点"梳理时间线"→ 调 /api/agent/timeline（整本进上下文按时序梳理事件）→ 竖向时间线。
-// 每条带时间 / 事件 / 章节 / 原文出处。按需 fetch 省 token。沿用「全书透视」轻量子块风格。
+// 点"梳理时间线"→ 调 /api/agent/timeline（整本进上下文按时序梳理事件）→ 时间轴图。
+// 命根子不是"按章节把事件列出来"，而是两件竖列表做不到的事：
+//   1. 把倒叙 / 多线的故事还原成真实时序（events 已按 order 排好真实先后）；
+//   2. 一眼看出哪里作者用了倒叙——某事件故事上早发生、却在靠后的章节才讲
+//      （order 靠前但 chapter 靠后），或反之（提前讲了后面才发生的事）。
+// 每条带时间 / 事件 / 章节 / 原文出处。按需 fetch 省 token。
 // ---------------------------------------------------------------------------
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
 import { FeatureEntryCard } from "./FeatureEntryCard";
@@ -28,6 +32,60 @@ interface TimelineProps {
   baseUrl: string;
 }
 
+// 一个事件在轴上排布时算好的派生量：故事序位次、叙述序位次、错位方向与幅度。
+interface PlacedEvent {
+  ev: TimelineEvent;
+  idx: number; // 在 events 里的下标（点开原文用它）
+  newPeriod: boolean; // time 文本比上一条变了 = 进入新时期，轴上拉开留白
+  dislocation: "flashback" | "foreshadow" | null; // 倒叙 / 预叙，null = 顺叙
+  gapChapters: number; // 章序偏离故事序多少章（绝对值），标注强弱用
+}
+
+// 把后端按 order 排好的事件，算出每条的"章序 vs 故事序"错位。
+//
+// 思路：events 已按故事真实先后（order）排好，下标 i 就是故事序位次。
+// 再看每条讲它的章号（chapter）在所有事件里排第几名——叙述序位次。
+// 两个位次差得多 = 这段脱离了顺叙：
+//   叙述序明显靠后（后面章节才讲早发生的事）→ 倒叙 flashback；
+//   叙述序明显靠前（前面章节先讲了后发生的事）→ 预叙 / 插叙 foreshadow。
+// 用位次差而非章号直接比，是因为不同书章号疏密差得远，位次更稳。
+function placeEvents(events: TimelineEvent[]): PlacedEvent[] {
+  // 章序位次：按 chapter 升序给每条一个名次（同章号并列取平均名次，避免抖动）。
+  const byChapter = events
+    .map((ev, idx) => ({ idx, chapter: ev.chapter }))
+    .sort((a, b) => a.chapter - b.chapter || a.idx - b.idx);
+  const narrativeRank = new Array<number>(events.length);
+  byChapter.forEach((item, rank) => {
+    narrativeRank[item.idx] = rank;
+  });
+
+  // 错位判定阈值：位次差要占总量一定比例才算"明显"，短列表放宽、长列表收紧，
+  // 避免相邻一两位的正常抖动被误标成倒叙。至少差 2 位起判。
+  const threshold = Math.max(2, Math.round(events.length * 0.15));
+
+  return events.map((ev, i) => {
+    const storyRank = i; // 已按 order 排好，下标即故事序位次
+    const drift = narrativeRank[i] - storyRank; // >0 越靠后章节才讲
+    let dislocation: PlacedEvent["dislocation"] = null;
+    if (drift >= threshold) dislocation = "flashback"; // 早发生、后面才讲
+    else if (drift <= -threshold) dislocation = "foreshadow"; // 后发生、前面先讲
+
+    // 第一条永远起一个时期刻度；之后只在 time 文本变了才起新刻度。
+    const prevTime = i > 0 ? events[i - 1].time?.trim() : "";
+    const newPeriod = !!ev.time?.trim() && (i === 0 || ev.time.trim() !== prevTime);
+
+    // 章序偏离故事序多少章（拿真实章号差，读者看得懂"隔了几章"）
+    const gapChapters = (() => {
+      // 找故事序上相邻那条的章号做参照，算这条讲得早/晚了几章
+      if (dislocation === null) return 0;
+      const ref = i > 0 ? events[i - 1].chapter : events[i + 1]?.chapter ?? ev.chapter;
+      return Math.abs(ev.chapter - ref);
+    })();
+
+    return { ev, idx: i, newPeriod, dislocation, gapChapters };
+  });
+}
+
 export function Timeline({
   sessionId,
   provider,
@@ -40,6 +98,12 @@ export function Timeline({
   const [error, setError] = useState<string | null>(null);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [trace, setTrace] = useState<RunTrace | null>(null);
+
+  const placed = useMemo(() => (events ? placeEvents(events) : []), [events]);
+  const dislocationCount = useMemo(
+    () => placed.filter((p) => p.dislocation !== null).length,
+    [placed],
+  );
 
   async function load() {
     setLoading(true);
@@ -120,9 +184,12 @@ export function Timeline({
           onClick={load}
         />
       </div>
-      <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-        把全书事件按真实时间先后理清（多线/倒叙也还原顺序）。点一条看原文出处。
+      <p className="text-sm text-[var(--color-ink-muted)] mb-2">
+        按故事真实先后排在一条主轴上；时期一变就拉开留白，看得出事件的疏密。
       </p>
+
+      {/* 图例：读者要先懂"轴左的记号是倒叙" */}
+      <TimelineLegend dislocationCount={dislocationCount} />
 
       {error && (
         <p className="text-sm" style={{ color: "var(--color-seal)" }}>
@@ -142,59 +209,291 @@ export function Timeline({
         >
           {/* 手卷上轴杆 */}
           <div style={{ height: 7, background: "var(--color-ink)", opacity: 0.5 }} aria-hidden />
-          <ol
-            className="relative border-l-2 ml-6 mr-4 py-4"
-            style={{ borderColor: "color-mix(in srgb, var(--color-seal) 30%, transparent)", animation: "tl-unroll .6s ease-out" }}
-          >
-            <style>{`@keyframes tl-unroll{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
-          {events.map((ev, i) => (
-            <li key={i} className="mb-4 ml-4">
-              <span
-                className="absolute -left-[7px] w-3 h-3 rounded-full"
-                style={{ background: "var(--color-seal)", boxShadow: "0 0 0 2px var(--color-paper-raised)" }}
-                aria-hidden="true"
-              />
-              <button
-                type="button"
-                onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                className="text-left w-full"
-              >
-                {ev.time && (
-                  <div className="text-xs text-[var(--color-seal)] mb-0.5">
-                    {ev.time}
-                  </div>
-                )}
-                <div
-                  className="text-body leading-relaxed text-[var(--color-ink)]"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  {ev.event}
-                </div>
-                <div className="text-xs text-[var(--color-ink-muted)] mt-1 flex items-center gap-1.5">
-                  <span>第 {ev.chapter} 章</span>
-                  {ev.verified && <SealMark size={17} title="原文已核验" />}
-                  <span className="ml-auto opacity-60">
-                    {openIdx === i ? "收起原文" : "看原文"}
-                  </span>
-                </div>
-              </button>
-              {openIdx === i && ev.evidence && (
-                <div
-                  className="mt-1.5 border-l-2 border-[var(--color-seal)]/40 pl-3 py-1 text-body-sm leading-relaxed text-[var(--color-ink)]"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  {ev.evidence}
-                </div>
-              )}
-            </li>
-          ))}
-          </ol>
+
+          {/* 时间轴：一条竖主轴，事件按故事序自上而下；倒叙 / 预叙的事件从轴上错开标出来 */}
+          <div className="relative py-4 pr-3" style={{ paddingLeft: 92 }}>
+            <style>{TIMELINE_CSS}</style>
+
+            {/* 主轴竖线（朱砂淡），压在时期刻度与事件之间 */}
+            <div
+              className="absolute top-4 bottom-4"
+              style={{
+                left: 84,
+                width: 2,
+                background:
+                  "linear-gradient(var(--color-seal) 0%, color-mix(in srgb, var(--color-seal) 35%, transparent) 100%)",
+              }}
+              aria-hidden
+            />
+
+            <ol className="relative m-0 p-0 list-none tl-unroll">
+              {placed.map((p, i) => (
+                <TimelineRow
+                  key={p.idx}
+                  placed={p}
+                  animIndex={i}
+                  open={openIdx === p.idx}
+                  onToggle={() =>
+                    setOpenIdx(openIdx === p.idx ? null : p.idx)
+                  }
+                />
+              ))}
+            </ol>
+          </div>
+
           {/* 手卷下轴杆 */}
           <div style={{ height: 7, background: "var(--color-ink)", opacity: 0.5 }} aria-hidden />
         </div>
       )}
 
-      {events && !loading && <RunStats trace={trace} note={`${events.length} 个事件`} />}
+      {events && !loading && (
+        <RunStats
+          trace={trace}
+          note={
+            dislocationCount > 0
+              ? `${events.length} 个事件 · ${dislocationCount} 处倒叙 / 插叙`
+              : `${events.length} 个事件 · 基本顺叙`
+          }
+        />
+      )}
     </div>
   );
 }
+
+// 图例：把"轴左朱砂记号 = 倒叙"这条读图规则先讲清楚，否则读者看不懂错位标记。
+function TimelineLegend({ dislocationCount }: { dislocationCount: number }) {
+  if (dislocationCount === 0) {
+    return (
+      <p className="text-xs text-[var(--color-ink-muted)] mb-3 opacity-80">
+        全书基本顺着讲，没有明显的倒叙 / 插叙。
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 text-xs text-[var(--color-ink-muted)]">
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className="inline-block w-2.5 h-2.5 rounded-full"
+          style={{ background: "var(--color-seal)" }}
+          aria-hidden
+        />
+        倒叙：故事上早发生、后面章节才讲
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className="inline-block w-2.5 h-2.5"
+          style={{
+            border: "1.5px solid var(--color-seal)",
+            background: "var(--color-seal-soft)",
+            transform: "rotate(45deg)",
+          }}
+          aria-hidden
+        />
+        插叙 / 预叙：后发生、却提前讲了
+      </span>
+    </div>
+  );
+}
+
+// 一行事件。顺叙的贴着主轴排；倒叙 / 预叙的往轴左错开一截、连一条斜引线，一眼看出脱序。
+function TimelineRow({
+  placed,
+  animIndex,
+  open,
+  onToggle,
+}: {
+  placed: PlacedEvent;
+  animIndex: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { ev, newPeriod, dislocation, gapChapters } = placed;
+  const isDislocated = dislocation !== null;
+
+  return (
+    <li
+      className="relative tl-row"
+      style={{
+        // 新时期上多留白，制造"疏"；同一时期挨着，制造"密"
+        marginTop: newPeriod ? 26 : 10,
+        // CSS 变量喂给 keyframes 做入场逐条延迟（不用 rAF，headless 也能跑）
+        ["--tl-delay" as string]: `${Math.min(animIndex * 45, 700)}ms`,
+      }}
+    >
+      {/* 时期刻度标签：立在主轴左侧，只在换时期时显示，等于把 time 当刻度 */}
+      {newPeriod && ev.time && (
+        <div
+          className="absolute text-xs font-medium text-[var(--color-seal)] text-right leading-tight"
+          style={{ left: -92, width: 74, top: 2, fontFamily: "var(--font-display)" }}
+        >
+          {ev.time}
+        </div>
+      )}
+
+      {/* 轴上的节点：顺叙实心小圆点；倒叙实心大点；插叙空心菱形 */}
+      <TimelineNode dislocation={dislocation} />
+
+      {/* 错位事件的斜引线：从轴上节点连到错开的卡片，视觉上"拉出去" */}
+      {isDislocated && (
+        <span
+          className="absolute"
+          style={{
+            left: -8,
+            top: 7,
+            width: 8,
+            height: 2,
+            background: "var(--color-seal)",
+            opacity: 0.55,
+          }}
+          aria-hidden
+        />
+      )}
+
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`text-left w-full rounded-sm ${isDislocated ? "tl-card-off" : "tl-card"}`}
+        style={{
+          // 错位事件整块往左错开一截并加朱砂描边，从顺叙的直线里"跳"出来
+          marginLeft: isDislocated ? -14 : 0,
+          padding: isDislocated ? "6px 9px" : "2px 0 2px 2px",
+          background: isDislocated ? "var(--color-seal-soft)" : "transparent",
+          border: isDislocated
+            ? "1px solid color-mix(in srgb, var(--color-seal) 40%, transparent)"
+            : "1px solid transparent",
+        }}
+      >
+        {/* 倒叙 / 插叙标签：说破"这里作者用了倒叙"，命根子的显式标注 */}
+        {isDislocated && (
+          <span
+            className="inline-flex items-center gap-1 mb-1 px-1.5 py-0.5 rounded-sm text-[var(--color-seal)]"
+            style={{
+              fontSize: "0.6875rem",
+              lineHeight: 1.2,
+              border: "1px solid color-mix(in srgb, var(--color-seal) 45%, transparent)",
+              fontFamily: "var(--font-display)",
+            }}
+          >
+            {dislocation === "flashback" ? "倒叙" : "插叙 / 预叙"}
+            {gapChapters > 0 && (
+              <span className="opacity-70">
+                · {dislocation === "flashback" ? "隔" : "提前"} {gapChapters} 章
+              </span>
+            )}
+          </span>
+        )}
+
+        <div
+          className="text-body leading-relaxed text-[var(--color-ink)]"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {ev.event}
+        </div>
+        <div className="text-xs text-[var(--color-ink-muted)] mt-1 flex items-center gap-1.5">
+          {/* 顺叙时 time 已在时期标签上，这里只在同一时期内补一个细时间，不喧宾 */}
+          {!newPeriod && ev.time && (
+            <span className="text-[var(--color-seal)] opacity-80">{ev.time}</span>
+          )}
+          <span>第 {ev.chapter} 章讲</span>
+          {ev.verified ? (
+            <SealMark size={17} title="原文已核验" />
+          ) : (
+            <span className="opacity-60">待核</span>
+          )}
+          <span className="ml-auto opacity-60">
+            {open ? "收起原文" : "看原文"}
+          </span>
+        </div>
+      </button>
+
+      {open && (
+        <div
+          className="mt-1.5 ml-0.5 border-l-2 pl-3 py-1 text-body-sm leading-relaxed text-[var(--color-ink)] tl-quote"
+          style={{
+            fontFamily: "var(--font-display)",
+            borderColor: "color-mix(in srgb, var(--color-seal) 40%, transparent)",
+          }}
+        >
+          {ev.evidence ? ev.evidence : "这条没在原文里找到确切出处，待核。"}
+        </div>
+      )}
+    </li>
+  );
+}
+
+// 轴上节点：三种形态对应顺叙 / 倒叙 / 插叙，光看节点就分得出脱序类型。
+function TimelineNode({
+  dislocation,
+}: {
+  dislocation: PlacedEvent["dislocation"];
+}) {
+  if (dislocation === "flashback") {
+    // 倒叙：实心大朱砂点，最跳眼
+    return (
+      <span
+        className="absolute rounded-full"
+        style={{
+          left: -8,
+          top: 3,
+          width: 13,
+          height: 13,
+          background: "var(--color-seal)",
+          boxShadow: "0 0 0 3px var(--color-paper-raised)",
+        }}
+        aria-hidden
+      />
+    );
+  }
+  if (dislocation === "foreshadow") {
+    // 插叙 / 预叙：空心菱形，跟倒叙区分开
+    return (
+      <span
+        className="absolute"
+        style={{
+          left: -7,
+          top: 3,
+          width: 11,
+          height: 11,
+          border: "2px solid var(--color-seal)",
+          background: "var(--color-paper-raised)",
+          transform: "rotate(45deg)",
+          boxShadow: "0 0 0 2px var(--color-paper-raised)",
+        }}
+        aria-hidden
+      />
+    );
+  }
+  // 顺叙：小实心点，贴着主轴
+  return (
+    <span
+      className="absolute rounded-full"
+      style={{
+        left: -3,
+        top: 6,
+        width: 8,
+        height: 8,
+        background: "var(--color-seal)",
+        boxShadow: "0 0 0 2px var(--color-paper-raised)",
+      }}
+      aria-hidden
+    />
+  );
+}
+
+// 入场动画全走 CSS：整卷从上展开一次 + 每行按 --tl-delay 依次浮入。
+// headless 预览把 rAF 节流，所以显示不依赖 JS 动画帧——纯 CSS keyframes。
+const TIMELINE_CSS = `
+@keyframes tl-unroll { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.tl-unroll { animation: tl-unroll .5s ease-out both; }
+@keyframes tl-rowin { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.tl-row { animation: tl-rowin .45s ease-out both; animation-delay: var(--tl-delay, 0ms); }
+.tl-card { transition: background .15s ease, border-color .15s ease; }
+.tl-card:hover { background: var(--color-paper-sunken); }
+.tl-card-off { transition: border-color .15s ease; }
+.tl-card-off:hover { border-color: var(--color-seal); }
+@keyframes tl-quotein { from { opacity: 0; } to { opacity: 1; } }
+.tl-quote { animation: tl-quotein .25s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .tl-unroll, .tl-row, .tl-quote { animation: none; }
+}
+`;

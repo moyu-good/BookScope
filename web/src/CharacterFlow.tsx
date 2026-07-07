@@ -55,11 +55,14 @@ const PAD_RIGHT = 24;
 const PAD_TOP = 28;
 const PAD_BOTTOM = 28;
 
-// storyline 是横向泳道：每人一条线穿过全书，画不下几百条（一百多回的书上百号人，全铺成
-// 泳道会糊成发丝、力学松弛也卡）。所以按出场频次取前 N 个主要角色——这是 storyline 格式的
-// 固有约束，不是关系图那种该去掉的帽。caption 透明写「主要 N 人 / 全书共 M 人」。
-// 18 太少（原值），抬到 40：泳道还排得开、又能看到更多主要角色。
-const TOP_CHARS = 40;
+// storyline 是横向泳道：每人一条线穿过全书。角色一多（几十号人）就糊成面条、看不清也难点。
+// 用户其实只想看主要角色何时同台，不是所有人的所有线。所以默认只画戏份最高的 8 个人，
+// 顶部给个控件让想看全的人一键展开到全部。
+//
+// 戏份排序键：每个角色「出现的章数」——数 chapters 里有多少章的 present 含这个名字。
+// 这个数直接从后端给的数据里数出来，不是拍脑袋定的。多人同场的群戏不会虚高谁的排名
+// （那是「同场对数」的毛病），出现章数更能代表一个人在全书的分量。
+const DEFAULT_TOP = 8; // 默认只画主要 8 人
 
 // 选中的同场束：唯一标识 = 章号 + 两人名
 interface SelectedPair {
@@ -89,6 +92,8 @@ export function CharacterFlow({
   const [selected, setSelected] = useState<SelectedPair | null>(null);
   const [selEv, setSelEv] = useState<PairEvidence | null>(null);
   const [hoverChar, setHoverChar] = useState<string | null>(null);
+  // 只看主要 DEFAULT_TOP 人（默认），还是看全部。控件在顶部，默认收着。
+  const [showAll, setShowAll] = useState(false);
 
   // 选中某条同场对 → 按需调 /agent/spine-evidence 取那一章里支撑这对人的那句原文(纯检索,不要 key)。
   useEffect(() => {
@@ -172,7 +177,7 @@ export function CharacterFlow({
     }
   }
 
-  // 全书出场总人数（给说明用——穷尽化后可能上百，图里只画前 TOP_CHARS 个）
+  // 全书出场总人数（给说明用——图里默认只画戏份最高的前 DEFAULT_TOP 个）
   const totalCast = useMemo(() => {
     if (!chapters) return 0;
     const all = new Set<string>();
@@ -180,25 +185,24 @@ export function CharacterFlow({
     return all.size;
   }, [chapters]);
 
-  // 画图用的视图：只留出场最频繁的前 TOP_CHARS 个角色，pairs 两端都在内才保留。
-  // 长尾次要人物（一两章露个脸）不进 storyline——否则泳道糊成一团、力学松弛也卡。
+  // 画图用的视图：默认只留戏份最高的前 DEFAULT_TOP 个角色（点了「看全部」就全留）。
+  // pairs 两端都在保留名单里才画——被过滤掉的次要人物不占泳道、也不牵同场束。
+  // 戏份 = 出现的章数（数这个人在多少章的 present 里），从后端数据里数出来。
   const view = useMemo(() => {
     if (!chapters) return null;
-    const freq = new Map<string, number>();
+    const chapterCount = new Map<string, number>();
     for (const c of chapters)
-      for (const name of c.present) freq.set(name, (freq.get(name) ?? 0) + 1);
-    const kept = new Set(
-      [...freq.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, TOP_CHARS)
-        .map(([name]) => name),
-    );
+      for (const name of c.present)
+        chapterCount.set(name, (chapterCount.get(name) ?? 0) + 1);
+    const ranked = [...chapterCount.entries()].sort((a, b) => b[1] - a[1]);
+    const limit = showAll ? ranked.length : DEFAULT_TOP;
+    const kept = new Set(ranked.slice(0, limit).map(([name]) => name));
     return chapters.map((c) => ({
       chapter: c.chapter,
       present: c.present.filter((n) => kept.has(n)),
       pairs: c.pairs.filter((p) => kept.has(p.a) && kept.has(p.b)),
     }));
-  }, [chapters]);
+  }, [chapters, showAll]);
 
   // ----- 布局派生量：人物 lane 基线、各章 x、每人出现区间、每章戏份 -----
   const layout = useMemo(() => {
@@ -437,6 +441,25 @@ export function CharacterFlow({
           : `${names.length} 个人物`}
         、{n} 章（{totalPairs} 条同场）。横线穿全书、线越粗这章戏越多；同场处两线靠拢成束，点束看那一章的原文出处（点开现取）。
       </p>
+
+      {/* 主要 N 人 / 全部 的切换：默认收在主要 DEFAULT_TOP 人，戏份多的书全画会糊。
+          只有当全书人数确实多于当前画的（有得可展）时才出这个控件，克制不喧宾夺主。 */}
+      {totalCast > DEFAULT_TOP && (
+        <div className="mb-2 flex items-center gap-3 text-xs">
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="px-2 py-0.5 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+          >
+            {showAll ? `只看主要 ${DEFAULT_TOP} 人` : `看全部 ${totalCast} 人`}
+          </button>
+          {!showAll && (
+            <span className="text-[var(--color-ink-muted)]">
+              只画了戏份最高的 {DEFAULT_TOP} 人（按出现章数）
+            </span>
+          )}
+        </div>
+      )}
 
       <svg
         ref={svgRef}
