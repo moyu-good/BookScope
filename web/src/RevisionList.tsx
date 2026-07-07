@@ -14,6 +14,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SealMark } from "./SealMark";
+import { SealButton } from "./SealButton";
 import {
   CATEGORY_LABEL,
   buildRevisionMarkdown,
@@ -221,16 +222,14 @@ export function RevisionList({
     <div className="pt-2">
       {/* 工具条：汇总 + 计数 + 导出 */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="一键汇总全书诊断"
+          loadingLabel={`汇总中 · 正在拉「${digestStage ?? ""}」…`}
+          loading={digesting}
+          disabled={!apiKey}
           onClick={runDigest}
-          disabled={digesting || !apiKey}
-          className="text-xs px-3 py-1.5 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {digesting
-            ? `汇总中 · 正在拉「${digestStage ?? ""}」…`
-            : "一键汇总全书诊断"}
-        </button>
+        />
         <button
           type="button"
           onClick={handleExport}
