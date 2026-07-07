@@ -26,6 +26,8 @@ interface SealButtonProps {
   label: string;
   /** loading 时的文字（默认「钤印中…」） */
   loadingLabel?: string;
+  /** 尺寸：md（默认）= 入口主按钮；sm = 结果区「重新生成」这类次级动作 */
+  size?: "sm" | "md";
   className?: string;
   title?: string;
 }
@@ -36,6 +38,7 @@ export function SealButton({
   disabled = false,
   label,
   loadingLabel,
+  size = "md",
   className = "",
   title,
 }: SealButtonProps) {
@@ -56,7 +59,9 @@ export function SealButton({
       }}
       onAnimationEnd={() => setStamping(false)}
       className={[
-        "seal-button relative overflow-hidden text-sm px-4 py-2 rounded border font-medium",
+        `seal-button relative overflow-hidden rounded border font-medium ${
+          size === "sm" ? "text-xs px-3 py-1.5" : "text-sm px-4 py-2"
+        }`,
         "transition-colors hover:brightness-105 disabled:opacity-60 disabled:cursor-default",
         stamping ? "seal-button--stamping" : "",
         className,

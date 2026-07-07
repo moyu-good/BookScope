@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { SealMark } from "./SealMark";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface Claim {
   order: number;
@@ -87,20 +89,39 @@ export function ArgumentStructure({
     }
   }
 
+  // 空态（还没梳理）：统一入口卡（视觉表现根治 · FeatureEntryCard）
+  if (!claims) {
+    return (
+      <FeatureEntryCard
+        title="论点结构"
+        lead="拆这本书的论证骨架：作者主张了什么、靠什么撑，每条钉在原文。"
+        actionLabel="梳理论点"
+        loadingLabel="梳理中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书拆论证，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
+        {loading && <RunningProcess label="梳理论点结构" />}
+      </FeatureEntryCard>
+    );
+  }
+
   return (
     <div className="pt-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed pr-4">
           拆这本书的论证骨架：作者主张了什么、靠什么撑，每条钉在原文。
         </p>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新梳理"
+          loadingLabel="梳理中…"
+          loading={loading}
           onClick={load}
-          disabled={loading || !apiKey}
-          className="shrink-0 text-xs px-3 py-1.5 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "梳理中（约 1 分钟）…" : claims ? "重新梳理" : "梳理论点"}
-        </button>
+          className="shrink-0"
+        />
       </div>
 
       {error && (

@@ -13,6 +13,8 @@
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { ShanshuiCurve, type CurveChapter } from "./ShanshuiCurve";
+import { FeatureEntryCard } from "./FeatureEntryCard";
+import { SealButton } from "./SealButton";
 
 interface NarrativeCurveProps {
   sessionId: string;
@@ -92,41 +94,24 @@ export function NarrativeCurve({
 
   if (!chapters) {
     return (
-      <div className="pt-4">
-        <h3
-          className="text-base font-bold text-[var(--color-ink)] mb-1"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          叙事曲线
-        </h3>
-        <p className="text-sm text-[var(--color-ink-muted)] mb-3">
-          逐章数能数的事：每章高度 = 事件数 + 转折数（伏笔回收），一眼看出整本书哪几章戏多、哪几章是转折。点一章列出这章实际发生的几件事，每件回原文核验。
-        </p>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || !apiKey}
-          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "读全书出曲线中（约 1 分钟）…" : "生成叙事曲线"}
-        </button>
-        {error && (
-          <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
-            {error}
-          </p>
-        )}
-        {!apiKey && (
-          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
-            填了 API key 才能生成。
-          </p>
-        )}
+      <FeatureEntryCard
+        title="叙事曲线"
+        lead="逐章数能数的事：每章高度 = 事件数 + 转折数（伏笔回收），一眼看出整本书哪几章戏多、哪几章是转折。点一章列出这章实际发生的几件事，每件回原文核验。"
+        actionLabel="生成叙事曲线"
+        loadingLabel="读全书出曲线中（约 1 分钟）…"
+        onAction={load}
+        loading={loading}
+        disabled={!apiKey}
+        hint="读全书出章脉，约 1 分钟；命中缓存秒出"
+        error={error}
+      >
         {loading && (
           <RunningProcess
             label="读全书出叙事曲线"
             hint="整本书喂进模型逐章精读出章脉，再数每章的事件和伏笔回收，约 1 分钟。"
           />
         )}
-      </div>
+      </FeatureEntryCard>
     );
   }
 
@@ -143,14 +128,13 @@ export function NarrativeCurve({
         >
           叙事曲线
         </h3>
-        <button
-          type="button"
+        <SealButton
+          size="sm"
+          label="重新生成"
+          loadingLabel="重出中…"
+          loading={loading}
           onClick={load}
-          disabled={loading}
-          className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-        >
-          {loading ? "重出中…" : "重新生成"}
-        </button>
+        />
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
