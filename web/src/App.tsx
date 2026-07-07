@@ -8,6 +8,8 @@ import { Reader } from "./Reader";
 import { bookScale } from "./bookScale";
 import type { BookScale } from "./bookScale";
 import { ScaleBanner } from "./ScaleBanner";
+import { SpineWarmupBanner } from "./SpineWarmupBanner";
+import type { SpineWarmupPhase } from "./SpineWarmupBanner";
 import { ActionLedger } from "./ActionLedger";
 import { CommitmentTracker } from "./CommitmentTracker";
 import { StanceSubtext } from "./StanceSubtext";
@@ -1052,6 +1054,116 @@ export function App() {
     };
   }, [currentSession]);
 
+  // ── 章脉后台预建（性能 Lever B 前端）─────────────────────────────────────
+  // 超长文第一次打开要整本读一遍建章脉（可能十几分钟）。一进这本书的分析台（书已选
+  // + 已填 key）就后台起预建，把等待挪到后台；建好后各整本书功能命中缓存秒出。
+  //
+  // phase：null=不显示（idle / error / 还没起）；building=在建；done=建好（短暂显示后收起）。
+  const [warmupPhase, setWarmupPhase] = useState<SpineWarmupPhase | null>(null);
+  // 去重：按 book_session_id 记"这本已经起过预建了"，换书才对新书再发一次。
+  // 不放 state——它只是"发没发过"的账本，不该触发 render。
+  const warmedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // 换书 / 掉 key：先清掉上一本的横幅，别让旧状态串到新书上。
+    setWarmupPhase(null);
+    // demo 是静态样本、没真后端，别发预建；没选书 / 没 key 也不发。
+    if (DEMO || !currentSession || !apiKey) return;
+    const sessionId = currentSession.session_id;
+    // 已对这本起过 → 不重发（防每次 render / 切 mode 重打）。换书 sessionId 变，新书没记过。
+    if (warmedRef.current.has(sessionId)) return;
+    warmedRef.current.add(sessionId);
+
+    // model / base_url 口径要和别的整本书功能一致（detect-genre 同款内联）：
+    // POST 和 GET 两边传同一个 model，空就都不传 → 后端按 provider 推同一个默认，
+    // 否则缓存键 / 状态键对不上（后端硬约束）。
+    const warmupModel = model.trim();
+    const warmupBaseUrl =
+      provider === "anthropic" ? "" : baseUrl.trim();
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const stopPolling = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const pollOnce = async () => {
+      try {
+        const params = new URLSearchParams({
+          book_session_id: sessionId,
+          provider,
+        });
+        if (warmupModel) params.set("model", warmupModel);
+        const resp = await fetch(
+          `/api/agent/prewarm-spine/status?${params.toString()}`,
+        );
+        if (!resp.ok || cancelled) return;
+        const data = (await resp.json()) as {
+          status: "idle" | "building" | "done" | "error";
+        };
+        if (cancelled) return;
+        if (data.status === "building") {
+          setWarmupPhase("building");
+        } else if (data.status === "done") {
+          setWarmupPhase("done");
+          stopPolling();
+        } else {
+          // idle / error：静默收起，不弹错（各 viz 还能按需现建，预建失败不该吓用户）。
+          setWarmupPhase(null);
+          stopPolling();
+        }
+      } catch {
+        // 网络抖动：这轮跳过，下一轮再试；不改 phase、不弹错。
+      }
+    };
+
+    (async () => {
+      try {
+        const resp = await fetch("/api/agent/prewarm-spine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_id: sessionId,
+            provider,
+            api_key: apiKey,
+            model: warmupModel || undefined,
+            base_url: warmupBaseUrl || undefined,
+          }),
+        });
+        if (!resp.ok || cancelled) return;
+        const data = (await resp.json()) as {
+          status: "cached" | "building" | "started";
+        };
+        if (cancelled) return;
+        if (data.status === "cached") {
+          // 已缓存：不用进度、直接当已就绪，横幅都不显（秒出，无需告知）。
+          setWarmupPhase(null);
+          return;
+        }
+        // building / started：进入轮询，每 ~4 秒查一次，直到 done / error / idle 停。
+        setWarmupPhase("building");
+        timer = setInterval(() => void pollOnce(), 4000);
+      } catch {
+        // 起建失败：静默，不弹错（预建是后台事，各功能仍可按需现建）。
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      stopPolling();
+    };
+  }, [currentSession, apiKey, provider, model, baseUrl]);
+
+  // 建好后横幅"全书已通读，分析秒出"短暂显示几秒就收起，不长期占地方。
+  useEffect(() => {
+    if (warmupPhase !== "done") return;
+    const t = setTimeout(() => setWarmupPhase(null), 4000);
+    return () => clearTimeout(t);
+  }, [warmupPhase]);
+
   // 选书时主动测一次题材（#14）：左栏 nav 按题材显隐（小说收起"思想·理论"组、
   // 理论书收起"人物"组）要 genre 先有值。以前 genre 只在用"论点结构"时才懒检测，
   // nav 显隐对刚选的书是哑的（全显）；这里换书就测一次填进 currentSession.genre。
@@ -1786,6 +1898,9 @@ export function App() {
 
           {currentSession && (
             <>
+              {warmupPhase && WHOLE_BOOK_MODES.has(mode) && (
+                <SpineWarmupBanner phase={warmupPhase} />
+              )}
               {scale && WHOLE_BOOK_MODES.has(mode) && <ScaleBanner scale={scale} />}
               <div className={mode === "ask" ? "" : "hidden"}>
                 <CanvasHeader
