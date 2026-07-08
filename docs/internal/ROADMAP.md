@@ -8,7 +8,7 @@
 >
 > 团队分工见 `CLAUDE.md`「团队架构」。
 
-**更新**：2026-07-01（算法依托溯源审计线：CLAUDE 加「算法依托真实」硬规则 + research-notes 004/005/006 + exp-016 刻度 probe + 850 语料挖出分块层 bug；作者 07-01 实测批 #5-8 复读/整合/划词/白方框）
+**更新**：2026-07-08（可视化层大翻修 + 人物志 arc：07-06 viz 五维大改 [~18 commit 未推] + 07-07→08 人物志严谨化 [3 commit 未推]——立起"可视化=有意义维度+真数据"、争议判断走 Toulmin、人物志=通用镜头。前批 07-01 算法依托溯源审计 + 实测批）
 
 ---
 
@@ -282,7 +282,13 @@
 
 ## ✅ 做完了（近期，新 → 旧）
 
-> ⬇️ 下面这批（2026-06-29 一程）**全本地已 commit、未 push**，等作者点头一起发版。
+> ⬇️ 2026-07-06→08 可视化大翻修 + 人物志 arc、以及 2026-06-29 一批，**全本地已 commit、未 push**，等作者点头一起发版。
+
+- **可视化层大翻修 + 人物志 arc（2026-07-06→08，本机，已 commit 未推）**：
+  - **07-06 viz 五维大改**（~18 commit）：Phase0 五 primitive（vizFocus 联动总线 / 证据浮层 / 图表 token / 证据强度标 / 存图基座）+ 关系图精美化 + 敌友锚原文根治 + 集合整合五镜头 + FeatureEntryCard 铺 ~16 viz + 命运线 / 在场 / 时间线 / 支线换形态。详见 STATE「2026-07-06」节。
+  - **07-07→08 人物志 arc**（3 commit：`27cc3bf` 后端立场端点 / `2ea5da4` 前端三件套+接线 / `9ec365a` 探针+案例研究）：作者锤"没意思 / 要图 / 争议压单分怎么行"逼出根子——**可视化 = 有意义维度 + 真数据**；处境在场只锚转折（去 densify 待核垃圾）、立场象限 Toulmin 正反 + 争议度（exp024 四判据 GO）+ `character_stance` 端点（轴可配、7 单测）；**人物志 = 通用镜头**（全员名册 + 点人现跑精确分析）接进 App「人物志」入口；exp022 史书人物志字段 probe GO；案例研究第 14 章「越美越可疑」。tsc / 单测 / 启动全绿，**真书 e2e 待起后端验**（最后一里）。详见 STATE「07-07→08」节 + memory `project_viz_person_lens_meaning_density_universal`。
+
+
 
 - **账号后台 1.6.2 全建（Phase 0→2c，hosted-only · local 逐字节零回归）**：`local|hosted` 开关（deployment.py）+ SQLite 数据层（accounts.py，归属隔离焊 SQL 层 + argon2）+ itsdangerous 令牌（auth.py）+ 注册 / 登录 / whoami / 注销 / 找回密码 / 邮箱验证路由（routes/accounts.py）+ provider-agnostic 邮件（mailer.py，SMTP 走 env）+ 书库（1c）与 agent 分析端点（1c-2 router 级守卫）**两层数据隔离** + 前端登录 UI（authClient/AuthGate）。ADR-011 签字。全套 1806 passed 零回归。
 - **1.7 会议垂直三炮**：行动项台账（会脉 meeting_spine + 端点 + ActionLedger）+ 悬而未决（open_issues 同趟抽）+ 跨会议追承诺兑现（meeting_commitments 复用 cross_doc 底座，五档状态、判不出标未知不猜兑现、逾期 BE 纯算）+ 4 份合成会议测试数据。
