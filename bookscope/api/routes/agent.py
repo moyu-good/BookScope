@@ -83,6 +83,7 @@ from bookscope.agent.character_arc import generate_character_arc_exhaustive
 from bookscope.agent.character_graph import (
     extract_character_graph_exhaustive,
 )
+from bookscope.agent.character_stance import generate_character_stance
 from bookscope.agent.character_voice import generate_character_voice
 from bookscope.agent.claim_support import check_claim_support
 from bookscope.agent.cross_doc import cross_doc_relations_from_spines
@@ -157,6 +158,8 @@ from bookscope.api.schemas import (
     CharacterFlowResponse,
     CharacterGraphRequest,
     CharacterGraphResponse,
+    CharacterStanceRequest,
+    CharacterStanceResponse,
     CharacterVoiceRequest,
     CharacterVoiceResponse,
     CheckCitationsRequest,
@@ -1678,6 +1681,71 @@ async def agent_character_voice(
         sample_too_small=bool(result and result.get("sample_too_small")),
         features=(result or {}).get("features", []),
         drift_items=(result or {}).get("drift_items", []),
+        scanned=result is not None,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/character-stance", response_model=CharacterStanceResponse)
+async def agent_character_stance(
+    request: CharacterStanceRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> CharacterStanceResponse:
+    """给一个角色在可配立场轴上正反取证 + 综合倾向 + 争议度（Toulmin，probe exp024 GO）。
+
+    整本进 context，pro/con 分列（各挂原文过核验）、net 综合倾向、dispute 争议度。争议判断
+    不压成单分：两方并陈让读者自己看（evidence-first 机制层）。轴（pos/neg）由调用方按书给。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = generate_character_stance(
+        character=request.character,
+        full_text=full_text,
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        pos_label=request.pos_label,
+        neg_label=request.neg_label,
+        session_id=request.book_session_id,
+    )
+    return CharacterStanceResponse(
+        character=request.character,
+        pos=(result or {}).get("pos", request.pos_label),
+        neg=(result or {}).get("neg", request.neg_label),
+        pro=(result or {}).get("pro", []),
+        con=(result or {}).get("con", []),
+        net=(result or {}).get("net", 0),
+        dispute=(result or {}).get("dispute", 0),
+        dispute_reason=(result or {}).get("dispute_reason", ""),
         scanned=result is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),

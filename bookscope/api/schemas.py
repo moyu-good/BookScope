@@ -782,6 +782,65 @@ class CharacterVoiceResponse(BaseModel):
     )
 
 
+class CharacterStanceRequest(BaseModel):
+    """POST /api/agent/character-stance 请求体（立场判定 Toulmin，probe exp024 GO）。
+
+    给一个角色 + 一条**可配的立场轴**（``pos_label`` ↔ ``neg_label``），整本进 context
+    正反取证 + 综合倾向 + 争议度。轴由调用方按书给（三国 = 尊汉扶主 / 篡逆自立，
+    安史 = 忠唐 / 附燕，别的书换别的）——此端点不认死某条轴。BYOK 同 CharacterVoiceRequest。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    character: str = Field(
+        ..., min_length=1, max_length=100, description="要判立场的角色名（可复用人物图节点）。"
+    )
+    pos_label: str = Field(
+        ..., min_length=1, max_length=40, description="立场轴正端（如 尊汉扶主）。"
+    )
+    neg_label: str = Field(
+        ..., min_length=1, max_length=40, description="立场轴负端（如 篡逆自立）。"
+    )
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class CharacterStanceResponse(BaseModel):
+    """POST /api/agent/character-stance 响应体（Toulmin：正据 + 反据 + 倾向 + 争议度）。
+
+    争议判断两方并陈、让读者自己看，不藏在一个确定分后头（evidence-first 机制层，
+    对治"曹操是否尊汉压成 -4 + 单句"那种拍脑袋 + 假精确 + 单证据）。前端画争议象限时：
+    ``dispute`` 高的不画笃定点（带不确定 + "争"标），点开看 ``pro`` / ``con`` 两栏。
+    """
+
+    character: str = Field(..., description="回显请求里的角色名。")
+    pos: str = Field(default="", description="回显立场轴正端。")
+    neg: str = Field(default="", description="回显立场轴负端。")
+    pro: list[dict] = Field(
+        default_factory=list,
+        description="偏正端的证据，每条 {原文:str, 说明:str, verified:bool}；原文过核验。",
+    )
+    con: list[dict] = Field(
+        default_factory=list, description="偏负端的证据，同 pro 结构。"
+    )
+    net: int = Field(default=0, description="综合倾向 -5（偏 neg）..0..+5（偏 pos）。")
+    dispute: int = Field(
+        default=0, description="争议度 0-5：正反两方都有硬证据、真两难时才高。"
+    )
+    dispute_reason: str = Field(default="", description="争议度的一句理由。")
+    scanned: bool = Field(
+        default=False, description="是否成功判定；false=失败/书太大，前端提示重试。"
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class RelationshipTimelineRequest(BaseModel):
     """POST /api/agent/relationship-timeline 请求体（关系随时间演变，WP-relationship-over-time）。
 
