@@ -29,6 +29,7 @@ export interface ArcPoint {
   evidence: string;
   verified: boolean;
   match_score: number;
+  note?: string; // 处境评语（≤12 字，依据原文那章实际发生的事；替掉"顺境/转折向好"套话）
 }
 
 export interface ArcCharacter {
@@ -77,12 +78,6 @@ function findTurns(points: ArcPoint[]): Set<number> {
     if (cur !== 0) prevDir = cur;
   }
   return turns;
-}
-
-function fortuneWord(f: number): string {
-  if (f > 1) return "得势";
-  if (f < -1) return "落难";
-  return "处境平";
 }
 
 // 把一条命运线切成"实线段 / 虚线段"。
@@ -374,7 +369,7 @@ function FateCell({
             const p = pts.find((q) => q.chapter === hover.chapter);
             if (!p) return null;
             const cx = xAt(p.chapter);
-            const label = `第${p.chapter}章 · ${fortuneWord(p.fortune)}`;
+            const label = p.note ? `第${p.chapter}章 · ${p.note}` : `第${p.chapter}章`;
             // 靠边时把浮标往里收，不出画布
             const tx = Math.min(CELL_W - PAD_R - 2, Math.max(PAD_L + 2, cx));
             const anchor = cx > CELL_W - 60 ? "end" : cx < 60 ? "start" : "middle";

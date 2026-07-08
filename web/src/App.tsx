@@ -57,6 +57,7 @@ import { RedheadStakes } from "./RedheadStakes";
 import { RedheadDocPanorama } from "./RedheadDocPanorama";
 import { RedheadDossierPanorama } from "./RedheadDossierPanorama";
 import { CharacterPanorama } from "./CharacterPanorama";
+import { PersonDossierPanel } from "./PersonDossierPanel";
 import { NarrativePanorama } from "./NarrativePanorama";
 import { QualityPanorama } from "./QualityPanorama";
 import { RelationshipTimeline } from "./RelationshipTimeline";
@@ -869,6 +870,7 @@ export function App() {
     | "redhead_panorama"
     | "redhead_dossier_panorama"
     | "char_panorama"
+    | "person_dossier"
     | "plot_panorama"
     | "quality_panorama"
     | "redhead_depgraph"
@@ -2030,6 +2032,22 @@ export function App() {
                 />
               </div>
 
+              {/* 人物志:全员名册(章脉派生)+ 点人现跑精确分析(立场 Toulmin / 处境),都锚原文。
+                  通用镜头(任何有人物的书都能开);史书将来额外加籍贯/官职/纪年字段。 */}
+              <div className={mode === "person_dossier" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="人物志"
+                  subtitle="全书人物一册:左边全员名册可搜,点谁看谁——他的立场(正反证据 + 争议度,不藏单分后)、处境转折,都锚原文。点开才现跑他的精确分析。"
+                />
+                <PersonDossierPanel
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               {/* 集合整合:情节脉络那组(叙事曲线/叙事流/时间线/支线/伏笔)合成一个镜头(下面各 mode-div 暂留、可逆)。 */}
               <div className={mode === "plot_panorama" ? "" : "hidden"}>
                 <CanvasHeader
@@ -2591,6 +2609,7 @@ type Mode =
   | "redhead_panorama"
   | "redhead_dossier_panorama"
   | "char_panorama"
+  | "person_dossier"
   | "plot_panorama"
   | "quality_panorama"
   | "redhead_depgraph"
@@ -2603,7 +2622,7 @@ type Mode =
 // 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
 const WHOLE_BOOK_MODES = new Set<Mode>([
-  "graph", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
+  "graph", "person_dossier", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
   "timeline", "narrative", "consistency", "argument", "style", "technique",
   "cards", "revision", "redhead", "redhead_actions", "redhead_plain",
   "redhead_stakes", "redhead_hardfacts",
@@ -2641,6 +2660,8 @@ const NAV_GROUPS: NavGroup[] = [
     modes: [
       // 集合整合:关系图 / 关系演变 / 人物弧线 / 声口 收成一个「人物」镜头(点一人总线联动出各面)。
       { id: "char_panorama", label: "人物" },
+      // 人物志:全员名册 + 点人现跑精确分析(立场 Toulmin / 处境),通用镜头。
+      { id: "person_dossier", label: "人物志" },
     ],
   },
   {

@@ -15,6 +15,7 @@
 
 import { useMemo, useState } from "react";
 import { type ArcCharacter, FateLineArc } from "./HuaniaoArc";
+import { FortunePresenceGrid } from "./FortunePresenceGrid";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { FeatureEntryCard } from "./FeatureEntryCard";
 import { SealButton } from "./SealButton";
@@ -27,6 +28,9 @@ interface CharacterArcProps {
   apiKey: string;
   model: string;
   baseUrl: string;
+  // 可选:预置一份弧线数据,跳过"点生成"直接进品读视图。给预览 / 测试注入真数据用,
+  // 生产不传(走点生成 → fetch 那条路)。
+  initialCharacters?: ArcCharacter[];
 }
 
 // 角色配色取分类盘（跟关系图 / 在场图同一套浅底色板），循环用——清爽不脏、彼此分得开
@@ -40,20 +44,17 @@ interface SelectedPoint {
   chapter: number;
 }
 
-function fortuneWord(f: number): string {
-  if (f > 1) return "得势";
-  if (f < -1) return "落难";
-  return "处境平";
-}
-
 export function CharacterArc({
   sessionId,
   provider,
   apiKey,
   model,
   baseUrl,
+  initialCharacters,
 }: CharacterArcProps) {
-  const [characters, setCharacters] = useState<ArcCharacter[] | null>(null);
+  const [characters, setCharacters] = useState<ArcCharacter[] | null>(
+    initialCharacters ?? null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trace, setTrace] = useState<RunTrace | null>(null);
@@ -62,6 +63,8 @@ export function CharacterArc({
   // 选择器：搜人名过滤 + 默认只列主要角色、"看全部"展开
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
+  // 两个品读视图：命运线（小多图折线）↔ 处境在场（章×人热力格），共用同一份数据 + 下面的档案面板
+  const [view, setView] = useState<"line" | "grid">("line");
 
   async function load() {
     setLoading(true);
@@ -171,8 +174,15 @@ export function CharacterArc({
   const profileChar = profileName
     ? characters.find((c) => c.name === profileName) ?? null
     : null;
-  // 档案里列出这个人所有点，按章序；有原文的正常列，没原文的标"待核"（不编）。
-  const profilePoints = profileChar ? profileChar.points : [];
+  // 档案只列"锚了原文的处境转折"（有 evidence 的点）——在场但没判过处境的填充章不进档案，
+  // 免得一屏"没依据/待核"（那是 densify 造的在场填充，剔掉、只留硬的）。
+  const profilePoints = profileChar
+    ? profileChar.points.filter((p) => p.evidence && p.evidence.trim())
+    : [];
+  // 命运线也只喂"锚原文的转折点"——去掉在场填充，线才不假装连续精确起伏。
+  const groundedChars = characters
+    .map((c) => ({ ...c, points: c.points.filter((p) => p.evidence && p.evidence.trim()) }))
+    .filter((c) => c.points.length > 0);
 
   return (
     <div className="pt-4">
@@ -192,8 +202,32 @@ export function CharacterArc({
         />
       </div>
 
+      {/* 视图开关：命运线（折线起落）↔ 处境在场（章×人热力格）。同一份数据两种看法。 */}
+      <div className="inline-flex mb-2 rounded border border-[var(--color-rule)] overflow-hidden text-sm">
+        {(["line", "grid"] as const).map((v) => {
+          const on = view === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className="px-3 py-1 transition-colors"
+              style={{
+                fontFamily: "var(--font-display)",
+                background: on ? "var(--color-seal)" : "transparent",
+                color: on ? "var(--color-paper)" : "var(--color-ink-muted)",
+              }}
+            >
+              {v === "line" ? "命运线" : "处境在场"}
+            </button>
+          );
+        })}
+      </div>
+
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        每人一条命运线：线往上=得势、往下=落难，朱砂点是命运转折的章（旁标章号）。点转折看那章原文；空心点=原文没核验上。纵轴只画相对起落（模型判读，不报精确分）。
+        {view === "line"
+          ? "命运线只画锚了原文的处境转折点（点看那章原文）：点往上=那一刻转好、往下=转坏；连线只表先后，不标精确刻度、不吹连续起伏。"
+          : "章 × 人的格子墙：淡底=在场（章脉逐章、真），朱 / 墨格=锚了原文的处境转折（向好朱 / 转坏墨，可点看原文）。没判过处境的不上色、不编。"}
       </p>
 
       {/* ── 选择器：搜人名 + 按戏份排序的角色清单（几百号人也挑得动） ── */}
@@ -285,17 +319,26 @@ export function CharacterArc({
         )}
       </div>
 
-      <FateLineArc
-        characters={characters}
-        charColor={charColor}
-        focusChar={focusChar}
-        selected={selected}
-        onSelect={(name, chapter) => setSelected({ name, chapter })}
-        onClearFocus={() => {
-          setFocusChar(null);
-          setSelected(null);
-        }}
-      />
+      {view === "line" ? (
+        <FateLineArc
+          characters={groundedChars}
+          charColor={charColor}
+          focusChar={focusChar}
+          selected={selected}
+          onSelect={(name, chapter) => setSelected({ name, chapter })}
+          onClearFocus={() => {
+            setFocusChar(null);
+            setSelected(null);
+          }}
+        />
+      ) : (
+        <FortunePresenceGrid
+          characters={characters}
+          focusChar={focusChar}
+          selected={selected}
+          onSelect={(name, chapter) => setSelected({ name, chapter })}
+        />
+      )}
 
       {/* 人物命运档案：点一个转折 / 聚焦一个人，就在这里铺开这个人的多个命运时刻——
           每个点一条（原文 + 钤印核验），按章序，像一份小人物志（接 CBDB 人物志的厚度），
@@ -311,9 +354,9 @@ export function CharacterArc({
               「{profileChar.name}」命运档案
             </p>
             <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-              活跃于第 {profilePoints[0].chapter}–{profilePoints[profilePoints.length - 1].chapter} 章
+              原文转折在第 {profilePoints[0].chapter}–{profilePoints[profilePoints.length - 1].chapter} 章
               {" · "}
-              {profilePoints.length} 个命运时刻
+              {profilePoints.length} 个锚原文的转折
               {(() => {
                 const ok = profilePoints.filter((p) => p.verified && p.evidence).length;
                 return ok > 0 ? ` · ${ok} 处原文已核验` : "";
@@ -337,7 +380,7 @@ export function CharacterArc({
                       <span className="font-bold" style={{ fontFamily: "var(--font-display)" }}>
                         第 {p.chapter} 章
                       </span>
-                      <span className="text-[var(--color-ink-muted)]"> · {fortuneWord(p.fortune)}</span>
+                      <span className="text-[var(--color-ink-muted)]"> · {p.note ?? (p.fortune > 0 ? "转折向好" : p.fortune < 0 ? "转折转坏" : "转折")}</span>
                     </p>
                     {verified ? (
                       <SealMark size={20} title="原文已核验" />
