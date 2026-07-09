@@ -46,6 +46,13 @@ interface Props {
   defaultColor?: string;
   xMid?: number;
   yMid?: number;
+  // 受控选中：传了就由父级管选中态（立场格局用它把象限点击 / 名册点击接到同一个人）；
+  // 不传 = 组件自管、内置详情浮层照旧（老用法）。
+  selected?: string | null;
+  onSelect?: (name: string | null) => void;
+  // 详情浮层：默认自带（selP 那块）；父级要自己渲染详情时（立场格局用 PersonDossier 的
+  // 正反证据面板）传 false 关掉，免得两块详情重复。
+  showDetail?: boolean;
 }
 
 const VB_W = 680;
@@ -63,8 +70,18 @@ export function StanceQuadrant({
   defaultColor = "#8a7f6a",
   xMid,
   yMid = 0,
+  selected,
+  onSelect,
+  showDetail = true,
 }: Props) {
-  const [sel, setSel] = useState<string | null>(null);
+  const [internalSel, setInternalSel] = useState<string | null>(null);
+  const controlled = selected !== undefined;
+  const sel: string | null = selected !== undefined ? selected : internalSel;
+  const pick = (name: string) => {
+    const next = sel === name ? null : name;
+    if (!controlled) setInternalSel(next);
+    onSelect?.(next);
+  };
 
   const { xLo, xHi, yAbs } = useMemo(() => {
     const xs = points.map((p) => p.x);
@@ -131,7 +148,7 @@ export function StanceQuadrant({
           // 争议大:竖向不确定带(高 ∝ 争议度),范围内立场"说不准"
           const bandH = contested ? (p.dispute / 5) * 96 : 0;
           return (
-            <g key={p.name} style={{ cursor: "pointer" }} onClick={() => setSel((s) => (s === p.name ? null : p.name))}>
+            <g key={p.name} style={{ cursor: "pointer" }} onClick={() => pick(p.name)}>
               {contested && (
                 <>
                   <rect x={cx - r} y={cy - bandH / 2} width={r * 2} height={bandH} rx={r} fill={c} opacity={0.14} />
@@ -167,7 +184,7 @@ export function StanceQuadrant({
         </span>
       </div>
 
-      {selP && (
+      {showDetail && selP && (
         <div className="mt-2 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2.5">
           <div className="flex items-center justify-between gap-2 mb-1">
             <p className="text-sm text-[var(--color-ink)]">

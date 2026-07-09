@@ -11,7 +11,7 @@
 // 本壳只管取数 + 状态。
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PersonDossier,
   type DossierArc,
@@ -20,6 +20,7 @@ import {
   type DossierRosterEntry,
   type DossierStance,
 } from "./PersonDossier";
+import type { QuadPoint } from "./StanceQuadrant";
 import { FeatureEntryCard } from "./FeatureEntryCard";
 import { RunningProcess } from "./runProcess";
 
@@ -31,6 +32,20 @@ interface Props {
   baseUrl: string;
 }
 
+// 关系图边的最小形态：只取算戏份（连接度）用得上的字段。
+interface GraphEdgeLite {
+  source: string;
+  target: string;
+  strength?: number;
+}
+// 批量粗定位一项（/agent/batch-stance 的 positions[i]）。
+interface BatchPos {
+  name: string;
+  net: number;
+  dispute: number;
+  brief?: string;
+}
+
 export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl }: Props) {
   const [roster, setRoster] = useState<DossierRosterEntry[] | null>(null);
   const [stanceMap, setStanceMap] = useState<Map<string, DossierStance>>(() => new Map());
@@ -40,6 +55,11 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
   const [error, setError] = useState<string | null>(null);
   const [axisPos, setAxisPos] = useState("");
   const [axisNeg, setAxisNeg] = useState("");
+  // 立场格局批量粗定位：关系图边（算戏份）+ 一次批量定位结果 + loading。
+  const [edges, setEdges] = useState<GraphEdgeLite[]>([]);
+  const [positions, setPositions] = useState<BatchPos[] | null>(null);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const batchStartedRef = useRef(false); // 单次触发去重：只跑一次批量，换轴时重置
 
   function reqBody(extra: Record<string, unknown> = {}): Record<string, unknown> {
     const b: Record<string, unknown> = { book_session_id: sessionId, provider, api_key: apiKey, ...extra };
@@ -92,13 +112,15 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
         const j = (await gRes.json().catch(() => null)) as { detail?: { message?: string } } | null;
         throw new Error(j?.detail?.message ?? `名册请求失败（${gRes.status}）`);
       }
-      const g = (await gRes.json()) as { nodes?: string[] };
+      const g = (await gRes.json()) as { nodes?: string[]; edges?: GraphEdgeLite[] };
       const names = g.nodes ?? [];
       if (names.length === 0) {
         setError("没抽出人物名册，稍后重试。");
         return;
       }
       setRoster(names.map((n) => ({ name: n, hasStance: false })));
+      // 边留着算戏份（连接度）：定象限里谁进前 20、谁的点大 / 靠右（主角）——都是可数事实，不靠 LLM 猜。
+      setEdges(g.edges ?? []);
       // 处境弧线（可选、一次拿主要角色；失败不阻断名册）
       try {
         const aRes = await fetch("/api/agent/character-arc", {
@@ -134,6 +156,7 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
 
   const fetchStance = useCallback(
     async (name: string) => {
+      if (!axisPos || !axisNeg) return; // 没立场轴不跑单人 Toulmin（后端 pos/neg 必填，避免 422）
       if (stanceMap.has(name) || loadingName === name) return;
       setLoadingName(name);
       try {
@@ -175,28 +198,107 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
     [stanceMap, loadingName, axisPos, axisNeg, sessionId, provider, apiKey, model, baseUrl],
   );
 
+  // 戏份 = 该人所有关系边 strength 之和（连接度）。定象限的 x（主角靠右）+ 点大小，也用来挑前 20。
+  const degreeByName = useMemo(() => {
+    const d = new Map<string, number>();
+    for (const e of edges) {
+      d.set(e.source, (d.get(e.source) ?? 0) + (e.strength ?? 1));
+      d.set(e.target, (d.get(e.target) ?? 0) + (e.strength ?? 1));
+    }
+    return d;
+  }, [edges]);
+
+  // 名册按戏份降序取前 20 主要人物喂批量定位（配角在下面名册搜，不挤进象限）。
+  const topNames = useMemo(() => {
+    if (!roster) return [];
+    return [...roster]
+      .map((r) => r.name)
+      .sort((a, b) => (degreeByName.get(b) ?? 0) - (degreeByName.get(a) ?? 0))
+      .slice(0, 20);
+  }, [roster, degreeByName]);
+
+  // 进视图 + 有立场轴（自动建议或用户填）后，一次批量把前 20 人粗定位到立场轴上。
+  // 失败 / 判不出 → positions 置空，前端不画象限、退回按需点人（优雅退）。ref 去重只跑一次。
+  useEffect(() => {
+    if (!roster || !axisPos || !axisNeg || topNames.length === 0) return;
+    if (batchStartedRef.current) return;
+    batchStartedRef.current = true;
+    setBatchLoading(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/agent/batch-stance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            reqBody({ characters: topNames, pos_label: axisPos, neg_label: axisNeg }),
+          ),
+        });
+        if (!res.ok) {
+          if (!cancelled) setPositions([]);
+          return;
+        }
+        const d = (await res.json()) as { positions?: BatchPos[]; scanned?: boolean };
+        if (cancelled) return;
+        setPositions(d.scanned ? (d.positions ?? []) : []);
+      } catch {
+        if (!cancelled) setPositions([]);
+      } finally {
+        if (!cancelled) setBatchLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster, axisPos, axisNeg, topNames]);
+
+  // 象限点：net/dispute 先用批量粗定位；某人点开跑过单人 Toulmin 后，用它更准的 net/dispute 覆盖（渐进精修）。
+  const quadPoints = useMemo<QuadPoint[]>(() => {
+    if (!positions || positions.length === 0) return [];
+    return positions.map((p) => {
+      const refined = stanceMap.get(p.name);
+      const deg = degreeByName.get(p.name) ?? 1;
+      return {
+        name: p.name,
+        x: deg,
+        y: refined ? refined.net : p.net,
+        group: "人物",
+        size: deg,
+        dispute: refined ? refined.dispute : p.dispute,
+        disputeReason: refined?.dispute_reason || p.brief || "",
+        pro: [],
+        con: [],
+      };
+    });
+  }, [positions, stanceMap, degreeByName]);
+
   function changeAxis(which: "pos" | "neg", val: string) {
     if (which === "pos") setAxisPos(val);
     else setAxisNeg(val);
     setStanceMap(new Map()); // 换轴 → 旧立场作废，重新点人现跑
     setLoadingName(null);
+    // 换轴也要重新批量定位：清结果 + 复位去重 ref，触发上面的 effect 再跑一次。
+    setPositions(null);
+    setBatchLoading(false);
+    batchStartedRef.current = false;
   }
 
   if (!roster) {
     return (
       <FeatureEntryCard
-        title="人物志"
-        lead="全书的人物都在这儿。左边一张名单，想看谁点谁：他偏向哪一边、有几分把握、正反两面的证据、处境怎么起落，每条都能翻回原文。点开谁，才分析谁。"
-        actionLabel="翻开人物志"
-        loadingLabel="正在通读全书，整理人物名单…"
+        title="立场格局"
+        lead="把书里的主要人物一口气打在一张立场图上：横看戏份，纵看立场倾向，谁站哪边、谁有争议一眼看清。想看细的点开谁，正反两面的证据、处境起落，每条都能翻回原文。"
+        actionLabel="翻开立场格局"
+        loadingLabel="正在通读全书，整理人物…"
         onAction={loadRoster}
         loading={loadingRoster}
         disabled={!apiKey}
-        hint="名单是通读全书后一次列出的；点开某个人才去分析他，读过一次后再看就快。"
+        hint="先通读全书列出人物、把主要人物一次定位到立场图上；点开某个人才细看他的正反取证。读过一次后再看就快。"
         error={error}
       >
         {loadingRoster && (
-          <RunningProcess label="正在通读全书，整理人物名单" hint="先把整本书读一遍，列出全部人物；读过一次后再看就快。" />
+          <RunningProcess label="正在通读全书，整理人物" hint="先把整本书读一遍列出人物；读过一次后再看就快。" />
         )}
       </FeatureEntryCard>
     );
@@ -208,7 +310,7 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
         className="text-base font-bold text-[var(--color-ink)] mb-3"
         style={{ fontFamily: "var(--font-display)" }}
       >
-        人物志
+        立场格局
       </h3>
       {/* 立场轴可配：每本书换（史书=尊汉/篡逆，别的书换别的）；改轴清缓存重跑 */}
       <div className="mb-3 flex items-center gap-2 flex-wrap text-sm">
@@ -236,6 +338,8 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
         axisNeg={axisNeg}
         onSelectPerson={fetchStance}
         loadingName={loadingName}
+        quadPoints={quadPoints}
+        quadLoading={batchLoading}
       />
     </div>
   );

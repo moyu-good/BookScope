@@ -15,6 +15,7 @@
 
 import { useMemo, useState } from "react";
 import { SealMark } from "./SealMark";
+import { StanceQuadrant, type QuadPoint } from "./StanceQuadrant";
 
 export interface DossierRosterEntry {
   name: string;
@@ -56,6 +57,10 @@ interface Props {
   onSelectPerson?: (name: string) => void;
   // 正在现跑分析的那个人名（真 app 传，显"分析中"）
   loadingName?: string | null;
+  // 立场格局主视图：前端一次批量定位好的点（net + dispute 粗定位）；空 = 不画象限。
+  quadPoints?: QuadPoint[];
+  // 批量定位还在跑（象限位置显 loading 占位）。
+  quadLoading?: boolean;
 }
 
 const FACTION_COLOR: Record<string, string> = {
@@ -63,6 +68,9 @@ const FACTION_COLOR: Record<string, string> = {
   蜀: "#a8322a",
   吴: "#2E8B6E",
 };
+
+// v1 不做派系：全员归一组、一个颜色（象限只用 net×戏份两维，颜色不承载信息）。
+const QUAD_GROUP_COLOR: Record<string, string> = { 人物: "var(--color-seal)" };
 
 export function PersonDossier({
   roster,
@@ -72,7 +80,11 @@ export function PersonDossier({
   axisNeg = "篡逆自立",
   onSelectPerson,
   loadingName = null,
+  quadPoints = [],
+  quadLoading = false,
 }: Props) {
+  // 有立场轴才画格局；没轴（工具书 / 诗集，suggest 返空）优雅退，名册照常。
+  const stanceEnabled = Boolean(axisPos && axisNeg);
   const stanceByName = useMemo(
     () => new Map(stance.map((s) => [s.name, s])),
     [stance],
@@ -94,7 +106,44 @@ export function PersonDossier({
   const factionColor = (f?: string) => (f ? FACTION_COLOR[f] ?? "#8a7f6a" : "#8a7f6a");
 
   return (
-    <div className="rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] overflow-hidden">
+    <div className="space-y-4">
+      {/* 立场格局主视图（大、在最上）：全员一口气打在立场轴上，一次通读的粗定位 */}
+      {stanceEnabled ? (
+        quadPoints.length > 0 ? (
+          <div>
+            <StanceQuadrant
+              points={quadPoints}
+              axisX={{ label: "戏份", low: "配角", high: "主角" }}
+              axisY={{ label: "立场", low: axisNeg, high: axisPos }}
+              groupColor={QUAD_GROUP_COLOR}
+              selected={sel}
+              onSelect={(name) => {
+                if (name) {
+                  setSel(name);
+                  onSelectPerson?.(name);
+                }
+              }}
+              showDetail={false}
+            />
+            <p className="mt-1.5 px-1 text-xs text-[var(--color-ink-muted)] leading-relaxed">
+              轴上是通读全书的一次
+              <span className="font-semibold text-[var(--color-ink)]">粗定位</span>
+              ：左右看戏份，上下看立场倾向。点开某个人，才正反两面取原文、看他真正的争议度；戏份轻的在下面名册里搜。
+            </p>
+          </div>
+        ) : quadLoading ? (
+          <div className="rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] p-6 text-center text-sm text-[var(--color-ink-muted)]">
+            正在把主要人物一次定位到立场格局上，通读全书约二十秒…
+          </div>
+        ) : null
+      ) : (
+        <div className="rounded border border-dashed border-[var(--color-rule)] bg-[var(--color-paper-raised)] p-4 text-sm text-[var(--color-ink-muted)] leading-relaxed">
+          这本书没有明显的立场对立，就不画立场格局了。下面的名册照常：点开谁，看他的处境起落，每条都取自原文。
+        </div>
+      )}
+
+      {/* 名册（次要）+ 选中人详情 */}
+      <div className="rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] overflow-hidden">
       <div className="flex flex-col md:flex-row" style={{ minHeight: 360 }}>
         {/* 左:全员名册 */}
         <div
@@ -174,7 +223,7 @@ export function PersonDossier({
             ) : null}
           </div>
 
-          {!s &&
+          {stanceEnabled && !s &&
             (loadingName === sel ? (
               <div className="mt-4 rounded border border-[var(--color-rule)] p-4 text-sm text-[var(--color-ink-muted)]">
                 正在分析「{sel}」的立场：通读全书，正反两面找证据，每条都取自原文，约 15 秒…
@@ -253,6 +302,7 @@ export function PersonDossier({
       <p className="px-3 py-2 text-xs text-[var(--color-ink-muted)] border-t border-[var(--color-rule)]">
         左边是全书 {roster.length} 个人的完整名单，能搜、不删减；右边每个人的立场和处境都取自原文，有争议的把正反两面都摆出来，不替你下定论。点开谁，才分析谁。
       </p>
+      </div>
     </div>
   );
 }

@@ -84,6 +84,7 @@ from bookscope.agent.character_graph import (
     extract_character_graph_exhaustive,
 )
 from bookscope.agent.character_stance import (
+    batch_stance_positions,
     generate_character_stance,
     suggest_stance_axis,
 )
@@ -154,6 +155,9 @@ from bookscope.api.schemas import (
     AnnotationsResponse,
     ArgumentStructureRequest,
     ArgumentStructureResponse,
+    BatchStancePosition,
+    BatchStanceRequest,
+    BatchStanceResponse,
     ChapterAskRequest,
     ChapterAskResponse,
     CharacterArcRequest,
@@ -1863,6 +1867,60 @@ def agent_suggest_stance_axis(
         pos=(result or {}).get("pos", ""),
         neg=(result or {}).get("neg", ""),
         scanned=result is not None,
+        book_session_id=request.book_session_id,
+    )
+
+
+@agent_router.post("/agent/batch-stance", response_model=BatchStanceResponse)
+def agent_batch_stance(
+    request: BatchStanceRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> BatchStanceResponse:
+    """一次把多个角色同时定位到可配立场轴上（立场格局主视图，probe exp032 GO）。
+
+    批量粗定位：整本进 context，一次调用给每人 net + dispute + 一句依据。net 方向可信、
+    dispute 是浅判——真争议由前端点开某人跑 character-stance 的单人 Toulmin 显。轴按书给。
+    判不出 / 失败返 scanned=False，前端不画象限、退回按需点人。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, _chunks = _long_context_inputs(assembler)
+    positions = batch_stance_positions(
+        characters=request.characters,
+        pos_label=request.pos_label,
+        neg_label=request.neg_label,
+        full_text=full_text,
+        llm_client=client,
+        model=model,
+    )
+    return BatchStanceResponse(
+        positions=[BatchStancePosition(**p) for p in (positions or [])],
+        scanned=positions is not None,
         book_session_id=request.book_session_id,
     )
 

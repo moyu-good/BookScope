@@ -40,6 +40,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_STANCE_MAX_TOKENS = 3200
 """正反两组证据（各带原文 + 一句说明）+ net + dispute + 理由，比单点判断长，给足头防截断/空。"""
 
+DEFAULT_BATCH_STANCE_MAX_TOKENS = 4000
+"""批量一次给一二十人各一个 net/dispute/依据，比单人长，给足头防截断（probe exp032）。"""
+
 _MAX_ATTEMPTS = 2
 _MAX_EVID = 8  # 单边证据条数上限，防跑飞
 
@@ -151,6 +154,131 @@ def generate_character_stance(
             "dispute_reason": str(parsed.get("dispute_reason", "")),
         }
     return None
+
+
+def _parse_batch(raw: str) -> list | None:
+    """批量输出是 JSON 数组：先直接 loads（数组 / ``{"people": [...]}``），再兜底切首个 ``[...]``。
+
+    ``extract_first_json_object`` 抠的是 ``{...}`` 对象，抠不了顶层数组，所以这里单开一个
+    数组专用解析（照 probe exp032 的 ``_parse`` 那套，已在三国真语料上验过）。
+    """
+    txt = _strip_code_fence(raw or "")
+    try:
+        obj = json.loads(txt)
+    except Exception:  # noqa: BLE001
+        obj = None
+    if isinstance(obj, list):
+        return obj
+    if isinstance(obj, dict) and isinstance(obj.get("people"), list):
+        return obj["people"]
+    i, j = txt.find("["), txt.rfind("]")
+    if 0 <= i < j:
+        try:
+            arr = json.loads(txt[i : j + 1])
+            return arr if isinstance(arr, list) else None
+        except Exception:  # noqa: BLE001
+            return None
+    return None
+
+
+def batch_stance_positions(
+    *,
+    characters: list[str],
+    pos_label: str,
+    neg_label: str,
+    full_text: str,
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_BATCH_STANCE_MAX_TOKENS,
+) -> list[dict[str, Any]] | None:
+    """一次把多个 ``characters`` 同时定位到「``pos_label`` ↔ ``neg_label``」轴上；判不出返 None。
+
+    立场格局主视图靠这个：批量一次给每人一个 ``{name, net, dispute, brief}``，不是一个个点
+    （那是懒加载的毛病）。probe exp032 在三国真语料上验过——批量 net 跟单人 Toulmin net
+    对得上（|Δ|≤2、方向不反），但批量对争议判得**浅**，所以这里只做**粗定位**：真争议要靠
+    点开某人跑 :func:`generate_character_stance` 的单人 Toulmin 才显（evidence-first 机制层，
+    别把批量 dispute 当权威）。
+
+    与单人 Toulmin 的两点不同：
+
+    - **不取证**：批量只给 net/dispute/一句依据，不拿 pro/con 原文（那太长、一次判一二十人塞
+      不下也判不深）——取证是点开单人时的事。
+    - **cache_enabled=True**：同一本书 + 同一批人 + 同一轴，答案稳定，命中省 token（同
+      :func:`suggest_stance_axis`）；单人 Toulmin 关缓存是因为要每条证据现核，批量没这需求。
+
+    轴由调用方按书给（不认死某条轴）。任意环节失败（调用抛错 / 解析不出数组 / 一个有效项都没）
+    返 None，让前端不画象限、优雅退回按需点人。
+    """
+    names = [str(c).strip() for c in characters if str(c).strip()]
+    if not names:
+        return None
+    instruction = (
+        f"判定下面列出的每一个人物在「{pos_label} ↔ {neg_label}」这条轴上的立场，一次性全给。\n"
+        "铁律：\n"
+        f"1. 只据原文判，别臆测。身份本身不代表立场（比如某一方的臣属不一定就偏{pos_label}，"
+        f"权臣不一定就偏{neg_label}），看原文里的行为。\n"
+        f"2. net = 综合倾向整数（-5 偏{neg_label} .. 0 中立 .. +5 偏{pos_label}）。\n"
+        "3. dispute = 争议度整数（0-5）：正反两方原文都有硬证据、真两难时才高；一边倒就低。\n"
+        "4. brief = 一句话依据，据原文，别编。"
+    )
+    system = build_longctx_system(full_text, instruction)
+    names_line = "、".join(names)
+    user = (
+        f"给这些人物一次性全部定位：{names_line}。\n"
+        "严格只输出 JSON 数组（不要别的话、不要 markdown 围栏），每人一项：\n"
+        '[{"name": "人名", "net": 整数-5到5, "dispute": 整数0到5, "brief": "一句依据"}]'
+    )
+    try:
+        response = _invoke_client(
+            llm_client,
+            model=model,
+            system=system,
+            tools=[],
+            messages=[{"role": "user", "content": user}],
+            max_tokens=max_tokens,
+            cache_enabled=True,
+        )
+    except Exception as exc:  # noqa: BLE001 — 包死，返 None
+        logger.warning(
+            "batch_stance_positions LLM call raised %s: %s", type(exc).__name__, exc
+        )
+        return None
+    arr = _parse_batch(llm_client.extract_final_text(response))
+    if not isinstance(arr, list):
+        logger.warning("batch_stance_positions 解析不出 JSON 数组")
+        return None
+
+    requested = set(names)
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in arr:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "")).strip()
+        # 只收请求过的人（不画没问过的名字，防模型顺口带出的臆造项污染格局）；去重
+        if not name or name not in requested or name in seen:
+            continue
+        raw_net = item.get("net")
+        if raw_net is None:  # 没给倾向就不臆造位置，跳过这一项
+            continue
+        try:
+            net = int(raw_net)
+        except (TypeError, ValueError):
+            continue
+        try:
+            dispute = int(item.get("dispute", 0) or 0)
+        except (TypeError, ValueError):
+            dispute = 0
+        out.append(
+            {
+                "name": name,
+                "net": max(-5, min(5, net)),
+                "dispute": max(0, min(5, dispute)),
+                "brief": str(item.get("brief", "")),
+            }
+        )
+        seen.add(name)
+    return out or None
 
 
 def suggest_stance_axis(

@@ -912,6 +912,63 @@ class SuggestStanceAxisResponse(BaseModel):
     book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
 
 
+class BatchStanceRequest(BaseModel):
+    """POST /api/agent/batch-stance 请求体（立场格局批量粗定位，probe exp032 GO）。
+
+    一次把多个角色同时定位到可配立场轴（``pos_label`` ↔ ``neg_label``）上，每人给 net +
+    dispute + 一句依据。立场格局主视图靠它一口气铺开全员；点开某人才跑 character-stance 的
+    单人 Toulmin 详证。轴由调用方按书给（不认死某条轴）。BYOK 同 CharacterStanceRequest。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    characters: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=60,
+        description="要一次定位的角色名（前端取人物图节点里戏份最重的前若干个）。",
+    )
+    pos_label: str = Field(
+        ..., min_length=1, max_length=40, description="立场轴正端（如 尊汉扶主）。"
+    )
+    neg_label: str = Field(
+        ..., min_length=1, max_length=40, description="立场轴负端（如 篡逆自立）。"
+    )
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class BatchStancePosition(BaseModel):
+    """立场格局里一个人的粗定位（批量一次判：net 方向可信、dispute 是浅判）。"""
+
+    name: str = Field(..., description="角色名。")
+    net: int = Field(default=0, description="综合倾向 -5（偏 neg）..0..+5（偏 pos）。")
+    dispute: int = Field(
+        default=0, description="争议度 0-5（批量粗判，别当权威，真争议点开看 Toulmin）。"
+    )
+    brief: str = Field(default="", description="一句话依据。")
+
+
+class BatchStanceResponse(BaseModel):
+    """POST /api/agent/batch-stance 响应体（一批角色的立场粗定位）。
+
+    ``scanned=False`` = 判不出 / 失败（前端不画象限、退回按需点人）。粗定位诚实：net 方向可信、
+    dispute 是浅判——真争议由前端点开某人跑单人 Toulmin 显（evidence-first 机制层，对治把
+    "曹操是否尊汉"这种千年争议在批量里压成一个确定分）。
+    """
+
+    positions: list[BatchStancePosition] = Field(
+        default_factory=list, description="每个角色一项 {name, net, dispute, brief}。"
+    )
+    scanned: bool = Field(
+        default=False, description="是否成功批量定位；false=失败/书太大，前端不画象限。"
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+
+
 class RelationshipTimelineRequest(BaseModel):
     """POST /api/agent/relationship-timeline 请求体（关系随时间演变，WP-relationship-over-time）。
 

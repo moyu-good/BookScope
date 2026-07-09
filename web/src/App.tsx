@@ -2071,8 +2071,8 @@ export function App() {
                   通用镜头(任何有人物的书都能开);史书将来额外加籍贯/官职/纪年字段。 */}
               <div className={mode === "person_dossier" ? "" : "hidden"}>
                 <CanvasHeader
-                  title="人物志"
-                  subtitle="全书的人物都在这儿：左边一张名单能搜，想看谁点谁。他偏向哪一边、有几分把握、正反两面的证据、处境怎么起落，每条都能翻到原文。点开谁，才分析谁。"
+                  title="立场格局"
+                  subtitle="把书里的主要人物一口气打在一张立场图上：横看戏份，纵看立场倾向，谁站哪边、谁有争议一眼看清。点开谁，才正反两面取原文、看他真正的争议度；戏份轻的在下面名册里搜。"
                 />
                 <PersonDossierPanel
                   key={currentSession.session_id}
@@ -2696,8 +2696,8 @@ const NAV_GROUPS: NavGroup[] = [
     modes: [
       // 集合整合:关系图 / 关系演变 / 人物弧线 / 声口 收成一个「人物」镜头(点一人总线联动出各面)。
       { id: "char_panorama", label: "人物" },
-      // 人物志:全员名册 + 点人现跑精确分析(立场 Toulmin / 处境),通用镜头。
-      { id: "person_dossier", label: "人物志" },
+      // 立场格局:全员一次批量粗定位到立场轴上(象限主视图),点人现跑单人 Toulmin 详证 + 处境;名册次要。
+      { id: "person_dossier", label: "立场格局" },
     ],
   },
   {

@@ -126,3 +126,94 @@ def test_net_missing_returns_none(monkeypatch):
 def test_llm_exception_returns_none(monkeypatch):
     _patch_invoke(monkeypatch, raises=RuntimeError("boom"))
     assert _gen(_FakeClient("{}")) is None
+
+
+# ---------------------------------------------------------------------------
+# batch_stance_positions —— 立场格局批量粗定位（probe exp032 GO）
+# ---------------------------------------------------------------------------
+
+
+def _batch(client, characters=None):  # noqa: ANN001
+    return cs.batch_stance_positions(
+        characters=characters if characters is not None else ["曹操", "诸葛亮", "董卓"],
+        pos_label="尊汉扶主",
+        neg_label="篡逆自立",
+        full_text="x",
+        llm_client=client,
+        model="m",
+    )
+
+
+def test_batch_success_array(monkeypatch):
+    final = json.dumps(
+        [
+            {"name": "曹操", "net": 0, "dispute": 4, "brief": "尊汉与篡逆两说皆有据"},
+            {"name": "诸葛亮", "net": 5, "dispute": 0, "brief": "毕生扶汉"},
+            {"name": "董卓", "net": -5, "dispute": 0, "brief": "废立擅权"},
+        ],
+        ensure_ascii=False,
+    )
+    _patch_invoke(monkeypatch)
+    r = _batch(_FakeClient(final))
+    assert r is not None and len(r) == 3
+    by = {d["name"]: d for d in r}
+    assert by["诸葛亮"]["net"] == 5 and by["董卓"]["net"] == -5
+    assert by["曹操"]["dispute"] == 4 and by["曹操"]["brief"]
+
+
+def test_batch_people_key_wrapper(monkeypatch):
+    # 模型把数组裹在 {"people": [...]} 里也认；brief 缺省为空串
+    final = json.dumps(
+        {"people": [{"name": "曹操", "net": -1, "dispute": 3}]}, ensure_ascii=False
+    )
+    _patch_invoke(monkeypatch)
+    r = _batch(_FakeClient(final), characters=["曹操"])
+    assert r is not None and r[0]["name"] == "曹操" and r[0]["brief"] == ""
+
+
+def test_batch_bracket_slice_fallback(monkeypatch):
+    # 数组前后裹解释文字 → 兜底切首个 [...]
+    final = '这是结果：\n[{"name": "曹操", "net": 0, "dispute": 3}]\n以上。'
+    _patch_invoke(monkeypatch)
+    r = _batch(_FakeClient(final), characters=["曹操"])
+    assert r is not None and r[0]["name"] == "曹操" and r[0]["net"] == 0
+
+
+def test_batch_clamps_and_skips_bad(monkeypatch):
+    final = json.dumps(
+        [
+            {"name": "曹操", "net": -99, "dispute": 42},  # 越界夹回
+            {"name": "", "net": 1},  # 空名跳过
+            {"name": "关羽"},  # 无 net 跳过（不臆造位置）
+            {"name": "貂蝉", "net": 2, "dispute": 1},  # 没请求的名字跳过
+        ],
+        ensure_ascii=False,
+    )
+    _patch_invoke(monkeypatch)
+    r = _batch(_FakeClient(final), characters=["曹操", "关羽"])
+    assert r is not None and len(r) == 1
+    assert r[0]["name"] == "曹操" and r[0]["net"] == -5 and r[0]["dispute"] == 5
+
+
+def test_batch_empty_characters_returns_none(monkeypatch):
+    _patch_invoke(monkeypatch)
+    assert _batch(_FakeClient("[]"), characters=[]) is None
+
+
+def test_batch_parse_fail_returns_none(monkeypatch):
+    _patch_invoke(monkeypatch)
+    assert _batch(_FakeClient("既不是 json 也不是数组")) is None
+
+
+def test_batch_all_items_bad_returns_none(monkeypatch):
+    # 解析出数组但一个有效项都没有（全无 net / 全非请求名）→ None
+    final = json.dumps(
+        [{"name": "关羽"}, {"name": "赵云", "net": 3}], ensure_ascii=False
+    )
+    _patch_invoke(monkeypatch)
+    assert _batch(_FakeClient(final), characters=["关羽"]) is None
+
+
+def test_batch_llm_exception_returns_none(monkeypatch):
+    _patch_invoke(monkeypatch, raises=RuntimeError("boom"))
+    assert _batch(_FakeClient("[]")) is None
