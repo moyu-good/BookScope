@@ -61,6 +61,8 @@ interface Props {
   quadPoints?: QuadPoint[];
   // 批量定位还在跑（象限位置显 loading 占位）。
   quadLoading?: boolean;
+  // 处境弧线还在取（没立场轴的书，靠它分清是"有处境可点"还是"这类书不适配这个镜头"）。
+  arcLoading?: boolean;
 }
 
 const FACTION_COLOR: Record<string, string> = {
@@ -82,6 +84,7 @@ export function PersonDossier({
   loadingName = null,
   quadPoints = [],
   quadLoading = false,
+  arcLoading = false,
 }: Props) {
   // 有立场轴才画格局；没轴（工具书 / 诗集，suggest 返空）优雅退，名册照常。
   const stanceEnabled = Boolean(axisPos && axisNeg);
@@ -104,6 +107,15 @@ export function PersonDossier({
   const a = arcByName.get(sel);
   const selEntry = roster.find((r) => r.name === sel);
   const factionColor = (f?: string) => (f ? FACTION_COLOR[f] ?? "#8a7f6a" : "#8a7f6a");
+
+  // 有没有任何可展开的处境：没立场轴时靠它分流——有处境=点开看起落；一个都没有=这类书不适配这个镜头。
+  const hasAnyArc = useMemo(
+    () => arc.some((x) => x.points.some((p) => p.evidence?.trim())),
+    [arc],
+  );
+  const hasArcForSel = Boolean(a && a.points.some((p) => p.evidence?.trim()));
+  // 既没立场轴、也没任何人有处境，且不在取数中 = 理论 / 论述类，这个镜头没东西可给，整块别摆。
+  const nothingToShow = !stanceEnabled && !arcLoading && !hasAnyArc;
 
   return (
     <div className="space-y-4">
@@ -136,13 +148,25 @@ export function PersonDossier({
             正在把主要人物一次定位到立场格局上，通读全书约二十秒…
           </div>
         ) : null
-      ) : (
+      ) : arcLoading ? (
+        <div className="rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] p-6 text-center text-sm text-[var(--color-ink-muted)]">
+          正在把主要人物的处境理一遍，看有没有可展开的轨迹…
+        </div>
+      ) : hasAnyArc ? (
         <div className="rounded border border-dashed border-[var(--color-rule)] bg-[var(--color-paper-raised)] p-4 text-sm text-[var(--color-ink-muted)] leading-relaxed">
-          这本书没有明显的立场对立，就不画立场格局了。下面的名册照常：点开谁，看他的处境起落，每条都取自原文。
+          这本书没有明显的立场对立，就不画立场格局了。下面点开有处境记录的人，看他的起落，每条都取自原文。
+        </div>
+      ) : (
+        <div className="rounded border border-dashed border-[var(--color-rule)] bg-[var(--color-paper-raised)] p-5 text-sm text-[var(--color-ink-muted)] leading-relaxed">
+          <p className="mb-1.5">
+            这本书更像理论 / 论述类。立场格局看的是人物的阵营立场和命运起落，这类书里出现的人，多是被引用的学者或举例提到的人物，没有这样的轨迹，就不展开了。
+          </p>
+          <p>想看谁被反复提到、彼此怎么关联，去「人物关系图」。</p>
         </div>
       )}
 
-      {/* 名册（次要）+ 选中人详情 */}
+      {/* 名册（次要）+ 选中人详情；理论 / 论述类没东西可点就整块不出（上面已给说明） */}
+      {!nothingToShow && (
       <div className="rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] overflow-hidden">
       <div className="flex flex-col md:flex-row" style={{ minHeight: 360 }}>
         {/* 左:全员名册 */}
@@ -297,12 +321,26 @@ export function PersonDossier({
               </ul>
             </div>
           )}
+
+          {/* 没立场轴、这个人也没处境轨迹：老实说没有，别留空白 */}
+          {!stanceEnabled &&
+            !hasArcForSel &&
+            (arcLoading ? (
+              <div className="mt-4 rounded border border-[var(--color-rule)] p-4 text-sm text-[var(--color-ink-muted)]">
+                正在整理「{sel}」的处境…
+              </div>
+            ) : (
+              <div className="mt-4 rounded border border-dashed border-[var(--color-rule)] p-4 text-sm text-[var(--color-ink-muted)] leading-relaxed">
+                这本书没有立场对立的格局，「{sel}」在正文里也没有留下处境起落的轨迹。理论 / 论述类里，很多人是被引用或举例提到的。
+              </div>
+            ))}
         </div>
       </div>
       <p className="px-3 py-2 text-xs text-[var(--color-ink-muted)] border-t border-[var(--color-rule)]">
         左边是全书 {roster.length} 个人的完整名单，能搜、不删减；右边每个人的立场和处境都取自原文，有争议的把正反两面都摆出来，不替你下定论。点开谁，才分析谁。
       </p>
       </div>
+      )}
     </div>
   );
 }

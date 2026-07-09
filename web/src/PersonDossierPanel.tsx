@@ -51,6 +51,7 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
   const [stanceMap, setStanceMap] = useState<Map<string, DossierStance>>(() => new Map());
   const [arc, setArc] = useState<DossierArc[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(false);
+  const [arcLoading, setArcLoading] = useState(false);
   const [loadingName, setLoadingName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [axisPos, setAxisPos] = useState("");
@@ -122,6 +123,7 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
       // 边留着算戏份（连接度）：定象限里谁进前 20、谁的点大 / 靠右（主角）——都是可数事实，不靠 LLM 猜。
       setEdges(g.edges ?? []);
       // 处境弧线（可选、一次拿主要角色；失败不阻断名册）
+      setArcLoading(true);
       try {
         const aRes = await fetch("/api/agent/character-arc", {
           method: "POST",
@@ -146,6 +148,8 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
         }
       } catch {
         /* 处境可缺，不阻断 */
+      } finally {
+        setArcLoading(false);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -340,6 +344,7 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
         loadingName={loadingName}
         quadPoints={quadPoints}
         quadLoading={batchLoading}
+        arcLoading={arcLoading}
       />
     </div>
   );
