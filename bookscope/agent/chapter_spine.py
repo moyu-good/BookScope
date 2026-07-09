@@ -49,16 +49,25 @@ DEFAULT_SPINE_MAX_TOKENS = 16000
 # 所以 char/plot 两个重维用 12 章封顶 + 12 万字段预算(配 16000 token 不爆);concept 轻维沿用全局 12。
 # **不动 exhaustive 的全局默认**(DEFAULT_CHAR_BUDGET=40000)——人物图 / 实体表等别的穷尽化功能照旧。
 _SPINE_HEAVY_DIM_MAX_CHAPTERS = 12
-"""char/plot 重维每段章闸;12 章配 16000 token 实测不爆(probe_spine_scale)。concept 轻维走全局 12。"""
+"""char/plot 重维每段章闸;12 章配 16000 token 实测不爆(probe_spine_scale)。
+concept 轻维走全局 12。"""
 
 _SPINE_CHAR_BUDGET = 120000
-"""章脉每段字符预算(probe 定的超长文 sweet spot);段大 = 往返少 = 冷启动快,不改 exhaustive 全局 4 万。"""
+"""章脉每段字符预算(probe 定的超长文 sweet spot);
+段大 = 往返少 = 冷启动快,不改 exhaustive 全局 4 万。"""
 
 _SPINE_CONTINUE_MAX_ROUNDS = 3
 """续抽最多补几轮——防止某段反复截断导致无限补抽,补满几轮还差就停(留 warning)。"""
 
-SPINE_SCHEMA_VERSION = "v1"
-"""章脉记录结构版本——升级要让缓存整本失效(接 ADR-008 L3,迁移计划第 5 步)。"""
+_SPINE_DEFAULT_WORKERS = 16
+"""章脉每维段并发默认(exp030,2026-07-09):明朝 6→16 墙钟 1.35×、0 掉章、0 429(32 并发远没到
+DeepSeek 限流,余量大)。段调用已带 429 指数退避,拉高安全。只动章脉;全局 exhaustive
+DEFAULT_WORKERS=6 不变、别的穷尽化功能照旧。传 max_workers 显式覆盖(probe 用)。"""
+
+SPINE_SCHEMA_VERSION = "v2"
+"""章脉记录结构版本——升级要让缓存整本失效(接 ADR-008 L3,迁移计划第 5 步)。
+v2(2026-07-08,WP-relationship-depth,probe exp025 GO):每条 relation 加 type(关系类型封闭集)
++ valence(这章敌友 -5..5)。旧缓存(v1,只有 pair/note)整本失效、下次用时重建带上新字段。"""
 
 
 # ── 三维抽取指令 ───────────────────────────────────────────────────────────
@@ -66,7 +75,9 @@ _INSTR_CHAR = (
     "你在给一本书做逐章人物精读。只针对下面这段原文,逐章抽,只抽本段出现的章,不臆测、不编造。\n"
     "每章给:\n"
     "1. present:这章在场（有戏份）的人物名数组。\n"
-    "2. relations:这章里有互动的人物对数组,每条 {pair:[甲,乙], note:这章他俩之间发生了什么}。\n"
+    "2. relations:这章里有互动的人物对数组,每条 {pair:[甲,乙], note:这章他俩之间发生了什么, "
+    "type:关系类型(从这个封闭集里选一个最贴的——亲族/君臣/同僚/师徒/结义/结盟/敌对/情谊/利用/其他), "
+    "valence:这章他俩的敌友倾向整数,-5(死敌)到 +5(至交),中立 0}。\n"
     "3. char_states:这章里主要人物的处境数组,每条 {name:人物, state:他这章处于什么境况}。\n"
     "4. evidence:这章里最能代表上面判定的一句原文逐字片段(原样摘录、不改写)。\n"
     "严格输出 JSON(别的话别说、别加 markdown 围栏):\n"
@@ -116,6 +127,37 @@ def _clamp_int(value: Any, lo: int, hi: int, default: int) -> int:
     return max(lo, min(hi, n))
 
 
+# 关系类型封闭集(锚 CBDB 亲属/社会/官职三大类;虚构补结义/情谊等)。不在集里 → "其他"。
+_REL_TYPES = frozenset(
+    ["亲族", "君臣", "同僚", "师徒", "结义", "结盟", "敌对", "情谊", "利用", "其他"]
+)
+
+
+def _coerce_relations(raw: Any) -> list[dict[str, Any]]:
+    """归一每条关系为 ``{pair, note, type, valence}``(章脉 v2,WP-relationship-depth)。
+
+    pair 必须两人才留;type 不在封闭集 / 缺 → "其他";valence 钳 -5..5(缺 / 非数 → 0)。
+    旧缓存(v1)没 type/valence,靠版本 bump 整本重建;此处只归一新抽的。
+    """
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for r in raw:
+        if not isinstance(r, dict):
+            continue
+        pair = r.get("pair")
+        if not (isinstance(pair, list) and len(pair) == 2):
+            continue
+        rtype = str(r.get("type", "")).strip()
+        out.append({
+            "pair": [str(pair[0]).strip(), str(pair[1]).strip()],
+            "note": str(r.get("note", "")).strip(),
+            "type": rtype if rtype in _REL_TYPES else "其他",
+            "valence": _clamp_int(r.get("valence"), -5, 5, 0),
+        })
+    return out
+
+
 def _coerce_dim(item: Any, dim: str) -> dict[str, Any] | None:
     """把一条章节 dict 归一成该维该有的字段;chapter 缺/非整数 → 丢(没章号摆不进章脉)。"""
     if not isinstance(item, dict):
@@ -134,6 +176,8 @@ def _coerce_dim(item: Any, dim: str) -> dict[str, Any] | None:
             out[field] = (v.strip() if isinstance(v, str) else "") or "群像"
         elif field == "mainline":
             out[field] = v if isinstance(v, bool) else True
+        elif field == "relations":
+            out[field] = _coerce_relations(v)
         elif typ is list:
             out[field] = v if isinstance(v, list) else []
     return out
@@ -337,6 +381,9 @@ def build_chapter_spine(
     if genre == "theory":
         dims.append(("concept", _INSTR_CONCEPT))
 
+    # 章脉默认拉高段并发(exp030:6→16,白捡 ~1.35× 墙钟、0 掉章、429 退避兜底)。
+    workers = _SPINE_DEFAULT_WORKERS if max_workers is None else max_workers
+
     # 抽一个维度(char/plot 重维收窄章闸 + 开续抽;concept 轻维走全局默认、不续抽)。
     def _run_dim(dim: str, instruction: str) -> list[dict[str, Any]]:
         heavy = dim != "concept"
@@ -363,7 +410,7 @@ def build_chapter_spine(
             max_tokens=max_tokens,
             char_budget=char_budget,
             max_chapters=dim_max_chapters,
-            max_workers=max_workers,
+            max_workers=workers,
             correct_fn=_correct_by_evidence,
             continue_fn=continue_fn,
             sweep_missing_chapters=True,  # 1.5.2 兜底:缺章单章重抽,堵住所有截断丢章

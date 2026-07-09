@@ -13,13 +13,19 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from bookscope.agent._internal.llm_cache import invoke_client_cached
 from bookscope.agent._internal.longctx_system import build_longctx_system
-from bookscope.agent._internal.loop_shared import read_openai_finish_reason
+from bookscope.agent._internal.loop_shared import (
+    DEFAULT_RATE_LIMIT_RETRY_LIMIT,
+    RATE_LIMIT_BACKOFF_BASE_SECONDS,
+    read_openai_finish_reason,
+)
+from bookscope.agent.errors import RateLimited
 
 logger = logging.getLogger(__name__)
 
@@ -169,18 +175,35 @@ def run_segments(
     def run_segment(seg: list[dict[str, Any]], depth: int = 0) -> list[dict[str, Any]]:
         seg_text = "".join(str(c.get("text", "")) for c in seg)
         system = build_longctx_system(seg_text, instruction)
-        try:
-            resp = invoke_client_cached(
-                llm_client,
-                model=model,
-                system=system,
-                tools=[],
-                messages=[{"role": "user", "content": user_msg}],
-                max_tokens=max_tokens,
-                cache_enabled=cache_enabled,
-            )
-        except Exception as exc:  # noqa: BLE001 — 单段失败跳过
-            logger.warning("exhaustive 段调用抛 %s: %s；跳过该段", type(exc).__name__, exc)
+        # 段调用带 429 指数退避重试(加并发的先决:高并发过载时 provider 返 429,
+        # 原来被 except 直接跳过 = 丢章;改成退避重试 1→2→4s,过载让路而非丢内容。
+        # 非限流错误仍按旧行为跳过该段。见研究笔记 013 第五节 + langextract 20 路并发)。
+        resp = None
+        for _attempt in range(DEFAULT_RATE_LIMIT_RETRY_LIMIT + 1):
+            try:
+                resp = invoke_client_cached(
+                    llm_client,
+                    model=model,
+                    system=system,
+                    tools=[],
+                    messages=[{"role": "user", "content": user_msg}],
+                    max_tokens=max_tokens,
+                    cache_enabled=cache_enabled,
+                )
+                break
+            except RateLimited:
+                if _attempt >= DEFAULT_RATE_LIMIT_RETRY_LIMIT:
+                    logger.warning("exhaustive 段限流重试 %d 次仍失败；跳过该段", _attempt)
+                    return []
+                sleep_s = RATE_LIMIT_BACKOFF_BASE_SECONDS * (2**_attempt)
+                logger.warning(
+                    "exhaustive 段被限流(429),第 %d 次退避 %.0fs 重试", _attempt + 1, sleep_s
+                )
+                time.sleep(sleep_s)
+            except Exception as exc:  # noqa: BLE001 — 非限流错误:同旧行为跳过该段
+                logger.warning("exhaustive 段调用抛 %s: %s；跳过该段", type(exc).__name__, exc)
+                return []
+        if resp is None:
             return []
         # 方案 A：先读 finish_reason，把"截没截"变成可观测量，再解析。
         truncated = read_openai_finish_reason(resp) == "length"

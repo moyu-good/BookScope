@@ -34,6 +34,16 @@ _DEFAULT_DB_REL_PATH = ".bookscope_cache/kg_cache.db"
 _CACHE_LOCK = threading.Lock()
 _CACHE_INSTANCE: SQLiteCache | None = None
 
+# ── 单飞(single-flight):同一条章脉只让一个线程真建,其余等它建完再读缓存 ──────────
+# 为什么:预热(prewarm 后台线程)和 viz 端点(FastAPI 线程池)都走 get_or_build_spine。冷启动
+# 时缓存还空,两边都 miss → 各建一遍同一条章脉 = 双份 token + 双倍墙钟(直接踩"少 token / 2min"
+# 目标的反面)。单飞让第二个及以后的调用等第一个的成果、不重复建。进程内多线程共享:一把锁 +
+# 每 key 一个 Event。
+_INFLIGHT_LOCK = threading.Lock()
+_INFLIGHT: dict[str, threading.Event] = {}
+_INFLIGHT_WAIT_TIMEOUT = 900.0
+"""等"正在建的那条章脉"最多等多久(秒)——够几百万字超大书冷建;领头线程挂了等待方也不会永久卡。"""
+
 
 def _default_db_path() -> Path:
     env_override = os.environ.get(ENV_DB_PATH)
@@ -71,6 +81,51 @@ def _compute_spine_cache_key(
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
+def _read_cached(cache: SQLiteCache, key: str) -> list[dict] | None:
+    """读并反序列化缓存的章脉;没有 / 坏 / 任何异常都当 miss 返 None(缓存层绝不 break 构建)。"""
+    try:
+        cached = cache.get(key)
+        if cached is None:
+            return None
+        spine = json.loads(cached.decode("utf-8"))
+        return spine if isinstance(spine, list) else None
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        logger.warning("spine_cache: deserialize failed (%s); 当 miss", exc)
+        return None
+    except Exception as exc:  # noqa: BLE001 — 缓存层意外不能 break 构建
+        logger.warning("spine_cache: read raised %s: %s; 当 miss", type(exc).__name__, exc)
+        return None
+
+
+def _write_cached(cache: SQLiteCache, key: str, spine: list[dict]) -> None:
+    """写缓存;空章脉不写(不把失败钉死),任何异常只 warning、不抛(miss 状态保留、下次重建)。"""
+    if not spine:
+        return
+    try:
+        cache.set(key, json.dumps(spine, ensure_ascii=False).encode("utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("spine_cache: set raised %s: %s; miss 状态保留", type(exc).__name__, exc)
+
+
+def _acquire_inflight(key: str) -> tuple[threading.Event, bool]:
+    """登记"我要建这条 key":返 (event, is_leader)。leader 负责真建;非 leader 等这个 event。"""
+    with _INFLIGHT_LOCK:
+        event = _INFLIGHT.get(key)
+        if event is not None:
+            return event, False
+        event = threading.Event()
+        _INFLIGHT[key] = event
+        return event, True
+
+
+def _release_inflight(key: str, event: threading.Event) -> None:
+    """建完(成功或失败)清登记 + 放行所有等待方(它们醒来重读缓存)。"""
+    with _INFLIGHT_LOCK:
+        if _INFLIGHT.get(key) is event:
+            del _INFLIGHT[key]
+    event.set()
+
+
 def build_chapter_spine_cached(
     *,
     all_chunks: list[dict],
@@ -78,40 +133,46 @@ def build_chapter_spine_cached(
     genre: str,
     build_func: Callable[[], list[dict]],
 ) -> list[dict]:
-    """带 book-level 缓存的章脉构建 wrapper。
+    """带 book-level 缓存 + 单飞的章脉构建 wrapper。
 
-    命中 → 直接返反序列化的章脉(跳过整本分维抽取);miss → 调 ``build_func`` 建一次、写缓存。
-    缓存层任何意外(DB 锁/磁盘/key 计算)都降级直调 ``build_func``,绝不 break 章脉构建。
-    空章脉(``[]``)不写缓存——避免把一次抽取失败钉死成"这本书没章脉"。
+    命中 → 直接返反序列化的章脉;miss → **单飞**建一次(同一 key 并发只建一遍,其余等它建完再读
+    缓存)、写缓存。缓存层任何意外都降级直调 ``build_func``,绝不 break 构建。空章脉(``[]``)不写
+    缓存——不把一次抽取失败钉死成"这本书没章脉"。
+
+    单飞(2026-07-09):预热后台线程 + viz 端点冷启动时都 miss,原来各建一遍同一条章脉 = 双份
+    token + 双倍墙钟。现在第二个及以后的调用等第一个的成果(接 2min 目标 / 少 token)。
     """
     if _is_cache_disabled():
         return build_func()
 
-    key: str | None = None
     try:
         cache = _get_cache()
         key = _compute_spine_cache_key(all_chunks=all_chunks, model=model, genre=genre)
-        cached = cache.get(key)
-        if cached is not None:
-            try:
-                spine = json.loads(cached.decode("utf-8"))
-                if isinstance(spine, list):
-                    return spine
-            except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-                logger.warning("spine_cache: deserialize failed (%s); 当 miss", exc)
-    except Exception as exc:  # noqa: BLE001 — 缓存层意外不能 break 构建
-        logger.warning("spine_cache: lookup raised %s: %s; 绕过缓存", type(exc).__name__, exc)
+    except Exception as exc:  # noqa: BLE001 — key / cache 初始化意外 → 直接建,不进单飞
+        logger.warning("spine_cache: init raised %s: %s; 绕过缓存", type(exc).__name__, exc)
         return build_func()
 
-    spine = build_func()
+    hit = _read_cached(cache, key)
+    if hit is not None:
+        return hit
 
-    if spine and key is not None:  # 空章脉不写,免得把失败钉死
-        try:
-            _get_cache().set(key, json.dumps(spine, ensure_ascii=False).encode("utf-8"))
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("spine_cache: set raised %s: %s; miss 状态保留", type(exc).__name__, exc)
+    event, is_leader = _acquire_inflight(key)
+    if not is_leader:
+        # 有人在建同一条:等它(带超时防领头挂了永久卡),醒来重读缓存;读到用、没读到自己兜底建。
+        event.wait(timeout=_INFLIGHT_WAIT_TIMEOUT)
+        hit = _read_cached(cache, key)
+        return hit if hit is not None else build_func()
 
-    return spine
+    try:
+        # 双检:从"首次 miss"到"抢到 leader"之间,可能有人刚建完并写了缓存。
+        hit = _read_cached(cache, key)
+        if hit is not None:
+            return hit
+        spine = build_func()
+        _write_cached(cache, key, spine)
+        return spine
+    finally:
+        _release_inflight(key, event)
 
 
 def get_or_build_spine(

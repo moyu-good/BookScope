@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import threading
+import time
+
 import bookscope.agent._internal.chapter_spine_cache as sc
 
 
@@ -83,3 +86,43 @@ def test_get_or_build_spine_builds_once_then_caches(monkeypatch, tmp_path) -> No
     out2 = sc.get_or_build_spine(chunks=_CHUNKS, llm_client=object(), model="m")
     assert out1 == _SPINE and out2 == _SPINE
     assert calls["n"] == 1                       # facade 也走缓存:建一次,第二次命中
+
+
+def test_single_flight_concurrent_same_key_builds_once(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    """单飞:两个线程并发建同一条章脉,只该真建一遍(预热 + viz 点击撞上时不重复建)。"""
+    _setup_temp(monkeypatch, tmp_path)
+    calls = {"n": 0}
+    started = threading.Event()  # leader 已进入 build_func
+    release = threading.Event()  # 测试放行 leader 完成(制造重叠窗口)
+
+    def _slow_build():  # noqa: ANN202
+        calls["n"] += 1
+        started.set()
+        release.wait(3.0)
+        return _SPINE
+
+    results: dict[str, list] = {}
+
+    def _worker(tag: str) -> None:
+        results[tag] = _run(_slow_build)
+
+    t1 = threading.Thread(target=_worker, args=("a",))
+    t1.start()
+    assert started.wait(3.0)          # 等 leader 真进了 build(此时 inflight 已登记这条 key)
+    t2 = threading.Thread(target=_worker, args=("b",))
+    t2.start()
+    time.sleep(0.1)                   # 给 t2 时间走到"等 leader"分支
+    release.set()                     # 放行 leader 完成、写缓存、放行等待方
+    t1.join(5.0)
+    t2.join(5.0)
+    assert calls["n"] == 1            # 并发同 key 只建一遍
+    assert results["a"] == _SPINE and results["b"] == _SPINE  # 两个线程拿到同一条章脉
+
+
+def test_single_flight_different_keys_dont_block(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    """不同 key 各建各的,单飞不该把它们串起来(别误伤并发不同书)。"""
+    _setup_temp(monkeypatch, tmp_path)
+    build, calls = _counted(_SPINE)
+    _run(build)                                   # key1
+    _run(build, model="m2")                       # key2:不同 key,照常各建
+    assert calls["n"] == 2
