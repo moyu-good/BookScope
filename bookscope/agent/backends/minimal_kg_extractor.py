@@ -464,6 +464,9 @@ class MinimalKGExtractor:
             attempts = 0
             last_exc: Exception | None = None
             response: Any = None
+            # 撞 finish_reason=length(reasoning 挤爆预算)时,加倍 max_tokens 重试一次再走 jieba。
+            eff_max_tokens = self._max_tokens
+            length_bumped = False
 
             # 通用 LLM 调用循环——ContentFiltered 走重试 + 中性化；其他 provider 错 /
             # 输出形态错都直接 break 走 jieba 兜底。作者第十六波明示——这条兜底
@@ -480,7 +483,7 @@ class MinimalKGExtractor:
                         system=active_system,
                         tools=[],
                         messages=[{"role": "user", "content": user_content}],
-                        max_tokens=self._max_tokens,
+                        max_tokens=eff_max_tokens,
                         # KG 抽实体是结构化确定性任务——DeepSeek 官方建议
                         # 代码/数据类用 temperature 0.0，少随机才稳。
                         temperature=_EXTRACTION_TEMPERATURE,
@@ -505,7 +508,21 @@ class MinimalKGExtractor:
                     text = self._client.extract_final_text(response)
                     return _parse_characters_json(text)
                 except LLMFormatError as exc:
+                    # finish_reason=length = reasoning 挤爆 max_tokens、content 空(非真格式错)。
+                    # 加倍预算重试一次再走 jieba:外国 / 人物密的书 8000 常不够,LLM 抽的名册比
+                    # jieba 分音译名准(exp008 同款,见 reference_reasoning_model_token_budget)。
                     last_exc = exc
+                    fr = read_openai_finish_reason(response) if response is not None else None
+                    if fr == "length" and not length_bumped:
+                        eff_max_tokens = min(eff_max_tokens * 2, 24000)
+                        length_bumped = True
+                        logger.info(
+                            "kg_batch %d 撞 length,max_tokens %d→%d 重试一次",
+                            batch_index,
+                            self._max_tokens,
+                            eff_max_tokens,
+                        )
+                        continue
                     break
 
             # 任何兜底分支统一走 jieba ——本地 NER 跟 provider 完全解耦，always

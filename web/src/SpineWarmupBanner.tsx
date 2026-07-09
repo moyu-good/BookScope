@@ -33,7 +33,7 @@ export function SpineWarmupBanner({ phase }: { phase: SpineWarmupPhase }) {
             </span>
             <span className="text-[var(--color-ink-muted)]">
               {" "}
-              —— 后台读一遍，完成后所有整本书分析都秒出。这会儿照常用任何功能，不用等。
+              —— 第一次读这本书要把整本读一遍（大书约几分钟），只此一次。现在点整本书功能会等它读完；读完之后再点，就都秒出了。
             </span>
           </>
         ) : (
