@@ -15,7 +15,6 @@ import { ChapterAsk } from "./ChapterAsk";
 import { AnnotatedReader } from "./AnnotatedReader";
 import { ArgumentStructure } from "./ArgumentStructure";
 import { ChapterCurves } from "./ChapterCurves";
-import { CharacterFlow } from "./CharacterFlow";
 import { CharacterVoice } from "./CharacterVoice";
 import { ConceptEvolution } from "./ConceptEvolution";
 import { ConsistencyScan } from "./ConsistencyScan";
@@ -49,7 +48,7 @@ interface AnalysisOverlayProps {
 // 走 generate_*_exhaustive、读完整本出结构的功能——大书上分很多段、慢且贵、可能截断。
 // 「问这一章」(单章) /「前情回顾」(到某章) /「实体·母题·概念」(query-scoped) 不在此列。
 const WHOLE_BOOK_FEATS = new Set([
-  "relationship", "flow", "chapter-curves", "foreshadow", "subplot", "timeline", "argument",
+  "relationship", "chapter-curves", "foreshadow", "subplot", "timeline", "argument",
 ]);
 
 type Feat = {
@@ -73,7 +72,6 @@ const GROUPS: { title: string; feats: Feat[] }[] = [
     title: "人物",
     feats: [
       { id: "relationship", label: "关系", hint: "关系网(全书星图) + 关系演变(带时间轴)，一个入口内部切" },
-      { id: "flow", label: "叙事流", hint: "谁何时入场、哪几章群戏" },
       { id: "charvoice", label: "声口一致", hint: "标出「这句不像他说的」" },
     ],
   },
@@ -131,8 +129,6 @@ export function AnalysisOverlay({
         return <AnnotatedReader {...shared} />;
       case "relationship":
         return <RelationshipView {...shared} />;
-      case "flow":
-        return <CharacterFlow {...shared} />;
       case "charvoice":
         return <CharacterVoice {...shared} />;
       case "foreshadow":

@@ -39,7 +39,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NarrativePhases } from "./NarrativePhases";
 import { NarrativeCurve } from "./NarrativeCurve";
-import { CharacterFlow } from "./CharacterFlow";
 import { Timeline } from "./Timeline";
 import { SubplotWeave } from "./SubplotWeave";
 import { ForeshadowArcs } from "./ForeshadowArcs";
@@ -53,12 +52,11 @@ interface NarrativePanoramaProps {
 }
 
 // 各段的次序 + 锚点 id + 导航标题。次序按读情节的自然动线：
-// 先看全书分几个大阶段（阶段）→ 整本节奏起伏（曲线）→ 人物线怎么穿过全书（流）→
-// 关键事件先后（时间线）→ 支线怎么编织（编织）→ 埋的坑填没填（伏笔）。
+// 先看全书分几个大阶段（阶段）→ 整本节奏起伏（曲线）→ 关键事件先后（时间线）→
+// 支线怎么编织（编织）→ 埋的坑填没填（伏笔）。
 type SectionId =
   | "phases"
   | "curve"
-  | "flow"
   | "timeline"
   | "subplot"
   | "foreshadow";
@@ -66,7 +64,6 @@ type SectionId =
 const SECTIONS: ReadonlyArray<{ id: SectionId; label: string }> = [
   { id: "phases", label: "阶段" },
   { id: "curve", label: "叙事曲线" },
-  { id: "flow", label: "叙事流" },
   { id: "timeline", label: "时间线" },
   { id: "subplot", label: "支线编织" },
   { id: "foreshadow", label: "伏笔回收" },
@@ -193,10 +190,6 @@ export function NarrativePanorama({
 
       <PanoramaSection id="curve" refs={sectionRefs} hidden={isTreatise}>
         <NarrativeCurve {...shared} />
-      </PanoramaSection>
-
-      <PanoramaSection id="flow" refs={sectionRefs}>
-        <CharacterFlow {...shared} />
       </PanoramaSection>
 
       <PanoramaSection id="timeline" refs={sectionRefs}>
