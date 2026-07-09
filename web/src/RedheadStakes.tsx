@@ -21,12 +21,15 @@
 //
 // 设计语言（数字善本案头）：朱墨双色（朱 = var(--color-seal)，墨 = var(--color-ink)，
 // 淡墨 = var(--color-ink-muted)）、宋体 var(--font-display)、留白、古籍克制——不堆
-// 古风、无 emoji。复用 SealMark（钤印）/ RunningProcess / RunStats，不引新依赖。
+// 古风、无 emoji。触发走 SealButton（钤印按钮），证据钉在 Phase0 共享件 EvidenceMark
+// （「鉴」印 / 证据强度标 + 悬停浮原文），跟依据链网、书侧镜头同一套。信号是研判层，
+// 刻意不接核验类共享件（不盖鉴印、不摆强度标——研判不冒充事实）。
 // ---------------------------------------------------------------------------
 
 import { useMemo, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
-import { SealMark } from "./SealMark";
+import { SealButton } from "./SealButton";
+import { EvidenceMark } from "./viz/EvidenceMark";
 
 // ---- 后端契约（对着 RedheadStakesResponse 写，别改后端） ----
 
@@ -256,6 +259,8 @@ export function RedheadStakes({
   const [openEvidence, setOpenEvidence] = useState<Record<string, boolean>>({});
   // 信号逐条点「看原文基础」展开 basis（键 = 信号下标）
   const [openBasis, setOpenBasis] = useState<Record<number, boolean>>({});
+  // 象限里选中的那枚点（键 = "o3" / "r1"）——选中后下方浮出它的完整卡
+  const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
 
   const roleTrimmed = role.trim();
 
@@ -265,6 +270,7 @@ export function RedheadStakes({
     setError(null);
     setOpenEvidence({});
     setOpenBasis({});
+    setSelectedPoint(null);
     try {
       const body: Record<string, unknown> = {
         book_session_id: sessionId,
@@ -323,6 +329,78 @@ export function RedheadStakes({
     [opportunities, risks],
   );
 
+  // 机会 + 风险合成象限的点：只带落位要用的两维（含金量 / 时效）+ 一个标题。
+  // 键沿用 "o{i}" / "r{i}"，跟 openEvidence 的键一套，选中后能直接找回原条。
+  const quadItems = useMemo<QuadItem[]>(
+    () => [
+      ...opportunities.map((o, i) => ({
+        key: `o${i}`,
+        kind: "opp" as const,
+        label: o.what,
+        substance: o.substance,
+        horizon: o.horizon,
+      })),
+      ...risks.map((r, i) => ({
+        key: `r${i}`,
+        kind: "risk" as const,
+        label: r.what,
+        substance: r.substance,
+        horizon: r.horizon,
+      })),
+    ],
+    [opportunities, risks],
+  );
+
+  // 选中的那枚点 → 复用 StakeCard 浮出完整一条（含金量凭据 + 原文都在卡里）。
+  function renderSelectedDetail() {
+    if (!selectedPoint) return null;
+    const open = !!openEvidence[selectedPoint];
+    const toggle = () =>
+      setOpenEvidence((cur) => ({
+        ...cur,
+        [selectedPoint]: !cur[selectedPoint],
+      }));
+    if (selectedPoint.startsWith("o")) {
+      const o = opportunities[Number(selectedPoint.slice(1))];
+      if (!o) return null;
+      return (
+        <StakeCard
+          kind="opp"
+          what={o.what}
+          detailLabel="为何是机会"
+          detail={o.why}
+          action={o.action}
+          substance={o.substance}
+          substanceReason={o.substance_reason}
+          horizon={o.horizon}
+          evidence={o.evidence}
+          verified={o.verified}
+          matchScore={o.match_score}
+          open={open}
+          onToggle={toggle}
+        />
+      );
+    }
+    const r = risks[Number(selectedPoint.slice(1))];
+    if (!r) return null;
+    return (
+      <StakeCard
+        kind="risk"
+        what={r.what}
+        detailLabel="代价 / 后果"
+        detail={r.cost}
+        substance={r.substance}
+        substanceReason={r.substance_reason}
+        horizon={r.horizon}
+        evidence={r.evidence}
+        verified={r.verified}
+        matchScore={r.match_score}
+        open={open}
+        onToggle={toggle}
+      />
+    );
+  }
+
   // ---- 身份输入区（永远在顶上，换身份重判一遍） ----
   const identityBar = (
     <div className="mb-4">
@@ -365,14 +443,14 @@ export function RedheadStakes({
           className="flex-1 text-sm px-3 py-2 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-seal)] disabled:opacity-50"
           style={{ fontFamily: "var(--font-display)" }}
         />
-        <button
-          type="button"
+        <SealButton
           onClick={load}
-          disabled={loading || !apiKey}
-          className="text-sm px-4 py-2 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] disabled:opacity-50 transition-colors whitespace-nowrap"
-        >
-          {loading ? "研判中…" : roleTrimmed ? "判利害与风向" : "看通用利害"}
-        </button>
+          loading={loading}
+          disabled={!apiKey}
+          label={roleTrimmed ? "判利害与风向" : "看通用利害"}
+          loadingLabel="研判中…"
+          className="whitespace-nowrap"
+        />
       </div>
       {error && (
         <p className="mt-2 text-sm" style={{ color: "var(--color-seal)" }}>
@@ -552,68 +630,28 @@ export function RedheadStakes({
         </section>
       )}
 
-      {/* ── 机会（证据层）── */}
-      {opportunities.length > 0 && (
+      {/* ── 机会与风险：含金量 × 时效 十字象限（②：取代原来的两列卡片清单）──
+          X = 时效（近 → 远 / 无期），Y = 含金量（真金白银 → 空头倡导）。机会朱点、风险墨环，
+          点一枚 → 下方浮出它的原文 + 判含金量的理由。都锚 substance / horizon 两个真实字段。 */}
+      {(opportunities.length > 0 || risks.length > 0) && (
         <section className="mb-6">
           <SectionHead
-            title="机会"
-            sub="可争取的红利"
-            count={opportunities.length}
+            title="机会与风险 · 含金量 × 时效"
+            sub="按含金量和时效摆进象限，点一枚看原文与凭据"
+            count={opportunities.length + risks.length}
           />
-          <div className="space-y-3">
-            {opportunities.map((o, i) => (
-              <StakeCard
-                key={`o${i}`}
-                kind="opp"
-                what={o.what}
-                detailLabel="为何是机会"
-                detail={o.why}
-                action={o.action}
-                substance={o.substance}
-                substanceReason={o.substance_reason}
-                horizon={o.horizon}
-                evidence={o.evidence}
-                verified={o.verified}
-                open={!!openEvidence[`o${i}`]}
-                onToggle={() =>
-                  setOpenEvidence((cur) => ({
-                    ...cur,
-                    [`o${i}`]: !cur[`o${i}`],
-                  }))
-                }
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── 风险（证据层）── */}
-      {risks.length > 0 && (
-        <section className="mb-6">
-          <SectionHead title="风险" sub="暴露面 / 代价" count={risks.length} />
-          <div className="space-y-3">
-            {risks.map((r, i) => (
-              <StakeCard
-                key={`r${i}`}
-                kind="risk"
-                what={r.what}
-                detailLabel="代价 / 后果"
-                detail={r.cost}
-                substance={r.substance}
-                substanceReason={r.substance_reason}
-                horizon={r.horizon}
-                evidence={r.evidence}
-                verified={r.verified}
-                open={!!openEvidence[`r${i}`]}
-                onToggle={() =>
-                  setOpenEvidence((cur) => ({
-                    ...cur,
-                    [`r${i}`]: !cur[`r${i}`],
-                  }))
-                }
-              />
-            ))}
-          </div>
+          <StakesQuadrant
+            items={quadItems}
+            selected={selectedPoint}
+            onSelect={setSelectedPoint}
+          />
+          {selectedPoint ? (
+            <div className="mt-3">{renderSelectedDetail()}</div>
+          ) : (
+            <p className="mt-2 text-caption text-[var(--color-ink-muted)]">
+              点象限里一枚——朱点是机会、墨色空心环是风险——看它的原话和判含金量的理由。
+            </p>
+          )}
         </section>
       )}
 
@@ -780,6 +818,7 @@ function StakeCard({
   horizon,
   evidence,
   verified,
+  matchScore,
   open,
   onToggle,
 }: {
@@ -793,6 +832,7 @@ function StakeCard({
   horizon: string;
   evidence: string;
   verified: boolean;
+  matchScore: number;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -857,28 +897,30 @@ function StakeCard({
         </p>
       )}
 
-      {/* 原文：核过盖印 + 可展开；核不过老实标待核 */}
+      {/* 原文：证据强度标 / 「鉴」印（悬停或聚焦浮出锚定原文）+ 可展开全文；核不过老实标。
+          强度标 + 浮层走 Phase0 共享件（EvidenceMark），跟依据链网、书侧镜头同一套。 */}
       <div className="mt-2">
-        {isVerified ? (
-          <div className="flex items-center gap-2 flex-wrap">
-            <SealMark size={17} title="原文已核验" />
-            {canOpen && (
-              <button
-                type="button"
-                onClick={onToggle}
-                className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
-              >
-                {open ? "收起原文" : "看原文出处"}
-              </button>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-[var(--color-ink-muted)] italic">
-            {canOpen
-              ? "未在原文比对命中·仅供参考"
-              : "暂无贴切原文（待核）"}
-          </p>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <EvidenceMark
+            evidence={evidence}
+            verified={verified}
+            matchScore={matchScore}
+          />
+          {!isVerified && canOpen && (
+            <span className="text-caption text-[var(--color-ink-muted)] italic">
+              未核·仅供参考
+            </span>
+          )}
+          {canOpen && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+            >
+              {open ? "收起原文" : "看原文出处"}
+            </button>
+          )}
+        </div>
         {canOpen && open && (
           <p
             className="mt-2 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
@@ -967,26 +1009,31 @@ function RelatedClauseRow({
         </p>
       )}
 
-      {/* 原文：核过盖印 + 可展开；核不过老实标待核 */}
+      {/* 原文：证据强度标 / 「鉴」印（悬停或聚焦浮出锚定原文 + 章次）+ 可展开全文；核不过老实标。
+          强度标 + 浮层走 Phase0 共享件（EvidenceMark），跟机会/风险、依据链网、书侧同一套。 */}
       <div className="mt-2">
-        {isVerified ? (
-          <div className="flex items-center gap-2 flex-wrap">
-            <SealMark size={17} title="原文已核验" />
-            {canOpen && (
-              <button
-                type="button"
-                onClick={onToggle}
-                className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
-              >
-                {open ? "收起原文" : "看原文出处"}
-              </button>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-[var(--color-ink-muted)] italic">
-            {canOpen ? "未在原文比对命中·仅供参考" : "暂无贴切原文（待核）"}
-          </p>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <EvidenceMark
+            evidence={clause.evidence}
+            verified={clause.verified}
+            matchScore={clause.match_score}
+            chapter={clause.chapter}
+          />
+          {!isVerified && canOpen && (
+            <span className="text-caption text-[var(--color-ink-muted)] italic">
+              未核·仅供参考
+            </span>
+          )}
+          {canOpen && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="text-caption text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+            >
+              {open ? "收起原文" : "看原文出处"}
+            </button>
+          )}
+        </div>
         {canOpen && open && (
           <p
             className="mt-2 text-body-sm leading-relaxed text-[var(--color-ink)] border-l-2 pl-3"
@@ -1006,5 +1053,305 @@ function RelatedClauseRow({
         )}
       </div>
     </article>
+  );
+}
+
+// ---- 含金量 × 时效 十字象限（②：机会 / 风险摆进两维，取代原来的两列卡片清单）----
+// X = 时效（近 左 → 远 / 无期 右），Y = 含金量（真金白银 上 → 空头倡导 下）。
+// 机会 = 朱实心点，风险 = 墨色空心环；点一枚 → 上层浮出那条的原文 + 判含金量的理由。
+// 位置只认 substance / horizon 两个真实字段。轴是离散三档，同一格里挤了多条就成对推开——
+// 格子才是真信号，格内那点微位移只为不叠住，不承载额外含义（不编数）。
+// 十字轴布局骨架借自 StanceQuadrant（缩放 / 防重叠 / 选中浮层那套），但那件专做立场争议
+// （连续轴 + 争议带 + 正反证据），跟这里离散两维、朱点墨环、复用 StakeCard 的形态不是一回事，
+// 故不套用它、就地自绘。
+interface QuadItem {
+  key: string;
+  kind: "opp" | "risk";
+  label: string; // 就是 what，图上标一截
+  substance: string;
+  horizon: string;
+}
+
+const QVB_W = 680;
+const QVB_H = 430;
+const QPAD = { t: 30, r: 30, b: 46, l: 96 };
+const QPW = QVB_W - QPAD.l - QPAD.r;
+const QPH = QVB_H - QPAD.t - QPAD.b;
+
+// 三档在轴上的落点（占绘图区的比例）。近靠左、远居中偏右、无期最右；真金白银最上、空头最下。
+const HORIZON_FX: Record<string, number> = { 近: 0.16, 远: 0.56, 无期: 0.86 };
+const SUBSTANCE_FY: Record<string, number> = {
+  真金白银: 0.15,
+  有条件兑现: 0.5,
+  空头倡导: 0.85,
+};
+// 十字分界：竖线切「近」与「远 / 无期」，横线把「真金白银」单独切到上半（值得动手的那格）。
+const Q_XMID_FX = 0.36;
+const Q_YMID_FY = 0.32;
+
+function truncateLabel(s: string, n: number): string {
+  const t = (s || "").trim();
+  return t.length > n ? `${t.slice(0, n)}…` : t;
+}
+
+function StakesQuadrant({
+  items,
+  selected,
+  onSelect,
+}: {
+  items: QuadItem[];
+  selected: string | null;
+  onSelect: (key: string | null) => void;
+}) {
+  const fx = (h: string) => QPAD.l + (HORIZON_FX[h] ?? 0.5) * QPW;
+  const fy = (s: string) => QPAD.t + (SUBSTANCE_FY[s] ?? 0.5) * QPH;
+  const cxMid = QPAD.l + Q_XMID_FX * QPW;
+  const cyMid = QPAD.t + Q_YMID_FY * QPH;
+
+  // 落位 + 防重叠：离散三档会把多条压到同一格，成对推开、别叠成一坨；越界拉回绘图区。
+  const laid = useMemo(() => {
+    const R = 9;
+    const pts = items.map((it, i) => ({
+      it,
+      cx: fx(it.horizon) + (((i * 37) % 13) - 6),
+      cy: fy(it.substance) + (((i * 53) % 13) - 6),
+      r: R,
+    }));
+    for (let iter = 0; iter < 80; iter++) {
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const a = pts[i];
+          const b = pts[j];
+          let dx = b.cx - a.cx;
+          let dy = b.cy - a.cy;
+          let d = Math.hypot(dx, dy);
+          if (d < 0.01) {
+            dx = 1;
+            dy = i - j || 1;
+            d = Math.hypot(dx, dy);
+          }
+          const min = a.r + b.r + 10;
+          if (d < min) {
+            const k = (min - d) / 2 / d;
+            a.cx -= dx * k;
+            a.cy -= dy * k;
+            b.cx += dx * k;
+            b.cy += dy * k;
+          }
+        }
+      }
+      for (const q of pts) {
+        q.cx = Math.max(QPAD.l + q.r, Math.min(QVB_W - QPAD.r - q.r, q.cx));
+        q.cy = Math.max(QPAD.t + q.r + 12, Math.min(QVB_H - QPAD.b - q.r, q.cy));
+      }
+    }
+    return pts;
+  }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const substanceRows: Substance[] = ["真金白银", "有条件兑现", "空头倡导"];
+  const horizonCols: Horizon[] = ["近", "远", "无期"];
+  const horizonColLabel: Record<Horizon, string> = {
+    近: "近（1-3 年）",
+    远: "远",
+    无期: "无期",
+  };
+
+  return (
+    <div className="rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)] p-3">
+      <svg
+        viewBox={`0 0 ${QVB_W} ${QVB_H}`}
+        className="w-full"
+        style={{ overflow: "visible" }}
+      >
+        {/* 上半（真金白银那格）淡朱底，衬「值得动手」 */}
+        <rect
+          x={QPAD.l}
+          y={QPAD.t}
+          width={QPW}
+          height={cyMid - QPAD.t}
+          fill="var(--color-seal)"
+          opacity={0.04}
+        />
+        {/* 含金量行参考线 + 左侧行标 */}
+        {substanceRows.map((s) => {
+          const y = fy(s);
+          return (
+            <g key={`row-${s}`}>
+              <line
+                x1={QPAD.l}
+                y1={y}
+                x2={QVB_W - QPAD.r}
+                y2={y}
+                stroke="var(--color-rule)"
+                strokeWidth={1}
+                strokeDasharray="2 4"
+                opacity={0.5}
+              />
+              <text
+                x={QPAD.l - 8}
+                y={y + 4}
+                fontSize={11.5}
+                textAnchor="end"
+                fill="var(--color-ink-muted)"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {s}
+              </text>
+            </g>
+          );
+        })}
+        {/* 时效列参考线 + 底部列标 */}
+        {horizonCols.map((h) => {
+          const x = fx(h);
+          return (
+            <g key={`col-${h}`}>
+              <line
+                x1={x}
+                y1={QPAD.t}
+                x2={x}
+                y2={QVB_H - QPAD.b}
+                stroke="var(--color-rule)"
+                strokeWidth={1}
+                strokeDasharray="2 4"
+                opacity={0.32}
+              />
+              <text
+                x={x}
+                y={QVB_H - QPAD.b + 18}
+                fontSize={11.5}
+                textAnchor="middle"
+                fill="var(--color-ink-muted)"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {horizonColLabel[h]}
+              </text>
+            </g>
+          );
+        })}
+        {/* 十字主轴（比参考线重）：横切真金白银 / 其余，竖切近 / 远无期 */}
+        <line
+          x1={QPAD.l}
+          y1={cyMid}
+          x2={QVB_W - QPAD.r}
+          y2={cyMid}
+          stroke="var(--color-rule)"
+          strokeWidth={1.5}
+        />
+        <line
+          x1={cxMid}
+          y1={QPAD.t}
+          x2={cxMid}
+          y2={QVB_H - QPAD.b}
+          stroke="var(--color-rule)"
+          strokeWidth={1.5}
+        />
+        {/* 轴向标注 */}
+        <text
+          x={QPAD.l - 8}
+          y={QPAD.t - 12}
+          fontSize={12}
+          textAnchor="start"
+          fill="var(--color-ink-muted)"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          ↑ 含金量
+        </text>
+        <text
+          x={QVB_W - QPAD.r}
+          y={QVB_H - QPAD.b + 34}
+          fontSize={12}
+          textAnchor="end"
+          fill="var(--color-ink-muted)"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          时效 →
+        </text>
+        {/* 角落读法提示（淡）：左上＝抓紧兑现，右下＝别太当真 */}
+        <text
+          x={cxMid - 8}
+          y={QPAD.t + 12}
+          fontSize={11}
+          textAnchor="end"
+          fill="var(--color-seal)"
+          opacity={0.65}
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          抓紧兑现
+        </text>
+        <text
+          x={QVB_W - QPAD.r}
+          y={QVB_H - QPAD.b - 6}
+          fontSize={11}
+          textAnchor="end"
+          fill="var(--color-ink-muted)"
+          opacity={0.7}
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          别太当真
+        </text>
+
+        {/* 点：机会朱实心、风险墨空心环；选中放大 + 换描边 */}
+        {laid.map(({ it, cx, cy, r }) => {
+          const on = selected === it.key;
+          const isOpp = it.kind === "opp";
+          const rr = on ? r + 2 : r;
+          return (
+            <g
+              key={it.key}
+              style={{ cursor: "pointer" }}
+              onClick={() => onSelect(on ? null : it.key)}
+            >
+              <circle
+                cx={cx}
+                cy={cy}
+                r={rr}
+                fill={isOpp ? "var(--color-seal)" : "var(--color-paper-raised)"}
+                opacity={isOpp ? (on ? 1 : 0.9) : 1}
+                stroke={
+                  isOpp
+                    ? on
+                      ? "var(--color-ink)"
+                      : "var(--color-paper-raised)"
+                    : "var(--color-ink)"
+                }
+                strokeWidth={isOpp ? (on ? 2 : 1.5) : on ? 2.6 : 2}
+              />
+              <text
+                x={cx}
+                y={cy - rr - 4}
+                fontSize={11}
+                textAnchor="middle"
+                fill="var(--color-ink)"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {truncateLabel(it.label, 9)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* 图例 */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-[var(--color-ink-muted)]">
+        <span className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-full"
+            style={{ background: "var(--color-seal)" }}
+          />
+          机会（朱点）
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-full border-2"
+            style={{
+              borderColor: "var(--color-ink)",
+              background: "transparent",
+            }}
+          />
+          风险（墨环）
+        </span>
+        <span>上＝真金白银，下＝空头倡导；左＝近，右＝远 / 无期</span>
+      </div>
+    </div>
   );
 }

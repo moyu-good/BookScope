@@ -155,17 +155,17 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
     return (
       <FeatureEntryCard
         title="人物志"
-        lead="全书人物一册在手：左边全员名册（可搜），点谁看谁——他的立场（正反证据 + 争议度）、处境转折，都锚原文。点开才现跑他的精确分析。"
-        actionLabel="开人物志"
-        loadingLabel="读全书出人物名册中…"
+        lead="全书的人物都在这儿。左边一张名单，想看谁点谁：他偏向哪一边、有几分把握、正反两面的证据、处境怎么起落，每条都能翻回原文。点开谁，才分析谁。"
+        actionLabel="翻开人物志"
+        loadingLabel="正在通读全书，整理人物名单…"
         onAction={loadRoster}
         loading={loadingRoster}
         disabled={!apiKey}
-        hint="名册来自章脉（整本读一次），点人现跑精确分析；命中缓存秒出"
+        hint="名单是通读全书后一次列出的；点开某个人才去分析他，读过一次后再看就快。"
         error={error}
       >
         {loadingRoster && (
-          <RunningProcess label="读全书出人物名册" hint="整本书出章脉、派生全员名册；命中缓存秒出。" />
+          <RunningProcess label="正在通读全书，整理人物名单" hint="先把整本书读一遍，列出全部人物；读过一次后再看就快。" />
         )}
       </FeatureEntryCard>
     );

@@ -11,7 +11,7 @@
 // 敌友色温：每幕节点颜色按 valence 从暖(盟)到冷(敌)取色——这是数据色，不跟主题走。
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
 import { useVizFocus } from "./viz/vizFocus";
 import { EvidencePopover } from "./viz/EvidencePopover";
@@ -422,6 +422,9 @@ function Chronicle({
   const verified = beats.filter((bt) => bt.verified && bt.evidence).length;
   const v = verdict;
 
+  // 走势线上正悬停哪一章：点上去下面那一幕跟着亮（联动）。null = 没在悬停。
+  const [hoverCh, setHoverCh] = useState<number | null>(null);
+
   return (
     <div className="mt-4">
       {/* 顶部统计 */}
@@ -505,11 +508,21 @@ function Chronicle({
         )}
       </div>
 
+      {/* ── 敌友色温走势线：卡片上方的一眼总览，从亲怎么走到敌 ── */}
+      <TemperatureTrend
+        beats={beats}
+        flashCh={flashCh}
+        hoverCh={hoverCh}
+        onPick={onPivot}
+        onHover={setHoverCh}
+      />
+
       {/* ── 逐幕编年（竖向时间线） ── */}
       <div className="mt-4">
         {beats.map((bt, idx) => {
           const color = valenceColor(bt.valence);
-          const flash = flashCh === bt.chapter;
+          // 走势线点了它（flashCh）或正悬停它（hoverCh），这一幕就亮起来。
+          const hot = flashCh === bt.chapter || hoverCh === bt.chapter;
           const isLast = idx === beats.length - 1;
           return (
             <div key={`${bt.chapter}-${idx}`}>
@@ -551,9 +564,9 @@ function Chronicle({
                   }}
                   className="flex-1 mb-3 p-3 rounded border bg-white transition-colors"
                   style={{
-                    borderColor: flash ? "var(--color-seal)" : "var(--color-rule)",
+                    borderColor: hot ? "var(--color-seal)" : "var(--color-rule)",
                     borderWidth: "0.5px",
-                    background: flash ? "var(--color-seal-soft)" : undefined,
+                    background: hot ? "var(--color-seal-soft)" : undefined,
                   }}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -597,6 +610,276 @@ function Chronicle({
       </div>
 
       {!!trace && <RunStats trace={trace} note={`${a}—${b} 共 ${total} 幕`} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 敌友色温走势线
+//
+// 横轴是章（拿每幕的 chapter），纵轴是敌友（每幕的 valence，友在上、敌在下）。
+// 一条线从暖（朱·亲）一路走到冷（墨蓝·敌），一眼看出这对人怎么由亲转敌。
+// 每章一个点、标着章号；点上去或点一下，下面对应那一幕跟着亮起来。
+// 点的颜色跟卡片左边那颗圆点同一套取色（valenceColor），所以同一幕两处一个色，认得出。
+// 纯 SVG + 纯 CSS：线是拿 CSS 描边动画描出来的，不靠 rAF，无头环境里也只会安静地画完，不会卡死。
+// ---------------------------------------------------------------------------
+function TemperatureTrend({
+  beats,
+  flashCh,
+  hoverCh,
+  onPick,
+  onHover,
+}: {
+  beats: Beat[];
+  flashCh: number | null;
+  hoverCh: number | null;
+  onPick: (ch: number) => void;
+  onHover: (ch: number | null) => void;
+}) {
+  // 渐变 id 要唯一；useId 带的冒号在 SVG 的 url(#…) 里有的浏览器认不了，去掉非字母数字。
+  const gradId = useId().replace(/[^a-zA-Z0-9]/g, "");
+
+  const layout = useMemo(() => {
+    // 只留 chapter / valence 都是正常数字的幕，按章从小到大排（线得从左往右走，不能来回折）。
+    const sorted = beats
+      .filter((b) => Number.isFinite(b.chapter) && Number.isFinite(b.valence))
+      .slice()
+      .sort((x, y) => x.chapter - y.chapter);
+
+    // 画布尺寸用 viewBox 坐标，宽度随容器等比缩放。
+    const VBW = 640;
+    const VBH = 172;
+    const padL = 40;
+    const padR = 18;
+    const padT = 20;
+    const padB = 32;
+    const plotW = VBW - padL - padR;
+    const plotH = VBH - padT - padB;
+
+    const n = sorted.length;
+    const minCh = n ? sorted[0].chapter : 0;
+    const maxCh = n ? sorted[n - 1].chapter : 0;
+    const span = maxCh - minCh;
+
+    const xFor = (ch: number, i: number): number => {
+      if (span > 0) return padL + ((ch - minCh) / span) * plotW; // 真按章号铺开
+      if (n > 1) return padL + (i / (n - 1)) * plotW; // 都挤在同一章时按序均分兜底
+      return padL + plotW / 2; // 只有一幕就居中
+    };
+    const yFor = (v: number): number => {
+      const c = Math.max(-5, Math.min(5, v));
+      return padT + ((5 - c) / 10) * plotH; // +5 顶、0 中、-5 底
+    };
+
+    // 章号标签抽稀：两端一定标，中间隔够宽才标，免得挤成一坨。
+    const MIN_GAP = 34;
+    let lastLabelX = -Infinity;
+    const nodes = sorted.map((b, i) => {
+      const cx = xFor(b.chapter, i);
+      const cy = yFor(b.valence);
+      const isEnd = i === 0 || i === n - 1;
+      let label = false;
+      if (isEnd || cx - lastLabelX >= MIN_GAP) {
+        label = true;
+        lastLabelX = cx;
+      }
+      return { beat: b, cx, cy, label };
+    });
+
+    return { nodes, VBW, VBH, padL, padT, plotW, plotH, zeroY: yFor(0) };
+  }, [beats]);
+
+  const { nodes, VBW, VBH, padL, padT, plotW, plotH, zeroY } = layout;
+  if (nodes.length === 0) return null;
+
+  const x0 = nodes[0].cx;
+  const xN = nodes[nodes.length - 1].cx;
+  const hasLine = nodes.length >= 2 && xN > x0;
+  const poly = nodes
+    .map((p) => `${p.cx.toFixed(1)},${p.cy.toFixed(1)}`)
+    .join(" ");
+
+  // 线的真实长度直接拿点坐标算出来（不碰 DOM），描边动画照它走，长线短线都描得匀、
+  // 且静止态一定是画满的（dasharray 等于全长，没有断口）。
+  let pathLen = 0;
+  for (let i = 1; i < nodes.length; i++) {
+    pathLen += Math.hypot(
+      nodes[i].cx - nodes[i - 1].cx,
+      nodes[i].cy - nodes[i - 1].cy,
+    );
+  }
+  const dash = Math.ceil(pathLen) + 1;
+
+  return (
+    <div className="mt-4 p-3 rounded border border-[var(--color-rule)] bg-[var(--color-paper-raised)]">
+      {/* 小标题 + 冷暖释义 */}
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-xs text-[var(--color-ink-muted)]">
+          敌友色温 · 一章章的走势
+        </p>
+        <div className="flex items-center gap-3 text-xs text-[var(--color-ink-muted)]">
+          <span className="flex items-center gap-1">
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-full"
+              style={{ background: valenceColor(5) }}
+            />
+            亲
+          </span>
+          <span className="flex items-center gap-1">
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-full"
+              style={{ background: valenceColor(-5) }}
+            />
+            敌
+          </span>
+        </div>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${VBW} ${VBH}`}
+        style={{ width: "100%", height: "auto", display: "block" }}
+        role="img"
+        aria-label="这对人物敌友色温的逐章走势线"
+      >
+        <style>{`
+          @keyframes rtlDrawIn { from { stroke-dashoffset: ${dash}; } to { stroke-dashoffset: 0; } }
+          .rtl-trend-line { animation: rtlDrawIn 820ms ease-out forwards; }
+        `}</style>
+
+        {hasLine && (
+          <defs>
+            <linearGradient
+              id={`grad-${gradId}`}
+              gradientUnits="userSpaceOnUse"
+              x1={x0}
+              y1="0"
+              x2={xN}
+              y2="0"
+            >
+              {nodes.map((p, i) => (
+                <stop
+                  key={i}
+                  offset={`${(((p.cx - x0) / (xN - x0)) * 100).toFixed(2)}%`}
+                  stopColor={valenceColor(p.beat.valence)}
+                />
+              ))}
+            </linearGradient>
+          </defs>
+        )}
+
+        {/* 中立基线（valence 0）：这条线之上是亲、之下是敌 */}
+        <line
+          x1={padL}
+          y1={zeroY}
+          x2={padL + plotW}
+          y2={zeroY}
+          stroke="var(--color-rule)"
+          strokeWidth="1"
+          strokeDasharray="3 4"
+        />
+        {/* 纵轴两头点一下方向：上亲下敌 */}
+        <text
+          x={padL - 8}
+          y={padT + 4}
+          textAnchor="end"
+          fontSize="11"
+          fill="var(--color-ink-muted)"
+        >
+          亲
+        </text>
+        <text
+          x={padL - 8}
+          y={padT + plotH}
+          textAnchor="end"
+          fontSize="11"
+          fill="var(--color-ink-muted)"
+        >
+          敌
+        </text>
+
+        {/* 走势线：冷暖渐变的描边，靠 CSS 一笔画出来 */}
+        {hasLine && (
+          <polyline
+            className="rtl-trend-line"
+            points={poly}
+            fill="none"
+            stroke={`url(#grad-${gradId})`}
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{ strokeDasharray: dash }}
+          />
+        )}
+
+        {/* 每章一个点：点它 / 悬停它，下面对应那一幕跟着亮 */}
+        {nodes.map((p, i) => {
+          const ch = p.beat.chapter;
+          const active = flashCh === ch || hoverCh === ch;
+          const col = valenceColor(p.beat.valence);
+          return (
+            <g
+              key={`${ch}-${i}`}
+              style={{ cursor: "pointer" }}
+              onClick={() => onPick(ch)}
+              onMouseEnter={() => onHover(ch)}
+              onMouseLeave={() => onHover(null)}
+            >
+              {/* 放大的透明命中区，好点也好悬停 */}
+              <circle cx={p.cx} cy={p.cy} r={13} fill="transparent" />
+              {active && (
+                <circle
+                  cx={p.cx}
+                  cy={p.cy}
+                  r={9}
+                  fill="none"
+                  stroke={col}
+                  strokeWidth="1.2"
+                  opacity="0.55"
+                />
+              )}
+              <circle
+                cx={p.cx}
+                cy={p.cy}
+                r={active ? 6 : 4.5}
+                fill={col}
+                stroke="var(--color-paper)"
+                strokeWidth="1.5"
+              />
+              {/* 章号：两端和抽稀后的点常标；正在联动的点一定标 */}
+              {(p.label || active) && (
+                <text
+                  x={p.cx}
+                  y={padT + plotH + 15}
+                  textAnchor="middle"
+                  fontSize="10"
+                  fill={active ? "var(--color-seal)" : "var(--color-ink-muted)"}
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  {ch}
+                </text>
+              )}
+              {/* 联动那一刻，浮出这一幕此刻是什么状态，指名道姓 */}
+              {active && p.beat.state && (
+                <text
+                  x={Math.max(padL + 4, Math.min(p.cx, padL + plotW - 4))}
+                  y={p.cy - 12}
+                  textAnchor="middle"
+                  fontSize="11"
+                  fill="var(--color-ink)"
+                  style={{ fontWeight: 700 }}
+                >
+                  {p.beat.state}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* 横轴是什么，别让人猜 */}
+      <p className="text-right text-xs text-[var(--color-ink-muted)] mt-0.5">
+        横轴 · 章
+      </p>
     </div>
   );
 }

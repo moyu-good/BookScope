@@ -216,7 +216,9 @@ def relationship_graph_from_spine(
 ) -> dict[str, Any]:
     """关系图视图:把章脉逐章 relations 聚合成 nodes + edges(章级锚,证据点开现取)。
 
-    edge = 一对人物跨章的并集:``{source, target, chapters:[出现的章], notes:[每章一句], weight}``。
+    edge = 一对人物跨章的并集:``{source, target, chapters:[出现的章], notes:[每章一句], weight}``,
+    章脉 v2 起再带 ``rel_type``(主导关系类型·跨章众数)+ ``valence``(综合敌友·跨章均值 -5..5);
+    旧缓存(v1)没这俩,边就不带,前端退回现有(共现粗细 + 兜底色)。
     weight = 出现章数(画粗细)。节点 = 所有露面人物。不带 upfront evidence(出路 B)。
     ``name_map``(别名→canonical,来自 KG)合并 玄德/刘备/先主 这类碎裂别名。
 
@@ -248,15 +250,30 @@ def relationship_graph_from_spine(
                 continue
             key = _norm_pair(a, b)
             e = edges.setdefault(key, {"source": key[0], "target": key[1],
-                                       "chapters": [], "notes": [], "weight": 0})
+                                       "chapters": [], "notes": [], "weight": 0,
+                                       "types": [], "valences": []})
             if ch not in e["chapters"]:
                 e["chapters"].append(ch)
                 e["weight"] += 1
             note = str(rel.get("note", "")).strip()
             if note:
                 e["notes"].append(note)
+            # v2(WP-relationship-depth,probe exp025 GO):关系带 type/valence 就收集,
+            # 聚合成边的主导类型 + 综合敌友;旧缓存(v1)没这俩 → 空 → 边不带、前端退现有。
+            rtype = str(rel.get("type", "")).strip()
+            if rtype and rtype != "其他":
+                e["types"].append(rtype)
+            val = rel.get("valence")
+            if isinstance(val, (int, float)) and not isinstance(val, bool):
+                e["valences"].append(float(val))
     for e in edges.values():
         e["chapters"].sort()
+        types = e.pop("types")
+        vals = e.pop("valences")
+        if types:
+            e["rel_type"] = max(set(types), key=types.count)  # 主导关系类型(跨章众数)
+        if vals:
+            e["valence"] = round(sum(vals) / len(vals))  # 综合敌友(跨章均值,-5..5)
 
     # 只画有关系的人(关系图本义):去掉没进任何边的孤立点。不设人数帽,几百号人有关系就画几百个。
     connected = {e["source"] for e in edges.values()} | {e["target"] for e in edges.values()}

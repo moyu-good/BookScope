@@ -169,7 +169,7 @@ export function Timeline({
         onAction={load}
         loading={loading}
         disabled={!apiKey}
-        hint="读全书按时序梳理，约 1 分钟；命中缓存秒出"
+        hint="读全书按时间先后梳理，约一分钟；读过一次再看就快"
         error={error}
       >
         {loading && <RunningProcess label="按时序梳理时间线" />}
@@ -477,12 +477,8 @@ function TimelineRow({
           {!newPeriod && ev.time && (
             <span className="text-[var(--color-seal)] opacity-80">{ev.time}</span>
           )}
-          <span>第 {ev.chapter} 章讲</span>
-          {ev.verified ? (
-            <SealMark size={17} title="原文已核验" />
-          ) : (
-            <span className="opacity-60">待核</span>
-          )}
+          <span>第 {ev.chapter} 章</span>
+          {ev.verified && <SealMark size={16} title="原文已核对" />}
           {/* 展开提示：文字 + 会转的小箭头，明确"点这行能展开原文"，hover 时更亮 */}
           <span className="tl-afford ml-auto inline-flex items-center gap-1">
             {open ? "收起原文" : "看原文"}
@@ -515,7 +511,7 @@ function TimelineRow({
             borderColor: "color-mix(in srgb, var(--color-seal) 40%, transparent)",
           }}
         >
-          {ev.evidence ? ev.evidence : "这条没在原文里找到确切出处，待核。"}
+          {ev.evidence ? ev.evidence : "这条在原文里没找到确切出处。"}
         </div>
       )}
     </li>

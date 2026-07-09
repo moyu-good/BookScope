@@ -173,7 +173,7 @@ export function StanceQuadrant({
             <p className="text-sm text-[var(--color-ink)]">
               <span className="font-bold" style={{ fontFamily: "var(--font-display)" }}>{selP.name}</span>
               <span className="text-[var(--color-ink-muted)]">
-                {" · "}{selP.group} · 综合倾向 {selP.y > 1 ? "偏尊汉" : selP.y < -1 ? "偏篡逆自立" : "中立"}（{selP.y > 0 ? `+${selP.y}` : selP.y}）
+                {" · "}{selP.group} · 综合倾向 {selP.y > 1 ? `偏${axisY.high}` : selP.y < -1 ? `偏${axisY.low}` : "中立"}（{selP.y > 0 ? `+${selP.y}` : selP.y}）
                 {selP.dispute >= DISPUTE_HI ? ` · 争议度 ${selP.dispute}（别当定论）` : ` · 争议度 ${selP.dispute}`}
               </span>
             </p>
@@ -182,14 +182,14 @@ export function StanceQuadrant({
             <p className="text-xs text-[var(--color-ink-muted)] mb-2 leading-relaxed">{selP.disputeReason}</p>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <EvidCol title="尊汉扶主的证据" tint="var(--color-seal)" items={selP.pro} />
-            <EvidCol title="篡逆自立的证据" tint="var(--color-ink)" items={selP.con} />
+            <EvidCol title={`${axisY.high}的证据`} tint="var(--color-seal)" items={selP.pro} />
+            <EvidCol title={`${axisY.low}的证据`} tint="var(--color-ink)" items={selP.con} />
           </div>
         </div>
       )}
 
       <p className="mt-2 text-xs text-[var(--color-ink-muted)]">
-        两轴每本书按分析换（此处三国：{axisX.label} × {axisY.label}）。立场走 Toulmin：正反证据都摆、锚原文；争议大的不画定论，自己看两方判。
+        两轴每本书按分析换（当前：{axisX.label} × {axisY.label}）。立场走 Toulmin：正反证据都摆、锚原文；争议大的不画定论，自己看两方判。
       </p>
     </div>
   );

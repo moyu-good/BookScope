@@ -257,3 +257,142 @@ class TestVerifyCitationsDisambiguation:
         out = verify_citations(citations, _DUP_EVIDENCE)
         assert out[0]["chunk_id"] == "ch2"
         assert out[0]["verified"] is True
+
+
+# ---------------------------------------------------------------------------
+# verify_citations —— 宽松二次核验（繁简 / 引号 / 省略号 / 超短 的召回补齐）
+# ---------------------------------------------------------------------------
+
+# 登记原文一律简体（epub 正文形态）。下面各条 snippet 用繁体 / 带引号 / 省略号拼接 /
+# 超短——都是 exp022 实测里被主比对误判成 none 的真原文形态。宽松二次核验要把它们捞回，
+# 同时不相干 / 掺假的绝不放进来。
+_LOOSE_EVIDENCE = {
+    "c1": {"chapter": 1, "text": "官渡一战，曹操大破袁绍百万之众，自此雄踞北方，威震天下。"},
+    "c2": {"chapter": 5, "text": "天子册封曹操为魏王，加九锡，赞拜不名，入朝不趋。"},
+    "c3": {"chapter": 9, "text": "关羽大意失荆州，兵败之后，望麦城而走，终为孙权所擒。"},
+    "c4": {"chapter": 2, "text": "龙腾虎跃凤鸣朝阳国运昌隆四海归心万民欢腾。"},
+}
+
+
+def _strict_would_miss(snippet: str) -> bool:
+    """主比对（逐字子串 + 0.6 containment，不折繁简、不去引号）一定核不上。
+
+    用它在每条测试里坐实"是宽松通路把这条捞回来的"，而不是碰巧过了主比对——否则测试
+    看似过了，其实没在考宽松逻辑。
+    """
+    ns = normalize_text(snippet)
+    for entry in _LOOSE_EVIDENCE.values():
+        nt = normalize_text(entry["text"])
+        if ns and nt and ns in nt:
+            return False
+        if char_ngram_containment(ns, nt) >= CONTAINMENT_THRESHOLD:
+            return False
+    return True
+
+
+class TestVerifyCitationsLoosePass:
+    """主比对判 none 后的宽松二次核验：召回上去、精度不丢。"""
+
+    def test_traditional_variant_verifies_as_quote(self) -> None:
+        """繁体引原文（epub 是简体）：折简体后逐字命中 → quote。"""
+        snip = "官渡一戰，曹操大破袁紹百萬之眾"
+        assert _strict_would_miss(snip)
+        out = verify_citations([{"chapter": 1, "snippet": snip}], _LOOSE_EVIDENCE)
+        assert out[0]["verified"] is True
+        assert out[0]["chunk_id"] == "c1"
+        assert out[0]["match_type"] == "quote"
+        assert out[0]["match_score"] == 1.0
+
+    def test_added_quotes_around_term_verifies(self) -> None:
+        """原文「魏王」被 LLM 引成带单引号 '魏王'：去引号后逐字命中 → quote。"""
+        snip = "'魏王'"
+        assert _strict_would_miss(snip)
+        out = verify_citations([{"chapter": 5, "snippet": snip}], _LOOSE_EVIDENCE)
+        assert out[0]["verified"] is True
+        assert out[0]["chunk_id"] == "c2"
+        assert out[0]["match_type"] == "quote"
+        assert out[0]["match_score"] == 1.0
+
+    def test_super_short_traditional_verifies(self) -> None:
+        """超短片段（5 字）带一处繁体差异（麥→麦）：折简体后逐字命中 → quote。"""
+        snip = "望麥城而走"
+        assert _strict_would_miss(snip)
+        out = verify_citations([{"chapter": 9, "snippet": snip}], _LOOSE_EVIDENCE)
+        assert out[0]["verified"] is True
+        assert out[0]["chunk_id"] == "c3"
+        assert out[0]["match_type"] == "quote"
+
+    def test_ellipsis_spliced_real_fragments_verify(self) -> None:
+        """省略号拼接跨段的两句真原话（还都是繁体）：逐段折简体逐字全命中 → quote。"""
+        snip = "官渡一戰……冊封曹操為魏王"
+        assert _strict_would_miss(snip)
+        out = verify_citations([{"chapter": 5, "snippet": snip}], _LOOSE_EVIDENCE)
+        assert out[0]["verified"] is True
+        assert out[0]["match_type"] == "quote"
+        assert out[0]["match_score"] == 1.0
+        assert out[0]["chunk_id"] == "c2"  # 锚到最长片段所在 chunk
+
+    def test_loose_containment_rescues_traditional_paraphrase(self) -> None:
+        """繁体轻改写（末字 腾→欣）：折简体后 containment 才过 0.6 → paraphrase。"""
+        snip = "龍騰虎躍鳳鳴朝陽國運昌隆四海歸心萬民歡欣"
+        assert _strict_would_miss(snip)
+        out = verify_citations([{"chapter": 2, "snippet": snip}], _LOOSE_EVIDENCE)
+        assert out[0]["verified"] is True
+        assert out[0]["chunk_id"] == "c4"
+        assert out[0]["match_type"] == "paraphrase"
+        assert CONTAINMENT_THRESHOLD <= out[0]["match_score"] < 1.0
+
+    # ---- 精度守卫：命根子是提召回不丢精度 ----
+
+    def test_unrelated_simplified_stays_none(self) -> None:
+        """编造的简体句：宽松也找不到 → 仍 none。"""
+        snip = "刘伯温夜观天象，断言金陵有王气，劝主公早定大计。"
+        out = verify_citations([{"chapter": 1, "snippet": snip}], _LOOSE_EVIDENCE)
+        assert out[0]["verified"] is False
+        assert out[0]["chunk_id"] is None
+        assert out[0]["match_type"] == "none"
+
+    def test_unrelated_traditional_stays_none(self) -> None:
+        """编造但用繁体写：折简体也找不到，绝不能因放宽繁简而误判成 verified。"""
+        snip = "劉伯溫夜觀天象，斷言金陵有王氣，勸主公早定大計。"
+        out = verify_citations([{"chapter": 1, "snippet": snip}], _LOOSE_EVIDENCE)
+        assert out[0]["verified"] is False
+        assert out[0]["match_type"] == "none"
+
+    def test_ellipsis_with_fabricated_fragment_stays_none(self) -> None:
+        """前半真、后半编造用省略号拼一起：有一段够长的找不到 → 整条不认。"""
+        snip = "官渡一战，曹操大破袁绍百万之众……刘伯温夜观天象断金陵王气"
+        out = verify_citations([{"chapter": 1, "snippet": snip}], _LOOSE_EVIDENCE)
+        assert out[0]["verified"] is False
+        assert out[0]["chunk_id"] is None
+        assert out[0]["match_type"] == "none"
+
+    def test_loose_hit_keeps_output_shape_and_original_fields(self) -> None:
+        """宽松命中也只附加 4 个标准字段，不引入新字段、原字段不动（8 个消费端契约）。"""
+        cit = {"chapter": 1, "snippet": "官渡一戰，曹操大破袁紹百萬之眾", "extra": "keep"}
+        out = verify_citations([cit], _LOOSE_EVIDENCE)[0]
+        assert out["extra"] == "keep"
+        assert out["chapter"] == 1
+        assert set(out) == {
+            "chapter",
+            "snippet",
+            "extra",
+            "verified",
+            "chunk_id",
+            "match_score",
+            "match_type",
+        }
+        assert out["match_type"] in {"quote", "paraphrase", "none"}
+
+    def test_disambiguation_flows_through_loose_pass(self) -> None:
+        """繁体短语折简体后在两章都逐字命中：自报章号 tie-break 在宽松通路里仍生效。"""
+        dup = {
+            "a": {"chapter": 2, "text": "话说天下大势分久必合合久必分"},
+            "b": {"chapter": 8, "text": "孔明叹曰天下大势合久必分今又当分"},
+        }
+        snip = "天下大勢"  # 繁体 勢；主比对因 勢≠势 核不上，折简体后两章都含
+        assert normalize_text(snip) not in normalize_text(dup["a"]["text"])
+        out = verify_citations([{"chapter": 8, "snippet": snip}], dup)
+        assert out[0]["verified"] is True
+        assert out[0]["chunk_id"] == "b"  # 自报第 8 章 → 锚 b，不取字典首个 a
+        assert out[0]["match_type"] == "quote"

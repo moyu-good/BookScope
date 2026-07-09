@@ -37,6 +37,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { NarrativePhases } from "./NarrativePhases";
 import { NarrativeCurve } from "./NarrativeCurve";
 import { CharacterFlow } from "./CharacterFlow";
 import { Timeline } from "./Timeline";
@@ -51,10 +52,11 @@ interface NarrativePanoramaProps {
   baseUrl: string;
 }
 
-// 五段的次序 + 锚点 id + 导航标题。次序按读情节的自然动线：
-// 先看整本节奏起伏（曲线）→ 人物线怎么穿过全书（流）→ 关键事件先后（时间线）→
-// 支线怎么编织（编织）→ 埋的坑填没填（伏笔）。
+// 各段的次序 + 锚点 id + 导航标题。次序按读情节的自然动线：
+// 先看全书分几个大阶段（阶段）→ 整本节奏起伏（曲线）→ 人物线怎么穿过全书（流）→
+// 关键事件先后（时间线）→ 支线怎么编织（编织）→ 埋的坑填没填（伏笔）。
 type SectionId =
+  | "phases"
   | "curve"
   | "flow"
   | "timeline"
@@ -62,12 +64,16 @@ type SectionId =
   | "foreshadow";
 
 const SECTIONS: ReadonlyArray<{ id: SectionId; label: string }> = [
+  { id: "phases", label: "阶段" },
   { id: "curve", label: "叙事曲线" },
   { id: "flow", label: "叙事流" },
   { id: "timeline", label: "时间线" },
   { id: "subplot", label: "支线编织" },
   { id: "foreshadow", label: "伏笔回收" },
 ];
+
+// 小说专属的几段：论述书套不上（尺子第 7 条题材退场）。判出论述型就把这三段收起来。
+const NOVEL_ONLY: ReadonlySet<SectionId> = new Set(["curve", "subplot", "foreshadow"]);
 
 export function NarrativePanorama({
   sessionId,
@@ -79,9 +85,29 @@ export function NarrativePanorama({
   // 每段一个 DOM 引用，点导航时滚到它。
   const sectionRefs = useRef<Map<SectionId, HTMLElement | null>>(new Map());
   // 当前滚到哪一段——导航高亮跟着走。用 IntersectionObserver 盯，不挂滚动监听。
-  const [active, setActive] = useState<SectionId>("curve");
+  const [active, setActive] = useState<SectionId>("phases");
+  // 阶段那段判出来的书型（叙事型 / 论述型）。据它做题材自适应：论述型收起小说专属的几段。
+  // 换书重置回未知，等新书重新生成阶段（本镜头一直挂着，不重置会残留上一本的判定）。
+  const [bookType, setBookType] = useState<string | null>(null);
+  useEffect(() => {
+    setBookType(null);
+  }, [sessionId]);
 
-  // 传给各组件的公共 prop 收成一份，五段透传同一组（跟 App 现在传给这五个视图的一致）。
+  const isTreatise = bookType === "论述型";
+  // 导航条只列当前该显示的段：论述型去掉小说专属的三段，其余照旧。书型未知前全列。
+  const visibleSections = useMemo(
+    () => SECTIONS.filter((s) => !(isTreatise && NOVEL_ONLY.has(s.id))),
+    [isTreatise],
+  );
+
+  // 收段后，若当前高亮的那段被收起来了，把高亮挪到第一段（阶段），免得导航高亮指向看不见的段。
+  useEffect(() => {
+    setActive((cur) =>
+      visibleSections.some((s) => s.id === cur) ? cur : visibleSections[0].id,
+    );
+  }, [visibleSections]);
+
+  // 传给各组件的公共 prop 收成一份，各段透传同一组（跟 App 现在传给这几个视图的一致）。
   const shared = useMemo(
     () => ({ sessionId, provider, apiKey, model, baseUrl }),
     [sessionId, provider, apiKey, model, baseUrl],
@@ -92,8 +118,8 @@ export function NarrativePanorama({
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  // 盯五段谁在视口里，命中就把它设为高亮。rootMargin 顶部收一截，让吸顶导航底下
-  // 那段才算「当前」，不是刚冒头就抢高亮。
+  // 盯各段谁在视口里，命中就把它设为高亮。收起来的段（display:none）不会被判相交，
+  // 高亮自然落在还显示的段上。rootMargin 顶部收一截，让吸顶导航底下那段才算「当前」。
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -130,7 +156,7 @@ export function NarrativePanorama({
           className="mr-1 h-3.5 w-[3px] rounded-full bg-[var(--color-seal)]"
           aria-hidden="true"
         />
-        {SECTIONS.map((s) => {
+        {visibleSections.map((s) => {
           const on = active === s.id;
           return (
             <button
@@ -152,12 +178,20 @@ export function NarrativePanorama({
         })}
       </nav>
 
-      {/* ── 五段视图 ──
+      {/* ── 各段视图 ──
           每段包一层带 ref + data-section + scroll-mt 的 <section>：ref 供点导航滚过来，
           scroll-mt 让滚到位后标题不被吸顶导航压住（导航约 3.25rem 高，留 scroll-mt-16）。
           段里直接渲染现成组件、只透传 shared——组件各自的懒生成入口原样保留，
-          全景不替它预跑任何一段。段与段之间用一道细朱砂规 + 留白分隔。 */}
-      <PanoramaSection id="curve" refs={sectionRefs} first>
+          全景不替它预跑任何一段。段与段之间用一道细朱砂规 + 留白分隔。
+
+          题材自适应：最上面「阶段」判出书型后回抛给 setBookType；论述型把小说专属的
+          叙事曲线 / 支线编织 / 伏笔回收 三段收起来（hidden），时间线、叙事流照留。
+          收起的段仍挂在树上（只是不显示），书型一变回叙事型就原样回来。 */}
+      <PanoramaSection id="phases" refs={sectionRefs} first>
+        <NarrativePhases {...shared} onBookType={(t) => setBookType(t)} />
+      </PanoramaSection>
+
+      <PanoramaSection id="curve" refs={sectionRefs} hidden={isTreatise}>
         <NarrativeCurve {...shared} />
       </PanoramaSection>
 
@@ -169,11 +203,11 @@ export function NarrativePanorama({
         <Timeline {...shared} />
       </PanoramaSection>
 
-      <PanoramaSection id="subplot" refs={sectionRefs}>
+      <PanoramaSection id="subplot" refs={sectionRefs} hidden={isTreatise}>
         <SubplotWeave {...shared} />
       </PanoramaSection>
 
-      <PanoramaSection id="foreshadow" refs={sectionRefs}>
+      <PanoramaSection id="foreshadow" refs={sectionRefs} hidden={isTreatise}>
         <ForeshadowArcs {...shared} />
       </PanoramaSection>
     </div>
@@ -181,15 +215,18 @@ export function NarrativePanorama({
 }
 
 // 一段的外壳：登记 ref、贴 data-section 给 observer 认、留吸顶偏移，段前画分隔规。
+// hidden 时整段 display:none（题材退场用）——仍挂在树上、各自懒生成状态不丢，题材一变就回来。
 function PanoramaSection({
   id,
   refs,
   first,
+  hidden,
   children,
 }: {
   id: SectionId;
   refs: React.MutableRefObject<Map<SectionId, HTMLElement | null>>;
   first?: boolean;
+  hidden?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -198,7 +235,7 @@ function PanoramaSection({
         refs.current.set(id, el);
       }}
       data-section={id}
-      className="scroll-mt-16"
+      className={`scroll-mt-16${hidden ? " hidden" : ""}`}
     >
       {/* 段间分隔：细朱砂规 + 上下留白。首段不画，免得贴着导航多一条线。 */}
       {!first && (

@@ -824,6 +824,7 @@ def policy_evolution_from_spines(
             "change": str(st.get("change", "")).strip(),
             "snippet": snippet,
             "verified": True,
+            "date": date_of.get(doc, ""),  # 成文日期原样带出（前端按它标度轴 / 显日期，空则退回按先后均排）
         })
 
     # 按成文日期升序(字符串比较;成文日期形如「2024年5月8日」,同年同月按字符序基本对——
@@ -834,7 +835,7 @@ def policy_evolution_from_spines(
         s["order"] = i
     out = [
         {"order": s["order"], "doc": s["doc"], "change": s["change"],
-         "snippet": s["snippet"], "verified": s["verified"]}
+         "snippet": s["snippet"], "verified": s["verified"], "date": s["date"]}
         for s in out
     ]
     return out  # 可空(主题不在这摞文件 / 锚不到真实文件)

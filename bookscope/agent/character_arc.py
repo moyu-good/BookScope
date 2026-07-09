@@ -62,11 +62,15 @@ _SYSTEM_INSTRUCTION = (
     "得势、得救、达成所愿往上走（正数）；落难、失败、受挫往下沉（负数）；"
     "这章处境没明显起落就填 0——**不要为了让曲线好看而编造不存在的波动**，"
     "一个全程平稳的角色，曲线本就该是平的。\n"
+    "3. note（处境一句话）：这章这个角色处境上**具体发生了什么**，一句话说清"
+    "（如\"潼关失守、弃长安、马嵬赐死贵妃\"），只据原文摘要、不空泛——"
+    "**绝不写\"转折向好 / 转坏\"这类方向词，要具体的事**；这章没明显起落可留空。\n"
     "只依据原文，不臆测、不编造。每个数值点给一条最能支撑你这章这个角色判定的"
     "原文逐字片段当证据；这个角色这章没出场就不必给这一章的点。\n"
     "严格输出 JSON（不要别的话、不要 markdown 代码围栏）：\n"
     '{"characters": [{"name": "角色名", "points": [{"chapter": 章号整数, '
     '"presence": 0-10整数, "fortune": -5到5整数, '
+    '"note": "这章处境上具体发生了什么，一句话；没起落可留空", '
     '"evidence": "支撑这章这个角色判定的原文逐字片段，原样摘录不改写"}]}]}\n'
     "每个角色的 points 按章号从小到大排列，覆盖该角色出场的主要章节（每个角色最多约 40 个点）；"
     "evidence 是原文里逐字出现的句子。宁可少而准，不必穷尽。"
@@ -83,10 +87,10 @@ def _clamp_int(value: Any, lo: int, hi: int, default: int) -> int:
 
 
 def _coerce_point(item: Any) -> dict[str, Any] | None:
-    """把一个逐章点归一成 ``{chapter, presence, fortune, evidence}``。
+    """把一个逐章点归一成 ``{chapter, presence, fortune, note, evidence}``。
 
     chapter 缺/非整数 → 丢（曲线点没章号没法摆横轴）；presence 钳到 0-10、
-    fortune 钳到 -5..5、evidence 可缺（缺则 verified 自然 False）。
+    fortune 钳到 -5..5、note（处境一句话，可空）、evidence 可缺（缺则 verified 自然 False）。
     """
     if not isinstance(item, dict):
         return None
@@ -97,6 +101,7 @@ def _coerce_point(item: Any) -> dict[str, Any] | None:
         "chapter": ch,
         "presence": _clamp_int(item.get("presence"), 0, 10, 0),
         "fortune": _clamp_int(item.get("fortune"), -5, 5, 0),
+        "note": str(item.get("note", "")).strip(),
         "evidence": str(item.get("evidence", "")).strip(),
     }
 

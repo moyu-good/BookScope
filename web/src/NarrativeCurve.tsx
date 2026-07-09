@@ -100,19 +100,19 @@ export function NarrativeCurve({
     return (
       <FeatureEntryCard
         title="叙事曲线"
-        lead="看全书的转折和伏笔回收落在哪几章。转折章标成醒目的朱砂点、章号就印在点边上，一眼看清转折砸在哪几章、密还是疏；事件多少退成淡墨山形垫底，只给个节奏感。点一个转折章，看这章收了哪几条伏笔、每条回原文核验。"
+        lead="看全书的转折、伏笔回收落在哪几章、每处收了几条。朱砂竖得越高，这章收的伏笔越多；章号印在点边上，一眼看清高潮压在哪几章。点一个转折章，看它收了哪几条、每条翻回原文。史书这类没有伏笔的，如实留白。"
         actionLabel="生成叙事曲线"
         loadingLabel="读全书出曲线中（约 1 分钟）…"
         onAction={load}
         loading={loading}
         disabled={!apiKey}
-        hint="读全书出章脉，约 1 分钟；命中缓存秒出"
+        hint="读全书理出脉络，约一分钟；读过一次再看就快"
         error={error}
       >
         {loading && (
           <RunningProcess
             label="读全书出叙事曲线"
-            hint="整本书喂进模型逐章精读出章脉，再数每章的事件和伏笔回收，约 1 分钟。"
+            hint="把整本书逐章读一遍，找出每章的关键事件和回收的伏笔，约一分钟。"
           />
         )}
       </FeatureEntryCard>
@@ -142,7 +142,7 @@ export function NarrativeCurve({
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
-        全书 {n} 章，转折落在其中 <span style={{ color: "var(--color-seal)" }}>{turningN}</span> 章（朱砂点，章号标在点边；一章收多条伏笔的点更大）。淡墨山形是事件多少，只垫个节奏感、不是重点。鼠标移过去吸附最近章，点转折章看这章收了哪几条伏笔、回原文核验。
+        全书 {n} 章，转折落在其中 <span style={{ color: "var(--color-seal)" }}>{turningN}</span> 章。朱砂竖线越高＝这章收的伏笔 / 转折越多，章号标在点边。鼠标移过去看是哪章，点一下看这章收了哪几条、翻回原文。
       </p>
 
       <ShanshuiCurve chapters={chapters} selected={selected} onSelect={setSelected} />

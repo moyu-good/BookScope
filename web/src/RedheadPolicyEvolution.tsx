@@ -8,7 +8,8 @@
 // 意象 = 政策编年 / 案卷纪年（官府办事的政策沿革），不套小说的叙事曲线、不做通用甘特图：
 //   一道竖直朱砂纪年轴贯穿全程，每个阶段一枚朱砂年轮墨钉钉在轴上（编年的纪年点），
 //   左边「成文日期」走日晷牌（朱砂描边纪时牌），右边「这份文件改了什么」+ 真实发文字号
-//   +（核得到的）那份文件原话。阶段按成文先后从上往下排（后端排好序），顶「起」底「讫」收束。
+//   +（核得到的）那份文件原话。阶段按成文先后从上往下排（后端排好序），轴距按成文日期的
+//   真实间隔撑开（隔得久拉得开、缺日期退回均匀排），顶「起」底「讫」收束。
 //   可另指定一个政策主题，只排这条线的演变。
 //
 // evidence-first（全站一个规矩）：阶段是后端按成文日期排的，每阶段 snippet 取那份文脉里
@@ -30,6 +31,7 @@ import { DossierHint } from "./RedheadDependencyGraph";
 interface PolicyStage {
   order: number; // 排序序（后端按成文日期排好）
   doc: string; // 真实发文字号
+  date?: string; // 成文日期原文（"2024年5月8日" / "2024年5月" / "2024年"，缺则为空）
   change: string; // 这份文件改了什么 / 推进了什么
   snippet: string; // 那份文脉里已核的原文片段（锚不到的阶段后端会丢）
   verified: boolean;
@@ -70,6 +72,16 @@ const DIRECTION_STYLE: Record<
   删除: { fill: false, tone: "ink", hint: "旧版有、新版删掉" },
 };
 
+// 把六种 direction 收成三类走势：收紧（约束力升——收紧 / 升格）、松绑（约束力降）、
+// 中性（转向 / 新增 / 删除，或没归到前两类的）。这是政策变没变紧的**真实信号**，
+// 全程只认后端逐字比出来的 direction 字段，不另发明。
+type DirClass = "收紧" | "松绑" | "中性";
+function classifyDirection(dir: string): DirClass {
+  if (dir === "收紧" || dir === "升格") return "收紧";
+  if (dir === "松绑") return "松绑";
+  return "中性";
+}
+
 interface RedheadPolicyEvolutionProps {
   bookSessionIds: string[];
   provider: string;
@@ -80,6 +92,22 @@ interface RedheadPolicyEvolutionProps {
 
 function hasText(v: string | null | undefined): boolean {
   return !!v && v.trim().length > 0;
+}
+
+// 把中文成文日期解析成一个可比较的时间数值（毫秒，Date.UTC 折算——月份长短不一也算得对）。
+// 认「2024年5月8日」「2024年5月」「2024年」三种写法：缺月按当年 1 月、缺日按当月 1 日补。
+// 解析不了的（空串、中文数字写法、别的格式）返回 null，交给上层按先后均匀排兜底——绝不硬猜。
+function parseDocDate(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (!s) return null;
+  const m = s.match(/(\d{4})\s*年(?:\s*(\d{1,2})\s*月)?(?:\s*(\d{1,2})\s*日)?/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  const month = m[2] ? parseInt(m[2], 10) : 1;
+  const day = m[3] ? parseInt(m[3], 10) : 1;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return Date.UTC(year, month - 1, day);
 }
 
 export function RedheadPolicyEvolution({
@@ -150,6 +178,80 @@ export function RedheadPolicyEvolution({
     () => stages.filter((s) => s.verified && hasText(s.snippet)).length,
     [stages],
   );
+
+  // ── 成文日期 → 真日期轴 ──
+  // 先把每个阶段的成文日期解析成时间数值（解析不了为 null）。够两个能解析的，就按相邻两阶段的
+  // 真实日期间隔成比例撑开轴距（隔得越久，拉得越开）；不够就退回均匀排、全没日期时另挂一句说明。
+  const stageDates = useMemo(
+    () => stages.map((s) => parseDocDate(s.date)),
+    [stages],
+  );
+  const datedCount = useMemo(
+    () => stageDates.filter((d) => d !== null).length,
+    [stageDates],
+  );
+  const useDateAxis = datedCount >= 2;
+  // 每个阶段头顶的间距（px）：gaps[0] 恒为 0。用真日期时按最大间隔归一到 [MIN,MAX]；
+  // 相邻缺日期的一段退回均匀间距——缺数据既不崩、也不假装轴上有它的位置。
+  const stageGaps = useMemo(() => {
+    const EVEN = 20; // ≈ 原 space-y-5(1.25rem) 的均匀间距
+    const MIN = 16;
+    const MAX = 132;
+    if (!useDateAxis) return stages.map((_, i) => (i === 0 ? 0 : EVEN));
+    let maxDelta = 0;
+    for (let i = 1; i < stages.length; i++) {
+      const a = stageDates[i - 1];
+      const b = stageDates[i];
+      if (a !== null && b !== null) {
+        const d = Math.abs(b - a);
+        if (d > maxDelta) maxDelta = d;
+      }
+    }
+    return stages.map((_, i) => {
+      if (i === 0) return 0;
+      const a = stageDates[i - 1];
+      const b = stageDates[i];
+      if (a === null || b === null || maxDelta === 0) return EVEN;
+      const ratio = Math.abs(b - a) / maxDelta;
+      return Math.round(MIN + ratio * (MAX - MIN));
+    });
+  }, [stages, stageDates, useDateAxis]);
+
+  // 措辞变化按走势分三组（收紧 / 中性 / 松绑），既给下方分带排布，也给上方走势条数数。
+  const diffByClass = useMemo(() => {
+    const g: Record<DirClass, PolicyDiff[]> = { 收紧: [], 中性: [], 松绑: [] };
+    for (const d of diffs) g[classifyDirection(d.direction)].push(d);
+    return g;
+  }, [diffs]);
+
+  // 每份文件（按发文字号）收到的措辞变化归到它名下——after_doc 是「新措辞来自哪份」，
+  // 所以一条 diff 记在它落地的那份文件头上。timeline 上每个阶段据此标它相对上一份是收还是松。
+  const dirByDoc = useMemo(() => {
+    const m = new Map<string, { 收紧: number; 松绑: number; 中性: number }>();
+    for (const d of diffs) {
+      const doc = (d.after_doc || "").trim();
+      if (!doc) continue;
+      const cls = classifyDirection(d.direction);
+      const cur = m.get(doc) ?? { 收紧: 0, 松绑: 0, 中性: 0 };
+      cur[cls] += 1;
+      m.set(doc, cur);
+    }
+    return m;
+  }, [diffs]);
+
+  // 某份文件的净走势：收紧多于松绑记「收紧」、反之「松绑」、两头相当或只有转向增删记「中性」。
+  // 取不到（这份没匹配的 diff）返回 null——不硬凑箭头，没数据就不标。
+  function netDirOfDoc(
+    doc: string,
+  ): { cls: DirClass; mixed: boolean } | null {
+    const c = dirByDoc.get((doc || "").trim());
+    if (!c) return null;
+    if (c.收紧 + c.松绑 + c.中性 === 0) return null;
+    if (c.收紧 > c.松绑) return { cls: "收紧", mixed: c.松绑 > 0 };
+    if (c.松绑 > c.收紧) return { cls: "松绑", mixed: c.收紧 > 0 };
+    if (c.收紧 > 0) return { cls: "中性", mixed: true }; // 收松相当 = 有紧有松
+    return { cls: "中性", mixed: false };
+  }
 
   // ---- 未生成：入口卡片（带主题输入框） ----
   if (!result) {
@@ -268,6 +370,15 @@ export function RedheadPolicyEvolution({
 
       {/* ── 政策编年：竖直朱砂纪年轴 + 每阶段年轮墨钉 ── */}
       {stages.length > 0 && (
+      <>
+      {/* 轴距怎么排的，据成文日期有没有如实告诉读者，绝不假装有真日期 */}
+      <p className="text-xs text-[var(--color-ink-muted)] mb-3 leading-relaxed">
+        {useDateAxis
+          ? "轴距按成文日期的真实间隔排——两份文件隔得越久，在轴上拉得越开。"
+          : datedCount === 0
+            ? "这组文件没标成文日期，按公文先后顺序均匀排（不代表真实时间间隔）。"
+            : "只有一份标了成文日期，排不出时间间隔，按先后顺序均匀排。"}
+      </p>
       <div className="relative pl-1">
         <div
           aria-hidden
@@ -281,16 +392,22 @@ export function RedheadPolicyEvolution({
           }}
         />
 
-        <ol className="space-y-5">
+        <ol>
           {stages.map((s, i) => {
             const verified = s.verified && hasText(s.snippet);
             const isOpen = !!openOrigin[i];
             const canOpenOrigin = hasText(s.snippet);
             const first = i === 0;
             const last = i === stages.length - 1;
+            // 这份相对上一份是收紧还是松绑——只在下方措辞变化真给出方向时才标。
+            const dir = netDirOfDoc(s.doc);
             return (
-              <li key={i} className="relative flex items-stretch gap-0">
-                {/* 左栏：日晷牌——发文字号摆这里当纪年牌（公文的纪年就是字号 + 日期） */}
+              <li
+                key={i}
+                className="relative flex items-stretch gap-0"
+                style={{ marginTop: i === 0 ? undefined : stageGaps[i] }}
+              >
+                {/* 左栏：日晷牌——有成文日期就把日期当纪时牌主角、字号缩小垫底；没日期退回拿字号当纪年牌 */}
                 <div className="shrink-0 pt-0.5" style={{ width: "6rem" }}>
                   <div
                     className="inline-flex flex-col items-end text-right rounded px-2 py-1 leading-tight"
@@ -300,12 +417,28 @@ export function RedheadPolicyEvolution({
                       fontFamily: "var(--font-display)",
                     }}
                   >
-                    <span
-                      className="text-caption font-bold tabular-nums break-all"
-                      style={{ color: "var(--color-seal)" }}
-                    >
-                      {hasText(s.doc) ? s.doc : `第 ${s.order ?? i + 1} 阶段`}
-                    </span>
+                    {hasText(s.date) ? (
+                      <>
+                        <span
+                          className="text-caption font-bold tabular-nums break-all"
+                          style={{ color: "var(--color-seal)" }}
+                        >
+                          {s.date}
+                        </span>
+                        {hasText(s.doc) && (
+                          <span className="mt-0.5 text-caption text-[var(--color-ink-muted)] break-all leading-tight">
+                            {s.doc}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span
+                        className="text-caption font-bold tabular-nums break-all"
+                        style={{ color: "var(--color-seal)" }}
+                      >
+                        {hasText(s.doc) ? s.doc : `第 ${s.order ?? i + 1} 阶段`}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -354,6 +487,12 @@ export function RedheadPolicyEvolution({
                     </p>
                   </div>
 
+                  {dir && !first && (
+                    <div className="mt-1.5">
+                      <DirChip cls={dir.cls} mixed={dir.mixed} />
+                    </div>
+                  )}
+
                   {!verified && (
                     <p className="mt-1 text-xs text-[var(--color-ink-muted)] italic">
                       {hasText(s.snippet)
@@ -393,6 +532,7 @@ export function RedheadPolicyEvolution({
           })}
         </ol>
       </div>
+      </>
       )}
 
       {/* ── 措辞 diff（逐字比）：政策的新闻在 delta 里 ── */}
@@ -414,14 +554,20 @@ export function RedheadPolicyEvolution({
             </span>
           </div>
           <p className="text-xs text-[var(--color-ink-muted)] mb-3 leading-relaxed">
-            同一件事跨文件措辞变了的地方——旧措辞、新措辞逐字摆出来。方向（升格 / 松绑 /
-            收紧…）是按约束力阶梯研判的口径；两边的原话都从原文逐字锚出来、核过才留。
+            同一件事跨文件措辞变了的地方——旧措辞、新措辞逐字摆出来。按走势分三层排：往上是
+            <b style={{ color: "var(--color-seal)" }}>收紧</b>（约束力升，动真格），往下是{" "}
+            <b>松绑</b>（约束力降，放宽了），中间是转向 / 增删。两边的原话都从原文逐字锚出来、核过才留。
           </p>
-          <ul className="space-y-3">
-            {diffs.map((d, i) => (
-              <DiffCard key={i} diff={d} />
-            ))}
-          </ul>
+          <TrendBar
+            tighten={diffByClass.收紧.length}
+            loosen={diffByClass.松绑.length}
+            neutral={diffByClass.中性.length}
+          />
+          <div className="mt-4 space-y-4">
+            <DiffBand cls="收紧" diffs={diffByClass.收紧} />
+            <DiffBand cls="中性" diffs={diffByClass.中性} />
+            <DiffBand cls="松绑" diffs={diffByClass.松绑} />
+          </div>
         </div>
       )}
 
@@ -493,6 +639,178 @@ function DiffCard({ diff }: { diff: PolicyDiff }) {
         </p>
       )}
     </li>
+  );
+}
+
+// 时序上一枚方向签：↑ 朱 = 较上一份收紧，↓ 墨 = 松绑，→ 淡墨 = 转向 / 增删（或有紧有松）。
+function DirChip({ cls, mixed }: { cls: DirClass; mixed: boolean }) {
+  const tight = cls === "收紧";
+  const loose = cls === "松绑";
+  const color = tight
+    ? "var(--color-seal)"
+    : loose
+      ? "var(--color-ink)"
+      : "var(--color-ink-muted)";
+  const arrow = tight ? "↑" : loose ? "↓" : "→";
+  const label =
+    cls === "中性"
+      ? mixed
+        ? "较上一份有紧有松"
+        : "较上一份转向 / 增删"
+      : `较上一份${cls}${mixed ? "为主" : ""}`;
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-caption px-1.5 py-0.5 rounded"
+      title="据下方「措辞变化」逐字比研判：约束力升记收紧、降记松绑"
+      style={{
+        color,
+        border: `0.5px solid ${color}`,
+        fontFamily: "var(--font-display)",
+      }}
+    >
+      <span aria-hidden style={{ fontWeight: 700 }}>
+        {arrow}
+      </span>
+      {label}
+    </span>
+  );
+}
+
+// 走势条：一根中线，松绑往左（墨）、收紧往右（朱），条长按条数归一。
+// 一眼看这项政策整体在收还是在松——数的是下面三带各有几条 diff，不另造分。
+function TrendBar({
+  tighten,
+  loosen,
+  neutral,
+}: {
+  tighten: number;
+  loosen: number;
+  neutral: number;
+}) {
+  const max = Math.max(1, tighten, loosen);
+  const verdict =
+    tighten > loosen
+      ? "整体在收紧"
+      : loosen > tighten
+        ? "整体在松绑"
+        : tighten > 0
+          ? "有紧有松"
+          : "多为转向 / 增删";
+  return (
+    <div className="mb-1">
+      <div className="flex items-center gap-2.5 mb-1.5 text-caption text-[var(--color-ink-muted)] flex-wrap tabular-nums">
+        <span>松绑 {loosen}</span>
+        <span style={{ color: "var(--color-seal)" }}>收紧 {tighten}</span>
+        {neutral > 0 && <span>转向 / 增删 {neutral}</span>}
+        <span className="text-[var(--color-ink)] font-bold not-italic">
+          {verdict}
+        </span>
+      </div>
+      <div
+        className="relative h-3 rounded overflow-hidden"
+        style={{ background: "var(--color-paper-sunken)" }}
+      >
+        {/* 松绑：从中线往左长 */}
+        <div
+          className="absolute top-0 bottom-0 flex justify-end"
+          style={{ left: 0, width: "50%" }}
+        >
+          <div
+            style={{
+              width: `${(loosen / max) * 100}%`,
+              background: "var(--color-ink)",
+              opacity: 0.5,
+            }}
+          />
+        </div>
+        {/* 收紧：从中线往右长 */}
+        <div
+          className="absolute top-0 bottom-0"
+          style={{ left: "50%", width: "50%" }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${(tighten / max) * 100}%`,
+              background: "var(--color-seal)",
+              opacity: 0.72,
+            }}
+          />
+        </div>
+        {/* 中线 */}
+        <div
+          className="absolute top-0 bottom-0 left-1/2 w-px"
+          style={{ background: "var(--color-rule)" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// 一条走势带：左侧方向轨（↑ 收紧朱 / ↓ 松绑墨 / → 中性淡墨）+ 右侧这一走势下的逐条 diff。
+// 收紧带排最上、松绑最下——位置本身就是「政策往哪个方向走」的编码。
+function DiffBand({ cls, diffs }: { cls: DirClass; diffs: PolicyDiff[] }) {
+  if (diffs.length === 0) return null;
+  const tight = cls === "收紧";
+  const loose = cls === "松绑";
+  const color = tight
+    ? "var(--color-seal)"
+    : loose
+      ? "var(--color-ink)"
+      : "var(--color-ink-muted)";
+  const arrow = tight ? "↑" : loose ? "↓" : "→";
+  const title = tight ? "收紧 / 升格" : loose ? "松绑" : "转向 · 增删";
+  const sub = tight
+    ? "约束力升，要动真格 / 门槛收窄"
+    : loose
+      ? "约束力降，放宽了"
+      : "换了方向或增删提法";
+  return (
+    <div className="flex gap-3">
+      <div
+        className="shrink-0 flex flex-col items-center"
+        style={{ width: "1.75rem" }}
+      >
+        <span
+          aria-hidden
+          style={{ color, fontWeight: 700, fontSize: 18, lineHeight: 1 }}
+        >
+          {arrow}
+        </span>
+        <span
+          className="flex-1 rounded-full mt-1"
+          style={{
+            width: "2px",
+            background: color,
+            opacity: tight || loose ? 0.5 : 0.3,
+          }}
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+          <span
+            className="text-body-sm font-bold"
+            style={{
+              color: tight || loose ? color : "var(--color-ink)",
+              fontFamily: "var(--font-display)",
+            }}
+          >
+            {title}
+          </span>
+          <span className="text-caption text-[var(--color-ink-muted)]">
+            {sub}
+          </span>
+          <span className="text-caption text-[var(--color-ink-muted)] tabular-nums">
+            {diffs.length}
+          </span>
+        </div>
+        <ul className="space-y-3">
+          {diffs.map((d, i) => (
+            <DiffCard key={i} diff={d} />
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 

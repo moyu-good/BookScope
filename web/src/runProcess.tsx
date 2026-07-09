@@ -25,11 +25,6 @@ export function formatChars(n: number | undefined): string {
   return `${n.toLocaleString("en-US")} 字`;
 }
 
-function fmtNum(n: number | undefined): string {
-  if (!n || n <= 0) return "0";
-  return n.toLocaleString("en-US");
-}
-
 /** ms → "45.9s" / "1m02s"。 */
 function fmtDuration(ms: number | undefined): string {
   if (!ms || ms <= 0) return "";
@@ -124,10 +119,10 @@ export function RunStats({
   if (!trace) return null;
   const parts: string[] = [];
   if (trace.chars) parts.push(`通读 ${formatChars(trace.chars)}`);
+  // 原始 token 数是给开发看的黑话，用户不需要；只在"这次没花钱（用上次存下的结果）"时提一句。
   const it = trace.input_tokens ?? 0;
   const ot = trace.output_tokens ?? 0;
-  if (it || ot) parts.push(`输入 ${fmtNum(it)}、输出 ${fmtNum(ot)} tokens`);
-  else parts.push("命中缓存（0 token）");
+  if (!it && !ot) parts.push("这次没重算，用的是上次存下的结果");
   if (trace.duration_ms) parts.push(`用时 ${fmtDuration(trace.duration_ms)}`);
   if (note) parts.push(note);
   if (parts.length === 0) return null;

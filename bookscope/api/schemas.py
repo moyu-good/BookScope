@@ -259,6 +259,11 @@ class GraphEdge(BaseModel):
         default=0, ge=0, description="命中 chunk 的真章号；未命中/未知为 0。"
     )
     match_score: float = Field(default=0.0, description="证据匹配分（0-1）。")
+    polarity: str | None = Field(
+        default=None,
+        description="关系极性 友 / 敌 / 中,后端据原文判(章脉 v2 每章 valence 聚合的综合敌友)。"
+        "缺 = 旧数据(v1),前端回落 relationKind 正则(保守)。",
+    )
 
 
 class CharacterGraphResponse(BaseModel):
@@ -697,8 +702,9 @@ class CharacterArcResponse(BaseModel):
         default_factory=list,
         description=(
             "per 角色逐章弧线。每条 {name:str, points:[{chapter:int, presence:0-10, "
-            "fortune:-5..5, evidence:str, verified:bool, match_score:float}]}；"
-            "point 的 evidence 过原文核验，verified=false 的标低置信。"
+            "fortune:-5..5, note:str（处境一句话·具体发生了什么·可空）, evidence:str, "
+            "verified:bool, match_score:float}]}；point 的 evidence 过原文核验，"
+            "verified=false 的标低置信。"
         ),
     )
     scanned: bool = Field(
@@ -710,6 +716,35 @@ class CharacterArcResponse(BaseModel):
         default_factory=dict,
         description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
     )
+
+
+class NarrativePhasesRequest(BaseModel):
+    """POST /api/agent/narrative-phases 请求体（情节脉络·阶段划分，WP-narrative-phases）。"""
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class NarrativePhasesResponse(BaseModel):
+    """POST /api/agent/narrative-phases 响应体。
+
+    ``book_type`` 叙事型 / 论述型;只有叙事型才切阶段(论述型 phases 为空、前端不显阶段)。
+    每个 phase 的代表事件 evidence 过原文核验(verified=false 标灰,evidence-first)。
+    """
+
+    book_type: str = Field(default="", description="叙事型 / 论述型;论述型不切阶段。")
+    phases: list[dict] = Field(
+        default_factory=list,
+        description="阶段 {name,start_ch,end_ch,gist,evidence,verified,match_score};论述型空。",
+    )
+    scanned: bool = Field(default=False, description="是否成功抽取；false=失败 / 书太大。")
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
 
 
 class CharacterVoiceRequest(BaseModel):
@@ -2233,6 +2268,8 @@ __all__ = [
     "ChapterTextResponse",
     "CharacterArcRequest",
     "CharacterArcResponse",
+    "NarrativePhasesRequest",
+    "NarrativePhasesResponse",
     "CharacterFlowRequest",
     "CharacterFlowResponse",
     "CharacterGraphRequest",

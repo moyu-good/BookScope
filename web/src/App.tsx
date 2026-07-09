@@ -781,6 +781,29 @@ function saveAutoSuggest(enabled: boolean): void {
   }
 }
 
+// 「笔记只留本地」开关持久化——托管版默认把笔记 / 标注存到账号（换设备能接着看）；
+// 打开这个开关就只存在当前这台设备的浏览器里、不上账号。默认关（没存过 / 解析失败
+// 都按关，即默认上账号同步）。本地版根本用不到账号，这个偏好对它没有意义。
+const NOTES_LOCAL_ONLY_STORAGE_KEY = "bookscope_notes_local_only_v1";
+
+function loadNotesLocalOnly(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(NOTES_LOCAL_ONLY_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveNotesLocalOnly(on: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(NOTES_LOCAL_ONLY_STORAGE_KEY, on ? "1" : "0");
+  } catch {
+    // 隐私模式 / 配额满 / SSR ——失败默默忽略
+  }
+}
+
 // 卷宗（1.6 跨文件）持久化——选进卷宗的 session_id 一组，刷新不丢、跨视图共享。
 // 跟 LLM 配置一个套路：纯本机存储，不上送服务端。
 const DOSSIER_STORAGE_KEY = "bookscope_dossier_v1";
@@ -893,6 +916,12 @@ export function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   // 启动那次"验明身份"是否跑完(避免没验完就闪一下登录弹窗)。
   const [authChecked, setAuthChecked] = useState(false);
+  // 「笔记只留本地」偏好（默认关＝上账号同步）。持久化到 localStorage，刷新不丢。
+  // 声明在这儿（挨着账号态）是因为下面切标注仓储的那段 effect 要用到它。
+  const [notesLocalOnly, setNotesLocalOnly] = useState<boolean>(loadNotesLocalOnly);
+  useEffect(() => {
+    saveNotesLocalOnly(notesLocalOnly);
+  }, [notesLocalOnly]);
 
   // 启动:先给 fetch 挂上令牌注入层(没令牌时是纯透传,local 零影响),再探测部署形态;
   // hosted 且本地有令牌就调 /auth/me 验,401 清掉过期令牌。local 直接当账号功能不存在。
@@ -926,16 +955,19 @@ export function App() {
     setAuthUser(null);
   }, []);
 
-  // 标注仓储据部署形态 + 登录态切底层（WP-reading-workspace Phase C-FE）：
-  // hosted 且已登录 → HostedAnnotationStore（走账号 DB、异步预热缓存）；
-  // 其余（local 模式 / hosted 未登录）→ LocalAnnotationStore（localStorage）。
+  // 标注仓储据部署形态 + 登录态 + 用户偏好切底层（WP-reading-workspace Phase C-FE）：
+  // hosted 且已登录、且没打开「只留本地」→ HostedAnnotationStore（走账号 DB、异步预热缓存）；
+  // 其余（local 模式 / hosted 未登录 / 用户主动选了只留本地）→ LocalAnnotationStore（localStorage）。
   // 登出会把 authUser 置空 → 这里切回 local 并清掉 Hosted 缓存，不串账号。
+  // 打开「只留本地」也切回 local：往后的笔记只进这台设备的浏览器，不上账号。
   // local 模式 deploymentMode 恒为 "local" → 永远只切成 local，Hosted 根本不实例化。
   useEffect(() => {
     setAnnotationBackend(
-      deploymentMode === "hosted" && authUser !== null ? "hosted" : "local",
+      deploymentMode === "hosted" && authUser !== null && !notesLocalOnly
+        ? "hosted"
+        : "local",
     );
-  }, [deploymentMode, authUser]);
+  }, [deploymentMode, authUser, notesLocalOnly]);
 
   // 只有 hosted + 验过身份 + 没登录,才挂登录弹窗。
   const needsAuth =
@@ -1803,6 +1835,9 @@ export function App() {
               setAutoSuggestEnabled={setAutoSuggestEnabled}
               theme={theme}
               setTheme={setTheme}
+              notesLocalOnly={notesLocalOnly}
+              setNotesLocalOnly={setNotesLocalOnly}
+              accountSyncAvailable={deploymentMode === "hosted"}
               onClose={() => setSettingsOpen(false)}
             />
           )}
@@ -1907,7 +1942,7 @@ export function App() {
               <div className={mode === "ask" ? "" : "hidden"}>
                 <CanvasHeader
                   title="问书"
-                  subtitle={`在读《${currentSession.book_title}》，带原文证据答深问题，没出处的结论一概不给。`}
+                  subtitle={`在读《${currentSession.book_title}》，问什么都拿原文回答，没出处的结论一概不给。`}
                 />
                 <Onboarding type="first_upload" triggered={hasUploaded} />
                 {/* 随便问 ↔ 给目标：前者走原问答（不动）；后者让 agent 自己编排该跑哪几个分析 */}
@@ -2021,7 +2056,7 @@ export function App() {
               <div className={mode === "char_panorama" ? "" : "hidden"}>
                 <CanvasHeader
                   title="人物"
-                  subtitle="读一本书的人:全局关系图点一个人,下面关系演变自动聚焦他,再往下人物弧线、声口。一个镜头顺着看,每段各自点生成。"
+                  subtitle="想读透一个人：在全局关系图上点他，下面的关系演变跟着聚焦到他，再往下看他的人物弧线、声口。顺着往下看，每一段单独点开生成。"
                 />
                 <CharacterPanorama
                   sessionId={currentSession.session_id}
@@ -2037,7 +2072,7 @@ export function App() {
               <div className={mode === "person_dossier" ? "" : "hidden"}>
                 <CanvasHeader
                   title="人物志"
-                  subtitle="全书人物一册:左边全员名册可搜,点谁看谁——他的立场(正反证据 + 争议度,不藏单分后)、处境转折,都锚原文。点开才现跑他的精确分析。"
+                  subtitle="全书的人物都在这儿：左边一张名单能搜，想看谁点谁。他偏向哪一边、有几分把握、正反两面的证据、处境怎么起落，每条都能翻到原文。点开谁，才分析谁。"
                 />
                 <PersonDossierPanel
                   sessionId={currentSession.session_id}
@@ -2052,7 +2087,7 @@ export function App() {
               <div className={mode === "plot_panorama" ? "" : "hidden"}>
                 <CanvasHeader
                   title="情节脉络"
-                  subtitle="一本书的脉络:叙事曲线看节奏起伏,叙事流看人物线穿全书,时间线排关键事件,再到支线、伏笔。一个镜头顺着看,每段各自点生成。"
+                  subtitle="一本书的来龙去脉：叙事曲线看节奏起伏，叙事流看人物线怎么穿过全书，时间线排出关键事件，再往下看支线和伏笔。顺着往下看，每一段单独点开生成。"
                 />
                 <NarrativePanorama
                   sessionId={currentSession.session_id}
@@ -2067,7 +2102,7 @@ export function App() {
               <div className={mode === "quality_panorama" ? "" : "hidden"}>
                 <CanvasHeader
                   title="质量 · 写作"
-                  subtitle="通读一遍写作质量:设定一致性、写作手法、文体体检各自扫问题,改稿清单收口带走,知识卡片沉淀。一个镜头顺着看,每段各自点生成。"
+                  subtitle="通读一遍写作质量：设定一致性、写作手法、文体体检各扫各的问题，改稿清单把要改的收在一起带走，知识卡片留住要点。顺着往下看，每一段单独点开生成。"
                 />
                 <QualityPanorama
                   sessionId={currentSession.session_id}
@@ -2184,7 +2219,7 @@ export function App() {
                 <CanvasHeader
                   title="时间线"
                   feature="timeline"
-                  subtitle="多线、倒叙也理清真实的时间先后，每条事件钉在原文。"
+                  subtitle="多线并进、倒叙插叙，都理清真正的先后顺序，每件事都能翻到原文。"
                 />
                 <Timeline
                   sessionId={currentSession.session_id}
@@ -2493,7 +2528,7 @@ export function App() {
           <div className={mode === "redhead_dossier_panorama" ? "" : "hidden"}>
             <CanvasHeader
               title="卷宗全景"
-              subtitle="一卷宗多份公文看关系:依据链网看谁依据谁,政策演变按时间看怎么改,上下级一致性勘对上下位。一个镜头顺着看,每段各自点生成。先在「卷宗」选一组(≥2 份)。"
+              subtitle="一份卷宗里多份公文之间的关系：依据链网看谁依据谁，政策演变按时间看怎么改，上下级一致性勘对上位和下位。顺着往下看，每一段单独点开生成。先在「卷宗」里选一组（至少 2 份）。"
             />
             <RedheadDossierPanorama
               bookSessionIds={dossierIds}
@@ -4994,6 +5029,11 @@ function SettingsDrawer(props: {
   setAutoSuggestEnabled: (b: boolean) => void;
   theme: ThemeMode;
   setTheme: (t: ThemeMode) => void;
+  /** 「笔记只留本地」开关：托管版默认上账号同步，打开＝只存这台设备。 */
+  notesLocalOnly: boolean;
+  setNotesLocalOnly: (b: boolean) => void;
+  /** 是否托管版（只有托管版才有账号可同步，本地版不显这个开关）。 */
+  accountSyncAvailable: boolean;
   onClose: () => void;
 }) {
   const {
@@ -5002,6 +5042,9 @@ function SettingsDrawer(props: {
     setAutoSuggestEnabled,
     theme,
     setTheme,
+    notesLocalOnly,
+    setNotesLocalOnly,
+    accountSyncAvailable,
     ...config
   } = props;
   return (
@@ -5083,6 +5126,50 @@ function SettingsDrawer(props: {
           />
         </button>
       </div>
+
+      {/* 笔记只留本地（托管版才显；本地版根本没账号，用不到这个开关） */}
+      {accountSyncAvailable && (
+        <div
+          className="mt-4 pt-4 flex items-start justify-between gap-4"
+          style={{ borderTop: "1px solid var(--color-rule)" }}
+        >
+          <div className="min-w-0">
+            <div
+              className="text-sm text-[var(--color-ink)]"
+              style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
+            >
+              笔记只留本地
+            </div>
+            <p className="mt-1 text-xs text-[var(--color-ink-muted)] leading-relaxed">
+              默认把你的笔记、高亮、书签存到账号，换设备登录能接着看。打开这个开关，往后的笔记就只存在这台设备的浏览器里、不上账号，换设备也带不走。图个清净的隐私党可以开。
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={notesLocalOnly}
+            aria-label="笔记只留本地，不上账号同步"
+            onClick={() => setNotesLocalOnly(!notesLocalOnly)}
+            className="relative shrink-0 mt-0.5 inline-flex h-6 w-11 items-center rounded-full transition-colors"
+            style={{
+              background: notesLocalOnly
+                ? "var(--color-seal)"
+                : "var(--color-rule)",
+            }}
+          >
+            <span
+              className="inline-block rounded-full bg-white transition-transform"
+              style={{
+                transform: notesLocalOnly
+                  ? "translateX(1.4rem)"
+                  : "translateX(0.18rem)",
+                width: "1.05rem",
+                height: "1.05rem",
+              }}
+            />
+          </button>
+        </div>
+      )}
 
       {/* 暗色主题(#20) */}
       <div
@@ -5172,7 +5259,7 @@ function CapabilityShowcase() {
         不做通用摘要，每类文本各有各的深读
       </p>
       <p className="text-sm text-[var(--color-ink-muted)] mb-4 leading-relaxed">
-        从上面书架挑一本，它先认出是哪类文本，再给对应那套深读。每个结论都钉在原文，点开能核。
+        从上面书架挑一本。它先认出这是哪一类书，再给这类书该有的那套深读；每个结论都能翻到原文，点开就核。
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 stagger">
         {TYPE_SHOWCASE.map((c) => (

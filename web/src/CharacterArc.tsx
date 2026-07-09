@@ -155,13 +155,13 @@ export function CharacterArc({
         onAction={load}
         loading={loading}
         disabled={!apiKey}
-        hint="读全书出章脉，约 1 分钟；命中缓存秒出"
+        hint="读全书理出脉络，约一分钟；读过一次再看就快"
         error={error}
       >
         {loading && (
           <RunningProcess
             label="读全书出人物命运线"
-            hint="整本书喂进模型，给主要角色逐章判处境起落，每个点都回原文核验，约 1 分钟。"
+            hint="把整本书逐章读一遍，给主要角色标出命运转折、每处回原文核对，约一分钟。"
           />
         )}
       </FeatureEntryCard>
@@ -226,8 +226,8 @@ export function CharacterArc({
 
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
         {view === "line"
-          ? "命运线只画锚了原文的处境转折点（点看那章原文）：点往上=那一刻转好、往下=转坏；连线只表先后，不标精确刻度、不吹连续起伏。"
-          : "章 × 人的格子墙：淡底=在场（章脉逐章、真），朱 / 墨格=锚了原文的处境转折（向好朱 / 转坏墨，可点看原文）。没判过处境的不上色、不编。"}
+          ? "命运线只画锚了原文的处境转折点：点一个转折，看那章具体发生了什么（原文）。点的高低只是走势暗示，不标精确刻度、不吹连续起伏。"
+          : "章 × 人的格子墙：淡底=在场（逐章、真），朱 / 墨格=锚了原文的处境转折，点一个看那章具体发生了什么（原文）。没判过处境的不上色、不编。"}
       </p>
 
       {/* ── 选择器：搜人名 + 按戏份排序的角色清单（几百号人也挑得动） ── */}
@@ -380,15 +380,9 @@ export function CharacterArc({
                       <span className="font-bold" style={{ fontFamily: "var(--font-display)" }}>
                         第 {p.chapter} 章
                       </span>
-                      <span className="text-[var(--color-ink-muted)]"> · {p.note ?? (p.fortune > 0 ? "转折向好" : p.fortune < 0 ? "转折转坏" : "转折")}</span>
+                      {p.note ? <span className="text-[var(--color-ink-muted)]"> · {p.note}</span> : null}
                     </p>
-                    {verified ? (
-                      <SealMark size={20} title="原文已核验" />
-                    ) : (
-                      <span className="shrink-0 text-xs text-[var(--color-ink-muted)] px-1.5 py-0.5 rounded border border-[var(--color-rule)]">
-                        待核
-                      </span>
-                    )}
+                    {verified && <SealMark size={20} title="原文已核对" />}
                   </div>
                   <p className="mt-1 text-sm text-[var(--color-ink)] leading-relaxed">
                     {p.evidence || "（这章没给出原文依据）"}
@@ -399,7 +393,7 @@ export function CharacterArc({
           </ul>
 
           <p className="px-3 py-2 text-xs text-[var(--color-ink-muted)] border-t border-[var(--color-rule)]">
-            盖「鉴」印的原文已在书中逐字比对核验；标「待核」的没在书里比对命中，仅供参考。
+            盖「鉴」印的原文已逐字核对过；没盖印的没在书里比对上，仅供参考。
           </p>
         </div>
       )}

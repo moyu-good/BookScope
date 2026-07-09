@@ -35,7 +35,10 @@ interface EvidencePopoverProps {
 // 由 verified + matchScore 定证据强度四态。规则跟全站一致:
 // 没原文 → 待核;核验没过 → 部分(有内容但没盖章);核验过看贴合度 → 强锚 / 弱锚。
 // matchScore 缺省时把"核验过"当强锚(核验本身已是最硬的信号)。
-function deriveStrength(
+//
+// 导出成共享判定:别的镜头(公文利害 / 要点提取…)要在浮层之外单独摆一枚 EvidenceBadge 时,
+// 强度从这一处算——证据强度只有一个真相来源,不各写各的(evidence-first 一处判、处处一致)。
+export function deriveEvidenceStrength(
   quote: string | undefined,
   verified: boolean | undefined,
   matchScore: number | undefined,
@@ -62,7 +65,7 @@ export function EvidencePopover({
   const sync = () => setOpen(hovering.current || focusing.current);
 
   const hasQuote = !!quote && !!quote.trim();
-  const strength = deriveStrength(quote, verified, matchScore);
+  const strength = deriveEvidenceStrength(quote, verified, matchScore);
 
   return (
     <span

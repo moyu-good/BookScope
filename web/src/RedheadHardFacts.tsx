@@ -28,9 +28,9 @@
 
 import { useState } from "react";
 import { RunningProcess, RunStats, type RunTrace } from "./runProcess";
-import { SealMark } from "./SealMark";
 import { FeatureEntryCard } from "./FeatureEntryCard";
 import { SealButton } from "./SealButton";
+import { EvidenceMark } from "./viz/EvidenceMark";
 
 // ---- 后端契约（对着写，别改后端） ----
 
@@ -391,11 +391,16 @@ export function RedheadHardFacts({
                           </span>
                         );
                       })()}
-                      {verifiedOrigin ? (
-                        <SealMark size={16} title="原文已核验" />
-                      ) : (
-                        <span className="text-caption text-[var(--color-ink-muted)]">
-                          未在原文比对命中·仅供参考
+                      {/* 证据强度标 / 「鉴」印（悬停或聚焦浮出锚定原文 + 强度四态）——走 Phase0 共享件 */}
+                      <EvidenceMark
+                        evidence={f.evidence}
+                        verified={f.verified}
+                        matchScore={f.match_score}
+                        sealSize={16}
+                      />
+                      {!verifiedOrigin && canOpen && (
+                        <span className="text-caption text-[var(--color-ink-muted)] italic">
+                          未核·仅供参考
                         </span>
                       )}
                       {canOpen && (
@@ -578,7 +583,12 @@ function HardFactsTimeline({
                 {/* 右栏：事项（context）+ 约束力签 + 原文 */}
                 <div className="flex-1 min-w-0 pl-3 pb-1">
                   <div className="flex items-start gap-2 flex-wrap">
-                    {verified && <SealMark size={17} title="原文已核验" />}
+                    {/* 证据强度标 / 「鉴」印（悬停或聚焦浮出锚定原文 + 强度四态）——走 Phase0 共享件 */}
+                    <EvidenceMark
+                      evidence={f.evidence}
+                      verified={f.verified}
+                      matchScore={f.match_score}
+                    />
                     <p
                       className="text-body leading-7 text-[var(--color-ink)]"
                       style={{ fontFamily: "var(--font-display)" }}
@@ -597,12 +607,10 @@ function HardFactsTimeline({
                     )}
                   </div>
 
-                  {/* 核不过老实标一行，绝不假装这个日期有原文撑 */}
-                  {!verified && (
+                  {/* 核不过老实标一行——EvidenceMark 已摆强度标（待核 / 部分），这里只补一句「仅供参考」 */}
+                  {!verified && canOpen && (
                     <p className="mt-1 text-xs text-[var(--color-ink-muted)] italic">
-                      {hasValue(f.evidence)
-                        ? "未在原文比对命中·仅供参考"
-                        : "暂无贴切原文（待核）"}
+                      未核·仅供参考
                     </p>
                   )}
 

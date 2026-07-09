@@ -120,11 +120,11 @@ export function FortunePresenceGrid({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-xs text-[var(--color-ink-muted)]">
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "var(--color-seal)" }} />
-          转折向好
+          处境往上的转折
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "var(--color-ink)" }} />
-          转折转坏
+          处境往下的转折
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "var(--color-ink-muted)", opacity: 0.3 }} />
@@ -213,7 +213,7 @@ export function FortunePresenceGrid({
       </div>
 
       <p className="mt-2 text-xs text-[var(--color-ink-muted)]">
-        一行＝一个人：淡底＝在场（章脉逐章、真），朱/墨格＝锚了原文的处境转折（可点看那句原文）。中间没判过的不编、不上暧昧档词。
+        一行＝一个人：淡底＝在场（逐章、真），朱/墨格＝锚了原文的处境转折（点一个看那章具体发生了什么）。中间没判过的不编、不上暧昧档词。
       </p>
     </div>
   );

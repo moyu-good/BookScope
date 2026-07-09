@@ -45,6 +45,10 @@ import { RedheadStakes } from "./RedheadStakes";
 import { RedheadHardFacts } from "./RedheadHardFacts";
 import { RedheadActionList } from "./RedheadActionList";
 import { RedheadFormatCheck } from "./RedheadFormatCheck";
+import { vizTokens } from "./viz/vizTokens";
+
+// 案卷动线序号（汉风）——把「读一份公文的自然次序」在导航上显出来（信息编码，不只列名字）。
+const ORDINALS = ["一", "二", "三", "四", "五", "六", "七", "八", "九"] as const;
 
 interface RedheadDocPanoramaProps {
   sessionId: string;
@@ -127,7 +131,7 @@ export function RedheadDocPanorama({
           sticky top-14 让它落在移动端固定顶栏（h-14）之下；桌面无固定栏，贴视口顶也不挡。
           底下一道细朱砂规收边，跟数字善本的分隔语言一致。 */}
       <nav
-        className="sticky top-14 md:top-0 z-10 -mx-1 mb-2 flex flex-wrap items-center gap-1.5 bg-[var(--color-paper)]/95 px-1 py-2 backdrop-blur"
+        className="sticky top-14 md:top-0 z-10 -mx-1 mb-2 flex flex-wrap items-center gap-1.5 bg-[var(--color-paper)]/95 px-1 py-2 backdrop-blur relative"
         style={{ borderBottom: "1px solid var(--color-rule)" }}
         aria-label="公文全景各段"
       >
@@ -135,7 +139,7 @@ export function RedheadDocPanorama({
           className="mr-1 h-3.5 w-[3px] rounded-full bg-[var(--color-seal)]"
           aria-hidden="true"
         />
-        {SECTIONS.map((s) => {
+        {SECTIONS.map((s, i) => {
           const on = active === s.id;
           return (
             <button
@@ -143,18 +147,38 @@ export function RedheadDocPanorama({
               type="button"
               onClick={() => scrollTo(s.id)}
               aria-current={on ? "true" : undefined}
-              className="rounded px-2.5 py-1 text-[13px] transition-colors"
+              className="inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-[13px]"
               style={{
                 fontFamily: "var(--font-display)",
                 color: on ? "var(--color-seal)" : "var(--color-ink-muted)",
                 background: on ? "var(--color-seal-soft)" : "transparent",
                 fontWeight: on ? 700 : 500,
+                // 克制过渡：色 + 底随高亮切换，走 vizTokens 的统一时长 / 缓动（纯 CSS）
+                transition: `color ${vizTokens.motion.fast}ms ${vizTokens.motion.easing}, background ${vizTokens.motion.fast}ms ${vizTokens.motion.easing}`,
               }}
             >
+              {/* 动线序号：汉风数字前缀，标这是第几段（读一份公文的自然次序） */}
+              <span
+                className="text-[11px] tabular-nums"
+                style={{ opacity: on ? 0.9 : 0.5 }}
+                aria-hidden="true"
+              >
+                {ORDINALS[i] ?? i + 1}
+              </span>
               {s.label}
             </button>
           );
         })}
+        {/* 阅读进度轨：一道朱砂细线随读到第几段推进（纯 CSS 宽度过渡，无 rAF、无 GPU） */}
+        <span
+          aria-hidden="true"
+          className="absolute left-0 bottom-[-1px] h-[2px] rounded-full bg-[var(--color-seal)]"
+          style={{
+            width: `${((Math.max(0, SECTIONS.findIndex((s) => s.id === active)) + 1) / SECTIONS.length) * 100}%`,
+            transition: `width ${vizTokens.motion.base}ms ${vizTokens.motion.easing}`,
+            opacity: 0.7,
+          }}
+        />
       </nav>
 
       {/* ── 六段视图 ──

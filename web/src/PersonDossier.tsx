@@ -177,24 +177,24 @@ export function PersonDossier({
           {!s &&
             (loadingName === sel ? (
               <div className="mt-4 rounded border border-[var(--color-rule)] p-4 text-sm text-[var(--color-ink-muted)]">
-                正在现跑「{sel}」的立场分析（整本进 context、正反取证、锚原文，约 15 秒）…
+                正在分析「{sel}」的立场：通读全书，正反两面找证据，每条都取自原文，约 15 秒…
               </div>
             ) : (
               <div className="mt-4 rounded border border-dashed border-[var(--color-rule)] p-4 text-sm text-[var(--color-ink-muted)] leading-relaxed">
                 {onSelectPerson ? (
                   <>
-                    这个人物在名册里（全员都在）。他的精确分析按需现跑——
+                    这个人在名单里。要看他的立场，点一下马上分析。
                     <button
                       type="button"
                       onClick={() => onSelectPerson(sel)}
                       className="ml-1 px-2.5 py-0.5 rounded text-[var(--color-paper)]"
                       style={{ background: "var(--color-seal)", fontFamily: "var(--font-display)" }}
                     >
-                      现跑立场分析
+                      分析他的立场
                     </button>
                   </>
                 ) : (
-                  "这个人物在名册里（章脉派生，全员都在）。精确分析（立场 / 处境）在真 app 里点开才现跑（查询时代理、锚原文）——本预览只对主要人物预置了数据。"
+                  "这个人在名单里（全书的人都在）。他的立场和处境，点开才分析，每条都取自原文。这个预览只给主要人物备了数据。"
                 )}
               </div>
             ))}
@@ -227,7 +227,7 @@ export function PersonDossier({
           {/* 处境（锚原文的转折） */}
           {a && a.points.filter((p) => p.evidence?.trim()).length > 0 && (
             <div className="mt-5">
-              <div className="text-sm font-medium text-[var(--color-seal)] mb-1.5">处境转折 · 逐条锚原文</div>
+              <div className="text-sm font-medium text-[var(--color-seal)] mb-1.5">处境转折 · 每条都取自原文</div>
               <ul className="space-y-1.5">
                 {a.points
                   .filter((p) => p.evidence?.trim())
@@ -251,7 +251,7 @@ export function PersonDossier({
         </div>
       </div>
       <p className="px-3 py-2 text-xs text-[var(--color-ink-muted)] border-t border-[var(--color-rule)]">
-        左侧全员名册来自章脉（全书 {roster.length} 人、可搜、不砍）；右侧立场 / 处境每条锚原文（争议判断两方并陈、不藏单分后）。真 app 里点谁现跑谁的精确分析。
+        左边是全书 {roster.length} 个人的完整名单，能搜、不删减；右边每个人的立场和处境都取自原文，有争议的把正反两面都摆出来，不替你下定论。点开谁，才分析谁。
       </p>
     </div>
   );

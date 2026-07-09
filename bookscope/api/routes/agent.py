@@ -108,6 +108,7 @@ from bookscope.agent.meeting_commitments import commitments_across_meetings
 from bookscope.agent.meeting_spine import action_ledger_from_meeting
 from bookscope.agent.meeting_stance import stances_from_meeting
 from bookscope.agent.motif_tracking import generate_motif_tracking
+from bookscope.agent.narrative_phases import generate_narrative_phases
 from bookscope.agent.orchestrate import orchestrate
 from bookscope.agent.question_processor import rewrite_followup
 from bookscope.agent.recap import generate_recap
@@ -185,6 +186,8 @@ from bookscope.api.schemas import (
     MotifTrackingResponse,
     NarrativeCurveRequest,
     NarrativeCurveResponse,
+    NarrativePhasesRequest,
+    NarrativePhasesResponse,
     OrchestrateRequest,
     PacingCurveRequest,
     PacingCurveResponse,
@@ -231,6 +234,7 @@ from bookscope.api.schemas import (
     WritingTechniqueRequest,
     WritingTechniqueResponse,
 )
+from bookscope.ingest.back_matter import exclude_back_matter
 
 logger = logging.getLogger(__name__)
 
@@ -1084,16 +1088,27 @@ async def agent_character_graph(
         # 不设人数帽:一百多回的书几百号人有关系就画几百个(曾错砍到 40,把"太少"造回来了)。
         # relationship_graph_from_spine 已只画有关系的人(去孤立点);密不密是前端缩放的事。
         g = relationship_graph_from_spine(spine, name_map=name_map)
+
+        def _polarity_of(edge: dict[str, Any]) -> str | None:
+            # v2 章脉:边带综合 valence → 映射 友/敌/中(前端 edgePolarity 优先用它、不再正则猜)。
+            # v1 旧缓存没 valence → None,前端回落 relationKind 正则(保守)。
+            v = edge.get("valence")
+            if not isinstance(v, (int, float)):
+                return None
+            return "友" if v > 1 else "敌" if v < -1 else "中"
+
         edges = [
             GraphEdge(
                 source=e["source"],
                 target=e["target"],
-                relation="、".join(e.get("notes", [])[:2]) or "同场",
+                # 关系标签:v2 用抽出的关系类型(君臣/敌对…),没有就退回逐章交互短语
+                relation=e.get("rel_type") or "、".join(e.get("notes", [])[:2]) or "同场",
                 strength=max(1, min(5, int(e.get("weight", 1)))),
                 evidence="",
                 verified=False,
                 chapter=(e["chapters"][0] if e.get("chapters") else 0),
                 match_score=0.0,
+                polarity=_polarity_of(e),
             )
             for e in g["edges"]
         ]
@@ -1611,6 +1626,47 @@ async def agent_character_arc(
     return CharacterArcResponse(
         characters=characters or [],
         scanned=characters is not None,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/narrative-phases", response_model=NarrativePhasesResponse)
+async def agent_narrative_phases(
+    request: NarrativePhasesRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> NarrativePhasesResponse:
+    """情节脉络·阶段划分:章脉派生,判书型、叙事型才切阶段、锚原文(WP-narrative-phases)。"""
+    assembler = _resolve_assembler(store, request.book_session_id)
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_type": "ProviderSdkMissing", "message": str(exc),
+                    "details": {"provider": request.provider}},
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_type": "ClientBuildFailed", "message": f"{type(exc).__name__}: {exc}",
+                    "details": {"provider": request.provider}},
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    spine = get_or_build_spine(chunks=chunks, llm_client=rec, model=model)
+    result = generate_narrative_phases(spine=spine, chunks=chunks, llm_client=rec, model=model)
+    return NarrativePhasesResponse(
+        book_type=(result or {}).get("book_type", ""),
+        phases=(result or {}).get("phases", []),
+        scanned=result is not None,
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
@@ -2721,12 +2777,27 @@ def _book_fits_long_context(assembler: R0BookAssembler) -> bool:
     return chars * 0.68 <= max_tokens
 
 
+def _exclude_back_matter_enabled() -> bool:
+    """书末非正文区剔除开关（默认开）。设 ``0`` / ``off`` / ``false`` / ``no`` 关掉当逃生口。"""
+    return os.environ.get("BOOKSCOPE_EXCLUDE_BACK_MATTER", "on").strip().lower() not in (
+        "0",
+        "off",
+        "false",
+        "no",
+    )
+
+
 def _long_context_inputs(assembler: R0BookAssembler) -> tuple[str, list[dict]]:
     """取整本文本 + 全书 chunks（给 citation 校验当证据 + 章号 ground truth）。
 
     chapter 填真章号（assembler 的 chunk→chapter 归一化映射，与 RAG 同口径）：
     长上下文模型自报章号会漂（exp-009/010 caveat），snippet verify 命中某 chunk
     后由 ``run_long_context`` 用这里的真章号覆盖模型自报值。映射拿不到的 chunk 退 0。
+
+    **书末非正文区剔除**（#48）：所有整本功能都从这里拿 full_text / chunks，是唯一共享上游。
+    在这里过一道 ``exclude_back_matter``——把并进最后一章的参考文献 / 注释 / 附录 / 索引 /
+    后记 / 致谢从两侧剔掉，让时间线 / 伏笔 / 章脉等 map-reduce 功能不再把书末区当正文抽。
+    识别保守（分章的书 + 严格标题 + 其后无章头 + 落尾部），公文 / 会议 / 单篇不受影响。
     """
     full_text = assembler._book_text.raw_text  # noqa: SLF001
     chunk_to_chapter = assembler._compute_chunk_to_chapter_map()  # noqa: SLF001
@@ -2738,6 +2809,8 @@ def _long_context_inputs(assembler: R0BookAssembler) -> tuple[str, list[dict]]:
         }
         for c in assembler._chunks  # noqa: SLF001
     ]
+    if _exclude_back_matter_enabled():
+        full_text, chunks = exclude_back_matter(full_text, chunks)
     return full_text, chunks
 
 
