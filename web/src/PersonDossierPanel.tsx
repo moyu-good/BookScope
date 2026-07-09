@@ -11,7 +11,7 @@
 // 本壳只管取数 + 状态。
 // ---------------------------------------------------------------------------
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   PersonDossier,
   type DossierArc,
@@ -38,8 +38,8 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [loadingName, setLoadingName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [axisPos, setAxisPos] = useState("尊汉扶主");
-  const [axisNeg, setAxisNeg] = useState("篡逆自立");
+  const [axisPos, setAxisPos] = useState("");
+  const [axisNeg, setAxisNeg] = useState("");
 
   function reqBody(extra: Record<string, unknown> = {}): Record<string, unknown> {
     const b: Record<string, unknown> = { book_session_id: sessionId, provider, api_key: apiKey, ...extra };
@@ -47,6 +47,37 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
     if (baseUrl) b.base_url = baseUrl;
     return b;
   }
+
+  // 按书自动建议立场轴：换书 / key 到位时，若两端都还空（没被用户改过），就问后端这本书
+  // 围绕的核心立场对立，填进去当默认（用户仍可改）。判不出（工具书 / 诗集）或失败就保持空，
+  // 让用户自己填；只在空时填，绝不覆盖用户已输入的。
+  useEffect(() => {
+    if (!sessionId || !apiKey) return;
+    if (axisPos !== "" || axisNeg !== "") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/agent/suggest-stance-axis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(reqBody()),
+        });
+        if (!res.ok) return;
+        const d = (await res.json()) as { pos?: string; neg?: string; scanned?: boolean };
+        if (cancelled) return;
+        if (d.scanned && d.pos && d.neg) {
+          setAxisPos(d.pos);
+          setAxisNeg(d.neg);
+        }
+      } catch {
+        /* 建议失败静默，保持空让用户自己填 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, apiKey]);
 
   async function loadRoster() {
     setLoadingRoster(true);
@@ -185,12 +216,14 @@ export function PersonDossierPanel({ sessionId, provider, apiKey, model, baseUrl
         <input
           value={axisPos}
           onChange={(e) => changeAxis("pos", e.target.value)}
+          placeholder="正端（如 尊汉扶主 / 忠唐）"
           className="w-28 px-2 py-1 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] outline-none focus:border-[var(--color-seal)]"
         />
         <span className="text-[var(--color-ink-muted)]">↔</span>
         <input
           value={axisNeg}
           onChange={(e) => changeAxis("neg", e.target.value)}
+          placeholder="负端（如 篡逆自立 / 附燕）"
           className="w-28 px-2 py-1 rounded border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] outline-none focus:border-[var(--color-seal)]"
         />
         <span className="text-xs text-[var(--color-ink-muted)]">改轴后点人重新现跑</span>

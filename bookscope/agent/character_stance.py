@@ -151,3 +151,62 @@ def generate_character_stance(
             "dispute_reason": str(parsed.get("dispute_reason", "")),
         }
     return None
+
+
+def suggest_stance_axis(
+    *,
+    sample_text: str,
+    llm_client: Any,
+    model: str,
+    max_tokens: int = 1000,
+) -> dict[str, str] | None:
+    """据书的节选建议一对立场轴标签（正端 ↔ 负端，各 ≤8 字）；判不出返 None。
+
+    立场象限的轴不该写死成三国的「尊汉扶主 / 篡逆自立」——每本书围绕的对立不同（安史 =
+    忠唐 / 附燕，别的书别的）。这里拿书的节选（书名 + 正文前若干字）让 LLM 判本书围绕的核心
+    立场 / 阵营对立，给一对默认标签当前端起点，用户仍可改。
+
+    命根子（evidence-first）：书里没有明显立场对立的（工具书 / 诗集 / 纯理论），返 None、
+    不硬造——prompt 明写"判不出就返空"。任意环节失败（调用抛错 / 解析不出 / pos 或 neg 空）
+    都返 None，让前端退回用户自己填。缓存开着——同一本书节选反复问答案稳定，命中省 token。
+
+    Returns:
+        ``{"pos": "...", "neg": "..."}``（各非空）；判不出 / 失败返 None。
+    """
+    system = (
+        "你是文本立场分析助手。给你一本书的开头节选，判断这本书围绕的核心立场 / 阵营对立"
+        "是什么，用一对简短对立标签概括（各不超过 8 个字），例如：\n"
+        "  尊汉扶主 ↔ 篡逆自立（三国）、忠唐 ↔ 附燕（安史之乱）、革命 ↔ 保皇。\n"
+        "只有这本书确实围绕某条立场 / 阵营对立展开时才给标签；工具书 / 诗集 / 纯理论 / 说明文"
+        "这类没有明显立场对立的，判不出就返空，绝不硬造。\n\n"
+        f"【书的节选】\n{sample_text}"
+    )
+    user = (
+        "严格只输出 JSON（不要别的话、不要 markdown 围栏）：\n"
+        '{"pos": "正端标签", "neg": "负端标签"}\n'
+        "两个标签各不超过 8 字、互为对立。判不出这本书的核心立场对立，就输出 "
+        '{"pos": "", "neg": ""}。'
+    )
+    try:
+        response = _invoke_client(
+            llm_client,
+            model=model,
+            system=system,
+            tools=[],
+            messages=[{"role": "user", "content": user}],
+            max_tokens=max_tokens,
+            cache_enabled=True,
+        )
+    except Exception as exc:  # noqa: BLE001 — 包死，返 None
+        logger.warning(
+            "suggest_stance_axis LLM call raised %s: %s", type(exc).__name__, exc
+        )
+        return None
+    parsed = _parse(llm_client.extract_final_text(response))
+    if parsed is None:
+        return None
+    pos = str(parsed.get("pos", "")).strip()
+    neg = str(parsed.get("neg", "")).strip()
+    if not pos or not neg:
+        return None
+    return {"pos": pos, "neg": neg}

@@ -876,6 +876,42 @@ class CharacterStanceResponse(BaseModel):
     )
 
 
+class SuggestStanceAxisRequest(BaseModel):
+    """POST /api/agent/suggest-stance-axis 请求体（按书建议一对立场轴标签）。
+
+    人物志立场象限的轴不写死三国的「尊汉扶主 / 篡逆自立」——拿书的节选让 LLM 判这本书
+    围绕的核心立场 / 阵营对立，给一对默认标签（用户仍可改）。字段同 CharacterStanceRequest
+    的 BYOK 部分，不带 character / pos_label / neg_label——轴正是这里要建议的。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class SuggestStanceAxisResponse(BaseModel):
+    """POST /api/agent/suggest-stance-axis 响应体（建议的一对立场轴标签）。
+
+    ``scanned=False`` 或 pos/neg 空 = 这本书判不出明显立场对立（工具书 / 诗集 / 纯理论），
+    前端保持空、让用户自己填（evidence-first：判不出不硬造）。
+    """
+
+    pos: str = Field(
+        default="", description="建议的立场轴正端（如 尊汉扶主 / 忠唐）；判不出为空。"
+    )
+    neg: str = Field(
+        default="", description="建议的立场轴负端（如 篡逆自立 / 附燕）；判不出为空。"
+    )
+    scanned: bool = Field(
+        default=False, description="是否给出建议；false=判不出/失败，前端保持空让用户填。"
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+
+
 class RelationshipTimelineRequest(BaseModel):
     """POST /api/agent/relationship-timeline 请求体（关系随时间演变，WP-relationship-over-time）。
 

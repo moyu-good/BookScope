@@ -2075,6 +2075,7 @@ export function App() {
                   subtitle="全书的人物都在这儿：左边一张名单能搜，想看谁点谁。他偏向哪一边、有几分把握、正反两面的证据、处境怎么起落，每条都能翻到原文。点开谁，才分析谁。"
                 />
                 <PersonDossierPanel
+                  key={currentSession.session_id}
                   sessionId={currentSession.session_id}
                   provider={provider}
                   apiKey={apiKey}

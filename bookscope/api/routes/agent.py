@@ -83,7 +83,10 @@ from bookscope.agent.character_arc import generate_character_arc_exhaustive
 from bookscope.agent.character_graph import (
     extract_character_graph_exhaustive,
 )
-from bookscope.agent.character_stance import generate_character_stance
+from bookscope.agent.character_stance import (
+    generate_character_stance,
+    suggest_stance_axis,
+)
 from bookscope.agent.character_voice import generate_character_voice
 from bookscope.agent.claim_support import check_claim_support
 from bookscope.agent.cross_doc import cross_doc_relations_from_spines
@@ -229,6 +232,8 @@ from bookscope.api.schemas import (
     SubplotWeaveResponse,
     SuggestQuestionsRequest,
     SuggestQuestionsResponse,
+    SuggestStanceAxisRequest,
+    SuggestStanceAxisResponse,
     TimelineRequest,
     TimelineResponse,
     WritingTechniqueRequest,
@@ -356,7 +361,7 @@ def _run_prewarm_build(
 
 
 @agent_router.post("/agent/prewarm-spine", response_model=PrewarmSpineResponse)
-async def agent_prewarm_spine(
+def agent_prewarm_spine(
     request: PrewarmSpineRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> PrewarmSpineResponse:
@@ -438,7 +443,7 @@ async def agent_prewarm_spine(
 @agent_router.get(
     "/agent/prewarm-spine/status", response_model=PrewarmSpineStatusResponse
 )
-async def agent_prewarm_spine_status(
+def agent_prewarm_spine_status(
     book_session_id: str,
     model: str | None = None,
     provider: str = "deepseek",
@@ -464,7 +469,7 @@ async def agent_prewarm_spine_status(
 
 
 @agent_router.post("/agent/ask", response_model=AgentAskResponse)
-async def agent_ask(
+def agent_ask(
     request: AgentAskRequest,
     store: BookSessionStore = Depends(get_book_session_store),
     conv_store: JSONFileConversationStore = Depends(get_conversation_store),
@@ -1033,7 +1038,7 @@ def _format_sse(event: LoopEvent) -> str:
 
 
 @agent_router.post("/agent/character-graph", response_model=CharacterGraphResponse)
-async def agent_character_graph(
+def agent_character_graph(
     request: CharacterGraphRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> CharacterGraphResponse:
@@ -1174,7 +1179,7 @@ async def agent_character_graph(
 
 
 @agent_router.post("/agent/character-flow", response_model=CharacterFlowResponse)
-async def agent_character_flow(
+def agent_character_flow(
     request: CharacterFlowRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> CharacterFlowResponse:
@@ -1229,7 +1234,7 @@ async def agent_character_flow(
 
 
 @agent_router.post("/agent/subplot-weave", response_model=SubplotWeaveResponse)
-async def agent_subplot_weave(
+def agent_subplot_weave(
     request: SubplotWeaveRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> SubplotWeaveResponse:
@@ -1284,7 +1289,7 @@ async def agent_subplot_weave(
 
 
 @agent_router.post("/agent/check-citations", response_model=CheckCitationsResponse)
-async def agent_check_citations(
+def agent_check_citations(
     request: CheckCitationsRequest,
 ) -> CheckCitationsResponse:
     """核每条引用撑不撑得起答案的论述（claim precision，exp-015 GO）。
@@ -1328,7 +1333,7 @@ async def agent_check_citations(
 
 
 @agent_router.post("/agent/suggest-questions", response_model=SuggestQuestionsResponse)
-async def agent_suggest_questions(
+def agent_suggest_questions(
     request: SuggestQuestionsRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> SuggestQuestionsResponse:
@@ -1388,7 +1393,7 @@ async def agent_suggest_questions(
 
 
 @agent_router.post("/agent/pacing-curve", response_model=PacingCurveResponse)
-async def agent_pacing_curve(
+def agent_pacing_curve(
     request: PacingCurveRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> PacingCurveResponse:
@@ -1438,7 +1443,7 @@ async def agent_pacing_curve(
 
 
 @agent_router.post("/agent/spine-evidence", response_model=SpineEvidenceResponse)
-async def agent_spine_evidence(
+def agent_spine_evidence(
     request: SpineEvidenceRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> SpineEvidenceResponse:
@@ -1462,7 +1467,7 @@ async def agent_spine_evidence(
 
 
 @agent_router.post("/agent/narrative-curve", response_model=NarrativeCurveResponse)
-async def agent_narrative_curve(
+def agent_narrative_curve(
     request: NarrativeCurveRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> NarrativeCurveResponse:
@@ -1517,7 +1522,7 @@ async def agent_narrative_curve(
 
 
 @agent_router.post("/agent/foreshadow-arcs", response_model=ForeshadowArcsResponse)
-async def agent_foreshadow_arcs(
+def agent_foreshadow_arcs(
     request: ForeshadowArcsRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> ForeshadowArcsResponse:
@@ -1576,7 +1581,7 @@ async def agent_foreshadow_arcs(
 
 
 @agent_router.post("/agent/character-arc", response_model=CharacterArcResponse)
-async def agent_character_arc(
+def agent_character_arc(
     request: CharacterArcRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> CharacterArcResponse:
@@ -1632,7 +1637,7 @@ async def agent_character_arc(
 
 
 @agent_router.post("/agent/narrative-phases", response_model=NarrativePhasesResponse)
-async def agent_narrative_phases(
+def agent_narrative_phases(
     request: NarrativePhasesRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> NarrativePhasesResponse:
@@ -1673,7 +1678,7 @@ async def agent_narrative_phases(
 
 
 @agent_router.post("/agent/character-voice", response_model=CharacterVoiceResponse)
-async def agent_character_voice(
+def agent_character_voice(
     request: CharacterVoiceRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> CharacterVoiceResponse:
@@ -1744,7 +1749,7 @@ async def agent_character_voice(
 
 
 @agent_router.post("/agent/character-stance", response_model=CharacterStanceResponse)
-async def agent_character_stance(
+def agent_character_stance(
     request: CharacterStanceRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> CharacterStanceResponse:
@@ -1809,9 +1814,63 @@ async def agent_character_stance(
 
 
 @agent_router.post(
+    "/agent/suggest-stance-axis", response_model=SuggestStanceAxisResponse
+)
+def agent_suggest_stance_axis(
+    request: SuggestStanceAxisRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> SuggestStanceAxisResponse:
+    """据书的节选建议一对立场轴标签（人物志立场象限的默认轴，用户仍可改）。
+
+    轴不写死三国的「尊汉扶主 / 篡逆自立」——拿书名 + 正文前 ~15000 字喂进去，让 LLM 判这本书
+    围绕的核心立场 / 阵营对立。判不出（工具书 / 诗集 / 纯理论）返空、不硬造（evidence-first）。
+    只取节选不整本——建议轴不需要全书，省 token。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    book_title, _ = _extract_book_meta(assembler)
+    raw_text = assembler._book_text.raw_text  # noqa: SLF001 — 同 book_cache 既有取法
+    sample = raw_text[:15000]
+    if book_title and book_title != "unknown":
+        sample = f"《{book_title}》\n\n{sample}"
+    result = suggest_stance_axis(sample_text=sample, llm_client=client, model=model)
+    return SuggestStanceAxisResponse(
+        pos=(result or {}).get("pos", ""),
+        neg=(result or {}).get("neg", ""),
+        scanned=result is not None,
+        book_session_id=request.book_session_id,
+    )
+
+
+@agent_router.post(
     "/agent/relationship-timeline", response_model=RelationshipTimelineResponse
 )
-async def agent_relationship_timeline(
+def agent_relationship_timeline(
     request: RelationshipTimelineRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RelationshipTimelineResponse:
@@ -1884,7 +1943,7 @@ async def agent_relationship_timeline(
 
 
 @agent_router.post("/agent/consistency-scan", response_model=ConsistencyScanResponse)
-async def agent_consistency_scan(
+def agent_consistency_scan(
     request: ConsistencyScanRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> ConsistencyScanResponse:
@@ -1943,7 +2002,7 @@ async def agent_consistency_scan(
 
 
 @agent_router.post("/agent/timeline", response_model=TimelineResponse)
-async def agent_timeline(
+def agent_timeline(
     request: TimelineRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> TimelineResponse:
@@ -1996,7 +2055,7 @@ async def agent_timeline(
 
 
 @agent_router.post("/agent/entity-recall", response_model=EntityRecallResponse)
-async def agent_entity_recall(
+def agent_entity_recall(
     request: EntityRecallRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> EntityRecallResponse:
@@ -2064,7 +2123,7 @@ async def agent_entity_recall(
 
 
 @agent_router.post("/agent/argument-structure", response_model=ArgumentStructureResponse)
-async def agent_argument_structure(
+def agent_argument_structure(
     request: ArgumentStructureRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> ArgumentStructureResponse:
@@ -2122,7 +2181,7 @@ async def agent_argument_structure(
 
 
 @agent_router.post("/agent/detect-genre", response_model=GenreDetectResponse)
-async def agent_detect_genre(
+def agent_detect_genre(
     request: GenreDetectRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> GenreDetectResponse:
@@ -2170,7 +2229,7 @@ async def agent_detect_genre(
 
 
 @agent_router.post("/agent/style-issues", response_model=StyleIssuesResponse)
-async def agent_style_issues(
+def agent_style_issues(
     request: StyleIssuesRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> StyleIssuesResponse:
@@ -2235,7 +2294,7 @@ async def agent_style_issues(
 
 
 @agent_router.post("/agent/recap", response_model=RecapResponse)
-async def agent_recap(
+def agent_recap(
     request: RecapRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RecapResponse:
@@ -2319,7 +2378,7 @@ _CHAPTER_DIGEST_Q = (
 
 
 @agent_router.post("/agent/chapter-ask", response_model=ChapterAskResponse)
-async def agent_chapter_ask(
+def agent_chapter_ask(
     request: ChapterAskRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> ChapterAskResponse:
@@ -2401,7 +2460,7 @@ async def agent_chapter_ask(
 
 
 @agent_router.post("/agent/concept-evolution", response_model=ConceptEvolutionResponse)
-async def agent_concept_evolution(
+def agent_concept_evolution(
     request: ConceptEvolutionRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> ConceptEvolutionResponse:
@@ -2475,7 +2534,7 @@ async def agent_concept_evolution(
 
 
 @agent_router.post("/agent/motif-tracking", response_model=MotifTrackingResponse)
-async def agent_motif_tracking(
+def agent_motif_tracking(
     request: MotifTrackingRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> MotifTrackingResponse:
@@ -2540,7 +2599,7 @@ async def agent_motif_tracking(
 
 
 @agent_router.post("/agent/writing-technique", response_model=WritingTechniqueResponse)
-async def agent_writing_technique(
+def agent_writing_technique(
     request: WritingTechniqueRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> WritingTechniqueResponse:
@@ -2600,7 +2659,7 @@ async def agent_writing_technique(
 
 
 @agent_router.post("/agent/study-cards", response_model=StudyCardsResponse)
-async def agent_study_cards(
+def agent_study_cards(
     request: StudyCardsRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> StudyCardsResponse:
@@ -2670,7 +2729,7 @@ async def agent_study_cards(
 
 
 @agent_router.post("/agent/annotations", response_model=AnnotationsResponse)
-async def agent_annotations(
+def agent_annotations(
     request: AnnotationsRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> AnnotationsResponse:
@@ -3490,7 +3549,7 @@ def _collect_doc_spines(
     "/agent/redhead/doc-structure",
     response_model=RedheadDocStructureResponse,
 )
-async def agent_redhead_doc_structure(
+def agent_redhead_doc_structure(
     request: RedheadDocStructureRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadDocStructureResponse:
@@ -3537,7 +3596,7 @@ async def agent_redhead_doc_structure(
     "/agent/redhead/dependency-graph",
     response_model=RedheadDependencyGraphResponse,
 )
-async def agent_redhead_dependency_graph(
+def agent_redhead_dependency_graph(
     request: RedheadCrossDocRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadDependencyGraphResponse:
@@ -3577,7 +3636,7 @@ async def agent_redhead_dependency_graph(
     "/agent/redhead/policy-evolution",
     response_model=RedheadPolicyEvolutionResponse,
 )
-async def agent_redhead_policy_evolution(
+def agent_redhead_policy_evolution(
     request: RedheadPolicyEvolutionRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadPolicyEvolutionResponse:
@@ -3613,7 +3672,7 @@ async def agent_redhead_policy_evolution(
     "/agent/redhead/level-consistency",
     response_model=RedheadLevelConsistencyResponse,
 )
-async def agent_redhead_level_consistency(
+def agent_redhead_level_consistency(
     request: RedheadCrossDocRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadLevelConsistencyResponse:
@@ -3644,7 +3703,7 @@ async def agent_redhead_level_consistency(
     "/agent/redhead/plain-language",
     response_model=RedheadPlainLanguageResponse,
 )
-async def agent_redhead_plain_language(
+def agent_redhead_plain_language(
     request: RedheadPlainLanguageRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadPlainLanguageResponse:
@@ -3673,7 +3732,7 @@ async def agent_redhead_plain_language(
     "/agent/redhead/close-reading",
     response_model=RedheadCloseReadingResponse,
 )
-async def agent_redhead_close_reading(
+def agent_redhead_close_reading(
     request: RedheadDocStructureRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadCloseReadingResponse:
@@ -3706,7 +3765,7 @@ async def agent_redhead_close_reading(
     "/agent/redhead/relevance",
     response_model=RedheadRelevanceResponse,
 )
-async def agent_redhead_relevance(
+def agent_redhead_relevance(
     request: RedheadRelevanceRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadRelevanceResponse:
@@ -3736,7 +3795,7 @@ async def agent_redhead_relevance(
 
 
 @agent_router.post("/agent/redhead/stakes", response_model=RedheadStakesResponse)
-async def agent_redhead_stakes(
+def agent_redhead_stakes(
     request: RedheadStakesRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadStakesResponse:
@@ -3777,7 +3836,7 @@ async def agent_redhead_stakes(
     "/agent/redhead/hard-facts",
     response_model=RedheadHardFactsResponse,
 )
-async def agent_redhead_hard_facts(
+def agent_redhead_hard_facts(
     request: RedheadDocStructureRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadHardFactsResponse:
@@ -3804,7 +3863,7 @@ async def agent_redhead_hard_facts(
     "/agent/meeting/action-ledger",
     response_model=MeetingActionLedgerResponse,
 )
-async def agent_meeting_action_ledger(
+def agent_meeting_action_ledger(
     request: MeetingActionLedgerRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> MeetingActionLedgerResponse:
@@ -3850,7 +3909,7 @@ async def agent_meeting_action_ledger(
     "/agent/meeting/stance",
     response_model=MeetingStanceResponse,
 )
-async def agent_meeting_stance(
+def agent_meeting_stance(
     request: MeetingStanceRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> MeetingStanceResponse:
@@ -3917,7 +3976,7 @@ def _collect_meeting_inputs(
     "/agent/meeting/commitments",
     response_model=MeetingCommitmentsResponse,
 )
-async def agent_meeting_commitments(
+def agent_meeting_commitments(
     request: MeetingCommitmentsRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> MeetingCommitmentsResponse:
@@ -3960,7 +4019,7 @@ async def agent_meeting_commitments(
     "/agent/redhead/timeline",
     response_model=RedheadTimelineResponse,
 )
-async def agent_redhead_timeline(
+def agent_redhead_timeline(
     request: RedheadDocStructureRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadTimelineResponse:
@@ -3992,7 +4051,7 @@ async def agent_redhead_timeline(
     "/agent/redhead/glossary",
     response_model=RedheadGlossaryResponse,
 )
-async def agent_redhead_glossary(
+def agent_redhead_glossary(
     request: RedheadDocStructureRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadGlossaryResponse:
@@ -4025,7 +4084,7 @@ async def agent_redhead_glossary(
     "/agent/redhead/format-check",
     response_model=RedheadFormatCheckResponse,
 )
-async def agent_redhead_format_check(
+def agent_redhead_format_check(
     request: RedheadDocStructureRequest,
     store: BookSessionStore = Depends(get_book_session_store),
 ) -> RedheadFormatCheckResponse:
