@@ -865,6 +865,7 @@ export function App() {
     | "ask"
     | "annotate"
     | "graph"
+    | "concept_graph"
     | "flow"
     | "reltime"
     | "chararc"
@@ -2131,6 +2132,21 @@ export function App() {
                 />
               </div>
 
+              <div className={mode === "concept_graph" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="概念关系图"
+                  subtitle="书里的核心概念怎么勾连：定义 / 包含 / 对立 / 因果，每条连线都点得到原文。"
+                />
+                <CharacterGraph
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                  defaultUnit="concept"
+                />
+              </div>
+
               <div className={mode === "reltime" ? "" : "hidden"}>
                 <CanvasHeader
                   title="关系演变"
@@ -2635,6 +2651,7 @@ type Mode =
   | "ask"
   | "annotate"
   | "graph"
+  | "concept_graph"
   | "flow"
   | "reltime"
   | "chararc"
@@ -2678,7 +2695,7 @@ type Mode =
 // 读完整本出结构的功能——大书上分很多段、慢且贵、可能截断,要提前提醒。
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
 const WHOLE_BOOK_MODES = new Set<Mode>([
-  "graph", "person_dossier", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
+  "graph", "concept_graph", "person_dossier", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
   "timeline", "narrative", "consistency", "argument", "scholar_stance", "style", "technique",
   "cards", "revision", "redhead", "redhead_actions", "redhead_plain",
   "redhead_stakes", "redhead_hardfacts",
@@ -2733,6 +2750,8 @@ const NAV_GROUPS: NavGroup[] = [
     title: "思想 · 理论",
     modes: [
       { id: "argument", label: "论点结构" },
+      // 概念关系图:理论书专属入口,复用关系图组件锁 concept;叙事书的人物关系图仍在「人物」组的全景里。
+      { id: "concept_graph", label: "概念关系图" },
       // 学者立场谱:理论书专属镜头,把书里对话的思想家按本书核心争论摆到发散轴上(替掉不适配的立场格局)。
       { id: "scholar_stance", label: "学者立场谱" },
     ],
@@ -2830,13 +2849,16 @@ function genreVisibleGroups(genre: string | undefined | null): Set<string> | nul
       "redhead_cross",
     ]);
   }
-  // 书类(小说/历史/理论/论文/诗歌/工具书):只留「问 & 读」+ 书的组,公文三组全藏。
-  if (
-    /(小说|novel|fiction|网文|历史|架空|玄幻|理论|论文|paper|哲学|philosophy|工具书|nonfiction|学术|诗|poem|poetry|散文)/.test(
-      g,
-    )
-  ) {
+  // 叙事类(小说/历史/网文/传记...):有人物,留「人物」组 + 情节 + 思想 + 质量。
+  if (/(小说|novel|fiction|网文|历史|传记|架空|玄幻)/.test(g)) {
     return new Set(["read", "character", "plot", "thought", "quality"]);
+  }
+  // 论述类(理论/论文/哲学/社科/工具书/诗...):没有叙事人物,砍掉「人物」组(概念关系图已挪进
+  // 「思想·理论」、立场格局是叙事镜头不适配)。留 读 + 情节 + 思想 + 质量。
+  if (
+    /(理论|论文|paper|哲学|philosophy|社科|工具书|nonfiction|学术|诗|poem|poetry|散文)/.test(g)
+  ) {
+    return new Set(["read", "plot", "thought", "quality"]);
   }
   // 其他 / 认不出:全显(兜底)。
   return null;

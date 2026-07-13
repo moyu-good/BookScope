@@ -43,6 +43,9 @@ interface CharacterGraphProps {
   baseUrl: string;
   // 点一个人物节点 → 广播选中给别的镜头(可选,不传则只能拖动,行为跟以前一样)。
   onSelectPerson?: (name: string) => void;
+  // 锁定分析单位:从「思想·理论」的概念关系图入口进来时传 "concept",跳过人物/概念选择卡直接出概念图。
+  // 不传 = 老行为(先选人物 / 概念)。叙事书人物全景里的关系图不传,行为不变。
+  defaultUnit?: "person" | "concept";
 }
 
 const PAD = 46;
@@ -166,6 +169,7 @@ export function CharacterGraph({
   model,
   baseUrl,
   onSelectPerson,
+  defaultUnit,
 }: CharacterGraphProps) {
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -174,7 +178,7 @@ export function CharacterGraph({
   const [selEv, setSelEv] = useState<{ loading: boolean; text: string; found: boolean } | null>(
     null,
   );
-  const [unit, setUnit] = useState<"person" | "concept">("person");
+  const [unit, setUnit] = useState<"person" | "concept">(defaultUnit ?? "person");
   // 默认只渲染戏份前 TOP_N 个;点"展开次要人物"才全量。次要人物多才显示这个开关。
   const [expanded, setExpanded] = useState(false);
   // 鼠标悬停的节点名——人多时只给主要角色标名,hover 任意一颗也临时显名,
@@ -661,6 +665,67 @@ export function CharacterGraph({
       "flex flex-col items-start gap-1.5 p-4 rounded-lg border text-left transition-colors " +
       "border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] " +
       "disabled:opacity-50 disabled:hover:border-[var(--color-rule)]";
+    // 从「思想·理论」概念关系图入口进来:锁 concept,只给一张卡直接生成,不摆人物/概念选择。
+    if (defaultUnit) {
+      const isConcept = defaultUnit === "concept";
+      const noun = isConcept ? "概念" : "人物";
+      return (
+        <div className="pt-4">
+          <p className="text-sm text-[var(--color-ink-muted)] mb-4">
+            {isConcept
+              ? "把书里的核心概念画成关系网：定义 / 包含 / 对立 / 因果，连线越粗越紧密，每条边点得到原文。"
+              : "把整本书的人物关系网画成可拖动的动态图，每条边点得到原文。"}
+          </p>
+          <button
+            type="button"
+            onClick={() => load(defaultUnit)}
+            disabled={loading || !apiKey}
+            className={cardCls}
+            style={{ maxWidth: 360 }}
+          >
+            <svg
+              width="30"
+              height="30"
+              viewBox="0 0 28 28"
+              fill="none"
+              stroke="var(--color-seal)"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            >
+              <path d="M7.5 9.2l11-1.4M8 11l5 7.5M20 9.3l-5.6 9" />
+              <circle cx="6" cy="8" r="2.6" fill="var(--color-paper)" />
+              <circle cx="22" cy="7" r="2.6" fill="var(--color-paper)" />
+              <circle cx="14" cy="21" r="2.6" fill="var(--color-paper)" />
+            </svg>
+            <span className="text-base font-bold text-[var(--color-ink)]">
+              {loading ? "抽取中…" : `生成${noun}关系图`}
+            </span>
+            <span className="text-xs text-[var(--color-ink-muted)]">
+              {isConcept ? "核心概念怎么勾连、多紧密" : "谁和谁、什么关系、多亲近"}
+            </span>
+          </button>
+          {error && (
+            <p className="mt-3 text-sm" style={{ color: "var(--color-seal)" }}>
+              {error}
+            </p>
+          )}
+          {loading && (
+            <RunningProcess
+              label={`抽取${noun}关系图`}
+              hint="整本书喂进模型抽关系网，每条边都要回原文核验，约 1 分钟。"
+            />
+          )}
+          {!apiKey && (
+            <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
+              填了 API key 才能生成。
+            </p>
+          )}
+          <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
+            整本书分段抽取再合并，大书也能抽，约 1-3 分钟。
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="pt-4">
         <p className="text-sm text-[var(--color-ink-muted)] mb-4">
