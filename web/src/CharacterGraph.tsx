@@ -331,6 +331,27 @@ export function CharacterGraph({
     return { nodes: keep, nodeSet, edges, hiddenCount: all.length - keep.length };
   }, [data, expanded, degree]);
 
+  // 阵营名册：把社区发现分出的群摊成文字（作者：既然分好阵营，就该在图外用文字列出来）。
+  // 只认渲染子集，跟图上的点色一一对应；按群大小降序、群内按戏份降序；单点不成群略去。
+  // 诚实：这是按关系亲疏（strength 加权 label propagation）自动分的群，不等于书里的正式阵营。
+  const factions = useMemo(() => {
+    if (!data) return [] as { id: number; members: string[] }[];
+    const byId = new Map<number, string[]>();
+    for (const name of rendered.nodes) {
+      const id = communities.get(name) ?? 0;
+      const arr = byId.get(id);
+      if (arr) arr.push(name);
+      else byId.set(id, [name]);
+    }
+    return [...byId.entries()]
+      .map(([id, members]) => ({
+        id,
+        members: [...members].sort((a, b) => (degree.get(b) ?? 0) - (degree.get(a) ?? 0)),
+      }))
+      .filter((g) => g.members.length >= 2)
+      .sort((a, b) => b.members.length - a.members.length);
+  }, [data, rendered, communities, degree]);
+
   // 有效聚焦的人:鼠标 hover 优先(即时),没 hover 时看总线——别的镜头广播了一个人、
   // 且这人正画在图里,就聚焦他。这样 hover 和跨镜头联动共用同一套高亮/淡化。
   const focusedName =
@@ -1015,6 +1036,59 @@ export function CharacterGraph({
         })}
         </g>
       </svg>
+
+      {/* 阵营名册：把上面按颜色分的群用文字列清楚（作者要的）。点名字在图上高亮他。 */}
+      {unit === "person" && factions.length >= 2 && (
+        <div className="mt-3 p-3 rounded border border-[var(--color-rule)] bg-white">
+          <div className="text-xs text-[var(--color-ink-muted)] mb-2">
+            阵营名册 · 按关系亲疏自动分的群（未必是书里的正式阵营）。点名字在图上高亮他。
+          </div>
+          <div className="space-y-2.5">
+            {factions.map((g) => (
+              <div key={g.id} className="flex items-start gap-2">
+                <span
+                  className="inline-block w-3 h-3 rounded-full mt-1 shrink-0"
+                  style={{ background: factionColor(g.id) }}
+                  aria-hidden
+                />
+                <div className="min-w-0">
+                  <span
+                    className="text-sm font-bold text-[var(--color-ink)]"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    {g.members[0]}
+                  </span>
+                  <span className="text-xs text-[var(--color-ink-muted)] ml-1">
+                    等 {g.members.length} 人
+                  </span>
+                  <div className="flex flex-wrap gap-x-1 gap-y-0.5 mt-1">
+                    {g.members.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() =>
+                          setFocus(
+                            focus?.kind === "person" && focus.id === name
+                              ? null
+                              : { kind: "person", id: name, label: name, bookSessionId: sessionId },
+                          )
+                        }
+                        className="text-xs px-1.5 py-0.5 rounded hover:bg-[var(--color-seal-soft)] transition-colors"
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          color: focusedName === name ? "var(--color-seal)" : "var(--color-ink)",
+                        }}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {sel && (
         <div className="mt-3 p-3 rounded border border-[var(--color-rule)] bg-white">
