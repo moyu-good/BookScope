@@ -969,6 +969,78 @@ class BatchStanceResponse(BaseModel):
     book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
 
 
+class ScholarStanceRequest(BaseModel):
+    """POST /api/agent/scholar-stance 请求体（学者立场谱，理论书镜头，probe exp033 GO）。
+
+    理论书跟哪些思想家对话、各自站在本书核心争论的哪一极。轴由模型据本书原文自己定
+    （不像 character-stance 由调用方给轴）——所以没有 character / pos_label / neg_label
+    字段，只带 BYOK 部分（同 SuggestStanceAxisRequest）。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class ScholarStanceAxis(BaseModel):
+    """本书核心争论轴：两极 + 依据（全用本书的话）。"""
+
+    pole_a: str = Field(default="", description="争论轴一极（如 国家能力 / 计划）。")
+    pole_b: str = Field(default="", description="争论轴另一极（如 市场自发 / 产权）。")
+    from_book: str = Field(default="", description="这条轴的依据，用本书原话概括。")
+
+
+class ScholarStancePosition(BaseModel):
+    """谱上一个学者：立场位置 + 原文原句（过片段核验）。"""
+
+    name: str = Field(..., description="学者 / 思想家名。")
+    stance_stated: bool = Field(
+        default=False, description="本书有没有明说 / 刻画其立场；false=只提名，不摆位置。"
+    )
+    pole: str = Field(default="", description="偏哪一极：a / b / 中；只提名为空。")
+    position: int = Field(
+        default=0,
+        description="立场位置 -5（紧贴 pole_a）..0（中/只提名）..+5（紧贴 pole_b）。",
+    )
+    quote: str = Field(default="", description="本书里刻画其立场的原文原句；只提名为空。")
+    quote_verified: bool = Field(
+        default=False,
+        description="原句按片段核过原书（evidence-first）；false=没锚上，前端标待核。",
+    )
+    brief: str = Field(default="", description="一句话说明。")
+
+
+class ScholarStanceResponse(BaseModel):
+    """POST /api/agent/scholar-stance 响应体（学者立场谱）。
+
+    ``scanned=False`` = 抽不出核心争论轴 / 有立场的学者不足 2 个（工具书 / 无学术对话的书），
+    前端不画谱、不硬造（evidence-first，同 suggest-stance-axis 判不出返空的精神）。
+    """
+
+    axis: ScholarStanceAxis | None = Field(
+        default=None, description="核心争论轴；判不出为 None。"
+    )
+    scholars: list[ScholarStancePosition] = Field(
+        default_factory=list,
+        description=(
+            "谱上每个学者一项 {name, stance_stated, pole, position, quote, "
+            "quote_verified, brief}。"
+        ),
+    )
+    scanned: bool = Field(
+        default=False, description="是否成功成谱；false=判不出/失败，前端不画谱。"
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(
+        default_factory=dict,
+        description="运行用量 trace：input_tokens/output_tokens/chars/duration_ms。",
+    )
+
+
 class RelationshipTimelineRequest(BaseModel):
     """POST /api/agent/relationship-timeline 请求体（关系随时间演变，WP-relationship-over-time）。
 

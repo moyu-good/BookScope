@@ -58,6 +58,7 @@ import { RedheadDocPanorama } from "./RedheadDocPanorama";
 import { RedheadDossierPanorama } from "./RedheadDossierPanorama";
 import { CharacterPanorama } from "./CharacterPanorama";
 import { PersonDossierPanel } from "./PersonDossierPanel";
+import { ScholarStancePanel } from "./ScholarStancePanel";
 import { NarrativePanorama } from "./NarrativePanorama";
 import { QualityPanorama } from "./QualityPanorama";
 import { RelationshipTimeline } from "./RelationshipTimeline";
@@ -876,6 +877,7 @@ export function App() {
     | "narrative"
     | "consistency"
     | "argument"
+    | "scholar_stance"
     | "style"
     | "recap"
     | "concept"
@@ -2309,6 +2311,23 @@ export function App() {
                 />
               </div>
 
+              {/* 学者立场谱:理论书专属镜头。把书里对话的学者按本书核心争论摆上发散轴,点人看原文取证。
+                  非理论书靠后端 scanned=false / 空学者集优雅退场。换书由 key 重挂。 */}
+              <div className={mode === "scholar_stance" ? "" : "hidden"}>
+                <CanvasHeader
+                  title="学者立场谱"
+                  subtitle="看这本书在跟哪些思想家对话：先理出它自己的核心争论，再把书里引到的学者按原文摆到争论的某一极，谁偏哪头一眼看清。点开谁，看书里怎么刻画他，每句都能核回原文。"
+                />
+                <ScholarStancePanel
+                  key={currentSession.session_id}
+                  sessionId={currentSession.session_id}
+                  provider={provider}
+                  apiKey={apiKey}
+                  model={model}
+                  baseUrl={effectiveBaseUrl()}
+                />
+              </div>
+
               <div className={mode === "technique" ? "" : "hidden"}>
                 <CanvasHeader
                   title="写作手法"
@@ -2628,6 +2647,7 @@ type Mode =
   | "narrative"
   | "consistency"
   | "argument"
+  | "scholar_stance"
   | "style"
   | "recap"
   | "concept"
@@ -2659,7 +2679,7 @@ type Mode =
 // 问书 / 精读 / 实体 / 前情 / 概念 / 母题是 query-scoped 或按章,不在此列。
 const WHOLE_BOOK_MODES = new Set<Mode>([
   "graph", "person_dossier", "reltime", "flow", "chararc", "charvoice", "foreshadow", "subplot",
-  "timeline", "narrative", "consistency", "argument", "style", "technique",
+  "timeline", "narrative", "consistency", "argument", "scholar_stance", "style", "technique",
   "cards", "revision", "redhead", "redhead_actions", "redhead_plain",
   "redhead_stakes", "redhead_hardfacts",
   "redhead_formatcheck", "meeting_ledger", "meeting_stance",
@@ -2713,6 +2733,8 @@ const NAV_GROUPS: NavGroup[] = [
     title: "思想 · 理论",
     modes: [
       { id: "argument", label: "论点结构" },
+      // 学者立场谱:理论书专属镜头,把书里对话的思想家按本书核心争论摆到发散轴上(替掉不适配的立场格局)。
+      { id: "scholar_stance", label: "学者立场谱" },
     ],
   },
   {

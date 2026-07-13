@@ -126,6 +126,7 @@ from bookscope.agent.redhead_stakes import stakes_from_doc
 from bookscope.agent.redhead_timeline import (
     timeline_from_spine as redhead_timeline_from_spine,
 )
+from bookscope.agent.scholar_stance import scholar_stance_spectrum
 from bookscope.agent.study_cards import generate_study_cards
 from bookscope.agent.style_issues import generate_style_issues
 from bookscope.agent.suggested_questions import generate_book_questions
@@ -226,6 +227,10 @@ from bookscope.api.schemas import (
     RelationshipTimelineResponse,
     Review,
     ReviewDimensionScore,
+    ScholarStanceAxis,
+    ScholarStancePosition,
+    ScholarStanceRequest,
+    ScholarStanceResponse,
     SpineEvidenceRequest,
     SpineEvidenceResponse,
     StudyCardsRequest,
@@ -1922,6 +1927,63 @@ def agent_batch_stance(
         positions=[BatchStancePosition(**p) for p in (positions or [])],
         scanned=positions is not None,
         book_session_id=request.book_session_id,
+    )
+
+
+@agent_router.post("/agent/scholar-stance", response_model=ScholarStanceResponse)
+def agent_scholar_stance(
+    request: ScholarStanceRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> ScholarStanceResponse:
+    """理论书镜头：本书跟哪些学者对话、各自站在核心争论的哪一极（probe exp033 GO）。
+
+    一次 book-first 长上下文：模型据本书原文自己定核心争论轴 + 抽对话学者，有立场的摆到轴上、
+    逐个挂原文原句过片段核验（绝不整条子串比对，治模型用"……"拼不相邻句的假挂）。抽不出轴 /
+    有立场学者 < 2 → scanned=False，前端不画谱（evidence-first：判不出不硬造）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, _chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    result = scholar_stance_spectrum(
+        full_text=full_text,
+        llm_client=rec,
+        model=model,
+        book_session_id=request.book_session_id,
+    )
+    axis = result.get("axis")
+    return ScholarStanceResponse(
+        axis=ScholarStanceAxis(**axis) if axis else None,
+        scholars=[ScholarStancePosition(**s) for s in result.get("scholars", [])],
+        scanned=bool(result.get("scanned")),
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
     )
 
 
