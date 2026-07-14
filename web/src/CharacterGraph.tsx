@@ -903,10 +903,17 @@ export function CharacterGraph({
       <p className="text-xs text-[var(--color-ink-muted)] mb-2">
         {data.nodes.length} 个{noun}、{data.edges.length} 条关系
         {rendered.hiddenCount > 0 && `（先画戏份最重的 ${rendered.nodes.length} 个）`}
-。每个{noun}是一个点、戏份越重点越大，颜色按阵营分群；连线=关系（敌红、亲绿、一般灰，越粗越亲密）；滚轮缩放、空白处拖动平移、拖节点挪位、点连线看那一章的原文出处（点开现取）。把鼠标停在一个点上，只亮它和跟它相连的一圈；点下面图例某类关系，只看这一类。
+。{unit === "concept"
+          ? "每个概念是一个点、关联越多点越大；连线 = 概念关系（定义 / 包含 / 对立 / 因果，越粗越紧密）。滚轮缩放、空白处拖动平移、拖节点挪位、点连线看原文出处（点开现取）。鼠标停在一个点上，只亮它和跟它相连的一圈。"
+          : "每个人物是一个点、戏份越重点越大，颜色按阵营分群；连线 = 关系（敌红、亲绿、一般灰，越粗越亲密）；滚轮缩放、空白处拖动平移、拖节点挪位、点连线看那一章的原文出处（点开现取）。鼠标停在一个点上，只亮它和跟它相连的一圈；点下面图例某类关系，只看这一类。"}
       </p>
       {/* 图例:关系类型可点筛选(点一类只看这一类,可多选,再点取消);节点统一墨色、大小=戏份那条只作说明不可点。 */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
+        {unit === "concept" ? (
+          // 概念图没有敌友 / 阵营:连线只表概念关系(定义/包含/对立/因果)、粗细表紧密,不套人物那套敌友色。
+          <span>连线 = 概念关系（定义 / 包含 / 对立 / 因果），越粗越紧密 · 点越大 = 关联越多</span>
+        ) : (
+          <>
         {(["foe", "kin", "neutral"] as RelKind[]).map((k) => {
           const on = edgeKinds.has(k);
           const dimmed = edgeKinds.size > 0 && !on; // 开了筛选、又没选中这类 = 淡掉,让选中项更显眼
@@ -950,6 +957,8 @@ export function CharacterGraph({
           </span>
           颜色 = 阵营（自动分群）· 点越大 = 戏份
         </span>
+          </>
+        )}
       </div>
       {rendered.hiddenCount > 0 && (
         <div className="mb-2">
@@ -1018,7 +1027,8 @@ export function CharacterGraph({
           const baseOp = active ? 1 : e.evidence && !e.verified ? 0.4 : 0.6;
           const emphOp = active ? 1 : isNeighborEdge ? 0.92 : baseOp;
           const opacity = filteredOut ? 0.1 : dimByHover ? 0.15 : emphOp;
-          const stroke = EDGE_COLOR[kind];
+          // 概念关系没有敌友,连线统一中性灰(粗细仍表紧密);人物图才按敌友极性上色。
+          const stroke = unit === "concept" ? "#9A948A" : EDGE_COLOR[kind];
           const strokeWidth =
             active || isNeighborEdge ? edgeWidth(e.strength) + 1.5 : edgeWidth(e.strength);
           return (
@@ -1085,7 +1095,7 @@ export function CharacterGraph({
               <circle cx={p.x} cy={p.y} r={Math.max(r + 12, 18)} fill="transparent" />
               {/* 星子本体 + 名字包在一个 <g> 里统一压暗;悬停的星 opacity=1 最醒目。 */}
               <g opacity={nodeOpacity}>
-                <StarNode cx={p.x} cy={p.y} r={isHovered ? r + 1.5 : r} color={factionColor(communities.get(name) ?? 0)} />
+                <StarNode cx={p.x} cy={p.y} r={isHovered ? r + 1.5 : r} color={unit === "concept" ? "#2E6B82" : factionColor(communities.get(name) ?? 0)} />
                 {showLabel && (
                   <text
                     x={p.x}
