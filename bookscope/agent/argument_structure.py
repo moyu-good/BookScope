@@ -18,7 +18,10 @@ from typing import Any
 from bookscope.agent._internal.exhaustive import merge_by_key, run_segments
 from bookscope.agent._internal.llm_cache import invoke_client_cached as _invoke_client
 from bookscope.agent._internal.longctx_system import build_longctx_system
+from bookscope.agent._internal.loop_shared import read_openai_finish_reason
 from bookscope.agent.citation_check import build_evidence_map, verify_citations
+from bookscope.agent.scholar_stance import _norm as _sc_norm
+from bookscope.agent.scholar_stance import _quote_grounded
 from bookscope.agent.utils.json_parsing import (
     extract_first_json_object as _extract_first_json_object,
 )
@@ -291,10 +294,208 @@ def generate_argument_structure_exhaustive(
     return merged
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# 论证骨架树:把平铺 claim 升成 中心论点(thesis) + 论点(逻辑角色 + supports 关系),锚原文。
+# exp034 GO(制内市场真语料:骨架能锚原文、有真层级;角色分化弱,靠 prompt 铁律 5 逼分化)。
+# ─────────────────────────────────────────────────────────────────────────
+
+DEFAULT_ARGUMENT_TREE_MAX_TOKENS = 12000
+"""树输出带每条论点的原文引文,比平铺 claim 长;flash 把 reasoning 算进 max_tokens,4000/8000
+易撞 finish_reason=length 空返,给 12000 打底、length 再加倍重试(同 scholar_stance / exp034)。"""
+
+_TREE_LENGTH_BUMP_CAP = 24000
+_TREE_MAX_ATTEMPTS = 3
+_TREE_MIN_CLAIMS = 2
+_ARGUMENT_ROLES = frozenset({"中心", "前提", "支撑", "递进", "反驳", "论据", "结论"})
+
+_TREE_INSTRUCTION = (
+    "你是严谨的学术论证分析助手。\n"
+    "任务:拆出这本书的**论证骨架**——中心论点 + 主要论点各自的逻辑角色和支撑关系。\n"
+    "铁律(违反即失败):\n"
+    "1. 只据本书原文判,不臆测、不用书外知识。每条论点必须能在原文找到刻画它的**原句**。\n"
+    "2. 先定全书**中心论点**(thesis):作者最核心那句主张,用本书的话概括。\n"
+    "3. 抽主要论点,每个给:role(逻辑角色,只从 中心 / 前提 / 支撑 / 递进 / 反驳 / 论据 / 结论 里选)、"
+    'supports(它直接**撑**或**反**哪一个,填另一条论点的 id,或填 "thesis" 表示直接撑中心论点)、'
+    "quote(本书原文里刻画它的原句,逐字照抄)、brief(一句)。\n"
+    "4. 只连原文里**真有论证关系**的:别硬造层级,也别把所有论点一律挂到 thesis 凑平;"
+    "论点之间有递进 / 支撑 / 反驳的,supports 指向那条论点的 id。\n"
+    "5. 角色尽量分化:别所有论点都填「支撑」——是前提 / 递进 / 反驳 / 论据 / 结论 的就如实标。"
+)
+_TREE_USER = (
+    "严格只输出 JSON(不要别的话、不要 markdown 围栏):\n"
+    '{"thesis":{"claim":"中心论点,用本书话概括","quote":"原文原句","from_book":"依据"},'
+    '"claims":[{"id":"c1","claim":"","role":"支撑","supports":"thesis",'
+    '"quote":"本书原文原句","brief":"一句"}]}\n'
+    "id 用 c1 / c2 / … 好让 supports 互相指。尽量抽全主要论点,理清谁撑谁、谁反谁。"
+)
+
+
+def _parse_tree(text: str) -> dict[str, Any] | None:
+    """解析论证树 JSON:要有 thesis(对象)+ claims(数组),否则 None。"""
+    candidate = _strip_code_fence((text or "").strip())
+    if not candidate:
+        return None
+    sliced = _extract_first_json_object(candidate)
+    if sliced is None:
+        return None
+    try:
+        obj = json.loads(sliced)
+    except json.JSONDecodeError:
+        return None
+    if (
+        isinstance(obj, dict)
+        and isinstance(obj.get("thesis"), dict)
+        and isinstance(obj.get("claims"), list)
+    ):
+        return obj
+    return None
+
+
+def generate_argument_tree(
+    *,
+    full_text: str,
+    chunks: list[dict[str, Any]],
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_ARGUMENT_TREE_MAX_TOKENS,
+    session_id: str | None = None,
+    genre: str | None = None,
+) -> dict[str, Any]:
+    """拆书的论证骨架树:中心论点 + 论点(逻辑角色 + supports 关系),每条锚原文。exp034 GO。
+
+    一次长上下文(book-first、缓存开):模型据原文定 thesis + 抽论点、连 supports。引文先过
+    ``verify_citations`` 拿 verified + 真章号,再用 ``_quote_grounded`` 片段兜底,捞回被整条 /
+    chunk 比对漏报的"……"拼接引文(exp022 / 033 / 034 教训)。题材非论说 / 抽不出 thesis /
+    有效论点 < 2 → graceful 空(判不出不硬造,同平铺版题材门控)。
+
+    Returns:
+        ``{"scanned": bool, "thesis": {claim, quote, quote_verified, chapter, from_book}|None,
+        "claims": [{id, claim, role, supports, quote, quote_verified, chapter, brief}]}``。
+    """
+    _ = session_id
+    graceful: dict[str, Any] = {"scanned": False, "thesis": None, "claims": []}
+    if not is_argument_genre(genre):
+        return graceful
+
+    system = build_longctx_system(full_text, _TREE_INSTRUCTION)
+    messages = [{"role": "user", "content": _TREE_USER}]
+    eff_max_tokens = max_tokens
+    length_bumped = False
+    obj: dict[str, Any] | None = None
+    for attempt in range(1, _TREE_MAX_ATTEMPTS + 1):
+        try:
+            response = _invoke_client(
+                llm_client,
+                model=model,
+                system=system,
+                tools=[],
+                messages=messages,
+                max_tokens=eff_max_tokens,
+                cache_enabled=True,
+            )
+        except Exception as exc:  # noqa: BLE001 — 包死,重试 / 返 graceful
+            logger.warning(
+                "argument_tree LLM call raised %s: %s (attempt %d)",
+                type(exc).__name__, exc, attempt,
+            )
+            continue
+        parsed = _parse_tree(llm_client.extract_final_text(response))
+        if parsed is not None:
+            obj = parsed
+            break
+        fr = read_openai_finish_reason(response)
+        if fr == "length" and not length_bumped:
+            eff_max_tokens = min(eff_max_tokens * 2, _TREE_LENGTH_BUMP_CAP)
+            length_bumped = True
+            logger.info(
+                "argument_tree 撞 finish_reason=length,max_tokens→%d 重试一次", eff_max_tokens
+            )
+            continue
+        logger.warning(
+            "argument_tree 解析不出 JSON(attempt %d/%d, finish_reason=%s)",
+            attempt, _TREE_MAX_ATTEMPTS, fr,
+        )
+        break
+
+    if obj is None:
+        return graceful
+    thesis_raw = obj.get("thesis")
+    if not isinstance(thesis_raw, dict):
+        return graceful
+    thesis_claim = str(thesis_raw.get("claim", "")).strip()
+    if not thesis_claim:
+        return graceful
+
+    raw_claims = obj.get("claims")
+    if not isinstance(raw_claims, list):
+        return graceful
+    claims: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for i, c in enumerate(raw_claims, 1):
+        if not isinstance(c, dict):
+            continue
+        claim = str(c.get("claim", "")).strip()
+        if not claim:
+            continue
+        cid = str(c.get("id", "")).strip() or f"c{i}"
+        if cid in seen_ids:
+            continue
+        seen_ids.add(cid)
+        role = str(c.get("role", "")).strip()
+        claims.append({
+            "id": cid,
+            "claim": claim,
+            "role": role if role in _ARGUMENT_ROLES else "支撑",
+            "supports": str(c.get("supports", "") or "").strip(),
+            "quote": str(c.get("quote", "") or "").strip(),
+            "brief": str(c.get("brief", "") or "").strip(),
+        })
+    if len(claims) < _TREE_MIN_CLAIMS:
+        return graceful
+    # supports 指向不存在的 id → 落 "thesis"(不悬空,同 exp034 尺子③关系不悬空)
+    valid_targets = seen_ids | {"thesis"}
+    for c in claims:
+        if c["supports"] not in valid_targets:
+            c["supports"] = "thesis"
+
+    # 引文核验 + 章号:thesis + 各 claim 一批过 verify_citations(拿 verified + 真章号),
+    # 再用 _quote_grounded 片段兜底捞回"……"拼接引文的漏报(exp022 / 033 / 034)。
+    full_norm = _sc_norm(full_text)
+    evidence_map = build_evidence_map(chunks)
+    quotes = [str(thesis_raw.get("quote", "") or "").strip()] + [c["quote"] for c in claims]
+    cits: list[dict[str, Any]] = [{"snippet": q} for q in quotes]
+    verify_citations(cits, evidence_map)
+
+    def _chapter_of(vc: dict[str, Any]) -> int:
+        cid = vc.get("chunk_id")
+        ch = evidence_map.get(cid, {}).get("chapter") if cid else None
+        return ch if isinstance(ch, int) and ch > 0 else 0
+
+    t_quote = quotes[0]
+    thesis = {
+        "claim": thesis_claim,
+        "quote": t_quote,
+        "quote_verified": bool(cits[0].get("verified"))
+        or (bool(t_quote) and _quote_grounded(t_quote, full_norm)),
+        "chapter": _chapter_of(cits[0]),
+        "from_book": str(thesis_raw.get("from_book", "") or "").strip(),
+    }
+    for c, vc in zip(claims, cits[1:], strict=True):
+        q = c["quote"]
+        c["quote_verified"] = bool(vc.get("verified")) or (
+            bool(q) and _quote_grounded(q, full_norm)
+        )
+        c["chapter"] = _chapter_of(vc)
+
+    return {"scanned": True, "thesis": thesis, "claims": claims}
+
+
 __all__ = [
     "DEFAULT_ARGUMENT_MAX_TOKENS",
+    "DEFAULT_ARGUMENT_TREE_MAX_TOKENS",
     "GENRE_SKIP_REASON",
     "generate_argument_structure",
     "generate_argument_structure_exhaustive",
+    "generate_argument_tree",
     "is_argument_genre",
 ]

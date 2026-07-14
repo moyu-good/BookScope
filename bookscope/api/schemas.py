@@ -1041,6 +1041,67 @@ class ScholarStanceResponse(BaseModel):
     )
 
 
+class ArgumentTreeRequest(BaseModel):
+    """POST /api/agent/argument-tree 请求体（论点结构骨架树，理论书镜头，probe exp034 GO）。
+
+    把论点结构从平铺 claim 清单升成 中心论点 + 论点（逻辑角色 + 支撑关系）的论证树。中心论点
+    与关系由模型据本书原文自己拆（同 scholar-stance），只带 BYOK 部分。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class ArgumentTreeThesis(BaseModel):
+    """全书中心论点（主脉）：作者最核心那句主张 + 原文原句（过核验）。"""
+
+    claim: str = Field(default="", description="中心论点，用本书话概括。")
+    quote: str = Field(default="", description="刻画中心论点的原文原句。")
+    quote_verified: bool = Field(default=False, description="原句核过原书；false=前端标待核。")
+    chapter: int = Field(default=0, description="命中章号；0=没锚上。")
+    from_book: str = Field(default="", description="依据（本书原话）。")
+
+
+class ArgumentTreeClaim(BaseModel):
+    """论证树上一条论点：逻辑角色 + 撑谁（supports）+ 原文原句（过核验）。"""
+
+    id: str = Field(..., description="论点 id（c1/c2/…），供 supports 互指。")
+    claim: str = Field(..., description="论点，用本书话概括。")
+    role: str = Field(
+        default="支撑", description="逻辑角色：中心/前提/支撑/递进/反驳/论据/结论。"
+    )
+    supports: str = Field(
+        default="thesis", description="它撑/反哪条：另一论点 id 或 thesis（直接撑中心论点）。"
+    )
+    quote: str = Field(default="", description="刻画它的原文原句。")
+    quote_verified: bool = Field(default=False, description="原句核过原书；false=前端标待核。")
+    chapter: int = Field(default=0, description="命中章号；0=没锚上。")
+    brief: str = Field(default="", description="一句话说明。")
+
+
+class ArgumentTreeResponse(BaseModel):
+    """POST /api/agent/argument-tree 响应体（论证骨架树）。
+
+    ``scanned=False`` = 非论说题材 / 抽不出中心论点 / 有效论点不足 2 条，前端不画树、不硬造
+    （evidence-first，同平铺 argument-structure 的题材门控精神）。
+    """
+
+    thesis: ArgumentTreeThesis | None = Field(
+        default=None, description="中心论点；判不出为 None。"
+    )
+    claims: list[ArgumentTreeClaim] = Field(
+        default_factory=list, description="论证树的论点（带逻辑角色 + supports 关系）。"
+    )
+    scanned: bool = Field(default=False, description="是否成功成树；false=判不出/失败。")
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+    trace: dict = Field(default_factory=dict, description="运行用量 trace。")
+
+
 class RelationshipTimelineRequest(BaseModel):
     """POST /api/agent/relationship-timeline 请求体（关系随时间演变，WP-relationship-over-time）。
 

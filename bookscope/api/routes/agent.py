@@ -58,7 +58,10 @@ from bookscope.agent._internal.doc_spine_cache import (
 )
 from bookscope.agent._internal.empty_semantics import is_confirmed_empty
 from bookscope.agent.annotations import generate_annotations
-from bookscope.agent.argument_structure import generate_argument_structure_exhaustive
+from bookscope.agent.argument_structure import (
+    generate_argument_structure_exhaustive,
+    generate_argument_tree,
+)
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.chapter_spine_canon import build_spine_name_map
 from bookscope.agent.chapter_spine_concept import concept_evolution_from_spine
@@ -156,6 +159,10 @@ from bookscope.api.schemas import (
     AnnotationsResponse,
     ArgumentStructureRequest,
     ArgumentStructureResponse,
+    ArgumentTreeClaim,
+    ArgumentTreeRequest,
+    ArgumentTreeResponse,
+    ArgumentTreeThesis,
     BatchStancePosition,
     BatchStanceRequest,
     BatchStanceResponse,
@@ -2295,6 +2302,67 @@ def agent_argument_structure(
     return ArgumentStructureResponse(
         claims=claims or [],
         scanned=claims is not None,
+        book_session_id=request.book_session_id,
+        trace=_run_trace(rec, full_text, _t0),
+    )
+
+
+@agent_router.post("/agent/argument-tree", response_model=ArgumentTreeResponse)
+def agent_argument_tree(
+    request: ArgumentTreeRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> ArgumentTreeResponse:
+    """论点结构骨架树：中心论点 + 论点（逻辑角色 + 支撑关系），每条锚原文（probe exp034 GO）。
+
+    一次 book-first 长上下文让模型据原文定中心论点 + 抽论点、连 supports 关系；引文过
+    verify_citations 拿章号、_quote_grounded 片段兜底。非论说题材 / 抽不出中心论点 /
+    有效论点 < 2 → scanned=False，前端不画树（evidence-first：判不出不硬造）。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    full_text, chunks = _long_context_inputs(assembler)
+    rec = _UsageRecorder(client)
+    _t0 = time.monotonic()
+    # 题材门控同平铺版：先检测题材，压到 theory/fiction 轴；非论说在函数内 graceful 退。
+    genre = store.ensure_genre(request.book_session_id, llm_client=rec, model=model)
+    result = generate_argument_tree(
+        full_text=full_text,
+        chunks=chunks,
+        llm_client=rec,
+        model=model,
+        session_id=request.book_session_id,
+        genre=genre_to_argument_axis(genre or None),
+    )
+    thesis = result.get("thesis")
+    return ArgumentTreeResponse(
+        thesis=ArgumentTreeThesis(**thesis) if thesis else None,
+        claims=[ArgumentTreeClaim(**c) for c in result.get("claims", [])],
+        scanned=bool(result.get("scanned")),
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
