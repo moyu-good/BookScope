@@ -466,6 +466,34 @@ class GenreDetectResponse(BaseModel):
     book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
 
 
+class BookModeRequest(BaseModel):
+    """POST /api/agent/detect-mode 请求体（选书时判一次叙事型 / 论述型）。
+
+    比题材细一维、按内容判（exp035）：分开叙事型历史（明朝→人物镜头）和论述型历史
+    （安史 / 经济制裁→思想镜头），前端据此只上对应一套镜头、不再两套重叠。清晰题材直接映射、
+    只含糊的（历史 / 传记）才真调 LLM。重复调命中缓存。BYOK。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(default="deepseek")
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class BookModeResponse(BaseModel):
+    """POST /api/agent/detect-mode 响应体。"""
+
+    mode: str = Field(
+        default="",
+        description=(
+            "narrative（叙事型：人物 / 情节推进）或 discursive（论述型：论点 / 概念推进）；"
+            "判不出退空串（前端按未判、维持题材默认）。"
+        ),
+    )
+    book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
+
+
 class PacingCurveRequest(BaseModel):
     """POST /api/agent/pacing-curve 请求体（节奏曲线可视化，exp-012 GO）。
 

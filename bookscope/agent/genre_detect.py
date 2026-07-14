@@ -232,12 +232,112 @@ def detect_genre(
     return FALLBACK_GENRE
 
 
+# ---------------------------------------------------------------------------
+# 叙事型 vs 论述型（book mode）——比题材(genre)更细一维，决定书上哪套镜头(exp035 GO)。
+#
+# 病根:"历史"标签太粗——明朝那些事儿(讲故事→该走人物镜头)和安史之乱 / 经济制裁(做分析→该走
+# 概念·学者镜头)都是"历史",按 genre 死映射分不开,导致人物镜头和思想镜头在同一本书上重叠。
+# 这一维**按内容判**(书名 + 开头),把书分成:
+#   · narrative(叙事型):人物 / 情节 / 事件推进 → 上人物 + 情节镜头
+#   · discursive(论述型):论点 / 概念 / 分析推进 → 上思想镜头(论点结构 / 概念图 / 学者立场谱)
+# exp035 实测:对预期 8/8、复跑全稳、历史书正确分流(明朝叙事 vs 安史论述)。
+# ---------------------------------------------------------------------------
+
+BOOK_MODES: frozenset[str] = frozenset({"narrative", "discursive"})
+"""book mode 封闭集。"""
+
+# 题材直接能定 mode 的:小说类必叙事、纯论说 / 工具 / 诗必论述——这些不必再调 LLM,
+# 直接映射(省一次调用)。只有含糊的(历史 / 传记 / 其他)才真去 detect_book_mode。
+_GENRE_TO_MODE: dict[str, str] = {
+    "小说": "narrative",
+    "理论": "discursive",
+    "论文": "discursive",
+    "诗歌": "discursive",
+    "工具书": "discursive",
+}
+_MODE_AMBIGUOUS_GENRES: frozenset[str] = frozenset({"历史", "传记", "其他", ""})
+"""这些题材光看 genre 定不了叙事 / 论述,要按内容判。"""
+
+_BOOK_MODE_SYSTEM = (
+    "你是书籍类型判定助手。判断一本书是【叙事型】还是【论述型】:\n"
+    "· 叙事型:以人物、情节、事件推进为主(小说、纪实故事、叙事体历史)。\n"
+    "· 论述型:以论点、概念、分析、论证推进为主(理论、论文、分析性 / 研究性历史、思想类)。\n"
+    "只据给的书名 + 开头判。注意:历史书两类都有——讲故事的叙事型 vs 做分析的论述型,别一律归一类。\n"
+    '严格输出 JSON:{"label":"叙事" 或 "论述"}(只回这个,别的都不要)。'
+)
+
+
+def mode_from_genre(genre: str | None) -> str | None:
+    """题材能直接定 mode 就返(narrative/discursive);含糊(历史 / 传记 / 其他)返 None(要按内容判)。"""
+    if not genre:
+        return None
+    return _GENRE_TO_MODE.get(genre)
+
+
+def _parse_book_mode(text: str | None) -> str:
+    """从模型回复抠 叙事 / 论述 → narrative / discursive;抠不到退空串。"""
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+    if "叙事" in raw:
+        return "narrative"
+    if "论述" in raw:
+        return "discursive"
+    return ""
+
+
+def detect_book_mode(
+    *,
+    title: str,
+    toc_titles: list[str] | None = None,
+    sample_text: str,
+    llm_client: Any,
+    model: str,
+    max_tokens: int = DEFAULT_GENRE_MAX_TOKENS,
+) -> str:
+    """一次轻 LLM 调用判书是 ``narrative`` 还是 ``discursive``(exp035 GO)。
+
+    输入同题材检测(书名 + 目录 + 开头,内部截断),不用长上下文。保守:失败 / 解析不出一律
+    退空串(永不抛错——这维是锦上添花,挂了不该让上层崩)。LLM 缓存开,重复调命中不重花。
+
+    Returns:
+        ``"narrative"`` | ``"discursive"``;拿不到退 ``""``。
+    """
+    user_msg = _build_user_message(
+        title=title, toc_titles=toc_titles or [], sample_text=sample_text
+    )
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            response = _invoke_client(
+                llm_client,
+                model=model,
+                system=_BOOK_MODE_SYSTEM,
+                tools=[],
+                messages=[{"role": "user", "content": user_msg}],
+                max_tokens=max_tokens,
+                cache_enabled=True,
+            )
+        except Exception as exc:  # noqa: BLE001 — 判不出退空串,不抛
+            logger.warning(
+                "book_mode LLM call raised %s: %s (attempt %d/%d)",
+                type(exc).__name__, exc, attempt, _MAX_ATTEMPTS,
+            )
+            continue
+        mode = _parse_book_mode(llm_client.extract_final_text(response))
+        if mode:
+            return mode
+    return ""
+
+
 __all__ = [
+    "BOOK_MODES",
     "DEFAULT_GENRE_MAX_TOKENS",
     "FALLBACK_GENRE",
     "GENRES",
+    "detect_book_mode",
     "detect_genre",
     "genre_to_argument_axis",
     "is_narrative_genre",
     "is_theory_genre",
+    "mode_from_genre",
 ]

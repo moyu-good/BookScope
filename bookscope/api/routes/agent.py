@@ -166,6 +166,8 @@ from bookscope.api.schemas import (
     BatchStancePosition,
     BatchStanceRequest,
     BatchStanceResponse,
+    BookModeRequest,
+    BookModeResponse,
     ChapterAskRequest,
     ChapterAskResponse,
     CharacterArcRequest,
@@ -2414,6 +2416,50 @@ def agent_detect_genre(
     return GenreDetectResponse(
         genre=genre, book_session_id=request.book_session_id
     )
+
+
+@agent_router.post("/agent/detect-mode", response_model=BookModeResponse)
+def agent_detect_book_mode(
+    request: BookModeRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> BookModeResponse:
+    """选书时判一次叙事型 / 论述型（懒判 + 缓存），前端据此只上对应一套镜头。
+
+    比题材细一维、按内容判（exp035 GO）——分开叙事型历史（明朝→人物镜头）和论述型历史
+    （安史 / 经济制裁→思想镜头），治人物镜头与思想镜头在同一本书上重叠。清晰题材（小说 / 理论 等）
+    直接映射不调 LLM，只含糊的（历史 / 传记）才真跑一次轻分类。判不出退空串（前端维持题材默认）。
+    """
+    _resolve_assembler(store, request.book_session_id)  # 不存在 → 404
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": request.provider},
+            },
+        ) from exc
+
+    model = request.model or default_model_for(request.provider)
+    mode = store.ensure_book_mode(
+        request.book_session_id, llm_client=client, model=model
+    )
+    return BookModeResponse(mode=mode, book_session_id=request.book_session_id)
 
 
 @agent_router.post("/agent/style-issues", response_model=StyleIssuesResponse)

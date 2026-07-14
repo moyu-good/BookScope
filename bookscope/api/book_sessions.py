@@ -318,6 +318,60 @@ class BookSessionStore:
         assembler._genre_cache = genre  # noqa: SLF001
         return genre
 
+    def ensure_book_mode(
+        self,
+        session_id: str,
+        *,
+        llm_client: Any,
+        model: str,
+    ) -> str:
+        """返回 session 的 book mode（``narrative`` / ``discursive``）；没判过就懒判一次、内存缓存。
+
+        比题材细一维、按内容判（exp035 GO），决定书上哪套镜头（叙事型→人物 + 情节；论述型→思想）。
+        题材能直接定 mode 的（小说→叙事、理论 / 论文 / 工具书 / 诗歌→论述）直接映射、不调 LLM；只有
+        含糊的（历史 / 传记 / 其他）才真跑 :func:`detect_book_mode`——这正是分开叙事型历史（明朝）和
+        论述型历史（安史 / 经济制裁）的关键。只内存缓存（不落 storage：这维不进书库标签，且
+        detect_book_mode 自带 LLM 缓存，重复调便宜）。失败退空串（前端按"未判"处理，向后兼容）。
+        """
+        from bookscope.agent.genre_detect import detect_book_mode, mode_from_genre
+
+        try:
+            assembler = self.get(session_id)
+        except BookSessionNotFound:
+            return ""
+
+        cached = getattr(assembler, "_book_mode_cache", None)
+        if isinstance(cached, str) and cached:
+            return cached
+
+        # 题材能直接定 mode 就不调 LLM（复用已缓存 / 懒检测的 genre）。
+        genre = self.ensure_genre(session_id, llm_client=llm_client, model=model)
+        derived = mode_from_genre(genre or None)
+        if derived:
+            assembler._book_mode_cache = derived  # noqa: SLF001
+            return derived
+
+        # 含糊题材（历史 / 传记 / 其他）→ 按内容判一次。
+        try:
+            book_text = assembler._book_text  # noqa: SLF001
+            title = str(getattr(book_text, "title", ""))
+            records = assembler._compute_chapter_records()  # noqa: SLF001
+            toc_titles = [r.title for r in records if r.title]
+            sample_text = records[0].full_text if records else book_text.raw_text
+            mode = detect_book_mode(
+                title=title,
+                toc_titles=toc_titles,
+                sample_text=sample_text or "",
+                llm_client=llm_client,
+                model=model,
+            )
+        except Exception as exc:  # noqa: BLE001 — 判不出退空串，不阻塞
+            logger.warning("book_mode detect failed for %s: %s", session_id, exc)
+            return ""
+
+        assembler._book_mode_cache = mode  # noqa: SLF001
+        return mode
+
     def clear(self) -> None:
         """只清空内存 cache（不清 storage）。单测 / 应用关闭时使用。
 
