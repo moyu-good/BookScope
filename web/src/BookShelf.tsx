@@ -33,6 +33,8 @@ export interface SessionMetadata {
   last_accessed_at: string;
   /** 题材（#10/#14）：封闭集里的题材词，空串=未分类。左栏 nav 据此按题材显隐。 */
   genre?: string;
+  /** 叙事型 narrative / 论述型 discursive(exp035,按内容判);决定书上哪套镜头。空 = 未判。 */
+  mode?: string;
 }
 
 export interface BookShelfProps {

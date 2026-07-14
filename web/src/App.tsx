@@ -1242,6 +1242,46 @@ export function App() {
     };
   }, [currentSession, apiKey, provider, model, baseUrl]);
 
+  // 选书后判一次"叙事型 / 论述型"(exp035),左栏据此只上对应一套镜头(叙事=人物+情节、论述=思想),
+  // 根治俩关系图俩立场重叠。等 genre 先有值(公文 / 会议走自己的垂直组、不判 mode)。已判过不重判;
+  // 判不出维持题材默认(genreVisibleGroups 里 mode 为空会退回按题材桶)。
+  useEffect(() => {
+    if (!currentSession || !apiKey) return;
+    if (currentSession.mode) return; // 已判 → 不重判
+    const genre = currentSession.genre ?? "";
+    if (!genre) return; // 等题材先出;currentSession.genre 更新会让本 effect 重跑
+    if (/公文|红头|会议|纪要/.test(genre)) return; // 垂直题材不需要 mode
+    const sessionId = currentSession.session_id;
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetch("/api/agent/detect-mode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_id: sessionId,
+            provider,
+            api_key: apiKey,
+            model: model.trim() || undefined,
+            base_url: provider === "anthropic" ? undefined : baseUrl.trim() || undefined,
+          }),
+        });
+        if (!resp.ok || cancelled) return;
+        const data = (await resp.json()) as { mode?: string };
+        const m = (data.mode ?? "").trim();
+        if (!m || cancelled) return;
+        setCurrentSession((prev) =>
+          prev && prev.session_id === sessionId ? { ...prev, mode: m } : prev,
+        );
+      } catch {
+        /* 判不出就维持题材默认,不打断 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSession, apiKey, provider, model, baseUrl]);
+
   // 书柜刷新触发器：上传成功后 + 删除成功后递增
   const [shelfRefresh, setShelfRefresh] = useState(0);
   // 上传成功后让书柜自动选中新书
@@ -1805,6 +1845,7 @@ export function App() {
         // genre hook：#14 选书时主动测一次题材填进 currentSession.genre，nav 据此显隐；
         // 没测出（空串/undefined）→ 全显（genreHighlightGroups 返 null）。
         genre={currentSession?.genre}
+        bookMode={currentSession?.mode}
         open={sidebarOpen}
         onOpenSettings={() => {
           setSettingsOpen(true);
@@ -2063,7 +2104,7 @@ export function App() {
                 {currentSession &&
                   (() => {
                     // 概览列的套餐 = 左栏可见组(按题材过滤,跟左栏一致),去掉"概览"自身。
-                    const vis = genreVisibleGroups(currentSession.genre);
+                    const vis = genreVisibleGroups(currentSession.genre, currentSession.mode);
                     const gs = NAV_GROUPS.filter((g) => !vis || vis.has(g.key))
                       .map((g) => ({
                         key: g.key,
@@ -2832,68 +2873,59 @@ const NAV_GROUPS: NavGroup[] = [
 // 命中的组高亮 + 默认展开;没命中的组不藏、只是默认折叠(用户仍可手动展开)。
 // **没有 genre 就返回 null = 全部组一视同仁、全显全展开**(向后兼容,现在没 genre 不能崩)。
 // 真正的题材分类数据由 #10 提供,这里只留"读 genre → 决定每组是否突出"的接线点。
-function genreHighlightGroups(genre: string | undefined | null): Set<string> | null {
-  if (!genre) return null;
-  const g = genre.toLowerCase();
-  // 题材关键词 → 该题材突出的组 key。未列到的题材落到 null（全显）。
-  if (/(小说|novel|fiction|网文|历史|架空|玄幻)/.test(g)) {
-    return new Set(["read", "character", "plot", "quality"]);
-  }
-  if (/(理论|论文|paper|哲学|philosophy|工具书|nonfiction|学术)/.test(g)) {
-    return new Set(["read", "thought", "quality"]);
-  }
-  if (/(诗|poem|poetry|散文)/.test(g)) {
-    return new Set(["read", "thought"]);
-  }
-  // 公文:只亮问&读 + 三个公文组,人物/情节/思想/质量这些"书"的维度收起。
-  if (/(公文|红头)/.test(g)) {
-    return new Set(["read", "redhead_read", "redhead_cross"]);
-  }
-  // 会议(1.7):只亮问&读 + 会议组,书 / 公文的维度收起。
-  if (/(会议|纪要|meeting)/.test(g)) {
-    return new Set(["read", "meeting"]);
-  }
-  // 认不出的题材:不强行偏向任何组,全显（等同没 genre）。
+// 书类题材(小说 / 历史 / 理论 / 论文 / 诗 / 工具书…);公文 / 会议是垂直、不走这套。
+const _BOOK_GENRE_RE =
+  /(小说|novel|fiction|网文|架空|玄幻|历史|传记|history|biograph|理论|论文|paper|哲学|philosophy|社科|工具书|nonfiction|学术|诗|poem|poetry|散文)/;
+
+// 叙事/论述 mode(exp035,按内容判)→ 书的镜头套餐。mode 优先:叙事只上人物 + 情节、论述只上思想,
+// 于是俩关系图(人物 / 概念)俩立场(立场格局 / 学者立场谱)不再在同一本书上撞。mode 没判出返 null,
+// 调用方退回按题材的默认桶(检测中 / 失败兜底,不至于门空)。
+function bookGroupsByMode(mode: string | undefined | null): Set<string> | null {
+  if (mode === "discursive") return new Set(["read", "thought", "quality"]);
+  if (mode === "narrative") return new Set(["read", "character", "plot", "quality"]);
   return null;
 }
 
-// 题材 → 哪几组可见（跨垂直硬隐藏，#18 左栏太多/区分难）。与 genreHighlightGroups（管展开/突出）
-// 分工:这个管"显不显"——公文藏掉书的组、书藏掉公文的组,直接砍掉跨垂直无关功能,左栏不再堆 8 组。
-// **没 genre / 认不出 → 返 null = 全显**(兜底:题材没测出不能把功能藏没)。
-function genreVisibleGroups(genre: string | undefined | null): Set<string> | null {
-  if (!genre) return null;
-  const g = genre.toLowerCase();
-  // 会议(1.7)已进 genre_detect:genre=会议 时只留「问 & 读」+ 会议组,书 / 公文的组全藏。
-  if (/(会议|纪要|meeting)/.test(g)) {
-    return new Set(["read", "meeting"]);
-  }
-  // 会议组只在 genre=会议 时显示。书 / 公文不再混入会议功能(作者 2026-06-30 实测嫌冲突,
-  // 把"meeting 当手动入口"的旧 fallback 去掉);会议没测准的极端情况靠重传 / 后续 genre 改写解。
-  // 公文:只留「问 & 读」+ 三个公文组,书的人物/情节/思想/质量全藏。
-  if (/(公文|红头)/.test(g)) {
-    return new Set([
-      "read",
-      "redhead_read",
-      "redhead_cross",
-    ]);
-  }
-  // 题材套餐(作者定"题材定套餐"):三桶,一本书显哪几组一表定死,不再事后打补丁。
-  // 概念关系图只在「思想·理论」出(关系图锁 person、删了选择卡),所以不会跟人物组重复。
-  // 虚构叙事(小说/网文/架空/玄幻):有人物 + 情节,不做论证 → 不显思想组。
+// mode 没判出时的按题材默认(跟旧三桶一致):虚构叙事 / 纪实叙事 / 论述。检测中或失败的兜底。
+function _bookGroupsFallbackByGenre(g: string): Set<string> {
   if (/(小说|novel|fiction|网文|架空|玄幻)/.test(g)) {
     return new Set(["read", "character", "plot", "quality"]);
   }
-  // 纪实叙事(历史/传记):有人物 + 事件,又常有论证 / 概念 → 人物 + 情节 + 思想 + 质量。
   if (/(历史|传记|history|biograph)/.test(g)) {
     return new Set(["read", "character", "plot", "thought", "quality"]);
   }
-  // 论述(理论/论文/哲学/社科/工具书/诗/散文):无叙事人物 / 情节 → 只读 + 思想 + 质量。
-  if (
-    /(理论|论文|paper|哲学|philosophy|社科|工具书|nonfiction|学术|诗|poem|poetry|散文)/.test(g)
-  ) {
-    return new Set(["read", "thought", "quality"]);
+  return new Set(["read", "thought", "quality"]);
+}
+
+// 题材(+ 叙事/论述 mode)→ 高亮(默认展开 + 描朱)哪几组。书类:高亮 = 可见,显了就亮(修
+// "历史书思想组显了却灰着"的自相矛盾)。没 genre / 认不出 → null(全显全展开,向后兼容)。
+function genreHighlightGroups(
+  genre: string | undefined | null,
+  mode?: string | null,
+): Set<string> | null {
+  if (!genre) return null;
+  const g = genre.toLowerCase();
+  if (/(公文|红头)/.test(g)) return new Set(["read", "redhead_read", "redhead_cross"]);
+  if (/(会议|纪要|meeting)/.test(g)) return new Set(["read", "meeting"]);
+  if (_BOOK_GENRE_RE.test(g)) {
+    return bookGroupsByMode(mode) ?? _bookGroupsFallbackByGenre(g);
   }
-  // 其他 / 认不出:全显(兜底)。
+  return null;
+}
+
+// 题材(+ 叙事/论述 mode)→ 哪几组可见(跨垂直硬隐藏,#18)。公文 / 会议按题材走垂直组;书类按 mode
+// 只上对应一套(叙事=人物+情节+质量、论述=思想+质量),mode 没判出退回按题材默认。没 genre → 全显。
+function genreVisibleGroups(
+  genre: string | undefined | null,
+  mode?: string | null,
+): Set<string> | null {
+  if (!genre) return null;
+  const g = genre.toLowerCase();
+  if (/(会议|纪要|meeting)/.test(g)) return new Set(["read", "meeting"]);
+  if (/(公文|红头)/.test(g)) return new Set(["read", "redhead_read", "redhead_cross"]);
+  if (_BOOK_GENRE_RE.test(g)) {
+    return bookGroupsByMode(mode) ?? _bookGroupsFallbackByGenre(g);
+  }
   return null;
 }
 
@@ -3254,6 +3286,9 @@ function Sidebar(props: {
   hasBook: boolean;
   /** #10 给 session 带上的题材；有值就按题材高亮可用组、没值全显（向后兼容） */
   genre?: string | null;
+  /** 叙事/论述 book mode(exp035):书类据它只上对应一套镜头;空 = 退回按题材默认。
+      注意跟上面的 mode(当前视图 Mode)不是一回事,故叫 bookMode。 */
+  bookMode?: string | null;
   open: boolean;
   onOpenSettings: () => void;
   /** 常驻「读」门：选中书直接进沉浸阅读器（不必回书库）。 */
@@ -3272,6 +3307,7 @@ function Sidebar(props: {
     currentBook,
     hasBook,
     genre,
+    bookMode,
     open,
     onOpenSettings,
     onRead,
@@ -3282,9 +3318,9 @@ function Sidebar(props: {
   } = props;
 
   // 题材 → 突出哪几组。null = 不偏向任何组（没 genre / 认不出的题材都走这条，全显）。
-  const highlighted = genreHighlightGroups(genre);
-  // 题材 → 哪几组可见（跨垂直硬隐藏，#18）:公文藏书组、书藏公文组;null=全显(题材没测出兜底)。
-  const visible = genreVisibleGroups(genre);
+  const highlighted = genreHighlightGroups(genre, bookMode);
+  // 题材(+ bookMode)→ 哪几组可见:公文/会议走垂直组、书类按叙事/论述上对应一套;null=全显(没测出兜底)。
+  const visible = genreVisibleGroups(genre, bookMode);
 
   // 折叠状态：记每组是否收起。默认——有 genre 时不突出的组默认收起；其余全展开。
   // 用户手动点过的组用这个 Map 覆盖默认，换书（genre 变）时重置回默认。
