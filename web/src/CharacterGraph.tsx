@@ -856,14 +856,18 @@ export function CharacterGraph({
           >
             {loading ? "抽取中…" : "重新生成"}
           </button>
-          <button
-            type="button"
-            onClick={() => load(otherUnit)}
-            disabled={loading}
-            className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
-          >
-            换成{otherTitle}
-          </button>
+          {/* 锁定单位（defaultUnit，如从「概念关系图」入口进来）时不给"换成X"——一个入口只干一件事，
+              人物 / 概念不再互相切,消掉跨题材选择带来的重复入口。 */}
+          {!defaultUnit && (
+            <button
+              type="button"
+              onClick={() => load(otherUnit)}
+              disabled={loading}
+              className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] bg-white hover:border-[var(--color-seal)] disabled:opacity-50 transition-colors"
+            >
+              换成{otherTitle}
+            </button>
+          )}
           {/* 缩放 / 平移控制:滚轮也能缩、空白处拖能平移,这几个按钮给不爱滚轮的人。 */}
           <button
             type="button"

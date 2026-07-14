@@ -155,6 +155,7 @@ export function CharacterPanorama({
         {/* 点人时：总线广播由组件内部做（下面关系演变段自动聚焦），本镜头顺手滚过去。 */}
         <CharacterGraph
           {...shared}
+          defaultUnit="person"
           onSelectPerson={() => scrollTo("reltime")}
         />
       </PanoramaSection>

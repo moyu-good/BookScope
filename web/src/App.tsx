@@ -2849,16 +2849,21 @@ function genreVisibleGroups(genre: string | undefined | null): Set<string> | nul
       "redhead_cross",
     ]);
   }
-  // 叙事类(小说/历史/网文/传记...):有人物,留「人物」组 + 情节 + 思想 + 质量。
-  if (/(小说|novel|fiction|网文|历史|传记|架空|玄幻)/.test(g)) {
+  // 题材套餐(作者定"题材定套餐"):三桶,一本书显哪几组一表定死,不再事后打补丁。
+  // 概念关系图只在「思想·理论」出(关系图锁 person、删了选择卡),所以不会跟人物组重复。
+  // 虚构叙事(小说/网文/架空/玄幻):有人物 + 情节,不做论证 → 不显思想组。
+  if (/(小说|novel|fiction|网文|架空|玄幻)/.test(g)) {
+    return new Set(["read", "character", "plot", "quality"]);
+  }
+  // 纪实叙事(历史/传记):有人物 + 事件,又常有论证 / 概念 → 人物 + 情节 + 思想 + 质量。
+  if (/(历史|传记|history|biograph)/.test(g)) {
     return new Set(["read", "character", "plot", "thought", "quality"]);
   }
-  // 论述类(理论/论文/哲学/社科/工具书/诗...):没有叙事人物,砍掉「人物」组(概念关系图已挪进
-  // 「思想·理论」、立场格局是叙事镜头不适配)。留 读 + 情节 + 思想 + 质量。
+  // 论述(理论/论文/哲学/社科/工具书/诗/散文):无叙事人物 / 情节 → 只读 + 思想 + 质量。
   if (
     /(理论|论文|paper|哲学|philosophy|社科|工具书|nonfiction|学术|诗|poem|poetry|散文)/.test(g)
   ) {
-    return new Set(["read", "plot", "thought", "quality"]);
+    return new Set(["read", "thought", "quality"]);
   }
   // 其他 / 认不出:全显(兜底)。
   return null;
