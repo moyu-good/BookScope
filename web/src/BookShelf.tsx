@@ -373,7 +373,20 @@ function BookRow(props: {
 
       {/* 行主体：书名一行 + 找书线索一行，右侧贴行内动作 */}
       <div className="flex flex-1 items-center gap-3 min-w-0 pl-3 pr-3 py-2.5">
-        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+        {/* 书名 / 线索区整块可点 = 进分析台(修"点书没反应";「读」「删除」按钮是兄弟节点,不受影响) */}
+        <div
+          className="flex flex-col gap-0.5 min-w-0 flex-1 cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={onSelect}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect();
+            }
+          }}
+          title={`进分析台分析《${session.book_title}》`}
+        >
           {/* 书名（宋体）+ ×N 份 */}
           <div className="flex items-baseline gap-2 min-w-0">
             <span

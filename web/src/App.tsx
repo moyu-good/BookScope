@@ -58,6 +58,7 @@ import { RedheadDocPanorama } from "./RedheadDocPanorama";
 import { RedheadDossierPanorama } from "./RedheadDossierPanorama";
 import { CharacterPanorama } from "./CharacterPanorama";
 import { PersonDossierPanel } from "./PersonDossierPanel";
+import { Overview } from "./Overview";
 import { ScholarStancePanel } from "./ScholarStancePanel";
 import { NarrativePanorama } from "./NarrativePanorama";
 import { QualityPanorama } from "./QualityPanorama";
@@ -862,6 +863,7 @@ export function App() {
   // app-shell 当前主画布显示哪一件事（左栏导航切换）
   const [mode, setMode] = useState<
     | "library"
+    | "overview"
     | "ask"
     | "annotate"
     | "graph"
@@ -1396,7 +1398,8 @@ export function App() {
 
   // 书柜回调：点 tab 切书 → 清空当前问答区
   const handleSelectShelfBook = useCallback((s: SessionMetadata) => {
-    setMode("ask");
+    // 进门先落概览页(作者定"先看一张概览"),不再直接甩进问书。
+    setMode("overview");
     setCurrentSession((prev) => {
       if (prev?.session_id === s.session_id) return prev;
       // 切到不同的书 → 清掉问答区
@@ -2056,6 +2059,29 @@ export function App() {
 
               {/* 集合整合:人物那组(关系图/关系演变/人物弧线/声口)合成一个镜头;
                   下面 graph/reltime/chararc/charvoice 的 mode-div 暂留、可逆,导航已收成一个「人物」入口。 */}
+              <div className={mode === "overview" ? "" : "hidden"}>
+                {currentSession &&
+                  (() => {
+                    // 概览列的套餐 = 左栏可见组(按题材过滤,跟左栏一致),去掉"概览"自身。
+                    const vis = genreVisibleGroups(currentSession.genre);
+                    const gs = NAV_GROUPS.filter((g) => !vis || vis.has(g.key))
+                      .map((g) => ({
+                        key: g.key,
+                        title: g.title,
+                        modes: g.modes.filter((m) => m.id !== "overview"),
+                      }))
+                      .filter((g) => g.modes.length > 0);
+                    return (
+                      <Overview
+                        bookTitle={currentSession.book_title}
+                        genre={currentSession.genre}
+                        groups={gs}
+                        onPick={(id) => setMode(id as typeof mode)}
+                      />
+                    );
+                  })()}
+              </div>
+
               <div className={mode === "char_panorama" ? "" : "hidden"}>
                 <CanvasHeader
                   title="人物"
@@ -2648,6 +2674,7 @@ export function App() {
 
 type Mode =
   | "library"
+  | "overview"
   | "ask"
   | "annotate"
   | "graph"
@@ -2721,6 +2748,7 @@ const NAV_GROUPS: NavGroup[] = [
     key: "read",
     title: "问 & 读",
     modes: [
+      { id: "overview", label: "概览" },
       { id: "ask", label: "问书" },
       { id: "annotate", label: "精读" },
       { id: "recap", label: "前情回顾" },
