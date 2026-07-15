@@ -2350,15 +2350,25 @@ def agent_argument_tree(
     full_text, chunks = _long_context_inputs(assembler)
     rec = _UsageRecorder(client)
     _t0 = time.monotonic()
-    # 题材门控同平铺版：先检测题材，压到 theory/fiction 轴；非论说在函数内 graceful 退。
+    # 门控改按 book mode(叙事 / 论述,exp035):论述型就跑论点结构——哪怕题材是"历史",论述型历史
+    # (如经济制裁)一样有论证骨架。避免"nav 按 mode 显了论点结构、后端却按 genre 轴判历史=叙事直接
+    # 退"的自相矛盾。mode 判不出(空)退回按 genre 的老轴(向后兼容)。
     genre = store.ensure_genre(request.book_session_id, llm_client=rec, model=model)
+    mode = store.ensure_book_mode(request.book_session_id, llm_client=rec, model=model)
+    axis = (
+        "theory"
+        if mode == "discursive"
+        else "fiction"
+        if mode == "narrative"
+        else genre_to_argument_axis(genre or None)
+    )
     result = generate_argument_tree(
         full_text=full_text,
         chunks=chunks,
         llm_client=rec,
         model=model,
         session_id=request.book_session_id,
-        genre=genre_to_argument_axis(genre or None),
+        genre=axis,
     )
     thesis = result.get("thesis")
     return ArgumentTreeResponse(
