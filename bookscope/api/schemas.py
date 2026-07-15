@@ -1039,6 +1039,10 @@ class ScholarStancePosition(BaseModel):
         default=False,
         description="原句按片段核过原书（evidence-first）；false=没锚上，前端标待核。",
     )
+    mentions: int = Field(
+        default=0,
+        description="被本书提及次数（名 / 姓取大者）；十字轴横轴＝被讨论分量（核心↔边缘），可数。",
+    )
     brief: str = Field(default="", description="一句话说明。")
 
 

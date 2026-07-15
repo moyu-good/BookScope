@@ -126,6 +126,19 @@ def _clean_position(position: Any) -> int:
         return 0
 
 
+def _mentions(name: str, full_text: str) -> int:
+    """数这个学者在书里被提多少次(全名或姓,取较大者)——当十字轴横轴"被讨论的分量"。
+    可数、grounded、不靠 LLM 猜(同人物象限横轴=戏份的道理)。外文名取 · 末段当姓。"""
+    n = (name or "").strip()
+    if not n:
+        return 0
+    counts = [full_text.count(n)]
+    surname = n.split("·")[-1]
+    if surname and surname != n and len(surname) >= 2:
+        counts.append(full_text.count(surname))
+    return max(counts)
+
+
 def scholar_stance_spectrum(
     *,
     full_text: str,
@@ -258,6 +271,8 @@ def scholar_stance_spectrum(
                 "quote": quote,
                 "quote_verified": verified,
                 "brief": str(s.get("brief", "") or "").strip(),
+                # 十字轴横轴:被本书讨论的分量(核心 ↔ 边缘)。只提名的也数,给前端排布用。
+                "mentions": _mentions(name, full_text),
             }
         )
 

@@ -62,6 +62,14 @@ function factionColor(communityId: number): string {
   return p[communityId % p.length];
 }
 
+// 概念节点按中心度(degree)深浅:越核心越深。中心度是概念真能编的维度(不像对概念无意义的"阵营")。
+// 墨蓝一色系从浅到深插值——经济制裁那种巨型核心概念自然最深,一眼拎出核心。
+function conceptColor(deg: number, maxDeg: number): string {
+  const t = maxDeg > 0 ? Math.min(1, deg / maxDeg) : 0;
+  const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
+  return `rgb(${lerp(0x9d, 0x1c)},${lerp(0xc0, 0x46)},${lerp(0xcc, 0x57)})`;
+}
+
 // 画布按节点数自适应——几百号人挤在小画布会糊成一团，节点多就把画布撑大（给力学更多铺开空间）。
 // 上限放到 2400:三国 348 人也铺得开;SVG 按容器宽缩放,逻辑空间大=结构(阵营/主次)散得开。
 function canvasSize(nodeCount: number): { w: number; h: number } {
@@ -305,6 +313,9 @@ export function CharacterGraph({
     }
     return d;
   }, [data]);
+
+  // 概念图节点按中心度上色要的最大度(归一分母)。人物图不用(它按阵营色)。
+  const maxDeg = useMemo(() => Math.max(1, ...degree.values()), [degree]);
 
   // 渲染子集:默认只取戏份(degree)前 TOP_N 个人物;点"展开"后才全量。
   // 力学、画节点、画边都只认这个子集——三国 348 人挤进力导向每帧 ~12 万对斥力会卡死,
@@ -911,7 +922,7 @@ export function CharacterGraph({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-2 text-xs text-[var(--color-ink-muted)]">
         {unit === "concept" ? (
           // 概念图没有敌友 / 阵营:连线只表概念关系(定义/包含/对立/因果)、粗细表紧密,不套人物那套敌友色。
-          <span>连线 = 概念关系（定义 / 包含 / 对立 / 因果），越粗越紧密 · 点越大 = 关联越多</span>
+          <span>连线 = 概念关系（定义 / 包含 / 对立 / 因果），越粗越紧密 · 点越大越深 = 越核心（关联越多）</span>
         ) : (
           <>
         {(["foe", "kin", "neutral"] as RelKind[]).map((k) => {
@@ -1095,7 +1106,7 @@ export function CharacterGraph({
               <circle cx={p.x} cy={p.y} r={Math.max(r + 12, 18)} fill="transparent" />
               {/* 星子本体 + 名字包在一个 <g> 里统一压暗;悬停的星 opacity=1 最醒目。 */}
               <g opacity={nodeOpacity}>
-                <StarNode cx={p.x} cy={p.y} r={isHovered ? r + 1.5 : r} color={unit === "concept" ? "#2E6B82" : factionColor(communities.get(name) ?? 0)} />
+                <StarNode cx={p.x} cy={p.y} r={isHovered ? r + 1.5 : r} color={unit === "concept" ? conceptColor(deg, maxDeg) : factionColor(communities.get(name) ?? 0)} />
                 {showLabel && (
                   <text
                     x={p.x}
