@@ -1,7 +1,7 @@
 {
   "name": "bookscope-web",
   "private": true,
-  "version": "1.8.2",
+  "version": "1.9.0",
   "type": "module",
   "description": "BookScope r1 — 最小前端：上传书 + 问答 + 看带原文引用的答案",
   "scripts": {
