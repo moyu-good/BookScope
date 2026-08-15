@@ -265,7 +265,7 @@ export function RedheadHardFacts({
       {/* #45 硬指标稀：真硬指标(时限/数字/起止)全无、只抽到框架泛信息时,老实说破这份以方针为主
           ——evidence-first 空值三态(确证稀 ≠ 没抽到),别让「适用范围/责任主体」冒充「要点」。 */}
       {hardIndicatorCount === 0 && total > 0 && (
-        <p className="mb-3 text-[13px] leading-relaxed rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-[var(--color-ink-muted)]">
+        <p className="mb-3 text-body-sm leading-relaxed rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-[var(--color-ink-muted)]">
           这份没有可钉死的硬指标（办结时限 / 达标比例 / 金额门槛这类）——它以方针部署为主，硬要求本就稀，不是没抽到。下面列的是适用范围、责任主体这类框架信息；要看逐条要求，去「逐条精读」。
         </p>
       )}
