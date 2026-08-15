@@ -1,0 +1,30 @@
+# 统一行尾策略：文本文件入库统一为 LF，检出时 Windows 用 CRLF、其它平台用 LF。
+* text=auto
+
+# 明确文本类型（防 git 对二进制误判）
+*.py     text eol=lf
+*.tsx    text eol=lf
+*.ts     text eol=lf
+*.json   text eol=lf
+*.jsonl  text eol=lf
+*.toml   text eol=lf
+*.md     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.sh     text eol=lf
+*.css    text eol=lf
+*.html   text eol=lf
+*.txt    text eol=lf
+
+# 二进制文件明确
+*.pdf    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.webp   binary
+*.gif    binary
+*.ico    binary
+*.woff   binary
+*.woff2  binary
+*.eot    binary
+*.ttf    binary
