@@ -39,13 +39,24 @@ export function saveReportHistory(entry: ReportHistoryEntry): void {
   }
 }
 
+export function deleteReportHistoryEntry(id: string): void {
+  try {
+    const cur = loadReportHistory().filter((x) => x.id !== id);
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(cur));
+  } catch {
+    /* localStorage 不可用时静默 */
+  }
+}
+
 export function ReportHistoryModal({
   history,
   onReopen,
+  onDelete,
   onClose,
 }: {
   history: ReportHistoryEntry[];
   onReopen: (entry: ReportHistoryEntry) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   return (
@@ -96,6 +107,14 @@ export function ReportHistoryModal({
                   style={{ fontFamily: "var(--font-display)" }}
                 >
                   重新打开
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(h.id)}
+                  title="删除这条历史"
+                  className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] shrink-0"
+                >
+                  删除
                 </button>
               </div>
             ))
