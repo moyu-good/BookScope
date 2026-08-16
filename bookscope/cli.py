@@ -370,6 +370,41 @@ def cmd_prewarm(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_version(args: argparse.Namespace) -> int:
+    import bookscope
+
+    print(bookscope.__version__)
+    return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """检查本地环境：Python/Node/key/前端依赖/缓存目录。"""
+    import shutil
+    import sys
+
+    ok = True
+
+    def check(name: str, passed: bool, detail: str = "") -> None:
+        nonlocal ok
+        mark = "✓" if passed else "✗"
+        print(f"  {mark} {name}" + (f" — {detail}" if detail else ""))
+        if not passed:
+            ok = False
+
+    print("BookScope 环境自检")
+    print(f"  Python: {sys.version.split()[0]}")
+    check("Python >= 3.12", sys.version_info >= (3, 12))
+    check("Node.js", shutil.which("node") is not None, shutil.which("node") or "未找到")
+    check("npm", shutil.which("npm") is not None, shutil.which("npm") or "未找到")
+    check("DEEPSEEK_API_KEY", bool(os.environ.get("DEEPSEEK_API_KEY")), "已设置" if os.environ.get("DEEPSEEK_API_KEY") else "未设置（可用 --api-key）")
+    check("OPENAI_API_KEY", bool(os.environ.get("OPENAI_API_KEY")), "已设置" if os.environ.get("OPENAI_API_KEY") else "未设置（可用 --api-key）")
+    web_node_modules = Path("web/node_modules")
+    check("web/node_modules", web_node_modules.exists(), "已安装" if web_node_modules.exists() else "请先 make install")
+    cache_dir = Path(".bookscope_cache")
+    check(".bookscope_cache", cache_dir.exists() or cache_dir.mkdir(parents=True, exist_ok=True) is None, "可写" if cache_dir.exists() else "已创建")
+    return 0 if ok else 1
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     path = Path(args.path)
     if not path.exists():
@@ -417,6 +452,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="书鉴 BookScope —— 把长文档变成可核验、可交互、可追问的书鉴。",
     )
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p_version = sub.add_parser("version", help="显示版本号")
+    p_version.set_defaults(func=cmd_version)
+
+    p_doctor = sub.add_parser("doctor", help="检查本地环境")
+    p_doctor.set_defaults(func=cmd_doctor)
 
     p_report = sub.add_parser("report", help="把一本书秒出结构版 HTML 报告")
     p_report.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")

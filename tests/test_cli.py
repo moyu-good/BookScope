@@ -89,3 +89,13 @@ def test_cmd_cluster_without_key_returns_2(tmp_path: Path, monkeypatch) -> None:
         provider="deepseek", api_key=None, model=None, base_url=None, open=False,
     )
     assert cli.cmd_cluster(args) == 2
+
+
+def test_cmd_version_returns_0(capsys) -> None:
+    import argparse
+
+    import bookscope.cli as cli
+
+    assert cli.cmd_version(argparse.Namespace()) == 0
+    out = capsys.readouterr().out.strip()
+    assert out
