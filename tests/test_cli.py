@@ -189,3 +189,19 @@ def test_cmd_summary_prints_chapters(tmp_path: Path, capsys) -> None:
     out = capsys.readouterr().out
     assert "测试书" in out
     assert "2 章" in out
+
+
+def test_cmd_catalog_generates_index(tmp_path: Path, capsys) -> None:
+    import bookscope.cli as cli
+
+    folder = tmp_path / "books"
+    folder.mkdir()
+    (folder / "a.txt").write_text("第一章 开端\n甲。\n", encoding="utf-8")
+    (folder / "b.md").write_text("# 第一章\n乙。\n", encoding="utf-8")
+    out = tmp_path / "out"
+    import argparse
+
+    assert cli.cmd_catalog(argparse.Namespace(path=str(folder), out=str(out))) == 0
+    assert (out / "index.html").exists()
+    assert (out / "a.html").exists()
+    assert (out / "b.html").exists()
