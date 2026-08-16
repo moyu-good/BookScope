@@ -63,6 +63,8 @@ section h2 .no{font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--
 .curve-detail{background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-top:12px;box-shadow:var(--shadow)}
 .curve-detail h4{color:var(--cinnabar);margin-bottom:8px}
 .curve-detail .event{font-size:14px;padding:6px 0;border-bottom:1px dashed var(--border)}
+.verify-toggle{display:inline-block;margin-top:12px;padding:6px 14px;border-radius:20px;border:1px solid var(--jade);background:var(--paper-card);color:var(--jade);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
+body.verified-only .quote.unverified{display:none}
 footer{text-align:center;padding:32px 16px;color:var(--ink-3);font-size:13px;border-top:1px solid var(--border);margin-top:32px;font-family:"Noto Sans SC",sans-serif}
 @media(max-width:640px){body{font-size:15px}.hero{padding:28px 14px 22px}.hero h1{font-size:22px}.hero .subtitle{font-size:13px}.stats{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}.stat{padding:12px 8px}.stat .num{font-size:22px}section{padding:20px 14px}section h2{font-size:18px}.card{padding:14px}.grid{grid-template-columns:1fr}.graph-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.graph-wrap svg{min-width:600px}.theme-toggle{width:40px;height:40px;bottom:12px;right:12px;font-size:16px}.print-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;right:62px}}
 """
@@ -393,6 +395,31 @@ def _consistency_html(consistency: dict) -> str:
     return "".join(items)
 
 
+def _verified_stats(data: dict) -> tuple[int, int]:
+    total = 0
+    verified = 0
+
+    def _add(items: list[dict]) -> None:
+        nonlocal total, verified
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            total += 1
+            if it.get("verified"):
+                verified += 1
+
+    _add(data.get("recap", {}).get("points", []))
+    _add(data.get("timeline", {}).get("events", []))
+    _add(data.get("argument_structure", {}).get("claims", []))
+    _add(data.get("concept_evolution", {}).get("stages", []))
+    _add(data.get("writing_technique", {}).get("techniques", []))
+    _add(data.get("motif_tracking", {}).get("occurrences", []))
+    _add(data.get("narrative_phases", {}).get("phases", []))
+    for c in data.get("character_arc", {}).get("characters", []):
+        _add(c.get("points", []))
+    return verified, total
+
+
 def render_visual_report(data: dict) -> str:
     meta = data.get("meta", {})
     book = meta.get("book", "长文档")
@@ -410,6 +437,7 @@ def render_visual_report(data: dict) -> str:
     writing_technique = data.get("writing_technique", {})
     motif = data.get("motif_tracking", {})
     phases = data.get("narrative_phases", {})
+    verified_count, verified_total = _verified_stats(data)
 
     stats = [
         ("章", len(curve.get("chapters", [])) or len(timeline.get("events", []))),
@@ -419,7 +447,7 @@ def render_visual_report(data: dict) -> str:
         ("论证", len(argument.get("claims", []))),
         ("伏笔", len(foreshadow.get("arcs", []))),
         ("技法", len(writing_technique.get("techniques", []))),
-        ("核验", f'{sum(1 for p in recap.get("points", []) if p.get("verified"))}/{len(recap.get("points", []))}'),
+        ("核验", f'{verified_count}/{verified_total}'),
     ]
     stat_html = "".join(
         f'<div class="stat"><div class="num">{_esc(v)}</div><div class="label">{_esc(k)}</div></div>'
@@ -450,7 +478,7 @@ def render_visual_report(data: dict) -> str:
 <style>{_build_css()}</style>
 </head>
 <body>
-<header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span></header>
+<header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button></header>
 <div class="stats">{stat_html}</div>
 {sections}
 <button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
