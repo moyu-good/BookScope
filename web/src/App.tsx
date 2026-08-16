@@ -1563,6 +1563,8 @@ export function App() {
   const [compareTarget, setCompareTarget] = useState<SessionMetadata | null>(null);
   /** 报告预览：出报告/对照报告后应用内 iframe 预览（可下载）。 */
   const [reportPreview, setReportPreview] = useState<ReportPreviewState | null>(null);
+  /** 跨文本/簇发现生成中的提示文案（等待 LLM 时给用户反馈） */
+  const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   /** 批量导入进度（书柜内进度条） */
   const [importProgress, setImportProgress] = useState<{ done: number; total: number; current: string | null } | null>(null);
   /** 报告历史（localStorage）+ 历史弹窗 */
@@ -1642,6 +1644,7 @@ export function App() {
         return;
       }
       if (sessions.length < 2) return;
+      setGeneratingReport("正在生成跨文本对照报告…（章脉缓存命中则快，首次需等 LLM）");
       try {
         const resp = await fetch("/api/agent/cross-book/report", {
           method: "POST",
@@ -1686,6 +1689,8 @@ export function App() {
         });
       } catch {
         alert("对照报告失败：网络错误");
+      } finally {
+        setGeneratingReport(null);
       }
     },
     [apiKey, provider, model, baseUrl],
@@ -1706,6 +1711,7 @@ export function App() {
         alert("自动发现一次最多 8 本（两两对照成本高），请分批");
         return;
       }
+      setGeneratingReport(`正在自动发现「${clusterName}」簇关系…（${sessions.length} 本两两对照，可能需几分钟）`);
       try {
         const resp = await fetch("/api/agent/cluster/discover", {
           method: "POST",
@@ -1752,6 +1758,8 @@ export function App() {
         });
       } catch {
         alert("自动发现失败：网络错误");
+      } finally {
+        setGeneratingReport(null);
       }
     },
     [apiKey, provider, model, baseUrl],
@@ -3403,6 +3411,17 @@ export function App() {
           }}
           onClose={() => setHistoryOpen(false)}
         />
+      )}
+      {generatingReport && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[190] pointer-events-none">
+          <div
+            className="flex items-center gap-2 rounded-full border border-[var(--color-rule)] px-4 py-2 text-xs text-[var(--color-ink)] shadow-lg"
+            style={{ background: "var(--color-paper-raised)" }}
+          >
+            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-seal)] border-t-transparent" />
+            {generatingReport}
+          </div>
+        </div>
       )}
       {reportPreview && (
         <ReportPreview
