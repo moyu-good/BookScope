@@ -108,6 +108,9 @@ bookscope report 书.epub --out 书鉴.html
 
 # 启动本地服务
 bookscope serve --port 8000
+
+# 两个文件直接出跨文本对照 HTML 报告（需要 LLM key）
+bookscope cross 书A.epub 书B.pdf --out 对照.html --api-key sk-...
 ```
 
 > 💡 默认使用 **DeepSeek `deepseek-v4-flash`**：国内可直连、便宜、适合长文本批量分析。也支持 OpenAI 兼容接口，自己搭的代理/网关都能接。

@@ -20,3 +20,22 @@ def test_cmd_report_generates_structure_html(tmp_path: Path) -> None:
     html = out.read_text(encoding="utf-8")
     assert "<!DOCTYPE html>" in html
     assert "测试书" in html
+
+
+def test_cmd_cross_without_key_returns_2(tmp_path: Path, monkeypatch) -> None:
+    import bookscope.cli as cli
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    f1 = tmp_path / "a.txt"
+    f2 = tmp_path / "b.txt"
+    f1.write_text("第一章\n甲。\n", encoding="utf-8")
+    f2.write_text("第一章\n乙。\n", encoding="utf-8")
+    import argparse
+
+    args = argparse.Namespace(
+        file1=str(f1), file2=str(f2), out=str(tmp_path / "x.html"),
+        title1=None, title2=None, provider="deepseek",
+        api_key=None, model=None, base_url=None, open=False,
+    )
+    assert cli.cmd_cross(args) == 2
