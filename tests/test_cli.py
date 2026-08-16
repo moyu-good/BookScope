@@ -259,3 +259,16 @@ def test_cmd_doctor_json_output(capsys) -> None:
     assert cli.cmd_doctor(argparse.Namespace(json=True)) == 0
     out = capsys.readouterr().out
     assert '"checks"' in out
+
+
+def test_cmd_search_finds_match(tmp_path: Path, capsys) -> None:
+    import bookscope.cli as cli
+
+    folder = tmp_path / "books"
+    folder.mkdir()
+    (folder / "a.txt").write_text("第一章 开端\n这里提到市场与政府的关系。\n", encoding="utf-8")
+    import argparse
+
+    assert cli.cmd_search(argparse.Namespace(path=str(folder), query="市场", top=3, json=False)) == 0
+    out = capsys.readouterr().out
+    assert "市场" in out

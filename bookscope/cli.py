@@ -551,6 +551,45 @@ def cmd_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_search(args: argparse.Namespace) -> int:
+    """零配置：在一个文件夹里跨书本地检索关键词。"""
+    import json
+
+    from bookscope.local_tools import load_chunks, local_search
+
+    folder = Path(args.path)
+    if not folder.is_dir():
+        print(f"文件夹不存在: {folder}", file=sys.stderr)
+        return 1
+    files = [p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in _IMPORT_EXTS]
+    if not files:
+        print(f"文件夹里没有支持的文件: {folder}", file=sys.stderr)
+        return 1
+    results = []
+    for f in sorted(files):
+        try:
+            _name, _book, _results, chunks = load_chunks(f, title=f.stem)
+        except Exception:  # noqa: BLE001
+            continue
+        for hit in local_search(args.query, chunks, top_k=args.top):
+            results.append({
+                "file": str(f),
+                "book": f.stem,
+                "chapter": hit.get("chapter"),
+                "text": hit.get("text", ""),
+                "score": hit.get("score", 0),
+            })
+    if getattr(args, "json", False):
+        print(json.dumps({"query": args.query, "results": results, "count": len(results)}, ensure_ascii=False, indent=2))
+    else:
+        if not results:
+            print("没有找到匹配")
+        else:
+            for r in results:
+                print(f"[{r['book']} · 第{r['chapter']}章] {r['text']}")
+    return 0
+
+
 def cmd_catalog(args: argparse.Namespace) -> int:
     """零配置：把一个文件夹生成可浏览的 HTML 书库目录。"""
     import json
@@ -704,6 +743,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_summary.add_argument("--title", default=None, help="书名（默认取文件名）")
     p_summary.add_argument("--json", action="store_true", help="以 JSON 输出章节摘要")
     p_summary.set_defaults(func=cmd_summary)
+
+    p_search = sub.add_parser("search", help="零配置：在文件夹里跨书本地检索关键词")
+    p_search.add_argument("path", help="书库文件夹路径")
+    p_search.add_argument("query", help="关键词")
+    p_search.add_argument("--top", type=int, default=3, help="每本书返回条数（默认 3）")
+    p_search.add_argument("--json", action="store_true", help="以 JSON 输出结果")
+    p_search.set_defaults(func=cmd_search)
 
     p_catalog = sub.add_parser("catalog", help="把一个文件夹生成可浏览的 HTML 书库目录")
     p_catalog.add_argument("path", help="书库文件夹路径")
