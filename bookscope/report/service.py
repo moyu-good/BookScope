@@ -367,6 +367,29 @@ def build_seq_graph_html(cd: dict) -> str:
 </script>"""
 
 
+def build_edges_list_html(cd: dict, labels: dict) -> str:
+    """关系说明列表：每条边 from→to + 关系 + rationale（报告里可读的"为什么"）。"""
+    edges = cd.get("edges", [])
+    if not edges:
+        return ""
+    items = []
+    for i, e in enumerate(edges):
+        meta = REL_META.get(e.get("relation", ""), {})
+        color = meta.get("color", TOKENS["ink-3"])
+        icon = meta.get("icon", "🔗")
+        frm = labels.get(e.get("from", ""), e.get("from", ""))
+        to = labels.get(e.get("to", ""), e.get("to", ""))
+        items.append(
+            f'<div class="edge-note" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--border)">'
+            f'<span style="flex-shrink:0;width:14px;height:14px;border-radius:50%;background:{color};margin-top:3px"></span>'
+            f'<div><div style="font-size:13px"><b>{esc(frm)}</b> '
+            f'<span style="color:{color}">{icon} {esc(e.get("relation",""))}</span> '
+            f'<b>{esc(to)}</b></div>'
+            f'<div style="font-size:12px;color:var(--ink-2);margin-top:2px">{esc(e.get("rationale",""))}</div></div></div>'
+        )
+    return "\n".join(items)
+
+
 def build_nav(cd: dict, n_spines: int, meta: dict) -> str:
     counts = {
         "nodes": len(cd.get("nodes", [])),
@@ -493,6 +516,7 @@ def render_report(inp: dict) -> str:
 
   <section id="graph"><h2><span class="no">贰</span>脉络关系</h2>{graph_html}
     <p style="font-size:13px;color:var(--ink-3);font-family:var(--font-sans);margin-top:10px">{graph_caption}</p>
+    {"" if is_doc else f'<div class="card" style="margin-top:14px"><h3 style="font-size:15px;color:var(--cinnabar);margin-bottom:6px">关系说明</h3>{build_edges_list_html(cd, labels)}</div>'}
   </section>
 
   <section id="narrative"><h2><span class="no">叁</span>总体逻辑脉络</h2>
