@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { loadReportHistory, type ReportHistoryEntry } from "./ReportHistory";
 import type { ApiError } from "./ErrorBanner";
 import { formatRelativeTime } from "./historyStorage";
 import { annotationStore } from "./annotationStore";
@@ -60,6 +61,8 @@ export interface BookShelfProps {
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   /** 簇总览报告：来源组聚合清单 */
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
+  /** 快捷重开最近报告 */
+  onReopenReport?: (entry: ReportHistoryEntry) => void;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -215,6 +218,7 @@ export function BookShelf({
   onOpenHistory,
   onAskBooks,
   onClusterReport,
+  onReopenReport,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -226,6 +230,7 @@ export function BookShelf({
   const [compareMode, setCompareMode] = useState(false);
   const [compareSelected, setCompareSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
+  const [reportHistory] = useState<ReportHistoryEntry[]>(() => loadReportHistory());
 
   const toggleCompareMode = () => {
     setCompareMode((v) => !v);
@@ -383,6 +388,8 @@ export function BookShelf({
         onCompareMany={onCompareMany}
         onAskBooks={onAskBooks}
         onClusterReport={onClusterReport}
+        onReopenReport={onReopenReport}
+        reportHistory={reportHistory}
         onSelect={onSelect}
         onRead={onRead}
         onReport={onReport}
@@ -407,6 +414,8 @@ function ShelfBody(props: {
   onCompareMany: (sessions: SessionMetadata[]) => void;
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
+  onReopenReport?: (entry: ReportHistoryEntry) => void;
+  reportHistory: ReportHistoryEntry[];
   onSelect: (session: SessionMetadata) => void;
   onRead: (session: SessionMetadata) => void;
   onReport: (session: SessionMetadata) => void;
@@ -427,6 +436,8 @@ function ShelfBody(props: {
     onCompareMany,
     onAskBooks,
     onClusterReport,
+    onReopenReport,
+    reportHistory,
     onSelect,
     onRead,
     onReport,
@@ -606,6 +617,8 @@ function ShelfBody(props: {
             onRead={() => onRead(s)}
             onReport={() => onReport(s)}
             onCompare={() => onCompare(s)}
+            recentReport={onReopenReport ? reportHistory.find((h) => h.type === "book" && h.sessionId === s.session_id) : undefined}
+            onReopenReport={onReopenReport}
             onAskDelete={() => onAskDelete(s.session_id)}
             onCancelDelete={onCancelDelete}
             onConfirmDelete={() => onConfirmDelete(s.session_id)}
@@ -712,6 +725,8 @@ function BookRow(props: {
   onRead: () => void;
   onReport: () => void;
   onCompare: () => void;
+  recentReport?: ReportHistoryEntry;
+  onReopenReport?: (entry: ReportHistoryEntry) => void;
   onAskDelete: () => void;
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
@@ -728,6 +743,8 @@ function BookRow(props: {
     onRead,
     onReport,
     onCompare,
+    recentReport,
+    onReopenReport,
     onAskDelete,
     onCancelDelete,
     onConfirmDelete,
@@ -894,6 +911,16 @@ function BookRow(props: {
           >
             对照
           </button>
+          {recentReport && onReopenReport && !compareMode && (
+            <button
+              type="button"
+              onClick={() => onReopenReport(recentReport)}
+              title={`重新打开最近报告（${new Date(recentReport.createdAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}）`}
+              className="text-xs px-3 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors flex-1 sm:flex-none"
+            >
+              最近报告
+            </button>
+          )}
 
           {isConfirming ? (
             <div className="flex items-center gap-1">

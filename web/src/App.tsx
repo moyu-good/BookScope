@@ -2440,6 +2440,7 @@ export function App() {
                 onCompareMany={handleCompareMany}
                 onAskBooks={handleAskBooks}
                 onClusterReport={handleClusterReport}
+                onReopenReport={(e) => void handleReopenReport(e)}
                 onImportFolder={handleImportFolder}
                 importProgress={importProgress}
                 onOpenHistory={() => setHistoryOpen(true)}
