@@ -49,6 +49,27 @@ class TestSQLiteCacheBasic:
         cache.set("k1", b"")
         assert cache.get("k1") == b""
 
+    def test_get_many_returns_hits_and_counts_misses(self, cache_path: Path) -> None:
+        """批量读：只返回命中的 key，hit/miss 计数要准确。"""
+        cache = SQLiteCache(cache_path, "calls", "v1")
+        cache.set("a", b"1")
+        cache.set("b", b"2")
+        got = cache.get_many(["a", "b", "missing"])
+        assert got == {"a": b"1", "b": b"2"}
+        s = cache.stats()
+        assert s["hit"] == 2
+        assert s["miss"] == 1
+
+    def test_get_many_handles_more_than_sql_batch_size(self, cache_path: Path) -> None:
+        """超过单批 500 时也能一次语义读完（长书上千章的关键路径）。"""
+        cache = SQLiteCache(cache_path, "calls", "v1")
+        keys = [f"k{i}" for i in range(600)]
+        for k in keys:
+            cache.set(k, k.encode())
+        got = cache.get_many(keys)
+        assert len(got) == 600
+        assert got["k599"] == b"k599"
+
     def test_persists_across_instances_same_path(self, cache_path: Path) -> None:
         """重启不丢——同 path 同 schema 第二个实例能读到第一个写的 row。"""
         cache1 = SQLiteCache(cache_path, "calls", "v1")

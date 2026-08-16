@@ -119,3 +119,17 @@ def test_verify_quote_effect_honest_exact_and_missing(tmp_path: Path) -> None:
     assert miss["verified"] is False
     assert miss["match_type"] == "none"
     assert "未找到" in miss["hint"]
+
+
+def test_analyze_one_call_effect(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+    from bookscope.local_tools import analyze_file
+
+    data_dir = tmp_path / "sessions"
+    monkeypatch.setenv("BOOKSCOPE_DATA_DIR", str(data_dir))
+    f = tmp_path / "a.txt"
+    f.write_text("第一章 开端\n这里提到市场与政府的关系。\n第二章 发展\n继续讨论制度演化。\n", encoding="utf-8")
+    out = analyze_file(f, data_dir=data_dir, question="市场与政府")
+    assert out["session_id"].startswith("api-")
+    assert "报告导航" in out["report_html"]
+    assert out["progress"]["total"] >= 1
+    assert len(out["local_hits"]) >= 1

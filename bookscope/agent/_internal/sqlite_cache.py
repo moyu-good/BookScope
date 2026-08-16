@@ -106,6 +106,32 @@ class SQLiteCache:
             self._hits += 1
         return bytes(value) if not isinstance(value, bytes) else value
 
+    def get_many(self, keys: list[str]) -> dict[str, bytes]:
+        """批量按 key 取 value；miss / version 不匹配不出现在结果里。
+
+        和 ``get`` 一样不更新每行 hit_count，但会更新进程级 hit/miss 计数。
+        一次连接内分批查询，避免几十万字书（上千章）逐 key 开连接的开销。
+        """
+        if not keys:
+            return {}
+        result: dict[str, bytes] = {}
+        with self._connect() as conn:
+            for i in range(0, len(keys), 500):
+                chunk = keys[i : i + 500]
+                placeholders = ",".join("?" * len(chunk))
+                rows = conn.execute(
+                    f"SELECT key, value, schema_version FROM {self._table} "
+                    f"WHERE key IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+                for key, value, row_version in rows:
+                    if row_version == self._schema_version:
+                        result[key] = bytes(value) if not isinstance(value, bytes) else value
+        with self._stats_lock:
+            self._hits += len(result)
+            self._misses += len(keys) - len(result)
+        return result
+
     def set(self, key: str, value: bytes) -> None:
         """写入 (key, value)；同 key 已存在则覆盖（INSERT OR REPLACE）。"""
         now = datetime.now(UTC).isoformat()

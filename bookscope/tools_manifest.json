@@ -126,6 +126,50 @@
       }
     },
     {
+      "name": "bookscope_analyze",
+      "description": "一键分析本地长文档：秒出结构版报告、查渐进进度、导入书库；有 LLM key 时自动后台预建深度章脉。AI 助手最简入口。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "本地文件绝对路径（epub/txt/pdf/docx/md）"
+          },
+          "title": {
+            "type": "string",
+            "description": "书名（可选）"
+          },
+          "question": {
+            "type": "string",
+            "description": "可选问题；不配 key 时返回本地检索原文片段"
+          },
+          "top_k": {
+            "type": "integer",
+            "description": "本地检索返回条数，默认 5"
+          },
+          "api_key": {
+            "type": "string",
+            "description": "LLM API key（可选，默认读环境变量）"
+          },
+          "provider": {
+            "type": "string",
+            "description": "默认 deepseek"
+          },
+          "model": {
+            "type": "string",
+            "description": "默认 deepseek-v4-flash"
+          },
+          "base_url": {
+            "type": "string",
+            "description": "OpenAI 兼容 base_url（可选）"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
       "name": "bookscope_verify",
       "description": "对一句引文在本地原文里做逐字核验（零配置，不需要 LLM key）。找到逐字命中返回 verified=true；找不到明确返回 false，不冒充已核验。",
       "parameters": {

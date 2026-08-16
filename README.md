@@ -32,7 +32,7 @@
 
 核验是立身之本：每条引文都翻回原文逐字比对，对得上才盖「鉴」印；推断明确标「研判」。
 
-> 🤖 **作为 AI 助手 Skill 使用**：工具清单在 `bookscope/tools_manifest.json`，统一调用入口是 `POST /api/tools/invoke`。接入说明见 [docs/ASSISTANT_SKILL.md](docs/ASSISTANT_SKILL.md)。
+> 🤖 **作为 AI 助手 Skill 使用**：工具清单在 `bookscope/tools_manifest.json`，统一调用入口是 `POST /api/tools/invoke`。AI 助手最简用法是只调一次 `bookscope_analyze`：结构版 + 渐进进度 + 导入书库一步到位。接入说明见 [docs/ASSISTANT_SKILL.md](docs/ASSISTANT_SKILL.md)。
 
 <p align="center">
   <img src="docs/images/hero-bookshelf.png" width="820" alt="书柜：每本书一卷书脊，按题材上色">
@@ -103,6 +103,7 @@ bookscope list
 
 - **可核验问答**：答案挂原文出处，逐字核对过才盖「鉴」印。
 - **渐进交付**：先秒出结构版，后台按章构建深度版，进度实时可见；改哪章只重算哪章。
+- **长文档原生**：按章批量缓存读，几十万字/上千章的结构报告与进度查询都在秒级；不是玩具级小文本。
 - **读书人的可视化**：叙事曲线、人物关系、时间线、伏笔回收，都锚回原文。
 - **跨文本与簇关系**：多本书自动发现继承/反驳/补充/落地/检验，可生成 HTML 或进入工作台继续追问。
 - **公文适配**：官话翻人话、挑相关条款、算时限门槛、多文件依据链。

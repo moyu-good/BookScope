@@ -129,6 +129,19 @@ def test_chapter_level_incremental_only_builds_changed_chapter(monkeypatch, tmp_
     assert len(out) == 2
 
 
+def test_spine_build_progress_many_chapters_uses_batch(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    """长书（几百章）progress 走批量缓存读，结果正确。"""
+    _setup_temp(monkeypatch, tmp_path)
+    chunks = [
+        {"chunk_id": f"c{i}", "chapter": i + 1, "text": f"text{i}"}
+        for i in range(300)
+    ]
+    prog = sc.spine_build_progress(chunks=chunks, model="m")
+    assert prog["total"] == 300
+    assert prog["built"] == 0
+    assert len(prog["missing_chapters"]) == 300
+
+
 def test_peek_returns_partial_spine(monkeypatch, tmp_path) -> None:  # noqa: ANN001
     """渐进：只建了第 1 章时 peek 返回部分，spine_build_progress 报 1/2。"""
     _setup_temp(monkeypatch, tmp_path)

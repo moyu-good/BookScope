@@ -15,6 +15,7 @@ AI 助手（如 Claude / GPT / 本地 agent）可以通过统一的工具调用�
 
 | 工具名 | 作用 |
 | --- | --- |
+| `bookscope_analyze` | 一键分析：结构版 + 渐进进度 + 导入书库 + 可选本地检索，有 key 自动预建深度章脉 |
 | `bookscope_import` | 导入本地文件/文件夹，返回 session_id |
 | `bookscope_report` | 生成结构版 HTML 书鉴报告 |
 | `bookscope_ask` | 对书提问（无 key 自动本地检索） |
@@ -56,6 +57,7 @@ POST /api/tools/catalog   {"path": "/path/to/books", "out": "/tmp/catalog"}
 POST /api/tools/invoke     {"tool": "bookscope_cluster", "arguments": {"files": ["a.txt", "b.txt", "c.txt"]}}
 POST /api/tools/invoke     {"tool": "bookscope_progress", "arguments": {"path": "/path/to/book.epub"}}
 POST /api/tools/invoke     {"tool": "bookscope_verify", "arguments": {"path": "/path/to/book.epub", "quote": "要核验的引文"}}
+POST /api/tools/invoke     {"tool": "bookscope_analyze", "arguments": {"path": "/path/to/book.epub", "question": "这本书的核心主张？"}}
 POST /api/tools/invoke     {"tool": "bookscope_prewarm", "arguments": {"session_id": "...", "api_key": "sk-..."}}
 ```
 

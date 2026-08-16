@@ -161,6 +161,7 @@ def tools_manifest() -> dict:
 def tools_invoke(req: InvokeRequest) -> dict:
     """AI 助手工具调用入口：按 tool 名 + 参数执行本地零配置能力。"""
     from bookscope.local_tools import (
+        analyze_file,
         cluster_files,
         cross_files,
         generate_catalog,
@@ -208,6 +209,41 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 args["quote"],
                 context_chars=int(args.get("context_chars", 120)),
             )
+        if req.tool == "bookscope_analyze":
+            import os as _os
+
+            api_key = args.get("api_key") or _os.environ.get("DEEPSEEK_API_KEY") or _os.environ.get("OPENAI_API_KEY") or ""
+            result = analyze_file(
+                Path(args["path"]),
+                data_dir=data_dir,
+                title=args.get("title"),
+                question=args.get("question"),
+                top_k=int(args.get("top_k", 5)),
+                model=args.get("model", "deepseek-v4-flash"),
+            )
+            if api_key:
+                from bookscope.api.book_sessions import BookSessionStore
+                from bookscope.api.routes.agent import (
+                    _build_prewarm_client,
+                    _start_prewarm_for_session,
+                )
+                from bookscope.api.session_storage import JSONFileSessionStorage
+
+                store = BookSessionStore(storage=JSONFileSessionStorage(root=data_dir))
+                client = _build_prewarm_client(
+                    provider=args.get("provider", "deepseek"),
+                    api_key=api_key,
+                    base_url=args.get("base_url"),
+                )
+                model = args.get("model", "deepseek-v4-flash")
+                status = _start_prewarm_for_session(
+                    store=store,
+                    book_session_id=result["session_id"],
+                    client=client,
+                    model=model,
+                )
+                result["prewarm_status"] = status
+            return result
         if req.tool == "bookscope_prewarm":
             import os as _os
 

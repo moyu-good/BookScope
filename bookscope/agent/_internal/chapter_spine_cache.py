@@ -206,11 +206,31 @@ def get_or_build_spine(
     groups = _chapter_groups(chunks)
     spine: list[dict[str, Any]] = []
     missing: list[tuple[int, list[dict]]] = []
-    for ch, ccs in groups.items():
-        key = _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
-        rec = _read_chapter_cached(cache, key)
-        if rec is not None:
-            spine.append(rec)
+    keys = [
+        _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
+        for ch, ccs in groups.items()
+    ]
+    try:
+        cached_map = cache.get_many(keys)
+    except Exception as exc:  # noqa: BLE001 — 批量读失败降级逐 key，仍不 break 构建
+        logger.warning("spine_cache: batch read raised %s: %s; 降级逐 key", type(exc).__name__, exc)
+        cached_map = {}
+        for ch, ccs in groups.items():
+            key = _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
+            rec = _read_chapter_cached(cache, key)
+            if rec is not None:
+                cached_map[key] = rec
+    for (ch, ccs), key in zip(groups.items(), keys):
+        raw = cached_map.get(key)
+        if raw is not None:
+            try:
+                rec = json.loads(raw.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                rec = None
+            if isinstance(rec, dict):
+                spine.append(rec)
+            else:
+                missing.append((ch, ccs))
         else:
             missing.append((ch, ccs))
 
@@ -250,12 +270,31 @@ def peek_spine_cache(
     except Exception as exc:  # noqa: BLE001 — peek 失败当没缓存，绝不 break
         logger.warning("spine_cache: peek init raised %s: %s; 当无缓存", type(exc).__name__, exc)
         return None
+    groups = _chapter_groups(chunks)
+    keys = [
+        _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
+        for ch, ccs in groups.items()
+    ]
+    try:
+        cached_map = cache.get_many(keys)
+    except Exception as exc:  # noqa: BLE001 — 批量读失败降级逐 key
+        logger.warning("spine_cache: peek batch read raised %s: %s; 降级逐 key", type(exc).__name__, exc)
+        cached_map = {}
+        for ch, ccs in groups.items():
+            key = _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
+            rec = _read_chapter_cached(cache, key)
+            if rec is not None:
+                cached_map[key] = rec
     spine: list[dict[str, Any]] = []
-    for ch, ccs in _chapter_groups(chunks).items():
-        key = _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
-        rec = _read_chapter_cached(cache, key)
-        if rec is not None:
-            spine.append(rec)
+    for (ch, ccs), key in zip(groups.items(), keys):
+        raw = cached_map.get(key)
+        if raw is not None:
+            try:
+                rec = json.loads(raw.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                rec = None
+            if isinstance(rec, dict):
+                spine.append(rec)
     if not spine:
         return None
     spine.sort(key=lambda r: r.get("chapter", 0))
@@ -276,9 +315,13 @@ def spine_build_progress(
     missing: list[int] = []
     try:
         cache = _get_cache()
-        for ch, ccs in groups.items():
-            key = _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
-            if _read_chapter_cached(cache, key) is not None:
+        keys = [
+            _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
+            for ch, ccs in groups.items()
+        ]
+        cached_map = cache.get_many(keys)
+        for ch, key in zip(groups, keys):
+            if cached_map.get(key) is not None:
                 built.append(ch)
             else:
                 missing.append(ch)

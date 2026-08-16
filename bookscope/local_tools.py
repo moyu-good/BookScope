@@ -491,5 +491,36 @@ def verify_quote(path: Path, quote: str, context_chars: int = 120) -> dict:
     }
 
 
+def analyze_file(
+    path: Path,
+    data_dir: Path,
+    title: str | None = None,
+    question: str | None = None,
+    top_k: int = 5,
+    model: str = "deepseek-v4-flash",
+) -> dict:
+    """一键分析入口：结构版 + 渐进进度 + 导入书库 + 可选本地检索。
+
+    这是给 AI 助手用的“最简入口”——一次调用就把一本长文档纳入工作流。
+    深度预建由调用方拿到 session_id 后按需触发（有 LLM key 时）。
+    """
+    html = structure_report_html(path, title=title)
+    progress = spine_progress(path, model=model, genre="fiction")
+    sid = import_file(path, data_dir, title=title)
+    name = title or path.stem
+    result: dict = {
+        "book": name,
+        "session_id": sid,
+        "report_html": html,
+        "progress": progress,
+        "mode": progress["mode"],
+    }
+    if question:
+        _name, _book, _results, chunks = load_chunks(path, title)
+        result["local_hits"] = local_search(question, chunks, top_k=top_k)
+        result["question"] = question
+    return result
+
+
 def default_data_dir() -> Path:
     return Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))
