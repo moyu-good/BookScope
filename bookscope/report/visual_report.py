@@ -55,6 +55,11 @@ section h2 .no{font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--
 .arc .status.dangling{background:var(--gold);color:#fff}
 .claim{display:flex;gap:12px;padding:10px 0;border-bottom:1px dashed var(--border)}
 .claim .no{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--cinnabar);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-family:"Noto Sans SC",sans-serif}
+.tl{position:relative;padding-left:26px}
+.tl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--border)}
+.tl-item{position:relative;padding:0 0 16px 14px}
+.tl-item::before{content:"";position:absolute;left:-22px;top:8px;width:10px;height:10px;border-radius:50%;background:var(--cinnabar);border:2px solid var(--paper-card);box-shadow:0 0 0 2px var(--cinnabar)}
+.tl-item .tl-time{font-size:12px;color:var(--ink-3);font-family:"Noto Sans SC",sans-serif;margin-bottom:2px}
 .graph-wrap{background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
 .graph-wrap svg{display:block;width:100%;height:auto}
 .graph-wrap .dim{opacity:.12}
@@ -203,12 +208,14 @@ def _timeline_html(timeline: dict) -> str:
     for e in events[:80]:
         v = e.get("verified", False)
         items.append(
-            f'<div class="point"><span class="badge">第{e.get("chapter","?")}章</span>'
-            f'<div><div style="font-weight:bold">{_esc(e.get("event",""))}</div>'
-            f'<div class="quote{" unverified" if not v else ""}"><span class="seal">{"鉴" if v else "研判"}</span>{_esc(e.get("evidence",""))}</div></div></div>'
+            f'<div class="tl-item">'
+            f'<div class="tl-time">第{e.get("chapter","?")}章 · {_esc(e.get("time",""))}</div>'
+            f'<div style="font-weight:bold">{_esc(e.get("event",""))}</div>'
+            f'<div class="quote{" unverified" if not v else ""}"><span class="seal">{"鉴" if v else "研判"}</span>{_esc(e.get("evidence",""))}</div>'
+            f'</div>'
         )
     return ('<div class="search-box"><input type="search" placeholder="🔍 搜索时间线…" data-filter="timeline"></div>'
-            '<div class="card" data-list="timeline">' + "".join(items) + "</div>")
+            '<div class="card" data-list="timeline"><div class="tl">' + "".join(items) + "</div></div>")
 
 
 def _recap_html(recap: dict) -> str:
