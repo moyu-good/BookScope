@@ -1,148 +1,168 @@
 <p align="center">
-  <img src="docs/images/logo.svg" width="116" alt="书鉴 BookScope">
+  <img src="docs/images/logo.svg" width="120" alt="书鉴 BookScope">
 </p>
 
 <h1 align="center">书鉴 · BookScope</h1>
 
 <p align="center">
-  读厚书、读公文的人用的工具。问它书里的事、公文里的条款，每句引文都翻回原文一字一字对过，对得上才显示、盖一个「鉴」印；它还把整本书按读书人的眼光画出来，把一份份公文摆一起看谁依据谁。
+  <b>把几百万字的大部头，变成一本可核验、可交互、可追问的「书鉴」。</b><br>
+  问书、画关系、理时间线、追伏笔、读公文、跨文本对照——每条结论都翻回原文核对，对得上才盖「鉴」印。
 </p>
 
 <p align="center">
   <a href="https://github.com/moyu-good/BookScope/actions"><img src="https://github.com/moyu-good/BookScope/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.14+-blue.svg" alt="Python 3.14+"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/python-3.12%2B-blue.svg" alt="Python 3.12+">
+  <img src="https://img.shields.io/badge/react-19-61dafb.svg" alt="React 19">
+  <img src="https://img.shields.io/badge/AI--Native-DeepSeek%20Ready-4D6BFE.svg" alt="AI Native / DeepSeek Ready">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
 </p>
 
 <p align="center">
   中文 · <a href="README.en.md">English</a> · <a href="https://moyu-good.github.io/BookScope/">在线 Demo</a>
 </p>
 
+---
+
+## 为什么会有 BookScope
+
+现在的 AI 聊天工具读长文时，最让人不敢信的是：它随口说「原文写了 XX」，你没法逐字回去查。书鉴从一开始就把「核验」当成立身之本——每一条引文都翻回原文逐字比对，对得上才显示并盖「鉴」印，对不上的直接不给你看；需要推断的地方明确标「研判」，不冒充事实。
+
+它也不是一个「阅读器」，而是一个**工具**：把复杂的长文本分析拆成一个个点一下就能用的动作，让几百万字的书也能渐进式地跑起来——先秒出结构版，后台继续构建深度版，随时能看到进度，不用干等几十分钟。
+
 <p align="center">
-  <img src="docs/images/hero-bookshelf.png" width="800" alt="书柜：传进来的每本书成一卷书脊，按题材上色，点开就是分析结果">
+  <img src="docs/images/hero-bookshelf.png" width="820" alt="书柜：每本书成一卷书脊，按题材上色">
   <br>
-  <sub>书柜。传进来的每本书立成一卷书脊，按题材上色：朱砂是公文，暖琥珀是小说与历史，墨青是理论与论文。点一卷，就打开那本书的分析。</sub>
+  <sub>书柜。传进来的每本书立成一卷书脊，按题材上色：朱砂是公文，暖琥珀是小说与历史，墨青是理论与论文。</sub>
 </p>
 
 ---
 
-## 它是什么
+## ✨ 核心能力
 
-把一本大部头（epub / txt / pdf）拖进去，像聊天一样问它。它也能画人物关系、看一章章的张力起落、理时间线、追伏笔、扫全书前后有没有写矛盾。
-
-还可以读党政公文（红头文件）。传一份进去，它认出这是公文，自动换一套专门读公文的工具：把官话翻成人话（「原则上同意」留了口子、「研究研究」约等于不办，这类弦外之意它会点破），挑出跟你身份相关的条款，算清每条要求的时限和门槛，还能把好几份文件摆一起看谁依据谁、政策怎么一步步改到现在。规矩和读书一样：每条结论锚回原文，核得到才盖「鉴」印，推断标「研判」不冒充事实。
-
-跑在你自己电脑上，用你自己的 AI 账号。书直接发给你选的那家 AI（默认 DeepSeek），书鉴这边没有服务器，碰不到你的书，也碰不到你的 key。
-
-**在线 Demo**：[moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/) 一本《三国演义》跑好的结果，不用装也不用填 key，打开就能点。想分析自己的书，克隆到本地。
-
-## 凭什么不一样
-
-**一是核验。** 现在的 AI 答你的时候经常顺嘴编一句「原文写了 XX」，听着像真的，你又没法一句句回去查。书鉴每给一句引文，都翻回原书逐字核对，对得上才显示、旁边盖一个「鉴」印，对不上的直接不给你看。要它下判断的地方（矛盾、伏笔、手法）也守同一条规矩：查不实就不说，宁可少给几条也不瞎编。这是立身之本，不是附加功能。
+### 1. 可核验的问答
+问书、问公文、跨书追问，答案都挂原文出处。逐字核对过的盖「鉴」印，核不上的不会冒出来。
 
 <p align="center">
   <img src="docs/images/hero-ask.png" width="760" alt="问书：答案挂原文出处，逐字核对过的盖「鉴」印">
-  <br>
-  <sub>问书。答案挂着原文出处，逐字核对过的盖了「鉴」印；核不上的不会冒出来。</sub>
 </p>
 
-**二是它把整本书画出来，画法是读书人的，不是数据仪表盘。** 张力曲线画成一道水墨山峦，人物关系铺成一片夜空星图，角色弧线长成一枝工笔花鸟。每一笔背后都钉着原文：点关系图的一条线、或时间线的一件事，它现去那一章把支撑的原句捞出来给你看。
+### 2. 读书人的可视化
+不是冷冰冰的仪表盘，而是有书卷气的图：叙事曲线画成水墨山峦，人物关系铺成星图，角色弧线长成工笔花鸟。每一笔背后都钉着原文。
 
 <p align="center">
   <img src="docs/images/narrative.png" width="48%" alt="山水叙事曲线">
   <img src="docs/images/arc.png" width="48%" alt="花鸟人物弧线">
   <br>
-  <sub>左：叙事曲线画成山水长卷，一峰一谷是一章的张力，红点是高潮。右：人物弧线画成工笔花鸟，每个角色一枝，枝的起伏是他的处境、着花疏密是他的戏份。</sub>
+  <sub>左：叙事曲线画成山水长卷。右：人物弧线画成工笔花鸟。</sub>
 </p>
 
 <p align="center">
   <img src="docs/images/relationship.png" width="48%" alt="关系演变小多图时间线">
   <img src="docs/images/foreshadow.png" width="48%" alt="伏笔回收弧线">
   <br>
-  <sub>左：关系演变。挑戏份最重的几十对，每对一行，线往上是越来越紧、往下是渐疏，一眼看完谁和谁怎么一章章走到这一步。右：伏笔回收。埋的坑收没收，朱红实线从埋点拱到回收点（魏延脑后反骨，第 53 回埋、第 105 回应验，拱过大半本书），灰虚线是埋了没填的。</sub>
+  <sub>左：关系演变。右：伏笔回收。</sub>
 </p>
 
-## 能做什么
+### 3. 长文档渐进式分析
+几百万字也不怕：先出零 LLM 的结构版报告（秒出），后台按章预建深度版，进度实时可见；改哪章只重算哪章，重复操作全部走缓存。
 
-左边一栏切功能，一次跑一件。传什么文件，左栏就亮什么工具：传书亮读书的工具，传公文（红头文件）亮读公文的工具，互不串。「问书」是随便聊，其余点一下（或填个词）就开跑。读书的工具按你想干的事分四拨：
+### 4. 跨文本对照与簇关系发现
+把多本书/多份文档摆在一起，自动发现谁继承谁、谁反驳谁、谁补充谁，还能一键生成可交互的 HTML 报告或进入结构化「对照工作台」继续追问。
 
-- **问**：问书（带原文出处答深问题）· 前情回顾（说你读到第几章，只回顾到这、后面不剧透）
-- **看人物**：关系网 + 关系怎么一章章升温降温 · 谁何时同场、谁的戏份起落 · 一个角色说话腔调稳不稳
-- **看情节**：逐章的张力 / 情感 / 视角 / 主支线 · 伏笔埋了收没收 · 每条支线何时活跃交汇 · 多线倒叙也理清真实时序
-- **查证学习**：盯一个人 / 物 / 母题 / 概念看它全书怎么铺开 · 扫前后矛盾、用词重复、视角穿帮 · 拆一本讲道理的书的论点结构、做成自测卡 · 把诊断聚成能勾选的改稿清单 · 边读边在行间看带证据的批注
+### 5. 公文/红头文件专门适配
+自动识别公文，换一套读公文的工具：官话翻人话、挑相关条款、算时限门槛、多文件依据链分析。
 
-读公文的工具另成一组：把官话翻人话、挑跟你相关的条款、算清时限和门槛、扫格式规不规范；多份文件还能摆一起看谁依据谁、政策怎么一步步演变、上下级对得齐不齐。
+---
 
-每点一个功能，都看得见它读了多少字、花了多少 token、跑了几秒。
+## 🚀 快速开始
 
-<p align="center">
-  <img src="docs/images/hero-timeline.png" width="48%" alt="时间线：全书事件按真实时序重排">
-  <img src="docs/images/hero-consistency.png" width="48%" alt="一致性自检：扫全书前后矛盾">
-  <br>
-  <sub>左：时间线，多线倒叙也理成真实时序，点一件事看那一章的原文。右：一致性自检，扫全书前后矛盾、用词重复、视角穿帮，每条都挂出处。</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gongwen-depgraph-graph.png" width="760" alt="依据链网：一卷宗里几份公文谁依据谁、谁发文给谁，画成一张网">
-  <br>
-  <sub>也读公文。一卷宗里几份文件的关系画成一张网：营商环境四件套，国务院条例在根上，国办意见、省条例、市条例按依据 / 发文一层层挂下来，关系全从原文锚出来。</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gongwen-m-stakes.png" width="38%" alt="利害与风向：按你的身份判机会和风险、标含金量">
-  <img src="docs/images/gongwen-m-plain.png" width="38%" alt="大白话翻译：官话翻人话、点破弦外之意">
-  <br>
-  <sub>手机上读一份公文。左：利害与风向，报上身份就按身份判机会和风险，每条标含金量（真金白银还是空头）。右：大白话，把官话翻成人话，碰到「原则上」「研究研究」这类官腔点破弦外之意。两样都钉原文、核得到盖「鉴」印。</sub>
-</p>
-
-## 快速开始
-
-需要 Python 3.14+ 和 Node.js。
+需要 **Python 3.12+** 和 **Node.js 18+**。
 
 ```bash
+# 1. 克隆
 git clone https://github.com/moyu-good/BookScope.git
 cd BookScope
+
+# 2. 装后端（pip 或 uv 二选一）
 pip install -e ".[dev]"
-python -m textblob.download_corpora       # 一次性 NLTK 资源
+# 或
+uv pip install --system -e ".[dev]"
 
-uvicorn bookscope.api.app:create_app --factory --reload --port 8000   # 后端
+# 3. 一次性下载 NLTK 资源
+python -m textblob.download_corpora
 
-# 另开一个终端
-cd web && npm install && npm run dev       # 前端，http://localhost:5173
+# 4. 启动后端
+uvicorn bookscope.api.app:create_app --factory --reload --port 8000
+
+# 5. 另开终端启动前端
+cd web && npm install && npm run dev
 ```
 
-打开 `http://localhost:5173`，左下角设置里填你的 AI key，拖一本 epub / txt / pdf 进去，开问。默认用 DeepSeek 的 `deepseek-v4-flash`，国内能直连，也最便宜。
+打开 <http://localhost:5173>，左下角设置里填你自己的 AI key，拖一本 epub / txt / pdf 进去就能开始。
 
-## 自带 key（BYOK）
+> 💡 默认使用 **DeepSeek `deepseek-v4-flash`**：国内可直连、便宜、适合长文本批量分析。也支持 OpenAI 兼容接口，自己搭的代理/网关都能接。
 
-书鉴不带任何厂商的 key，你用自己的。设置里预置了八家：DeepSeek（默认）、智谱 GLM、通义千问、Kimi、Anthropic、OpenAI、Gemini、Grok，选哪家接口地址就自动填好。除 Anthropic 外都走 OpenAI 那套通用接口，你自己搭的代理、别的兼容服务也接得上。
+---
 
-key 只待在浏览器里，跟着请求直接发给你选的那家，不经过任何服务器，也没有埋点统计。
+## 🧩 生态适配 & 快捷使用
 
-## 它怎么干活
+BookScope 定位是**工具**，所以「接入简单、复杂功能一键可用」和功能本身一样重要。
 
-不在传书的时候就把整本拆碎、提前算好一堆结论摆着。传书只建一个轻索引；等你真问了，才让 agent 现场翻原文、一条条核对：
+| 场景 | 方式 |
+| --- | --- |
+| **本地 Web 工具** | 一条命令起前后端，浏览器里拖文件即用 |
+| **BYOK 多厂商** | DeepSeek（默认）、智谱、通义、Kimi、Anthropic、OpenAI、Gemini、Grok，或任何 OpenAI 兼容服务 |
+| **可分享交付物** | 报告生成独立 HTML，可下载、新窗口打开、打印/存 PDF |
+| **IM 推送** | 支持 Feishu 文件推送（配置 `outbound.allowedFileDirs` 后直接把报告发到会话） |
+| **结构化数据** | 跨文本对照/簇关系提供 JSON 数据端点，方便二次开发 |
+| **在线 Demo** | [moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/) 免安装体验 |
+
+### AI-Native / DeepSeek Ready
+- 默认 DeepSeek，针对长文本、JSON 结构化输出做了重试与容错；
+- 所有分析端点统一 BYOK，key 只留在浏览器，不经过任何服务器；
+- 支持 OpenAI 兼容协议，接代理、接国产模型、接自建网关都只需改 base_url。
+
+---
+
+## 🏗 它怎么干活
+
+不在传书时把整本拆碎提前算完。传书只建轻索引；你真问了，才让 agent 现场翻原文、逐条核对。
 
 ```
-传书（一次）              提问（每次）
-  解析 epub/txt/pdf        route：判断走快路径还是 agent 循环
-  按章切块 + 建索引         agent 现场查原文、给答案 + 引用
-                          verify_citations：每条引用回原文逐字比对
-                            → 对不上的盖不了「鉴」印
+传书（一次）                提问（每次）
+  解析 epub/txt/pdf          route：判断走快路径还是 agent 循环
+  按章切块 + 建索引           agent 现场查原文、给答案 + 引用
+                            verify_citations：每条引用回原文逐字比对
+                              → 对不上的盖不了「鉴」印
 ```
 
-要画整本书的那些图（关系、曲线、伏笔），是另一条路：整本精读一次，出一份带原文证据的逐章结构，各种图都从这一份派生，不用每画一张就重读一遍全书。所以几百万字的网文也跑得动，点之前它会先告诉你这本有多大、大概要等多久。
+整本书的图（关系、曲线、伏笔）走另一条路：整本精读一次，出一份带原文证据的逐章结构，所有图都从这一份派生，不重复读全书。
 
-## 技术栈
+---
 
-Python 3.14 · FastAPI · Pydantic v2 · React 19 + Vite + TypeScript + Tailwind v4 · 多厂商 LLM（BYOK，默认 DeepSeek）· FAISS + BM25 · 1300+ 个 pytest 用例。
+## 🛠 技术栈
 
-## 文档
+- **后端**：Python 3.12 · FastAPI · Pydantic v2 · SQLite 缓存
+- **前端**：React 19 · Vite · TypeScript · Tailwind v4
+- **AI**：多厂商 LLM（BYOK，默认 DeepSeek）· OpenAI 兼容协议
+- **检索/分析**：FAISS · BM25 · NetworkX · 2000+ pytest 用例
 
-- [用户手册](docs/USER_GUIDE.md)：各功能怎么用、怎么配 key、怎么读答案
-- [架构总图](docs/ARCHITECTURE.md)：传书 / 提问两条链路、引用核验、缓存
-- [架构决策记录](docs/architecture-decisions/)：每个关键技术决策怎么拍的
+---
+
+## 📚 文档
+
+- [用户手册](docs/USER_GUIDE.md)
+- [架构总图](docs/ARCHITECTURE.md)
+- [架构决策记录](docs/architecture-decisions/)
 - [贡献指南](CONTRIBUTING.md)
+
+---
+
+## 🤝 贡献
+
+欢迎提 Issue、PR、想法。请保持「核验优先」和「渐进交付」两条主线：任何新功能都要能锚回原文，任何长文档操作都不能让用户干等。
+
+---
 
 ## License
 

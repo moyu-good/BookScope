@@ -10,7 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/moyu-good/BookScope/actions"><img src="https://github.com/moyu-good/BookScope/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.14+-blue.svg" alt="Python 3.14+"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.12%2B-blue.svg" alt="Python 3.12+"></a>
+  <img src="https://img.shields.io/badge/AI--Native-DeepSeek%20Ready-4D6BFE.svg" alt="AI Native / DeepSeek Ready">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
@@ -35,6 +36,8 @@ It also reads Chinese government documents (red-header official documents, 红�
 It runs locally on your own AI account. The book text goes straight to the provider you pick (DeepSeek by default); there's no server in between, so nothing here ever touches your book or your key.
 
 **Live demo**: [moyu-good.github.io/BookScope](https://moyu-good.github.io/BookScope/) — a finished analysis of *Romance of the Three Kingdoms* you can click through, no install and no key.
+
+**Tool-first**: one command to run locally, BYOK for any OpenAI-compatible provider (DeepSeek by default), reports as portable HTML, Feishu delivery, and JSON data endpoints for deeper integrations.
 
 ## Why it's different
 
@@ -86,7 +89,7 @@ Every tool shows how many words it read, how many tokens it spent, how many seco
 
 ## Quick start
 
-Requires Python 3.14+ and Node.js.
+Requires Python 3.12+ and Node.js.
 
 ```bash
 git clone https://github.com/moyu-good/BookScope.git
