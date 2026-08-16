@@ -95,6 +95,26 @@ interface ShelfEntry {
 }
 
 const CONFIRM_AUTO_REVERT_MS = 5000;
+const COLLAPSED_SOURCES_KEY = "bookscope_collapsed_sources";
+
+function loadCollapsedSources(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(COLLAPSED_SOURCES_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveCollapsedSources(sources: Set<string>): void {
+  try {
+    window.localStorage.setItem(COLLAPSED_SOURCES_KEY, JSON.stringify([...sources]));
+  } catch {
+    /* localStorage 不可用时静默 */
+  }
+}
 
 async function parseError(resp: Response): Promise<ApiError> {
   try {
@@ -520,12 +540,13 @@ function ShelfBody(props: {
   };
 
   // 来源组折叠：书多时先收起来，只留组头统计和操作
-  const [collapsedSources, setCollapsedSources] = useState<Set<string>>(new Set());
+  const [collapsedSources, setCollapsedSources] = useState<Set<string>>(() => loadCollapsedSources());
   const toggleCollapsed = (source: string) => {
     setCollapsedSources((prev) => {
       const next = new Set(prev);
       if (next.has(source)) next.delete(source);
       else next.add(source);
+      saveCollapsedSources(next);
       return next;
     });
   };
