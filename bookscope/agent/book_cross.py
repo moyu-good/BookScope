@@ -278,6 +278,48 @@ def _sanitize_reason(data: dict, perspectives: list[dict]) -> dict:
     }
 
 
+_ASK_PROMPT = """你是一位跨文本对照分析专家。给你多本书的「书级观点骨架」和已有的跨文本对照结论（关系/概念演变/分歧），请回答用户关于这些书对比的问题。
+
+要求：
+- 只依据提供的观点骨架与对照结论回答，不编造
+- 每条结论锚到具体书名和章号（如「《可能性的艺术》第12章」）
+- 如果材料不足，老实说材料不足，不硬编
+- 推断标「研判」；有原文主张支撑的可以明确说
+- 回答用中文，简洁、分点"""
+
+
+def cross_book_ask(
+    *,
+    perspectives: list[dict],
+    reason: dict,
+    question: str,
+    llm_client: Any,
+    model: str,
+) -> dict:
+    """跨文本对照追问：在多书观点骨架 + 已有对照结论上回答问题。
+
+    不重读全文（喂 perspective + reason 缓存）；返回 {"answer", "sources"}。
+    """
+    blocks = []
+    for p in perspectives:
+        claims = "；".join(f"{c.get('claim','')}(第{c.get('chapter','?')}章)" for c in p.get("claims", [])[:8])
+        blocks.append(f"《{p.get('title','')}》(slug={p.get('slug','')}) 立场：{p.get('stance','')}；主旨：{p.get('summary','')}；主张：{claims}")
+    relation_lines = "；".join(
+        f"{e.get('from')} --{e.get('relation')}--> {e.get('to')}: {e.get('rationale','')}"
+        for e in reason.get("edges", [])
+    ) or "（暂无关系）"
+    user = (
+        "【各书观点骨架】\n" + "\n\n".join(blocks)
+        + "\n\n【已有对照关系】\n" + relation_lines
+        + "\n\n【用户问题】\n" + question
+    )
+    data = _ask_json(llm_client, model, _ASK_PROMPT, user, max_tokens=1500)
+    return {
+        "answer": data.get("answer", ""),
+        "sources": data.get("sources", []),
+    }
+
+
 def build_cross_book_report_input(
     *,
     perspectives: list[dict],

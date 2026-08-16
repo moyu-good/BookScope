@@ -633,6 +633,31 @@ class CrossBookReportRequest(BaseModel):
     base_url: str | None = Field(default=None)
 
 
+class CrossBookAskRequest(BaseModel):
+    """POST /api/agent/cross-book/ask 请求体：对照报告内追问。
+
+    在多书观点骨架 + 已有对照结论上回答，不重读全文。
+    """
+
+    book_session_ids: list[str] = Field(
+        ..., min_length=2, description="至少两本书的 session_id（与对照报告一致）。"
+    )
+    question: str = Field(..., min_length=1, max_length=2000, description="用户问题。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class CrossBookAskResponse(BaseModel):
+    """POST /api/agent/cross-book/ask 响应体。"""
+
+    answer: str = Field(..., description="跨文本对照回答。")
+    sources: list[str] = Field(default_factory=list, description="来源（书名/章号）。")
+
+
 class PrewarmSpineStatusResponse(BaseModel):
     """GET /api/agent/prewarm-spine/status 响应体：轮询后台预建进度。
 

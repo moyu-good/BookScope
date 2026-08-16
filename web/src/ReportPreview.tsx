@@ -14,6 +14,8 @@ export interface ReportPreviewState {
   fileName: string;
   /** 单书报告带 session_id，用于报告内追问 */
   sessionId?: string;
+  /** 对照报告带多本书 session_id，用于跨文本追问 */
+  sessionIds?: string[];
 }
 
 export function ReportPreview({

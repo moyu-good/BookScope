@@ -1631,6 +1631,7 @@ export function App() {
           url,
           title: `跨文本对照 · ${titles}`,
           fileName: `跨文本对照-${titles.replace(/[\/:*?"<>|]/g, "_")}.html`,
+          sessionIds: sessions.map((x) => x.session_id),
         });
       } catch {
         alert("对照报告失败：网络错误");
@@ -1642,19 +1643,28 @@ export function App() {
   /** 报告内追问：调 /agent/ask（单书报告），答案展示在预览下方。 */
   const handleReportAsk = useCallback(
     async (question: string, preview: ReportPreviewState) => {
-      if (!preview.sessionId) throw new Error("这份报告不支持追问（仅单书报告可追问）");
-      const resp = await fetch("/api/agent/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          book_session_id: preview.sessionId,
-          provider,
-          api_key: apiKey,
-          model: model.trim() || undefined,
-          base_url: effectiveBaseUrl() || undefined,
-        }),
-      });
+      const common = {
+        provider,
+        api_key: apiKey,
+        model: model.trim() || undefined,
+        base_url: effectiveBaseUrl() || undefined,
+      };
+      let resp: Response;
+      if (preview.sessionIds && preview.sessionIds.length >= 2) {
+        resp = await fetch("/api/agent/cross-book/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...common, book_session_ids: preview.sessionIds, question }),
+        });
+      } else if (preview.sessionId) {
+        resp = await fetch("/api/agent/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...common, book_session_id: preview.sessionId, question }),
+        });
+      } else {
+        throw new Error("这份报告不支持追问");
+      }
       if (!resp.ok) {
         let msg = `追问失败（${resp.status}）`;
         try {
@@ -2895,7 +2905,7 @@ export function App() {
         <ReportPreview
           preview={reportPreview}
           onAsk={
-            reportPreview.sessionId
+            reportPreview.sessionId || (reportPreview.sessionIds && reportPreview.sessionIds.length >= 2)
               ? (q) => handleReportAsk(q, reportPreview)
               : undefined
           }

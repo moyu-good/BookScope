@@ -49,7 +49,7 @@ from bookscope.agent import (
     run_fast_path,
 )
 from bookscope.report.builders import build_book_report, build_structure_report
-from bookscope.agent.book_cross import build_book_perspective, cross_book_reason, build_cross_book_report_input
+from bookscope.agent.book_cross import build_book_perspective, cross_book_reason, build_cross_book_report_input, cross_book_ask
 from bookscope.report.service import render_report
 
 from bookscope.agent._internal.chapter_spine_cache import (
@@ -162,6 +162,8 @@ from bookscope.api.schemas import (
     AgentAskResponse,
     BookReportRequest,
     CrossBookReportRequest,
+    CrossBookAskRequest,
+    CrossBookAskResponse,
     AnnotationsRequest,
     AnnotationsResponse,
     ArgumentStructureRequest,
@@ -4498,6 +4500,52 @@ def agent_cross_book_report(
     )
     html = render_report(inp)
     return Response(content=html, media_type="text/html; charset=utf-8")
+
+
+@agent_router.post("/agent/cross-book/ask", response_model=CrossBookAskResponse)
+def agent_cross_book_ask(
+    request: CrossBookAskRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> CrossBookAskResponse:
+    """跨文本对照追问：在多书观点骨架 + 已有对照结论上回答，不重读全文。"""
+    model = request.model or default_model_for(request.provider)
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_type": "ProviderSdkMissing", "message": str(exc)},
+        ) from exc
+
+    perspectives = []
+    for sid in request.book_session_ids:
+        assembler = _resolve_assembler(store, sid)
+        _full_text, chunks = _long_context_inputs(assembler)
+        spine = peek_spine_cache(chunks=chunks, model=model, genre="fiction")
+        if not spine:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error_type": "SpineNotReady",
+                    "message": "有文档章脉未建完，先等预建完成再追问",
+                },
+            )
+        book_title, _ = _extract_book_meta(assembler)
+        perspectives.append(build_book_perspective(
+            spine=spine, book_title=book_title or sid, slug=sid[-8:],
+            llm_client=client, model=model,
+        ))
+
+    reason = cross_book_reason(perspectives=perspectives, llm_client=client, model=model)
+    result = cross_book_ask(
+        perspectives=perspectives, reason=reason, question=request.question,
+        llm_client=client, model=model,
+    )
+    return CrossBookAskResponse(answer=result.get("answer", ""), sources=result.get("sources", []))
 
 
 __all__ = ["agent_router"]
