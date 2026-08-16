@@ -1,7 +1,7 @@
 PYTHON ?= python3
 PIP ?= pip3
 
-.PHONY: install dev web test lint build demo report
+.PHONY: install dev web test lint build demo report ci
 
 install: ## 安装后端 + 前端依赖 + NLTK 资源
 	$(PIP) install -e ".[dev]"
@@ -28,3 +28,5 @@ demo: ## 前端 demo 构建
 
 report: ## 一条命令把书变成结构版 HTML 报告（用法: make report FILE=书.epub OUT=书鉴.html）
 	$(PYTHON) -m bookscope.cli report $(FILE) --out $(OUT)
+
+ci: lint test build ## 本地复现 GitHub CI（ruff + 全套测试 + 前端构建）
