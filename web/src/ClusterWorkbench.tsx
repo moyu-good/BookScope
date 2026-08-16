@@ -59,6 +59,7 @@ export function ClusterWorkbench({
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [asking, setAsking] = useState(false);
+  const [relationFilter, setRelationFilter] = useState("全部");
 
   useEffect(() => {
     let cancelled = false;
@@ -217,11 +218,27 @@ export function ClusterWorkbench({
             <h3 className="text-xs font-bold text-[var(--color-ink-muted)] mb-2" style={{ fontFamily: "var(--font-display)" }}>
               簇关系网（{data.edges.length} 条 · {data.pair_count} 对两两对照）
             </h3>
+            <div className="flex flex-wrap items-center gap-1 mb-2">
+              {["全部", "继承", "反驳", "补充", "落地", "检验"].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRelationFilter(r)}
+                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                    relationFilter === r
+                      ? "border-[var(--color-seal)] text-[var(--color-seal)] bg-[var(--color-seal-soft)]"
+                      : "border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)]"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
             <div className="flex flex-col gap-2">
-              {data.edges.length === 0 ? (
+              {data.edges.filter((e) => relationFilter === "全部" || e.relation === relationFilter).length === 0 ? (
                 <p className="text-sm text-[var(--color-ink-muted)] italic">暂无明显关系。</p>
               ) : (
-                data.edges.map((e, i) => (
+                data.edges.filter((e) => relationFilter === "全部" || e.relation === relationFilter).map((e, i) => (
                   <div key={i} className="rounded-md border border-[var(--color-rule)] px-3 py-2 text-xs" style={{ background: "var(--color-paper-raised)" }}>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-[var(--color-ink)]">{e.from}</span>
