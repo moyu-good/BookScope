@@ -92,6 +92,10 @@ class AgentAskRequest(BaseModel):
             "追问是接着问下一问，两者可以并存。"
         ),
     )
+    chapter: int | None = Field(
+        default=None,
+        description="可选：限定只精读这一章回答（按需级，快而准）。",
+    )
 
 
 class ReviewDimensionScore(BaseModel):
