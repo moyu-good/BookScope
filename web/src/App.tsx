@@ -2745,6 +2745,16 @@ export function App() {
                 <span>深度分析 / 跨文本对照需要 LLM key 时才配置。</span>
                 <button
                   type="button"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText("bookscope self-test").catch(() => {});
+                    alert("已复制：bookscope self-test");
+                  }}
+                  className="px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-seal)] hover:border-[var(--color-seal)] transition-colors"
+                >
+                  复制自检命令
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSettingsOpen(true)}
                   className="px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-seal)] hover:border-[var(--color-seal)] transition-colors"
                 >
