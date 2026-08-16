@@ -158,16 +158,14 @@ class TestResultCache(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         # 用临时 db，避免污染真实缓存
         self._old = bc._cache
+        self._old_get_cache = bc._get_cache
         bc._cache = None
-        import os
-        self._old_env = os.environ.get("BOOKSCOPE_BOOK_CROSS_CACHE_DB_PATH")
-        # book_cross 没有独立 db path env，用 monkeypatch 方式：直接替换 _CACHE_DB_REL 不方便，
-        # 改为把 _get_cache 指向临时 SQLiteCache
         from bookscope.agent._internal.sqlite_cache import SQLiteCache
         bc._get_cache = lambda: SQLiteCache(self.tmp / "cache.db", "book_cross_results", "v1")
 
     def tearDown(self):
         self.bc._cache = self._old
+        self.bc._get_cache = self._old_get_cache
 
     def test_perspective_cached(self):
         spine = [{"chapter": 1, "events": ["甲"], "claims": [], "mainline": True}]
