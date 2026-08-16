@@ -272,3 +272,16 @@ def test_cmd_search_finds_match(tmp_path: Path, capsys) -> None:
     assert cli.cmd_search(argparse.Namespace(path=str(folder), query="市场", top=3, json=False)) == 0
     out = capsys.readouterr().out
     assert "市场" in out
+
+
+def test_cmd_stats_returns_counts(tmp_path: Path, capsys) -> None:
+    import bookscope.cli as cli
+
+    folder = tmp_path / "books"
+    folder.mkdir()
+    (folder / "a.txt").write_text("第一章 开端\n甲。\n第二章 发展\n乙。\n", encoding="utf-8")
+    import argparse
+
+    assert cli.cmd_stats(argparse.Namespace(path=str(folder), json=False)) == 0
+    out = capsys.readouterr().out
+    assert "1 本" in out

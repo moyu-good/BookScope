@@ -69,6 +69,9 @@ bookscope catalog ./我的书库 --out ./书库目录
 # 零配置：在文件夹里跨书本地检索关键词
 bookscope search ./我的书库 "市场与政府"
 
+# 零配置：统计书库规模（本数/章数/字数）
+bookscope stats ./我的书库 --json
+
 # 零配置核心链路自检（读文件→报告→导入→本地问答）
 bookscope self-test
 

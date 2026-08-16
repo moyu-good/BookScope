@@ -551,6 +551,41 @@ def cmd_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_stats(args: argparse.Namespace) -> int:
+    """零配置：统计书库规模（本数/章数/字数）。"""
+    import json
+
+    from bookscope.local_tools import load_chunks
+
+    folder = Path(args.path)
+    if not folder.is_dir():
+        print(f"文件夹不存在: {folder}", file=sys.stderr)
+        return 1
+    files = [p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in _IMPORT_EXTS]
+    if not files:
+        print(f"文件夹里没有支持的文件: {folder}", file=sys.stderr)
+        return 1
+    total_chapters = 0
+    total_chars = 0
+    per_book = []
+    for f in sorted(files):
+        try:
+            _name, _book, _results, chunks = load_chunks(f, title=f.stem)
+        except Exception:  # noqa: BLE001
+            continue
+        chapters = len({c.get("chapter") or 0 for c in chunks})
+        chars = sum(len(str(c.get("text", ""))) for c in chunks)
+        total_chapters += chapters
+        total_chars += chars
+        per_book.append({"book": f.stem, "chapters": chapters, "chars": chars})
+    stats = {"books": len(per_book), "chapters": total_chapters, "chars": total_chars, "per_book": per_book}
+    if getattr(args, "json", False):
+        print(json.dumps(stats, ensure_ascii=False, indent=2))
+    else:
+        print(f"书库：{stats['books']} 本 · {stats['chapters']} 章 · {stats['chars']} 字")
+    return 0
+
+
 def cmd_search(args: argparse.Namespace) -> int:
     """零配置：在一个文件夹里跨书本地检索关键词。"""
     import json
@@ -727,6 +762,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_summary.add_argument("--title", default=None, help="书名（默认取文件名）")
     p_summary.add_argument("--json", action="store_true", help="以 JSON 输出章节摘要")
     p_summary.set_defaults(func=cmd_summary)
+
+    p_stats = sub.add_parser("stats", help="零配置：统计书库规模（本数/章数/字数）")
+    p_stats.add_argument("path", help="书库文件夹路径")
+    p_stats.add_argument("--json", action="store_true", help="以 JSON 输出统计")
+    p_stats.set_defaults(func=cmd_stats)
 
     p_search = sub.add_parser("search", help="零配置：在文件夹里跨书本地检索关键词")
     p_search.add_argument("path", help="书库文件夹路径")
