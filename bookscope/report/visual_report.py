@@ -141,7 +141,8 @@ def _timeline_html(timeline: dict) -> str:
             f'<div><div style="font-weight:bold">{_esc(e.get("event",""))}</div>'
             f'<div class="quote{" unverified" if not v else ""}"><span class="seal">{"鉴" if v else "研判"}</span>{_esc(e.get("evidence",""))}</div></div></div>'
         )
-    return '<div class="card">' + "".join(items) + "</div>"
+    return ('<div class="search-box"><input type="search" placeholder="🔍 搜索时间线…" data-filter="timeline"></div>'
+            '<div class="card" data-list="timeline">' + "".join(items) + "</div>")
 
 
 def _recap_html(recap: dict) -> str:
@@ -156,7 +157,8 @@ def _recap_html(recap: dict) -> str:
             f'<div><div style="font-weight:bold">{_esc(p.get("point",""))}</div>'
             f'<div class="quote{" unverified" if not v else ""}"><span class="seal">{"鉴" if v else "研判"}</span>{_esc(p.get("snippet",""))}</div></div></div>'
         )
-    return '<div class="card">' + "".join(items) + "</div>"
+    return ('<div class="search-box"><input type="search" placeholder="🔍 搜索逻辑主线…" data-filter="recap"></div>'
+            '<div class="card" data-list="recap">' + "".join(items) + "</div>")
 
 
 def _concept_html(concept: dict) -> str:
@@ -186,7 +188,8 @@ def _argument_html(argument: dict) -> str:
             f'<div><div style="font-weight:bold">{_esc(c.get("claim",""))}</div>'
             f'<div class="quote{" unverified" if not v else ""}"><span class="seal">{"鉴" if v else "研判"}</span>{_esc(c.get("evidence",""))}</div></div></div>'
         )
-    return '<div class="card">' + "".join(items) + "</div>"
+    return ('<div class="search-box"><input type="search" placeholder="🔍 搜索论证结构…" data-filter="argument"></div>'
+            '<div class="card" data-list="argument">' + "".join(items) + "</div>")
 
 
 def _foreshadow_html(foreshadow: dict) -> str:
@@ -278,6 +281,19 @@ def render_visual_report(data: dict) -> str:
 <header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span></header>
 <div class="stats">{stat_html}</div>
 {sections}
+<button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
 <footer>BookScope · 逻辑梳理与可视化报告 · 所有引文均回原文核验</footer>
+<script>
+document.querySelectorAll('[data-filter]').forEach(input=>{{
+  input.addEventListener('input',()=>{{
+    const q=input.value.trim().toLowerCase();
+    const list=document.querySelector('[data-list="'+input.dataset.filter+'"]');
+    if(!list)return;
+    list.querySelectorAll('.point,.claim,.arc').forEach(el=>{{
+      el.style.display=(!q||(el.textContent||'').toLowerCase().includes(q))?'':'none';
+    }});
+  }});
+}});
+</script>
 </body>
 </html>"""
