@@ -49,6 +49,24 @@ export function ReportPreview({
     a.remove();
   };
 
+  const openInNewTab = () => {
+    window.open(preview.url, "_blank", "noopener");
+  };
+
+  const printReport = () => {
+    const w = window.open(preview.url, "_blank");
+    if (w) {
+      // 等待加载后调打印（可存 PDF）
+      w.addEventListener("load", () => {
+        try {
+          w.print();
+        } catch {
+          /* 跨域/拦截时忽略 */
+        }
+      });
+    }
+  };
+
   const submitAsk = async () => {
     const q = question.trim();
     if (!q || !onAsk || asking) return;
@@ -144,6 +162,22 @@ export function ReportPreview({
               {regenerating ? "更新中…" : "重新生成更全版"}
             </button>
           )}
+          <button
+            type="button"
+            onClick={openInNewTab}
+            title="在新标签打开"
+            className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition"
+          >
+            新窗口
+          </button>
+          <button
+            type="button"
+            onClick={printReport}
+            title="打印 / 存 PDF"
+            className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition"
+          >
+            打印 / PDF
+          </button>
           <button
             type="button"
             onClick={download}
