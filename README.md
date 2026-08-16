@@ -129,6 +129,11 @@ curl -X POST http://localhost:8000/api/tools/ask-local \
 curl -X POST http://localhost:8000/api/tools/catalog \
   -H 'Content-Type: application/json' \
   -d '{"path":"/path/to/books","out":"/tmp/catalog"}'
+
+# 零配置跨书本地检索
+curl -X POST http://localhost:8000/api/tools/search \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"/path/to/books","query":"市场与政府"}'
 ```
 
 ---

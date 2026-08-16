@@ -47,6 +47,12 @@ class CatalogRequest(BaseModel):
     out: str = Field(default="bookscope-catalog", description="输出目录（默认 bookscope-catalog）")
 
 
+class SearchRequest(BaseModel):
+    path: str = Field(..., description="书库文件夹绝对路径")
+    query: str = Field(..., min_length=1)
+    top_k: int = Field(default=3, ge=1, le=20)
+
+
 def _chunks_to_dicts(results) -> list[dict]:
     return [
         {
@@ -130,6 +136,18 @@ def tools_ask_local(
         })
     results = local_search(req.question, chunks, top_k=req.top_k)
     return {"mode": "local", "results": results}
+
+
+@tools_router.post("/search")
+def tools_search(req: SearchRequest) -> dict:
+    """零配置：在文件夹里跨书本地检索关键词。"""
+    from bookscope.local_tools import search_folder
+
+    try:
+        results = search_folder(Path(req.path), req.query, top_k=req.top_k)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"query": req.query, "results": results, "count": len(results)}
 
 
 @tools_router.post("/catalog")

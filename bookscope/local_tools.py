@@ -112,6 +112,28 @@ def local_search(question: str, chunks: list[dict], top_k: int = 5) -> list[dict
     return results
 
 
+def search_folder(folder: Path, query: str, top_k: int = 3) -> list[dict]:
+    """在一个文件夹里跨书本地检索关键词。"""
+    if not folder.is_dir():
+        raise ValueError(f"文件夹不存在: {folder}")
+    files = [p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in IMPORT_EXTS]
+    results = []
+    for f in sorted(files):
+        try:
+            _name, _book, _results, chunks = load_chunks(f, title=f.stem)
+        except Exception:  # noqa: BLE001
+            continue
+        for hit in local_search(query, chunks, top_k=top_k):
+            results.append({
+                "file": str(f),
+                "book": f.stem,
+                "chapter": hit.get("chapter"),
+                "text": hit.get("text", ""),
+                "score": hit.get("score", 0),
+            })
+    return results
+
+
 def generate_catalog(folder: Path, out_dir: Path) -> tuple[Path, list[dict]]:
     """把一个文件夹生成可浏览的 HTML 书库目录，返回 (index_path, entries)。"""
     import re

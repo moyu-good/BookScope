@@ -555,30 +555,14 @@ def cmd_search(args: argparse.Namespace) -> int:
     """零配置：在一个文件夹里跨书本地检索关键词。"""
     import json
 
-    from bookscope.local_tools import load_chunks, local_search
+    from bookscope.local_tools import search_folder
 
     folder = Path(args.path)
-    if not folder.is_dir():
-        print(f"文件夹不存在: {folder}", file=sys.stderr)
+    try:
+        results = search_folder(folder, args.query, top_k=args.top)
+    except Exception as exc:  # noqa: BLE001
+        print(f"检索失败: {exc}", file=sys.stderr)
         return 1
-    files = [p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in _IMPORT_EXTS]
-    if not files:
-        print(f"文件夹里没有支持的文件: {folder}", file=sys.stderr)
-        return 1
-    results = []
-    for f in sorted(files):
-        try:
-            _name, _book, _results, chunks = load_chunks(f, title=f.stem)
-        except Exception:  # noqa: BLE001
-            continue
-        for hit in local_search(args.query, chunks, top_k=args.top):
-            results.append({
-                "file": str(f),
-                "book": f.stem,
-                "chapter": hit.get("chapter"),
-                "text": hit.get("text", ""),
-                "score": hit.get("score", 0),
-            })
     if getattr(args, "json", False):
         print(json.dumps({"query": args.query, "results": results, "count": len(results)}, ensure_ascii=False, indent=2))
     else:

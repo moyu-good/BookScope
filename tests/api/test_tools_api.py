@@ -89,3 +89,14 @@ def test_tools_catalog_generates_index(client: TestClient, tmp_path: Path) -> No
     assert body["count"] == 1
     assert (out / "index.html").exists()
     assert (out / "a.html").exists()
+
+
+def test_tools_search_returns_results(client: TestClient, tmp_path: Path) -> None:
+    folder = tmp_path / "books"
+    folder.mkdir()
+    (folder / "a.txt").write_text("第一章 开端\n这里提到市场与政府的关系。\n", encoding="utf-8")
+    resp = client.post("/api/tools/search", json={"path": str(folder), "query": "市场"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["count"] >= 1
+    assert body["results"][0]["book"] == "a"
