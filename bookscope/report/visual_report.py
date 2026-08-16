@@ -431,6 +431,29 @@ def _method_html() -> str:
         '</ul></div>'
     )
 
+def _integration_html() -> str:
+    code = (
+        "{\n"
+        '  "tool": "bookscope_visualize",\n'
+        '  "arguments": {\n'
+        '    "path": "/path/to/长文档.epub",\n'
+        '    "mode": "full",\n'
+        '    "concept": "忠义"\n'
+        "  }\n"
+        "}"
+    )
+    return (
+        '<div class="card">'
+        '<h3 style="color:var(--cinnabar);margin-bottom:8px">🤖 AI 助手接入方式</h3>'
+        '<p style="font-size:14px;color:var(--ink-2);margin-bottom:10px">这份 HTML 由 BookScope 作为 AI 助手的 tool/skill 生成。调用方式：</p>'
+        '<pre style="background:var(--paper);border:1px solid var(--border);border-radius:10px;padding:12px;overflow-x:auto;font-size:13px;font-family:monospace;color:var(--ink)">'
+        + _esc(code) +
+        '</pre>'
+        '<p style="font-size:13px;color:var(--ink-3);margin-top:8px">也可用 quick 模式快速出核心轮廓，或用 deep_report 出完整书鉴报告。</p>'
+        '</div>'
+    )
+
+
 
 
 
@@ -568,7 +591,8 @@ def render_visual_report(data: dict) -> str:
 <section id="foreshadow"><h2><span class="no">拾肆</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
 <section id="consistency"><h2><span class="no">拾伍</span>前后一致性</h2>{_consistency_html(consistency)}</section>
 <section id="method"><h2><span class="no">拾陆</span>方法说明</h2>{_method_html()}</section>
-<section id="next"><h2><span class="no">拾柒</span>下一步可以做什么</h2>{_next_steps_html()}</section>
+<section id="integration"><h2><span class="no">拾柒</span>AI 助手接入方式</h2>{_integration_html()}</section>
+<section id="next"><h2><span class="no">拾捌</span>下一步可以做什么</h2>{_next_steps_html()}</section>
 """
 
     return f"""<!DOCTYPE html>
@@ -603,7 +627,8 @@ def render_visual_report(data: dict) -> str:
 <a href="#foreshadow">拾肆 · 伏笔与回收</a>
 <a href="#consistency">拾伍 · 前后一致性</a>
 <a href="#method">拾陆 · 方法说明</a>
-<a href="#next">拾柒 · 下一步可以做什么</a>
+<a href="#integration">拾柒 · AI 助手接入方式</a>
+<a href="#next">拾捌 · 下一步可以做什么</a>
 </div>
 <button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
 <button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
