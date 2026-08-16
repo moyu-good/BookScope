@@ -138,7 +138,9 @@ export function ReportCenter({
           📚 报告中心
         </span>
         <span className="text-xs text-[var(--color-ink-muted)]">
-          {sessions ? `${sessions.length} 本 · ${readyCount} 本就绪 · ${history.length} 份报告` : "加载中…"}
+          {sessions
+            ? `${sessions.length} 本 · ${readyCount} 本就绪 · ${new Set(sessions.map((x) => x.source_folder?.trim() || "手动上传")).size} 个来源组 · ${history.length} 份报告`
+            : "加载中…"}
         </span>
         <button
           type="button"
