@@ -288,6 +288,47 @@ def cmd_cluster(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_import(args: argparse.Namespace) -> int:
+    """把本地文件导入书库（Web 直接可见）。"""
+    path = Path(args.path)
+    if not path.exists():
+        print(f"文件不存在: {path}", file=sys.stderr)
+        return 1
+    title = args.title or path.stem
+    print(f"正在导入 {path} …")
+    book = load_text(path, title=title)
+    results, _stats = chunk_book_with_stats(book)
+    print(f"  读取 {len(results)} 个片段")
+
+    import uuid
+
+    from bookscope.agent.backends.r0_assembler import R0BookAssembler
+    from bookscope.api.book_sessions import BookSessionStore
+    from bookscope.api.session_storage import JSONFileSessionStorage
+    from bookscope.models.schemas import BookKnowledgeGraph
+
+    kg = BookKnowledgeGraph(book_title=title, language=getattr(book, "language", "zh"), characters=[])
+    assembler = R0BookAssembler(
+        book_text=book,
+        chunks=results,
+        knowledge_graph=kg,
+        session_vector_store=None,
+    )
+    # 让 Web 端能按来源文件夹分组
+    try:
+        assembler.source_folder = str(path.parent.resolve())
+    except Exception:  # noqa: BLE001
+        pass
+
+    session_id = f"cli-{uuid.uuid4().hex[:12]}"
+    storage = JSONFileSessionStorage(root=Path(args.data_dir))
+    store = BookSessionStore(storage=storage)
+    store.register(session_id, assembler)
+    print(f"已导入书库：{session_id} · 《{title}》")
+    print(f"  数据目录：{Path(args.data_dir).resolve()}")
+    return 0
+
+
 def cmd_ask(args: argparse.Namespace) -> int:
     """对一本书直接提问，输出带原文引用的答案。"""
     api_key = args.api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
@@ -518,6 +559,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_cluster.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
     p_cluster.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
     p_cluster.set_defaults(func=cmd_cluster)
+
+    p_import = sub.add_parser("import", help="把本地文件导入书库（Web 直接可见）")
+    p_import.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
+    p_import.add_argument("--title", default=None, help="书名（默认取文件名）")
+    p_import.add_argument("--data-dir", default="data/sessions", help="书库数据目录（默认 data/sessions）")
+    p_import.set_defaults(func=cmd_import)
 
     p_ask = sub.add_parser("ask", help="对一本书直接提问，输出带原文引用的答案")
     p_ask.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")

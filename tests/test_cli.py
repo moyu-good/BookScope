@@ -115,3 +115,19 @@ def test_cmd_report_deep_without_key_returns_2(tmp_path: Path, monkeypatch) -> N
         provider="deepseek", api_key=None, model=None, base_url=None, open=False,
     )
     assert cli.cmd_report(args) == 2
+
+
+def test_cmd_import_creates_session(tmp_path: Path, capsys) -> None:
+    import bookscope.cli as cli
+
+    f = tmp_path / "a.txt"
+    f.write_text("第一章\n甲。\n第二章\n乙。\n", encoding="utf-8")
+    data_dir = tmp_path / "sessions"
+    import argparse
+
+    args = argparse.Namespace(path=str(f), title="测试书", data_dir=str(data_dir))
+    assert cli.cmd_import(args) == 0
+    out = capsys.readouterr().out
+    assert "已导入书库" in out
+    # storage 目录应有至少一个 session 子目录
+    assert any(data_dir.iterdir())
