@@ -4815,17 +4815,11 @@ def agent_cluster_discover(
     对照报告：nodes=全部书，edges=所有 pair 的继承/反驳/补充/落地/检验。
     """
     model = request.model or default_model_for(request.provider)
-    try:
-        client = build_llm_client_from_params(
-            provider=request.provider,
-            api_key=request.api_key,
-            base_url=request.base_url,
-        )
-    except ImportError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error_type": "ProviderSdkMissing", "message": str(exc)},
-        ) from exc
+    client = _build_prewarm_client(
+        provider=request.provider,
+        api_key=request.api_key,
+        base_url=request.base_url,
+    )
 
     # 取每本 perspective（缓存命中秒出）；必须整本全就绪——部分章脉做簇关系
     # 会漏掉未建章的主张，误导整组关系网。先扫一遍全部进度，未就绪一次报全。
