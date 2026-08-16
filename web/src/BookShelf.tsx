@@ -770,7 +770,7 @@ function ShelfBody(props: {
           )}
         </div>
         {!collapsedSources.has(g.source) && (
-        <ul className="flex flex-col rounded border border-[var(--color-rule)] overflow-hidden divide-y divide-[var(--color-rule)]">
+        <ul className="flex flex-col rounded border border-[var(--color-rule)] overflow-hidden divide-y divide-[var(--color-rule)]" style={{ boxShadow: "var(--shadow-soft)" }}>
       {g.items.map((entry) => {
         const s = entry.session;
         const isActive = s.session_id === activeSessionId;
@@ -962,12 +962,12 @@ function BookRow(props: {
   // 一行 = 一条函套书脊领头的目录项。
   // active：整行朱砂淡底 + 左缘朱砂细线（与书脊条并列，强调"这本正在用"）。
   const rowClass = [
-    "group relative flex items-stretch transition-colors",
+    "group relative flex items-stretch transition-all",
     isSelected
       ? "ring-1 ring-inset ring-[var(--color-seal)] bg-[var(--color-seal-soft)]"
       : isActive
         ? "bg-[var(--color-seal-soft)]"
-        : "bg-[var(--color-paper-raised)] hover:bg-[var(--color-paper-sunken)]",
+        : "bg-[var(--color-paper-raised)] hover:bg-[var(--color-paper-sunken)] hover:shadow-[var(--shadow-raised)]",
   ].join(" ");
 
   return (
