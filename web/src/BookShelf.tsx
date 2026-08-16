@@ -278,6 +278,13 @@ export function BookShelf({
       return next;
     });
   };
+  const selectGroup = (sessions: SessionMetadata[]) => {
+    setCompareSelected((prev) => {
+      const next = new Set(prev);
+      for (const s of sessions) next.add(s.session_id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -430,6 +437,7 @@ export function BookShelf({
         query={query}
         onQueryChange={setQuery}
         onToggleSelect={toggleCompareSelect}
+        onSelectGroup={selectGroup}
         onSelectAll={() => {
           if (state.kind === "ready") setCompareSelected(new Set(state.sessions.map((x) => x.session_id)));
         }}
@@ -464,6 +472,7 @@ function ShelfBody(props: {
   query: string;
   onQueryChange: (q: string) => void;
   onToggleSelect: (id: string) => void;
+  onSelectGroup: (sessions: SessionMetadata[]) => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
   onCompareMany: (sessions: SessionMetadata[]) => void;
@@ -492,6 +501,7 @@ function ShelfBody(props: {
     query,
     onQueryChange,
     onToggleSelect,
+    onSelectGroup,
     onSelectAll,
     onClearSelection,
     onCompareMany,
@@ -676,6 +686,16 @@ function ShelfBody(props: {
           </button>
           <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{g.items.length} 本</span>
           <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">· 就绪 {readyInGroup}/{g.items.length}</span>
+          {compareMode && (
+            <button
+              type="button"
+              onClick={() => onSelectGroup(g.items.map((e) => e.session))}
+              title={`把「${g.source}」这 ${g.items.length} 本全部加入对照选择`}
+              className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+            >
+              全选本组
+            </button>
+          )}
           {!compareMode && (
             <div className="ml-auto flex items-center gap-1.5">
               {onPrewarmGroup && g.items.length >= 1 && (
