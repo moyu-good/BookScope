@@ -172,6 +172,15 @@ export function ReportCenter({
             ? `${sessions.length} 本 · ${readyCount} 本就绪 · ${new Set(sessions.map((x) => x.source_folder?.trim() || "手动上传")).size} 个来源组 · ${history.length} 份报告`
             : "加载中…"}
         </span>
+        {sessions && sessions.length > 0 && selectedIds.size === 0 && (
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set(sessions.map((x) => x.session_id)))}
+            className="ml-auto text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition"
+          >
+            全选
+          </button>
+        )}
         {selectedIds.size > 0 && (
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-[var(--color-ink-muted)]">已选 {selectedIds.size} 本</span>
