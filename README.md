@@ -58,10 +58,10 @@ cd web && npm install && npm run dev
 或者完全不用前端，直接用 CLI：
 
 ```bash
-# 一条命令把书变成可分享的 HTML 报告（零 LLM、秒出）
+# 一条命令把书变成可分享的 HTML 报告（秒出）
 bookscope report 书.epub --out 书鉴.html --open
 
-# 深度版书鉴报告（需要 LLM key）
+# 深度版书鉴报告
 bookscope report 书.epub --deep --out 书鉴深度.html --api-key sk-...
 
 # 对一本书直接提问，带原文引用
@@ -81,8 +81,7 @@ bookscope list
 
 不需要 Docker，不需要服务器，不需要从零搭环境。
 
-> 💡 **零配置可用**：结构报告、导入书库、列表、启动服务这些基础功能不需要任何 API key。
-> 深度分析 / 问答 / 跨文本对照属于可选 LLM 功能，需要时才配置自己的 key（默认 DeepSeek）。
+> 💡 **在 AI 助手里直接可用**：BookScope 作为 tool/skill 被调用时，LLM 能力来自当前 AI 助手本身；结构报告、导入、检索等基础能力秒级返回，深度分析自动使用助手已有的模型能力。
 
 ---
 

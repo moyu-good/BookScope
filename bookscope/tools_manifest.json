@@ -5,7 +5,7 @@
   "tools": [
     {
       "name": "bookscope_import",
-      "description": "导入本地文件或文件夹到书库，返回 session_id。零配置，不需要 LLM key。",
+      "description": "导入本地文件或文件夹到书库，返回 session_id。AI 助手可直接调用。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -25,7 +25,7 @@
     },
     {
       "name": "bookscope_report",
-      "description": "给一个本地文件路径，生成结构版 HTML 书鉴报告（零 LLM）。",
+      "description": "给一个本地文件路径，生成结构版 HTML 书鉴报告（秒出，深度版就绪后自动升级）。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -170,8 +170,44 @@
       }
     },
     {
+      "name": "bookscope_deep_report",
+      "description": "出一份认真版书鉴 HTML：深度章脉已就绪时直接给完整书鉴报告；未就绪时先给结构版并自动后台预建深度章脉（AI 助手有 LLM 能力时自动启用）。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "本地文件绝对路径"
+          },
+          "title": {
+            "type": "string",
+            "description": "书名（可选）"
+          },
+          "api_key": {
+            "type": "string",
+            "description": "LLM API key（可选，AI 助手环境通常已自动提供）"
+          },
+          "provider": {
+            "type": "string",
+            "description": "默认 deepseek"
+          },
+          "model": {
+            "type": "string",
+            "description": "默认 deepseek-v4-flash"
+          },
+          "base_url": {
+            "type": "string",
+            "description": "OpenAI 兼容 base_url（可选）"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
       "name": "bookscope_verify",
-      "description": "对一句引文在本地原文里做逐字核验（零配置，不需要 LLM key）。找到逐字命中返回 verified=true；找不到明确返回 false，不冒充已核验。",
+      "description": "对一句引文在本地原文里做逐字核验。找到逐字命中返回 verified=true；找不到明确返回 false，不冒充已核验。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -196,7 +232,7 @@
     },
     {
       "name": "bookscope_prewarm",
-      "description": "对已导入书库的一本书后台预建深度章脉（渐进交付：先返回，后台按章构建，之后用 bookscope_progress 看进度）。需要 LLM key。",
+      "description": "对已导入书库的一本书后台预建深度章脉（渐进交付：先返回，后台按章构建，之后用 bookscope_progress 看进度）。AI 助手有 LLM 能力时自动启用。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -228,7 +264,7 @@
     },
     {
       "name": "bookscope_progress",
-      "description": "查看一本书的深度章脉构建进度（只读缓存，零配置，不需要 LLM key）。用于渐进交付：没建完时先给结构版，建完再给深度版。",
+      "description": "查看一本书的深度章脉构建进度（只读缓存）。用于渐进交付：没建完时先给结构版，建完再给深度版。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -252,7 +288,7 @@
     },
     {
       "name": "bookscope_cross",
-      "description": "两个本地文件直接出跨文本对照 HTML 报告（需要 LLM key）。",
+      "description": "两个本地文件直接出跨文本对照 HTML 报告。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -289,7 +325,7 @@
     },
     {
       "name": "bookscope_cluster",
-      "description": "多个文件（2-8）直接出簇关系网 HTML 报告（两两对照聚合，需要 LLM key）。",
+      "description": "多个文件（2-8）直接出簇关系网 HTML 报告（两两对照聚合）。",
       "parameters": {
         "type": "object",
         "properties": {

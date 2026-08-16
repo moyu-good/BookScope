@@ -203,6 +203,63 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 model=args.get("model", "deepseek-v4-flash"),
                 genre=args.get("genre", "fiction"),
             )
+        if req.tool == "bookscope_deep_report":
+            import os as _os
+
+            from bookscope.local_tools import load_chunks
+
+            path = Path(args["path"])
+            model = args.get("model", "deepseek-v4-flash")
+            sid = import_file(path, data_dir, title=args.get("title"))
+            name, _book, _results, chunks = load_chunks(path, args.get("title"))
+            progress = spine_progress(path, model=model, genre="fiction")
+            api_key = args.get("api_key") or _os.environ.get("DEEPSEEK_API_KEY") or _os.environ.get("OPENAI_API_KEY") or ""
+            if progress["ready"]:
+                from bookscope.agent._internal.chapter_spine_cache import peek_spine_cache
+                from bookscope.report.builders import build_book_report
+                from bookscope.report.service import render_report
+
+                spine = peek_spine_cache(chunks=chunks, model=model, genre="fiction")
+                if spine:
+                    meta = {
+                        "title": f"《{name}》书鉴报告",
+                        "subtitle": f"已覆盖 {progress['built']}/{progress['total']} 章 · 深度章脉就绪",
+                        "seal": "书 鉴",
+                        "nav_title": "书鉴 · 报告导航",
+                        "unit_label": "章",
+                        "generated_by": f"书鉴 BookScope · 《{name}》",
+                    }
+                    html = render_report(build_book_report(spine, meta))
+                    return {"html": html, "coverage": "full", "session_id": sid, "progress": progress}
+            html = structure_report_html(path, title=args.get("title"))
+            result = {
+                "html": html,
+                "coverage": "structure",
+                "session_id": sid,
+                "progress": progress,
+            }
+            if api_key:
+                from bookscope.api.book_sessions import BookSessionStore
+                from bookscope.api.routes.agent import (
+                    _build_prewarm_client,
+                    _start_prewarm_for_session,
+                )
+                from bookscope.api.session_storage import JSONFileSessionStorage
+
+                store = BookSessionStore(storage=JSONFileSessionStorage(root=data_dir))
+                client = _build_prewarm_client(
+                    provider=args.get("provider", "deepseek"),
+                    api_key=api_key,
+                    base_url=args.get("base_url"),
+                )
+                status = _start_prewarm_for_session(
+                    store=store,
+                    book_session_id=sid,
+                    client=client,
+                    model=model,
+                )
+                result["prewarm_status"] = status
+            return result
         if req.tool == "bookscope_verify":
             return verify_quote(
                 Path(args["path"]),

@@ -15,18 +15,19 @@ AI 助手（如 Claude / GPT / 本地 agent）可以通过统一的工具调用�
 
 | 工具名 | 作用 |
 | --- | --- |
-| `bookscope_analyze` | 一键分析：结构版 + 渐进进度 + 导入书库 + 可选本地检索，有 key 自动预建深度章脉 |
+| `bookscope_analyze` | 一键分析：结构版 + 渐进进度 + 导入书库 + 可选本地检索，自动启用深度预建 |
+| `bookscope_deep_report` | 认真版书鉴 HTML：深度就绪给完整报告，未就绪先给结构版并自动预建 |
 | `bookscope_import` | 导入本地文件/文件夹，返回 session_id |
 | `bookscope_report` | 生成结构版 HTML 书鉴报告 |
-| `bookscope_ask` | 对书提问（无 key 自动本地检索） |
+| `bookscope_ask` | 对书提问（AI 助手有 LLM 时智能回答，本地检索兜底） |
 | `bookscope_search` | 文件夹跨书本地检索 |
 | `bookscope_stats` | 统计书库规模 |
 | `bookscope_catalog` | 生成 HTML 书库目录 |
-| `bookscope_verify` | 对一句引文在原文里做逐字核验（零配置，找不到就明确说找不到） |
-| `bookscope_progress` | 查看一本书深度章脉构建进度（零配置，渐进交付） |
-| `bookscope_prewarm` | 对已导入的书后台预建深度章脉，立刻返回（需要 LLM key，配合 progress 轮询） |
-| `bookscope_cross` | 两个文件直接出跨文本对照 HTML 报告（需要 LLM key） |
-| `bookscope_cluster` | 2-8 个文件两两聚合，出文档簇关系网 HTML 报告（需要 LLM key） |
+| `bookscope_verify` | 对一句引文在原文里做逐字核验（找不到就明确说找不到） |
+| `bookscope_progress` | 查看一本书深度章脉构建进度（渐进交付） |
+| `bookscope_prewarm` | 对已导入的书后台预建深度章脉，立刻返回（配合 progress 轮询） |
+| `bookscope_cross` | 两个文件直接出跨文本对照 HTML 报告 |
+| `bookscope_cluster` | 2-8 个文件两两聚合，出文档簇关系网 HTML 报告 |
 
 ## 调用方式
 
@@ -58,7 +59,8 @@ POST /api/tools/invoke     {"tool": "bookscope_cluster", "arguments": {"files": 
 POST /api/tools/invoke     {"tool": "bookscope_progress", "arguments": {"path": "/path/to/book.epub"}}
 POST /api/tools/invoke     {"tool": "bookscope_verify", "arguments": {"path": "/path/to/book.epub", "quote": "要核验的引文"}}
 POST /api/tools/invoke     {"tool": "bookscope_analyze", "arguments": {"path": "/path/to/book.epub", "question": "这本书的核心主张？"}}
-POST /api/tools/invoke     {"tool": "bookscope_prewarm", "arguments": {"session_id": "...", "api_key": "sk-..."}}
+POST /api/tools/invoke     {"tool": "bookscope_deep_report", "arguments": {"path": "/path/to/book.epub"}}
+POST /api/tools/invoke     {"tool": "bookscope_prewarm", "arguments": {"session_id": "..."}}
 ```
 
 ## 接入 AI 助手的建议
