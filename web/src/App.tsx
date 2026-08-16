@@ -2251,6 +2251,34 @@ export function App() {
     [apiKey, provider, model, baseUrl],
   );
 
+  /** 生成 HTML 书库目录（零配置，不需要 key） */
+  const handleGenerateCatalog = useCallback(async () => {
+    const folder = window.prompt("输入书库文件夹绝对路径（如 D:\\书）");
+    if (!folder || !folder.trim()) return;
+    try {
+      const resp = await fetch("/api/tools/catalog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: folder.trim(), out: "bookscope-catalog" }),
+      });
+      if (!resp.ok) {
+        let msg = `生成目录失败（${resp.status}）`;
+        try {
+          const d = (await resp.json()) as { detail?: string };
+          if (typeof d?.detail === "string") msg = d.detail;
+        } catch {
+          /* 非 JSON */
+        }
+        alert(msg);
+        return;
+      }
+      const data = (await resp.json()) as { index?: string };
+      if (data.index) window.open(data.index, "_blank");
+    } catch {
+      alert("生成目录失败：网络错误");
+    }
+  }, []);
+
   /** 出书鉴报告：/agent/book/report 拿 HTML → 下载。章脉没建过后端 404，弹提示。 */
   const openReport = useCallback(async (s: SessionMetadata) => {
     // 结构版报告不需要 key；后端只读缓存/零 LLM。没 key 时给一个占位串过 schema。
@@ -2751,6 +2779,7 @@ export function App() {
                 progressModel={model.trim() || undefined}
                 onReopenReport={(e) => void handleReopenReport(e)}
                 onImportFolder={handleImportFolder}
+                onGenerateCatalog={handleGenerateCatalog}
                 importProgress={importProgress}
                 onOpenHistory={() => setHistoryOpen(true)}
                 onOpenReportCenter={() => setReportCenterOpen(true)}

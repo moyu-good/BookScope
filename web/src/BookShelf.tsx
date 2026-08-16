@@ -55,6 +55,8 @@ export interface BookShelfProps {
   onOpenWorkbench?: (sessions: SessionMetadata[]) => void;
   /** 批量导入本地书库（仅本地模式） */
   onImportFolder?: () => void;
+  /** 生成 HTML 书库目录（零配置） */
+  onGenerateCatalog?: () => void;
   /** 批量导入进度（书柜内进度条） */
   importProgress?: { done: number; total: number; current: string | null } | null;
   /** 打开报告历史 */
@@ -248,6 +250,7 @@ export function BookShelf({
   onCompareMany,
   onOpenWorkbench,
   onImportFolder,
+  onGenerateCatalog,
   importProgress,
   onOpenHistory,
   onOpenReportCenter,
@@ -394,6 +397,17 @@ export function BookShelf({
             style={{ fontFamily: "var(--font-display)" }}
           >
             导入书库
+          </button>
+        )}
+        {onGenerateCatalog && (
+          <button
+            type="button"
+            onClick={onGenerateCatalog}
+            title="把一个文件夹生成可浏览的 HTML 书库目录"
+            className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            生成目录
           </button>
         )}
         <button
