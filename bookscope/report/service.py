@@ -141,6 +141,12 @@ section h2 .no{{font-family:var(--font-sans);font-size:13px;color:var(--ink-3);l
 #graph-svg{{display:block;width:100%;cursor:grab}}
 #graph-svg:active{{cursor:grabbing}}
 #graph-svg text{{user-select:none;pointer-events:none}}
+.edge{{transition:opacity .15s;cursor:pointer}}
+.edge:hover{{opacity:1}}
+.edge:hover path{{stroke-width:3}}
+.node{{cursor:pointer;transition:transform .15s}}
+.node:hover{{transform:translateY(-2px)}}
+.node:hover rect{{stroke-width:2.5;filter:drop-shadow(0 4px 6px rgba(0,0,0,.14))}}
 
 /* 引文 */
 .quote{{background:var(--cinnabar-soft);border-left:4px solid var(--cinnabar);padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}}
