@@ -240,6 +240,7 @@ class BookSessionStore:
             "genre": "",
             "created_at": "",
             "last_accessed_at": "",
+            "source_folder": getattr(assembler, "source_folder", None),
         }
 
     def ensure_genre(

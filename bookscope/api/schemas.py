@@ -2466,6 +2466,9 @@ class SessionMetadata(BaseModel):
         ...,
         description="ISO-8601 UTC 时间戳；最近一次访问 session 的时刻。",
     )
+    source_folder: str | None = Field(
+        default=None, description="批量导入来源文件夹（本地模式）。"
+    )
 
 
 class SessionListResponse(BaseModel):

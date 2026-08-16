@@ -35,6 +35,8 @@ export interface SessionMetadata {
   genre?: string;
   /** 叙事型 narrative / 论述型 discursive(exp035,按内容判);决定书上哪套镜头。空 = 未判。 */
   mode?: string;
+  /** 批量导入来源文件夹（本地模式，后端持久化） */
+  source_folder?: string;
 }
 
 export interface BookShelfProps {
@@ -164,7 +166,10 @@ function groupBySource(entries: ShelfEntry[]): { source: string; items: ShelfEnt
   const sources = getImportSources();
   const groups = new Map<string, ShelfEntry[]>();
   for (const e of entries) {
-    const src = sources[e.session.session_id]?.trim() || "手动上传";
+    const src =
+      e.session.source_folder?.trim() ||
+      sources[e.session.session_id]?.trim() ||
+      "手动上传";
     if (!groups.has(src)) groups.set(src, []);
     groups.get(src)!.push(e);
   }

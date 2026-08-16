@@ -169,6 +169,9 @@ class JSONFileSessionStorage:
                 "created_at": created_at,
                 "last_accessed_at": now,
             }
+            source_folder = getattr(assembler, "source_folder", None)
+            if source_folder:
+                metadata["source_folder"] = source_folder
             # genre 是懒检测出来后写回的，重新 save（如重传同一本）时尽量复用旧值，
             # 别把已分好的类冲掉——和 created_at 一样的"复用旧值"语义。
             existing_genre = _read_genre_or_empty(session_dir / _METADATA_FILE)

@@ -627,6 +627,7 @@ def _run_folder_import(
                 session_vector_store=vector_store,
             )
             assembler.chapter_detection_stats = chapter_stats.to_dict()
+            assembler.source_folder = str(path.parent)
             session_id = uuid.uuid4().hex[:16]
             store.register(session_id, assembler)
             imported.append((session_id, chunks))
