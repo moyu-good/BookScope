@@ -238,5 +238,26 @@ def cross_files(
     return render_report(inp)
 
 
+def list_sessions(data_dir: Path) -> list[dict]:
+    """列出书库里已导入的书。"""
+    import json
+
+    from bookscope.api.session_storage import JSONFileSessionStorage
+
+    storage = JSONFileSessionStorage(root=data_dir)
+    books = []
+    for sid in sorted(storage.list_all()):
+        meta_path = data_dir / sid / "metadata.json"
+        title = sid
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                title = meta.get("book_title", sid)
+            except Exception:  # noqa: BLE001
+                pass
+        books.append({"session_id": sid, "book_title": title})
+    return books
+
+
 def default_data_dir() -> Path:
     return Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))
