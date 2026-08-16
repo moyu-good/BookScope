@@ -635,9 +635,16 @@ function ShelfBody(props: {
 
   if (state.sessions.length === 0) {
     return (
-      <p className="text-sm text-[var(--color-ink-muted)] italic">
-        还没上传过书。下面贰区拖一本 epub / txt / pdf 进来即可入库。
-      </p>
+      <div
+        className="rounded-xl border border-dashed border-[var(--color-rule)] px-6 py-10 text-center"
+        style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
+      >
+        <div className="text-4xl mb-2">📚</div>
+        <p className="text-sm font-bold text-[var(--color-ink)]">书柜还是空的</p>
+        <p className="text-xs text-[var(--color-ink-muted)] mt-1">
+          拖一本 epub / txt / pdf / docx / md 进来，或点「导入文件夹」批量入库。
+        </p>
+      </div>
     );
   }
 
