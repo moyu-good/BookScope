@@ -535,6 +535,36 @@ def agent_ask(
     错误分层按 ADR-003 约定的 provider / loop 错误体系翻译。
     """
     assembler = _resolve_assembler(store, request.book_session_id)
+
+    # 按章精读问答：指定 chapter 时只精读该章（单章直读，不依赖全书检索/章脉）
+    if request.chapter is not None:
+        client = _build_client_or_raise(request)
+        model = request.model or default_model_for(request.provider)
+        _full_text, chunks = _long_context_inputs(assembler)
+        chapter_chunks = [c for c in chunks if c.get("chapter") == request.chapter]
+        if not chapter_chunks:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_type": "ChapterNotFound", "message": f"第 {request.chapter} 章不存在"},
+            )
+        chapter_text = "\n".join(str(c.get("text", "")) for c in chapter_chunks)
+        lc_result = run_long_context(
+            request.question,
+            full_text=chapter_text,
+            chunks=chapter_chunks,
+            llm_client=client,
+            model=model,
+            session_id=request.book_session_id,
+        )
+        if lc_result is not None:
+            return AgentAskResponse(
+                answer=lc_result.answer,
+                citations=lc_result.citations,
+                trace=_serialize_trace(lc_result.trace),
+                book_session_id=request.book_session_id,
+                route_type="chapter",
+            )
+
     backends = assembler.build_all()
 
     search_backend = backends["search"]

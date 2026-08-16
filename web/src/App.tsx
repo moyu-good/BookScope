@@ -1862,7 +1862,7 @@ export function App() {
 
   /** 报告内追问：调 /agent/ask（单书报告），答案展示在预览下方。 */
   const handleReportAsk = useCallback(
-    async (question: string, preview: ReportPreviewState) => {
+    async (question: string, preview: ReportPreviewState, chapter?: number) => {
       const common = {
         provider,
         api_key: apiKey,
@@ -1880,7 +1880,7 @@ export function App() {
         resp = await fetch("/api/agent/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...common, book_session_id: preview.sessionId, question }),
+          body: JSON.stringify({ ...common, book_session_id: preview.sessionId, question, chapter }),
         });
       } else {
         throw new Error("这份报告不支持追问");
@@ -3237,7 +3237,7 @@ export function App() {
           preview={reportPreview}
           onAsk={
             reportPreview.sessionId || (reportPreview.sessionIds && reportPreview.sessionIds.length >= 2)
-              ? (q) => handleReportAsk(q, reportPreview)
+              ? (q, ch) => handleReportAsk(q, reportPreview, ch)
               : undefined
           }
           onRegenerate={handleRegenerateReport}

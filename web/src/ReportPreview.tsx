@@ -28,12 +28,13 @@ export function ReportPreview({
 }: {
   preview: ReportPreviewState;
   /** 追问回调：问题 → 答案文本（由 App 调 /agent/ask）；不传则隐藏追问框 */
-  onAsk?: (question: string) => Promise<string>;
+  onAsk?: (question: string, chapter?: number) => Promise<string>;
   /** 重新生成（结构版/部分版时可用，拉取更全版本） */
   onRegenerate?: () => Promise<void>;
   onClose: () => void;
 }) {
   const [question, setQuestion] = useState("");
+  const [chapter, setChapter] = useState("");
   const [asking, setAsking] = useState(false);
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
@@ -51,10 +52,15 @@ export function ReportPreview({
   const submitAsk = async () => {
     const q = question.trim();
     if (!q || !onAsk || asking) return;
+    const ch = chapter.trim() ? Number(chapter.trim()) : undefined;
+    if (chapter.trim() && (!Number.isInteger(ch) || (ch ?? 0) < 1)) {
+      setError("章号要是正整数");
+      return;
+    }
     setAsking(true);
     setError("");
     try {
-      const ans = await onAsk(q);
+      const ans = await onAsk(q, ch);
       setAnswer(ans);
     } catch (e) {
       setError(e instanceof Error ? e.message : "追问失败");
@@ -94,6 +100,15 @@ export function ReportPreview({
         <div className="ml-auto flex items-center gap-2">
           {onAsk && (
             <div className="flex items-center gap-1.5 mr-2">
+              <input
+                type="number"
+                min={1}
+                value={chapter}
+                onChange={(e) => setChapter(e.target.value)}
+                placeholder="章"
+                title="可选：只精读这一章回答"
+                className="w-14 text-xs px-2 py-1.5 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] outline-none focus:border-[var(--color-seal)]"
+              />
               <input
                 type="text"
                 value={question}
