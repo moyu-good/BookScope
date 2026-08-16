@@ -114,6 +114,9 @@ bookscope cross 书A.epub 书B.pdf --out 对照.html --api-key sk-...
 
 # 对一本书直接提问，输出带原文引用的答案
 bookscope ask 书.epub "这本书的核心主张是什么？" --api-key sk-...
+
+# 先预建章脉缓存，后续 report/cross/ask 会更快
+bookscope prewarm 书.epub --api-key sk-...
 ```
 
 > 💡 默认使用 **DeepSeek `deepseek-v4-flash`**：国内可直连、便宜、适合长文本批量分析。也支持 OpenAI 兼容接口，自己搭的代理/网关都能接。

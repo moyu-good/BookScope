@@ -172,6 +172,33 @@ def cmd_ask(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_prewarm(args: argparse.Namespace) -> int:
+    """预建一本书的章脉缓存（后续 report/cross/ask 命中秒出）。"""
+    api_key = args.api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("需要 LLM key：--api-key 或环境变量 DEEPSEEK_API_KEY / OPENAI_API_KEY", file=sys.stderr)
+        return 2
+    path = Path(args.path)
+    if not path.exists():
+        print(f"文件不存在: {path}", file=sys.stderr)
+        return 1
+    provider = args.provider or "deepseek"
+    model = args.model or "deepseek-v4-flash"
+    try:
+        client = _build_client(provider, api_key, args.base_url, model)
+    except Exception as exc:  # noqa: BLE001
+        print(f"LLM client 构建失败: {exc}", file=sys.stderr)
+        return 2
+
+    from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
+
+    title, chunks = _load_chunks(path, args.title)
+    print(f"正在预建《{title}》章脉（首次较慢，之后走缓存）…")
+    spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
+    print(f"章脉就绪：{len(spine)} 章")
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     path = Path(args.path)
     if not path.exists():
@@ -226,6 +253,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_report.add_argument("--title", default=None, help="书名（默认取文件名）")
     p_report.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
     p_report.set_defaults(func=cmd_report)
+
+    p_prewarm = sub.add_parser("prewarm", help="预建一本书的章脉缓存（后续操作秒出）")
+    p_prewarm.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
+    p_prewarm.add_argument("--title", default=None, help="书名（默认取文件名）")
+    p_prewarm.add_argument("--provider", default="deepseek", help="LLM 厂商（默认 deepseek）")
+    p_prewarm.add_argument("--api-key", default=None, help="LLM API key（默认读 DEEPSEEK_API_KEY / OPENAI_API_KEY）")
+    p_prewarm.add_argument("--model", default=None, help="模型名（默认 deepseek-v4-flash）")
+    p_prewarm.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
+    p_prewarm.set_defaults(func=cmd_prewarm)
 
     p_ask = sub.add_parser("ask", help="对一本书直接提问，输出带原文引用的答案")
     p_ask.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")

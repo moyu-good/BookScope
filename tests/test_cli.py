@@ -55,3 +55,19 @@ def test_cmd_ask_without_key_returns_2(tmp_path: Path, monkeypatch) -> None:
         provider="deepseek", api_key=None, model=None, base_url=None, json=False,
     )
     assert cli.cmd_ask(args) == 2
+
+
+def test_cmd_prewarm_without_key_returns_2(tmp_path: Path, monkeypatch) -> None:
+    import bookscope.cli as cli
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    f = tmp_path / "a.txt"
+    f.write_text("第一章\n甲。\n", encoding="utf-8")
+    import argparse
+
+    args = argparse.Namespace(
+        path=str(f), title=None, provider="deepseek",
+        api_key=None, model=None, base_url=None,
+    )
+    assert cli.cmd_prewarm(args) == 2
