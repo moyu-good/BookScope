@@ -148,6 +148,10 @@ section h2 .no{{font-family:var(--font-sans);font-size:13px;color:var(--ink-3);l
 .node:hover{{transform:translateY(-2px)}}
 .node:hover rect{{stroke-width:2.5;filter:drop-shadow(0 4px 6px rgba(0,0,0,.14))}}
 
+/* 关系说明列表 */
+.edge-note{{transition:background .15s,padding-left .15s,border-radius .15s}}
+.edge-note:hover{{background:var(--cinnabar-soft);padding-left:6px;border-radius:6px}}
+
 /* 引文 */
 .quote{{background:var(--cinnabar-soft);border-left:4px solid var(--cinnabar);padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0}}
 .quote .seal-mark{{display:inline-block;color:var(--cinnabar);border:1px solid var(--cinnabar);padding:0 7px;border-radius:4px;font-size:11px;font-weight:bold;margin-right:8px;vertical-align:1px}}
