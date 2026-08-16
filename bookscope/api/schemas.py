@@ -599,6 +599,22 @@ class PrewarmSpineResponse(BaseModel):
     book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
 
 
+class BookReportRequest(BaseModel):
+    """POST /api/agent/book/report 请求体：出书鉴报告。
+
+    只读章脉缓存，章脉没建过不主动建（返回 404 提示先跑分析 / 预建章脉）。
+    body 与整本书端点一致（BYOK）；genre 服务端固定 fiction（与整本书功能同一条 spine 缓存键）。
+    """
+
+    book_session_id: str = Field(..., min_length=1, description="Book session 标识。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
 class PrewarmSpineStatusResponse(BaseModel):
     """GET /api/agent/prewarm-spine/status 响应体：轮询后台预建进度。
 

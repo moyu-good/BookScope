@@ -48,6 +48,9 @@ from bookscope.agent import (
     route_question,
     run_fast_path,
 )
+from bookscope.report.builders import build_book_report
+from bookscope.report.service import render_report
+
 from bookscope.agent._internal.chapter_spine_cache import (
     get_or_build_spine,
     peek_spine_cache,
@@ -155,6 +158,7 @@ from bookscope.api.deployment import (
 from bookscope.api.schemas import (
     AgentAskRequest,
     AgentAskResponse,
+    BookReportRequest,
     AnnotationsRequest,
     AnnotationsResponse,
     ArgumentStructureRequest,
@@ -4350,6 +4354,41 @@ def agent_redhead_format_check(
         book_session_id=request.book_session_id,
         trace=_run_trace(rec, full_text, _t0),
     )
+
+
+@agent_router.post("/agent/book/report")
+def agent_book_report(
+    request: BookReportRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> Response:
+    """书鉴报告：章脉缓存 → 书鉴风格 HTML 报告（P1）。
+
+    只读缓存（peek），章脉没建过就 404 提示先跑分析 / 预建——报告不主动触发全书精读。
+    返回完整 HTML 页面（media_type=text/html），前端可直接下载/新窗口打开。
+    """
+    assembler = _resolve_assembler(store, request.book_session_id)
+    model = request.model or default_model_for(request.provider)
+    _, chunks = _long_context_inputs(assembler)
+    spine = peek_spine_cache(chunks=chunks, model=model, genre="fiction")
+    if not spine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_type": "SpineNotBuilt",
+                "message": "章脉未建：先跑一次整本书分析（或预建章脉）再出报告",
+            },
+        )
+    book_title, _ = _extract_book_meta(assembler)
+    display_title = book_title if book_title and book_title != "unknown" else "本书"
+    inp = build_book_report(spine, {
+        "title": f"《{display_title}》书鉴报告",
+        "seal": "书 鉴",
+        "nav_title": "书鉴 · 报告导航",
+        "unit_label": "章",
+        "generated_by": f"书鉴 BookScope · 《{display_title}》",
+    })
+    html = render_report(inp)
+    return Response(content=html, media_type="text/html; charset=utf-8")
 
 
 __all__ = ["agent_router"]
