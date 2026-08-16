@@ -1761,6 +1761,58 @@ export function App() {
     [apiKey, provider, model, baseUrl],
   );
 
+  /** 重新生成更全版报告：结构版/部分版时再调端点，拉取最新覆盖。 */
+  const handleRegenerateReport = useCallback(async (): Promise<void> => {
+    const cur = reportPreview;
+    if (!cur) return;
+    if (!apiKey) {
+      alert("先配置 LLM key（设置里）再重新生成");
+      return;
+    }
+    const common = {
+      provider,
+      api_key: apiKey,
+      model: model.trim() || undefined,
+      base_url: effectiveBaseUrl() || undefined,
+    };
+    try {
+      let resp: Response;
+      if (cur.sessionIds && cur.sessionIds.length >= 2) {
+        resp = await fetch("/api/agent/cross-book/report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...common, book_session_ids: cur.sessionIds }),
+        });
+      } else if (cur.sessionId) {
+        resp = await fetch("/api/agent/book/report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...common, book_session_id: cur.sessionId }),
+        });
+      } else {
+        return;
+      }
+      if (!resp.ok) {
+        let msg = `重新生成失败（${resp.status}）`;
+        try {
+          const d = (await resp.json()) as { detail?: { message?: string } };
+          if (d?.detail?.message) msg = d.detail.message;
+        } catch {
+          /* 非 JSON 错误体 */
+        }
+        alert(msg);
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const coverage = resp.headers.get("X-Report-Coverage") ?? undefined;
+      URL.revokeObjectURL(cur.url); // 释放旧 blob
+      setReportPreview({ ...cur, url, coverage });
+    } catch {
+      alert("重新生成失败：网络错误");
+    }
+  }, [reportPreview, apiKey, provider, model, baseUrl]);
+
   /** 报告内追问：调 /agent/ask（单书报告），答案展示在预览下方。 */
   const handleReportAsk = useCallback(
     async (question: string, preview: ReportPreviewState) => {
@@ -3122,6 +3174,7 @@ export function App() {
               ? (q) => handleReportAsk(q, reportPreview)
               : undefined
           }
+          onRegenerate={handleRegenerateReport}
           onClose={() => {
             URL.revokeObjectURL(reportPreview.url);
             setReportPreview(null);

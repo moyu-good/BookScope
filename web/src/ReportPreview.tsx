@@ -23,17 +23,21 @@ export interface ReportPreviewState {
 export function ReportPreview({
   preview,
   onAsk,
+  onRegenerate,
   onClose,
 }: {
   preview: ReportPreviewState;
   /** 追问回调：问题 → 答案文本（由 App 调 /agent/ask）；不传则隐藏追问框 */
   onAsk?: (question: string) => Promise<string>;
+  /** 重新生成（结构版/部分版时可用，拉取更全版本） */
+  onRegenerate?: () => Promise<void>;
   onClose: () => void;
 }) {
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
 
   const download = () => {
     const a = document.createElement("a");
@@ -110,6 +114,20 @@ export function ReportPreview({
                 {asking ? "追问中…" : "追问"}
               </button>
             </div>
+          )}
+          {onRegenerate && preview.coverage && preview.coverage !== "full" && (
+            <button
+              type="button"
+              onClick={() => {
+                setRegenerating(true);
+                void onRegenerate().finally(() => setRegenerating(false));
+              }}
+              disabled={regenerating}
+              className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-gold,#9C7A2E)] text-[var(--color-gold,#9C7A2E)] hover:brightness-110 disabled:opacity-40 transition"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {regenerating ? "更新中…" : "重新生成更全版"}
+            </button>
           )}
           <button
             type="button"
