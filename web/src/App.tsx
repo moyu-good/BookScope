@@ -2028,32 +2028,6 @@ export function App() {
   /** 报告内追问：调 /agent/ask（单书报告），答案展示在预览下方。 */
   const handleReportAsk = useCallback(
     async (question: string, preview: ReportPreviewState, chapter?: number) => {
-      // 零配置：单书追问没有 key 时走本地检索
-      if (!apiKey && preview.sessionId) {
-        const lresp = await fetch("/api/tools/ask-local", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: preview.sessionId, question }),
-        });
-        if (!lresp.ok) {
-          let msg = `本地追问失败（${lresp.status}）`;
-          try {
-            const d = (await lresp.json()) as { detail?: string };
-            if (typeof d?.detail === "string") msg = d.detail;
-          } catch {
-            /* 非 JSON */
-          }
-          throw new Error(msg);
-        }
-        const data = (await lresp.json()) as { results?: { chapter?: number; text?: string; score?: number }[] };
-        if (!data.results || data.results.length === 0) {
-          return "本地检索没有找到相关片段（配置 LLM key 可获得智能回答）";
-        }
-        return (
-          "本地检索结果（未配置 LLM key）：\n\n" +
-          data.results.map((r) => `[第${r.chapter ?? "?"}章] ${r.text ?? ""}`).join("\n\n")
-        );
-      }
       const common = {
         provider,
         api_key: apiKey,
@@ -2097,41 +2071,8 @@ export function App() {
     const folder = window.prompt("输入本地书库文件夹绝对路径（如 D:\\书）");
     if (!folder || !folder.trim()) return;
     const path = folder.trim();
-    // 零配置路径：没 key 也能导入（tools API 只做本地 ingest，不调 LLM）
     if (!apiKey) {
-      try {
-        const resp = await fetch("/api/tools/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path }),
-        });
-        if (!resp.ok) {
-          let msg = `导入失败（${resp.status}）`;
-          try {
-            const d = (await resp.json()) as { detail?: string };
-            if (typeof d?.detail === "string") msg = d.detail;
-          } catch {
-            /* 非 JSON */
-          }
-          alert(msg);
-          return;
-        }
-        const data = (await resp.json()) as {
-          imported?: { session_id?: string | null; file?: string; book_title?: string | null; error?: string | null }[];
-          session_id?: string;
-          book_title?: string;
-        };
-        const entries = data.imported ?? (data.session_id ? [{ session_id: data.session_id, book_title: data.book_title }] : []);
-        rememberImportSources(
-          entries
-            .filter((r) => r.session_id && !r.error)
-            .map((r) => ({ session_id: r.session_id!, source_folder: path })),
-        );
-        alert(`导入完成：${entries.filter((r) => r.session_id && !r.error).length} 本`);
-        setShelfRefresh((n) => n + 1);
-      } catch {
-        alert("导入失败：网络错误");
-      }
+      alert("先配置 LLM key（设置里）再导入");
       return;
     }
     try {
@@ -2251,38 +2192,12 @@ export function App() {
     [apiKey, provider, model, baseUrl],
   );
 
-  /** 生成 HTML 书库目录（零配置，不需要 key） */
-  const handleGenerateCatalog = useCallback(async () => {
-    const folder = window.prompt("输入书库文件夹绝对路径（如 D:\\书）");
-    if (!folder || !folder.trim()) return;
-    try {
-      const resp = await fetch("/api/tools/catalog", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: folder.trim(), out: "bookscope-catalog" }),
-      });
-      if (!resp.ok) {
-        let msg = `生成目录失败（${resp.status}）`;
-        try {
-          const d = (await resp.json()) as { detail?: string };
-          if (typeof d?.detail === "string") msg = d.detail;
-        } catch {
-          /* 非 JSON */
-        }
-        alert(msg);
-        return;
-      }
-      const data = (await resp.json()) as { index?: string };
-      if (data.index) window.open(data.index, "_blank");
-    } catch {
-      alert("生成目录失败：网络错误");
-    }
-  }, []);
-
   /** 出书鉴报告：/agent/book/report 拿 HTML → 下载。章脉没建过后端 404，弹提示。 */
   const openReport = useCallback(async (s: SessionMetadata) => {
-    // 结构版报告不需要 key；后端只读缓存/零 LLM。没 key 时给一个占位串过 schema。
-    const reportKey = apiKey || "local-no-key";
+    if (!apiKey) {
+      alert("先配置 LLM key（设置里）再出报告");
+      return;
+    }
     try {
       const resp = await fetch("/api/agent/book/report", {
         method: "POST",
@@ -2290,7 +2205,7 @@ export function App() {
         body: JSON.stringify({
           book_session_id: s.session_id,
           provider,
-          api_key: reportKey,
+          api_key: apiKey,
           model: model.trim() || undefined,
           base_url: effectiveBaseUrl() || undefined,
         }),
@@ -2355,16 +2270,6 @@ export function App() {
    *  进度回调让外层把当前这条的进度条折出来。 */
   async function uploadOne(item: UploadItem): Promise<UploadResponse> {
     setIngestProgress(INGEST_PROGRESS_INITIAL);
-    // 零配置：没 key 时走本地 tools/upload（不做 LLM KG，只 ingest + BM25）
-    if (!apiKey) {
-      const fd = new FormData();
-      fd.append("file", item.file);
-      fd.append("book_title", item.title);
-      fd.append("language", language);
-      const resp = await fetch("/api/tools/upload", { method: "POST", body: fd });
-      if (!resp.ok) throw await parseError(resp);
-      return (await resp.json()) as UploadResponse;
-    }
     let finalResult: UploadResponse | null = null;
     const stream = streamUploadBook({
       file: item.file,
@@ -2408,7 +2313,7 @@ export function App() {
    *  且进度条是共享的一根，串行才说得清现在在传哪本。 */
   async function handleUpload(e: FormEvent) {
     e.preventDefault();
-    if (uploading) return;
+    if (uploading || !apiKey) return;
     // 只传还没成功的（queued / 之前失败过想重试的 error）
     const pending = queue.filter(
       (it) => it.status === "queued" || it.status === "error",
@@ -2728,40 +2633,16 @@ export function App() {
           )}
 
           {!apiKey && (
-            <div
-              className="mb-6 rounded-lg border border-[var(--color-seal)]/40 px-4 py-3 text-sm text-[var(--color-ink)]"
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="mb-6 w-full text-left rounded-lg border border-[var(--color-seal)]/40 px-4 py-3 text-sm text-[var(--color-ink)] hover:border-[var(--color-seal)] transition-colors"
               style={{ background: "var(--color-seal-soft)" }}
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-seal)] text-[var(--color-seal)]"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  零配置模式
-                </span>
-                <span>基础功能可直接用：上传 / 导入 / 结构报告 / 章节摘要 / 本地问答</span>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-muted)]">
-                <span>深度分析 / 跨文本对照需要 LLM key 时才配置。</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText("bookscope self-test").catch(() => {});
-                    alert("已复制：bookscope self-test");
-                  }}
-                  className="px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-seal)] hover:border-[var(--color-seal)] transition-colors"
-                >
-                  复制自检命令
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen(true)}
-                  className="px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-seal)] hover:border-[var(--color-seal)] transition-colors"
-                >
-                  去设置（可选）
-                </button>
-              </div>
-            </div>
+              先填一个 LLM 的 API key 才能用，点这里去
+              <span style={{ color: "var(--color-seal)" }}>设置</span>
+              （左栏底部，自带的 key、不上传服务器）。
+            </button>
           )}
 
           {/* 主画布：一次只显示一件事 */}
@@ -2789,7 +2670,6 @@ export function App() {
                 progressModel={model.trim() || undefined}
                 onReopenReport={(e) => void handleReopenReport(e)}
                 onImportFolder={handleImportFolder}
-                onGenerateCatalog={handleGenerateCatalog}
                 importProgress={importProgress}
                 onOpenHistory={() => setHistoryOpen(true)}
                 onOpenReportCenter={() => setReportCenterOpen(true)}

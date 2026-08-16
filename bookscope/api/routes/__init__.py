@@ -8,6 +8,5 @@ from bookscope.api.routes.agent import agent_router
 from bookscope.api.routes.books import books_router
 from bookscope.api.routes.health import health_router
 from bookscope.api.routes.sessions import sessions_router
-from bookscope.api.routes.tools import tools_router
 
-__all__ = ["agent_router", "books_router", "health_router", "sessions_router", "tools_router"]
+__all__ = ["agent_router", "books_router", "health_router", "sessions_router"]

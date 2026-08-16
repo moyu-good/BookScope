@@ -37,15 +37,15 @@ def _chunks_to_dicts(results: list) -> list[dict]:
 
 
 def _load_chunks(path: Path, title: str | None = None) -> tuple[str, list[dict]]:
-    """读取一本书并切成报告/章脉需要的 dict chunks（复用 local_tools）。"""
-    from bookscope.local_tools import load_chunks as _load
-
-    name, _book, _results, chunks = _load(path, title)
-    return name, chunks
+    """读取一本书并切成报告/章脉需要的 dict chunks。"""
+    book = load_text(path, title=title)
+    results, _stats = chunk_book_with_stats(book)
+    name = title or path.stem
+    return name, _chunks_to_dicts(results)
 
 
 def _build_client(provider: str, api_key: str, base_url: str | None, model: str):
-    from bookscope.api.dependencies import build_llm_client_from_params
+    from bookscope.agent import build_llm_client_from_params
 
     return build_llm_client_from_params(
         provider=provider,
@@ -84,7 +84,7 @@ def cmd_cross(args: argparse.Namespace) -> int:
             print(f"文件不存在: {path}", file=sys.stderr)
             return 1
         title, chunks = _load_chunks(path, getattr(args, f"title{idx + 1}", None))
-        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…", file=sys.stderr)
+        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…")
         spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
         slug = f"b{idx}"
         perspectives.append(build_book_perspective(
@@ -201,7 +201,7 @@ def cmd_cluster(args: argparse.Namespace) -> int:
             print(f"文件不存在: {path}", file=sys.stderr)
             return 1
         title, chunks = _load_chunks(path, getattr(args, f"title{idx + 1}", None))
-        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…", file=sys.stderr)
+        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…")
         spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
         perspectives.append(build_book_perspective(
             spine=spine, book_title=title, slug=f"b{idx}",
@@ -290,111 +290,75 @@ def cmd_cluster(args: argparse.Namespace) -> int:
 
 def cmd_list(args: argparse.Namespace) -> int:
     """列出书库里已导入的书。"""
-    import json
-
     from bookscope.api.session_storage import JSONFileSessionStorage
 
     storage = JSONFileSessionStorage(root=Path(args.data_dir))
     ids = storage.list_all()
-    books = []
+    if not ids:
+        print("书库为空")
+        return 0
     for sid in sorted(ids):
         meta_path = Path(args.data_dir) / sid / "metadata.json"
         title = sid
         if meta_path.exists():
+            import json
+
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
                 title = meta.get("book_title", sid)
             except Exception:  # noqa: BLE001
                 pass
-        books.append({"session_id": sid, "book_title": title})
-    if getattr(args, "json", False):
-        print(json.dumps({"books": books, "count": len(books)}, ensure_ascii=False, indent=2))
-    else:
-        if not books:
-            print("书库为空")
-        else:
-            for b in books:
-                print(f"{b['session_id']}	{b['book_title']}")
+        print(f"{sid}	{title}")
     return 0
 
 
-_IMPORT_EXTS = {".txt", ".epub", ".pdf", ".docx", ".md", ".markdown"}
-
-
-def _import_one(path: Path, data_dir: Path, title: str | None = None) -> str:
-    """导入单个文件，返回 session_id（复用 local_tools）。"""
-    from bookscope.local_tools import import_file
-
-    return import_file(path, data_dir, title=title)
-
-
 def cmd_import(args: argparse.Namespace) -> int:
-    """把本地文件/文件夹导入书库（Web 直接可见），支持多个路径。"""
-    import json
-
-    files: list[Path] = []
-    for raw in args.paths:
-        path = Path(raw)
-        if not path.exists():
-            print(f"路径不存在: {path}", file=sys.stderr)
-            continue
-        if path.is_dir():
-            found = [p for p in path.rglob("*") if p.is_file() and p.suffix.lower() in _IMPORT_EXTS]
-            if not found:
-                print(f"文件夹里没有支持的文件: {path}", file=sys.stderr)
-            files.extend(found)
-        else:
-            files.append(path)
-    if not files:
+    """把本地文件导入书库（Web 直接可见）。"""
+    path = Path(args.path)
+    if not path.exists():
+        print(f"文件不存在: {path}", file=sys.stderr)
         return 1
+    title = args.title or path.stem
+    print(f"正在导入 {path} …")
+    book = load_text(path, title=title)
+    results, _stats = chunk_book_with_stats(book)
+    print(f"  读取 {len(results)} 个片段")
 
-    data_dir = Path(args.data_dir)
-    imported = []
-    for f in sorted(files):
-        try:
-            session_id = _import_one(f, data_dir, title=args.title if len(files) == 1 else None)
-        except Exception as exc:  # noqa: BLE001
-            imported.append({"file": str(f), "session_id": None, "error": str(exc)})
-            continue
-        imported.append({"file": str(f), "session_id": session_id, "book_title": f.stem})
-    count = sum(1 for x in imported if x["session_id"])
-    if getattr(args, "json", False):
-        print(json.dumps({"imported": imported, "count": count, "total": len(files), "data_dir": str(data_dir.resolve())}, ensure_ascii=False, indent=2))
-    else:
-        for x in imported:
-            if x["session_id"]:
-                print(f"  已导入书库：{x['session_id']} · 《{x['book_title']}》（{Path(x['file']).name}）")
-            else:
-                print(f"  导入失败: {x['error']}")
-        print(f"完成：成功 {count}/{len(files)} 本")
-        print(f"  数据目录：{data_dir.resolve()}")
-    return 0 if count else 1
+    import uuid
 
+    from bookscope.agent.backends.r0_assembler import R0BookAssembler
+    from bookscope.api.book_sessions import BookSessionStore
+    from bookscope.api.session_storage import JSONFileSessionStorage
+    from bookscope.models.schemas import BookKnowledgeGraph
 
+    kg = BookKnowledgeGraph(book_title=title, language=getattr(book, "language", "zh"), characters=[])
+    assembler = R0BookAssembler(
+        book_text=book,
+        chunks=results,
+        knowledge_graph=kg,
+        session_vector_store=None,
+    )
+    # 让 Web 端能按来源文件夹分组
+    try:
+        assembler.source_folder = str(path.parent.resolve())
+    except Exception:  # noqa: BLE001
+        pass
 
-def _local_ask(question: str, chunks: list[dict], json_out: bool) -> int:
-    """零配置本地检索问答：没有 LLM key 时返回最相关原文片段。"""
-    import json
-
-    from bookscope.local_tools import local_search
-
-    results = local_search(question, chunks, top_k=5)
-    if not results:
-        print("本地检索没有找到相关片段（可配置 LLM key 获得智能回答）")
-        return 1
-    if json_out:
-        print(json.dumps({"mode": "local", "results": results}, ensure_ascii=False, indent=2))
-    else:
-        print("本地检索结果（未配置 LLM key，仅返回相关原文）")
-        for r in results:
-            print(f"\n[第{r['chapter']}章 · 命中 {int(r['score'])} 个词]")
-            print(r["text"])
+    session_id = f"cli-{uuid.uuid4().hex[:12]}"
+    storage = JSONFileSessionStorage(root=Path(args.data_dir))
+    store = BookSessionStore(storage=storage)
+    store.register(session_id, assembler)
+    print(f"已导入书库：{session_id} · 《{title}》")
+    print(f"  数据目录：{Path(args.data_dir).resolve()}")
     return 0
 
 
 def cmd_ask(args: argparse.Namespace) -> int:
-    """对一本书直接提问，输出带原文引用的答案；没 key 时自动降级为本地检索。"""
+    """对一本书直接提问，输出带原文引用的答案。"""
     api_key = args.api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("需要 LLM key：--api-key 或环境变量 DEEPSEEK_API_KEY / OPENAI_API_KEY", file=sys.stderr)
+        return 2
     path = Path(args.path)
     if not path.exists():
         print(f"文件不存在: {path}", file=sys.stderr)
@@ -410,9 +374,6 @@ def cmd_ask(args: argparse.Namespace) -> int:
     from bookscope.agent.long_context import run_long_context
 
     title, chunks = _load_chunks(path, args.title)
-    if not api_key:
-        print(f"未配置 LLM key，使用本地检索问答《{title}》…")
-        return _local_ask(args.question, chunks, args.json)
     book = load_text(path, title=title)
     print(f"正在问《{title}》：{args.question}")
     result = run_long_context(
@@ -483,167 +444,32 @@ def cmd_version(args: argparse.Namespace) -> int:
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     """检查本地环境：Python/Node/key/前端依赖/缓存目录。"""
-    import json
     import shutil
     import sys
 
     ok = True
-    checks: list[dict] = []
 
     def check(name: str, passed: bool, detail: str = "") -> None:
         nonlocal ok
-        checks.append({"name": name, "ok": bool(passed), "detail": detail})
+        mark = "✓" if passed else "✗"
+        print(f"  {mark} {name}" + (f" — {detail}" if detail else ""))
         if not passed:
             ok = False
 
     def warn(name: str, detail: str = "") -> None:
-        checks.append({"name": name, "ok": True, "optional": True, "detail": detail})
+        print(f"  ○ {name}" + (f" — {detail}" if detail else ""))
 
-    check("Python >= 3.12", sys.version_info >= (3, 12), sys.version.split()[0])
+    print("BookScope 环境自检")
+    print(f"  Python: {sys.version.split()[0]}")
+    check("Python >= 3.12", sys.version_info >= (3, 12))
     check("Node.js", shutil.which("node") is not None, shutil.which("node") or "未找到")
     check("npm", shutil.which("npm") is not None, shutil.which("npm") or "未找到")
     warn("LLM key（可选）", "未配置也不影响基础功能；深度分析/问答需要时才配置")
     web_node_modules = Path("web/node_modules")
     check("web/node_modules", web_node_modules.exists(), "已安装" if web_node_modules.exists() else "请先 make install")
     cache_dir = Path(".bookscope_cache")
-    cache_ok = cache_dir.exists() or cache_dir.mkdir(parents=True, exist_ok=True) is None
-    check(".bookscope_cache", cache_ok, "可写" if cache_ok else "无法创建")
-
-    if getattr(args, "json", False):
-        print(json.dumps({"ok": ok, "checks": checks}, ensure_ascii=False, indent=2))
-    else:
-        print("BookScope 环境自检")
-        for c in checks:
-            if c.get("optional"):
-                print(f"  ○ {c['name']} — {c['detail']}")
-            else:
-                mark = "✓" if c["ok"] else "✗"
-                print(f"  {mark} {c['name']}" + (f" — {c['detail']}" if c["detail"] else ""))
-        print("基础环境就绪；LLM 深度功能为可选项。")
-    return 0 if ok else 1
-
-
-def cmd_summary(args: argparse.Namespace) -> int:
-    """零配置：在终端打印书的结构/章节摘要。"""
-    import json
-
-    path = Path(args.path)
-    if not path.exists():
-        print(f"文件不存在: {path}", file=sys.stderr)
-        return 1
-    title = args.title or path.stem
-    _name, chunks = _load_chunks(path, title)
-    groups: dict[int, list[dict]] = {}
-    for c in chunks:
-        ch = c.get("chapter") or 0
-        groups.setdefault(ch, []).append(c)
-    chapters = []
-    for ch in sorted(groups):
-        text = " ".join(str(c.get("text", "")) for c in groups[ch])
-        excerpt = " ".join(text.split())[:80]
-        chapters.append({"chapter": ch, "excerpt": excerpt})
-    if getattr(args, "json", False):
-        print(json.dumps({"title": title, "chapter_count": len(groups), "chapters": chapters}, ensure_ascii=False, indent=2))
-    else:
-        print(f"《{title}》 · {len(groups)} 章")
-        for ch in chapters:
-            print(f"  第{ch['chapter']}章：{ch['excerpt']}")
-    return 0
-
-
-def cmd_stats(args: argparse.Namespace) -> int:
-    """零配置：统计书库规模（本数/章数/字数）。"""
-    import json
-
-    from bookscope.local_tools import stats_folder
-
-    folder = Path(args.path)
-    try:
-        stats = stats_folder(folder)
-    except Exception as exc:  # noqa: BLE001
-        print(f"统计失败: {exc}", file=sys.stderr)
-        return 1
-    if getattr(args, "json", False):
-        print(json.dumps(stats, ensure_ascii=False, indent=2))
-    else:
-        print(f"书库：{stats['books']} 本 · {stats['chapters']} 章 · {stats['chars']} 字")
-    return 0
-
-
-def cmd_search(args: argparse.Namespace) -> int:
-    """零配置：在一个文件夹里跨书本地检索关键词。"""
-    import json
-
-    from bookscope.local_tools import search_folder
-
-    folder = Path(args.path)
-    try:
-        results = search_folder(folder, args.query, top_k=args.top)
-    except Exception as exc:  # noqa: BLE001
-        print(f"检索失败: {exc}", file=sys.stderr)
-        return 1
-    if getattr(args, "json", False):
-        print(json.dumps({"query": args.query, "results": results, "count": len(results)}, ensure_ascii=False, indent=2))
-    else:
-        if not results:
-            print("没有找到匹配")
-        else:
-            for r in results:
-                print(f"[{r['book']} · 第{r['chapter']}章] {r['text']}")
-    return 0
-
-
-def cmd_catalog(args: argparse.Namespace) -> int:
-    """零配置：把一个文件夹生成可浏览的 HTML 书库目录。"""
-    import json
-
-    from bookscope.local_tools import generate_catalog
-
-    folder = Path(args.path)
-    out_dir = Path(args.out)
-    try:
-        index_path, entries = generate_catalog(folder, out_dir)
-    except Exception as exc:  # noqa: BLE001
-        print(f"生成失败: {exc}", file=sys.stderr)
-        return 1
-    if getattr(args, "json", False):
-        print(json.dumps({"index": str(index_path.resolve()), "count": len(entries), "entries": entries}, ensure_ascii=False, indent=2))
-    else:
-        print(f"已生成书库目录: {index_path.resolve()} ({len(entries)} 本)")
-    return 0
-
-
-def cmd_self_test(args: argparse.Namespace) -> int:
-    """零配置核心链路自检：读文件 → 结构报告 → 导入 → 本地问答。"""
-    import json
-    import tempfile
-
-    from bookscope.local_tools import import_file, load_chunks, local_search, structure_report_html
-
-    steps = []
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td)
-        book = root / "sample.txt"
-        book.write_text("第一章 开端\n这是关于经济改革的讨论。\n第二章 发展\n这里提到市场与政府的关系。\n", encoding="utf-8")
-
-        html = structure_report_html(book, title="自检书")
-        steps.append({"name": "结构报告", "ok": "<!DOCTYPE html>" in html})
-
-        data_dir = root / "sessions"
-        session_id = import_file(book, data_dir, title="自检书")
-        steps.append({"name": "导入书库", "ok": session_id.startswith("api-"), "session_id": session_id})
-
-        _name, _b, _results, chunks = load_chunks(book, title="自检书")
-        results = local_search("市场与政府", chunks)
-        steps.append({"name": "本地问答", "ok": bool(results), "count": len(results)})
-
-    ok = all(x["ok"] for x in steps)
-    if getattr(args, "json", False):
-        print(json.dumps({"ok": ok, "steps": steps}, ensure_ascii=False, indent=2))
-    else:
-        for x in steps:
-            print(f"  {'✓' if x['ok'] else '✗'} {x['name']}")
-        print("零配置核心链路自检通过" if ok else "零配置核心链路自检失败")
+    check(".bookscope_cache", cache_dir.exists() or cache_dir.mkdir(parents=True, exist_ok=True) is None, "可写" if cache_dir.exists() else "已创建")
+    print("基础环境就绪；LLM 深度功能为可选项。")
     return 0 if ok else 1
 
 
@@ -653,9 +479,9 @@ def cmd_report(args: argparse.Namespace) -> int:
         print(f"文件不存在: {path}", file=sys.stderr)
         return 1
     title = args.title or path.stem
-    print(f"正在读取 {path} …", file=sys.stderr)
+    print(f"正在读取 {path} …")
     book = load_text(path, title=title)
-    print("正在分章/切块 …", file=sys.stderr)
+    print("正在分章/切块 …")
     results, stats = chunk_book_with_stats(book)
     chunks = _chunks_to_dicts(results)
 
@@ -674,7 +500,7 @@ def cmd_report(args: argparse.Namespace) -> int:
         from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
         from bookscope.report.builders import build_book_report
 
-        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…", file=sys.stderr)
+        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…")
         spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
         meta = {
             "title": f"《{title}》书鉴报告",
@@ -696,22 +522,9 @@ def cmd_report(args: argparse.Namespace) -> int:
         }
         inp = build_structure_report(chunks, meta)
     html = render_report(inp)
-    if getattr(args, "stdout", False):
-        sys.stdout.write(html)
-        return 0
     out = Path(args.out)
     out.write_text(html, encoding="utf-8")
-    if getattr(args, "json", False):
-        import json
-
-        print(json.dumps({
-            "out": str(out.resolve()),
-            "bytes": len(html),
-            "mode": "deep" if getattr(args, "deep", False) else "structure",
-            "title": title,
-        }, ensure_ascii=False, indent=2))
-    else:
-        print(f"已生成: {out.resolve()} ({len(html)} bytes)")
+    print(f"已生成: {out.resolve()} ({len(html)} bytes)")
     if getattr(args, "open", False):
         import webbrowser
 
@@ -740,36 +553,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_version.set_defaults(func=cmd_version)
 
     p_doctor = sub.add_parser("doctor", help="检查本地环境")
-    p_doctor.add_argument("--json", action="store_true", help="以 JSON 输出检查结果")
     p_doctor.set_defaults(func=cmd_doctor)
-
-    p_summary = sub.add_parser("summary", help="零配置：在终端打印书的结构/章节摘要")
-    p_summary.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
-    p_summary.add_argument("--title", default=None, help="书名（默认取文件名）")
-    p_summary.add_argument("--json", action="store_true", help="以 JSON 输出章节摘要")
-    p_summary.set_defaults(func=cmd_summary)
-
-    p_stats = sub.add_parser("stats", help="零配置：统计书库规模（本数/章数/字数）")
-    p_stats.add_argument("path", help="书库文件夹路径")
-    p_stats.add_argument("--json", action="store_true", help="以 JSON 输出统计")
-    p_stats.set_defaults(func=cmd_stats)
-
-    p_search = sub.add_parser("search", help="零配置：在文件夹里跨书本地检索关键词")
-    p_search.add_argument("path", help="书库文件夹路径")
-    p_search.add_argument("query", help="关键词")
-    p_search.add_argument("--top", type=int, default=3, help="每本书返回条数（默认 3）")
-    p_search.add_argument("--json", action="store_true", help="以 JSON 输出结果")
-    p_search.set_defaults(func=cmd_search)
-
-    p_catalog = sub.add_parser("catalog", help="把一个文件夹生成可浏览的 HTML 书库目录")
-    p_catalog.add_argument("path", help="书库文件夹路径")
-    p_catalog.add_argument("--out", default="bookscope-catalog", help="输出目录（默认 bookscope-catalog）")
-    p_catalog.add_argument("--json", action="store_true", help="以 JSON 输出目录结果")
-    p_catalog.set_defaults(func=cmd_catalog)
-
-    p_self_test = sub.add_parser("self-test", help="零配置核心链路自检")
-    p_self_test.add_argument("--json", action="store_true", help="以 JSON 输出自检结果")
-    p_self_test.set_defaults(func=cmd_self_test)
 
     p_report = sub.add_parser("report", help="把一本书秒出结构版 HTML 报告")
     p_report.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
@@ -781,8 +565,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_report.add_argument("--model", default=None, help="模型名（默认 deepseek-v4-flash）")
     p_report.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
     p_report.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
-    p_report.add_argument("--json", action="store_true", help="以 JSON 输出生成结果元数据")
-    p_report.add_argument("--stdout", action="store_true", help="把 HTML 输出到 stdout（不写文件）")
     p_report.set_defaults(func=cmd_report)
 
     p_prewarm = sub.add_parser("prewarm", help="预建一本书的章脉缓存（后续操作秒出）")
@@ -807,14 +589,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_list = sub.add_parser("list", help="列出书库里已导入的书")
     p_list.add_argument("--data-dir", default="data/sessions", help="书库数据目录（默认 data/sessions）")
-    p_list.add_argument("--json", action="store_true", help="以 JSON 输出书库列表")
     p_list.set_defaults(func=cmd_list)
 
     p_import = sub.add_parser("import", help="把本地文件导入书库（Web 直接可见）")
-    p_import.add_argument("paths", nargs="+", help="一个或多个文件/文件夹路径（txt / epub / pdf / docx / md）")
+    p_import.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
     p_import.add_argument("--title", default=None, help="书名（默认取文件名）")
     p_import.add_argument("--data-dir", default="data/sessions", help="书库数据目录（默认 data/sessions）")
-    p_import.add_argument("--json", action="store_true", help="以 JSON 输出导入结果")
     p_import.set_defaults(func=cmd_import)
 
     p_ask = sub.add_parser("ask", help="对一本书直接提问，输出带原文引用的答案")

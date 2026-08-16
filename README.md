@@ -23,16 +23,14 @@
 
 ## 它是什么
 
-**不是平台，不是服务器，也不是一个让用户去学 CLI 的产品——它是一个可以嵌入 AI 助手的 tool / 插件 / 辅助 skill。**
+**不是平台，不是服务器，是一个跑在你电脑上的工具。**
 
-- 本地起一个轻量服务，AI 助手通过 `/api/tools/invoke` 调用它；
-- 也可以被脚本/其他软件直接调用（CLI 只是内部调试/脚本的一种方式）；
+- 本地起一个轻量服务，浏览器里拖文件就能用；
+- 也可以完全不用浏览器：一条 CLI 命令直接出报告、提问、跨文本对照；
 - 自带 BYOK，默认 DeepSeek，也兼容任何 OpenAI 兼容接口；
 - 不收集你的书，不碰你的 key。
 
 核验是立身之本：每条引文都翻回原文逐字比对，对得上才盖「鉴」印；推断明确标「研判」。
-
-> 🤖 **作为 AI 助手 Skill 使用**：工具清单在 `bookscope/tools_manifest.json`，统一调用入口是 `POST /api/tools/invoke`。接入说明见 [docs/ASSISTANT_SKILL.md](docs/ASSISTANT_SKILL.md)。
 
 <p align="center">
   <img src="docs/images/hero-bookshelf.png" width="820" alt="书柜：每本书一卷书脊，按题材上色">
@@ -61,31 +59,11 @@ cd web && npm install && npm run dev
 # 一条命令把书变成可分享的 HTML 报告（零 LLM、秒出）
 bookscope report 书.epub --out 书鉴.html --open
 
-# 零配置：终端直接看书的章节摘要（--json 可给脚本用）
-bookscope summary 书.epub
-bookscope summary 书.epub --json
-
-# 零配置：一个文件夹生成可浏览的 HTML 书库目录
-bookscope catalog ./我的书库 --out ./书库目录
-
-# 零配置：在文件夹里跨书本地检索关键词
-bookscope search ./我的书库 "市场与政府"
-
-# 零配置：统计书库规模（本数/章数/字数）
-bookscope stats ./我的书库 --json
-
-# 零配置核心链路自检（读文件→报告→导入→本地问答）
-bookscope self-test
-
 # 深度版书鉴报告（需要 LLM key）
 bookscope report 书.epub --deep --out 书鉴深度.html --api-key sk-...
 
-# 把 HTML 直接输出到 stdout（管道/脚本用）
-bookscope report 书.epub --stdout > 书鉴.html
-
-# 对一本书直接提问；没配置 key 时自动降级为本地检索（返回相关原文）
+# 对一本书直接提问，带原文引用
 bookscope ask 书.epub "这本书的核心主张是什么？" --api-key sk-...
-bookscope ask 书.epub "市场与政府"
 
 # 两个文件直接出跨文本对照报告
 bookscope cross 书A.epub 书B.pdf --out 对照.html --api-key sk-...
@@ -96,67 +74,13 @@ bookscope cluster 书A.epub 书B.pdf 书C.txt --name "政治学组" --out 簇关
 # 预建章脉缓存 / 导入书库 / 查看书库
 bookscope prewarm 书.epub --api-key sk-...
 bookscope import 书.epub --title "书名"
-bookscope import ./我的书库
-bookscope import 书A.epub 书B.pdf ./另一个书库
 bookscope list
 ```
 
 不需要 Docker，不需要服务器，不需要从零搭环境。
 
 > 💡 **零配置可用**：结构报告、导入书库、列表、启动服务这些基础功能不需要任何 API key。
-> 提交前本地复现 CI：`make ci`（ruff + 全套测试 + 前端构建）。
 > 深度分析 / 问答 / 跨文本对照属于可选 LLM 功能，需要时才配置自己的 key（默认 DeepSeek）。
-
-### 本地工具 API（零配置，不需要 key）
-
-```bash
-# 直接给一个本地文件路径，返回结构版 HTML 报告
-curl -X POST http://localhost:8000/api/tools/report \
-  -H 'Content-Type: application/json' \
-  -d '{"path":"/path/to/book.epub"}'
-
-# 把本地文件/文件夹导入书库，返回 session_id
-curl -X POST http://localhost:8000/api/tools/import \
-  -H 'Content-Type: application/json' \
-  -d '{"path":"/path/to/book.epub"}'
-
-# 零配置单文件上传（multipart，不需要 key）
-curl -X POST http://localhost:8000/api/tools/upload \
-  -F 'file=@/path/to/book.epub' \
-  -F 'book_title=书名'
-
-# 零配置本地问答（对已导入 session 做本地检索）
-curl -X POST http://localhost:8000/api/tools/ask-local \
-  -H 'Content-Type: application/json' \
-  -d '{"session_id":"...","question":"市场与政府"}'
-
-# 零配置生成 HTML 书库目录
-curl -X POST http://localhost:8000/api/tools/catalog \
-  -H 'Content-Type: application/json' \
-  -d '{"path":"/path/to/books","out":"/tmp/catalog"}'
-
-# 零配置跨书本地检索
-curl -X POST http://localhost:8000/api/tools/search \
-  -H 'Content-Type: application/json' \
-  -d '{"path":"/path/to/books","query":"市场与政府"}'
-
-# 零配置统计书库规模
-curl -X POST http://localhost:8000/api/tools/stats \
-  -H 'Content-Type: application/json' \
-  -d '{"path":"/path/to/books"}'
-```
-
-### Tools API 一览（零配置，不需要 key）
-
-| 端点 | 作用 |
-| --- | --- |
-| `POST /api/tools/import` | 导入本地文件/文件夹，返回 session_id |
-| `POST /api/tools/report` | 给本地路径，返回结构版 HTML 报告 |
-| `POST /api/tools/upload` | multipart 单文件上传，零配置入库 |
-| `POST /api/tools/ask-local` | 对已导入 session 做本地检索问答 |
-| `POST /api/tools/catalog` | 生成 HTML 书库目录 |
-| `POST /api/tools/search` | 文件夹跨书本地检索 |
-| `POST /api/tools/stats` | 统计书库规模 |
 
 ---
 
