@@ -519,6 +519,17 @@ function ShelfBody(props: {
     }
   };
 
+  // 来源组折叠：书多时先收起来，只留组头统计和操作
+  const [collapsedSources, setCollapsedSources] = useState<Set<string>>(new Set());
+  const toggleCollapsed = (source: string) => {
+    setCollapsedSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(source)) next.delete(source);
+      else next.add(source);
+      return next;
+    });
+  };
+
   // 章脉进度徽章：批量查询每本书 built/total（纯读缓存），后台预建时 15s 自动刷新
   const [spineProgress, setSpineProgress] = useState<Record<string, { built: number; total: number; ready: boolean }>>({});
   // 手动「预建整组」后立即重新拉一次进度（不用等 15s 轮询）
@@ -628,9 +639,16 @@ function ShelfBody(props: {
       return (
       <div key={g.source} className="mb-4">
         <div className="flex items-baseline gap-2 px-1 mb-1.5">
-          <span className="text-xs font-bold text-[var(--color-ink-muted)]" style={{ fontFamily: "var(--font-display)" }}>
-            {g.source}
-          </span>
+          <button
+            type="button"
+            onClick={() => toggleCollapsed(g.source)}
+            aria-expanded={!collapsedSources.has(g.source)}
+            title={collapsedSources.has(g.source) ? `展开「${g.source}」` : `折叠「${g.source}」`}
+            className="text-xs font-bold text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {collapsedSources.has(g.source) ? "▸" : "▾"} {g.source}
+          </button>
           <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{g.items.length} 本</span>
           <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">· 就绪 {readyInGroup}/{g.items.length}</span>
           {!compareMode && (
@@ -683,6 +701,7 @@ function ShelfBody(props: {
             </div>
           )}
         </div>
+        {!collapsedSources.has(g.source) && (
         <ul className="flex flex-col rounded border border-[var(--color-rule)] overflow-hidden divide-y divide-[var(--color-rule)]">
       {g.items.map((entry) => {
         const s = entry.session;
@@ -711,6 +730,7 @@ function ShelfBody(props: {
         );
       })}
         </ul>
+        )}
       </div>
       );
     })}
