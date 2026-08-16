@@ -220,6 +220,8 @@ from bookscope.api.schemas import (
     PacingCurveRequest,
     PacingCurveResponse,
     PreviousReviewHint,
+    PrewarmSpineBatchRequest,
+    PrewarmSpineBatchResponse,
     PrewarmSpineRequest,
     PrewarmSpineResponse,
     PrewarmSpineStatusResponse,
@@ -393,46 +395,21 @@ def _run_prewarm_build(
             }
 
 
-@agent_router.post("/agent/prewarm-spine", response_model=PrewarmSpineResponse)
-def agent_prewarm_spine(
-    request: PrewarmSpineRequest,
-    store: BookSessionStore = Depends(get_book_session_store),
-) -> PrewarmSpineResponse:
-    """后台预建整本书章脉,立刻返回(不阻塞十几分钟的构建)。
+def _start_prewarm_for_session(
+    *,
+    store: BookSessionStore,
+    book_session_id: str,
+    client: Any,
+    model: str,
+) -> str:
+    """单本启动后台预建；返回 ``cached`` / ``building`` / ``started``。
 
     幂等:同一本书(同 model/genre)正在建 → 不重复起,返 building;已在缓存里 →
-    返 cached(不用建);否则起后台线程建、返 started。前端拿到 building/started 后
-    轮询 /agent/prewarm-spine/status。
+    返 cached(不用建);否则起后台线程建、返 started。抛出的异常由调用方决定
+    （单本端点转 400/404；批量端点记 failed 继续下一本）。
     """
-    assembler = _resolve_assembler(store, request.book_session_id)
-
-    try:
-        client = build_llm_client_from_params(
-            provider=request.provider,
-            api_key=request.api_key,
-            base_url=request.base_url,
-        )
-    except ImportError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error_type": "ProviderSdkMissing",
-                "message": str(exc),
-                "details": {"provider": request.provider},
-            },
-        ) from exc
-    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error_type": "ClientBuildFailed",
-                "message": f"{type(exc).__name__}: {exc}",
-                "details": {"provider": request.provider},
-            },
-        ) from exc
-
-    model = request.model or default_model_for(request.provider)
-    key = _prewarm_key(request.book_session_id, model)
+    assembler = _resolve_assembler(store, book_session_id)
+    key = _prewarm_key(book_session_id, model)
     _full_text, chunks = _long_context_inputs(assembler)
 
     # 幂等 1:缓存全命中 → 不用建,直接返 cached(不占 building 坑、不派线程)。
@@ -449,18 +426,14 @@ def agent_prewarm_spine(
                 "total_chapters": progress["total"],
                 "error": None,
             }
-        return PrewarmSpineResponse(
-            status="cached", book_session_id=request.book_session_id
-        )
+        return "cached"
 
     # 幂等 2:已有一路在建 → 不重复起。加锁下"看状态 + 占坑"要原子,否则两个并发
     # POST 都看到 idle 会各起一路建同一本书(白建一次)。占 building 坑后再派线程。
     with _PREWARM_LOCK:
         cur = _PREWARM_STATE.get(key)
         if cur is not None and cur["status"] == "building":
-            return PrewarmSpineResponse(
-                status="building", book_session_id=request.book_session_id
-            )
+            return "building"
         _PREWARM_STATE[key] = {
             "status": "building",
             "chapters": None,
@@ -478,9 +451,103 @@ def agent_prewarm_spine(
         client=client,
         model=model,
     )
-    return PrewarmSpineResponse(
-        status="started", book_session_id=request.book_session_id
+    return "started"
+
+
+def _build_prewarm_client(
+    *,
+    provider: str,
+    api_key: str,
+    base_url: str | None,
+) -> Any:
+    """按 BYOK 参数建 LLM client；失败统一转 HTTP 400（和单本端点一致）。"""
+    try:
+        return build_llm_client_from_params(
+            provider=provider,
+            api_key=api_key,
+            base_url=base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ProviderSdkMissing",
+                "message": str(exc),
+                "details": {"provider": provider},
+            },
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — 翻译成 HTTP
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_type": "ClientBuildFailed",
+                "message": f"{type(exc).__name__}: {exc}",
+                "details": {"provider": provider},
+            },
+        ) from exc
+
+
+@agent_router.post("/agent/prewarm-spine", response_model=PrewarmSpineResponse)
+def agent_prewarm_spine(
+    request: PrewarmSpineRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> PrewarmSpineResponse:
+    """后台预建整本书章脉,立刻返回(不阻塞十几分钟的构建)。
+
+    幂等:同一本书(同 model/genre)正在建 → 不重复起,返 building;已在缓存里 →
+    返 cached(不用建);否则起后台线程建、返 started。前端拿到 building/started 后
+    轮询 /agent/prewarm-spine/status。
+    """
+    client = _build_prewarm_client(
+        provider=request.provider,
+        api_key=request.api_key,
+        base_url=request.base_url,
     )
+    model = request.model or default_model_for(request.provider)
+    status = _start_prewarm_for_session(
+        store=store,
+        book_session_id=request.book_session_id,
+        client=client,
+        model=model,
+    )
+    return PrewarmSpineResponse(
+        status=status, book_session_id=request.book_session_id
+    )
+
+
+@agent_router.post(
+    "/agent/prewarm-spine/batch", response_model=PrewarmSpineBatchResponse
+)
+def agent_prewarm_spine_batch(
+    request: PrewarmSpineBatchRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> PrewarmSpineBatchResponse:
+    """一组书统一后台预建章脉（报告中心/书柜来源组「预建整组」）。
+
+    建一次 client，逐本走与单本完全相同的幂等启动；单本失败不阻断整组，
+    记进 ``failed`` / ``errors`` 由前端提示。立刻返回，进度继续走
+    ``/agent/spine-progress``。
+    """
+    client = _build_prewarm_client(
+        provider=request.provider,
+        api_key=request.api_key,
+        base_url=request.base_url,
+    )
+    model = request.model or default_model_for(request.provider)
+    resp = PrewarmSpineBatchResponse()
+    for sid in request.book_session_ids:
+        try:
+            status = _start_prewarm_for_session(
+                store=store,
+                book_session_id=sid,
+                client=client,
+                model=model,
+            )
+            getattr(resp, status).append(sid)
+        except Exception as exc:  # noqa: BLE001 — 单本失败继续下一本
+            resp.failed.append(sid)
+            resp.errors[sid] = f"{type(exc).__name__}: {exc}"
+    return resp
 
 
 @agent_router.get(
@@ -4703,20 +4770,25 @@ def agent_cluster_discover(
             detail={"error_type": "ProviderSdkMissing", "message": str(exc)},
         ) from exc
 
-    # 取每本 perspective（缓存命中秒出）
+    # 取每本 perspective（缓存命中秒出）；必须整本全就绪——部分章脉做簇关系
+    # 会漏掉未建章的主张，误导整组关系网。
+    progress_list = []
     perspectives = []
     for sid in request.book_session_ids:
         assembler = _resolve_assembler(store, sid)
         _full_text, chunks = _long_context_inputs(assembler)
-        spine = peek_spine_cache(chunks=chunks, model=model, genre="fiction")
-        if not spine:
+        progress = spine_build_progress(chunks=chunks, model=model, genre="fiction")
+        progress_list.append({"session_id": sid, **progress})
+        if progress["total"] == 0 or progress["built"] < progress["total"]:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "error_type": "SpineNotReady",
                     "message": "有文档章脉未建完，先等预建完成再自动发现",
+                    "progress": progress_list,
                 },
             )
+        spine = peek_spine_cache(chunks=chunks, model=model, genre="fiction")
         book_title, _ = _extract_book_meta(assembler)
         perspectives.append(build_book_perspective(
             spine=spine, book_title=book_title or sid, slug=sid[-8:],

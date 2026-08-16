@@ -603,6 +603,39 @@ class PrewarmSpineResponse(BaseModel):
     book_session_id: str = Field(..., description="回显请求里的 book_session_id。")
 
 
+class PrewarmSpineBatchRequest(BaseModel):
+    """POST /api/agent/prewarm-spine/batch 请求体：一组书统一后台预建章脉。
+
+    给「导入了一个文件夹 / 报告中心来源组」用——一次点下去把整组没建的书都排进
+    后台线程池（2 workers 串行建），立刻返回；前端继续用 spine-progress 看进度。
+    幂等语义与单本一致：已缓存/已在建的不重复起。
+    """
+
+    book_session_ids: list[str] = Field(
+        ..., min_length=1, description="同一来源组的 session_id 列表。"
+    )
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class PrewarmSpineBatchResponse(BaseModel):
+    """POST /api/agent/prewarm-spine/batch 响应体：按本回显启动结果。
+
+    ``started`` 本次刚起后台建；``building`` 已在建（幂等没重复起）；``cached``
+    已缓存无需建；``failed`` 单本启动失败（session 不存在 / 读文件失败等）。
+    """
+
+    started: list[str] = Field(default_factory=list)
+    building: list[str] = Field(default_factory=list)
+    cached: list[str] = Field(default_factory=list)
+    failed: list[str] = Field(default_factory=list)
+    errors: dict[str, str] = Field(default_factory=dict)
+
+
 class BookReportRequest(BaseModel):
     """POST /api/agent/book/report 请求体：出书鉴报告。
 

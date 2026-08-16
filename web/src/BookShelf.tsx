@@ -63,6 +63,8 @@ export interface BookShelfProps {
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   /** 簇总览报告：来源组聚合清单 */
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
+  /** 预建整组章脉：一键把来源组没建的书排进后台 */
+  onPrewarmGroup?: (sessions: SessionMetadata[]) => void;
   /** 快捷重开最近报告 */
   onReopenReport?: (entry: ReportHistoryEntry) => void;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
@@ -221,6 +223,7 @@ export function BookShelf({
   onOpenReportCenter,
   onAskBooks,
   onClusterReport,
+  onPrewarmGroup,
   onReopenReport,
   onDeleted,
   refreshTrigger,
@@ -406,6 +409,7 @@ export function BookShelf({
         onCompareMany={onCompareMany}
         onAskBooks={onAskBooks}
         onClusterReport={onClusterReport}
+        onPrewarmGroup={onPrewarmGroup}
         onReopenReport={onReopenReport}
         reportHistory={reportHistory}
         onSelect={onSelect}
@@ -434,6 +438,7 @@ function ShelfBody(props: {
   onCompareMany: (sessions: SessionMetadata[]) => void;
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
+  onPrewarmGroup?: (sessions: SessionMetadata[]) => void;
   onReopenReport?: (entry: ReportHistoryEntry) => void;
   reportHistory: ReportHistoryEntry[];
   onSelect: (session: SessionMetadata) => void;
@@ -458,6 +463,7 @@ function ShelfBody(props: {
     onCompareMany,
     onAskBooks,
     onClusterReport,
+    onPrewarmGroup,
     onReopenReport,
     reportHistory,
     onSelect,
@@ -498,6 +504,8 @@ function ShelfBody(props: {
 
   // 章脉进度徽章：批量查询每本书 built/total（纯读缓存），后台预建时 15s 自动刷新
   const [spineProgress, setSpineProgress] = useState<Record<string, { built: number; total: number; ready: boolean }>>({});
+  // 手动「预建整组」后立即重新拉一次进度（不用等 15s 轮询）
+  const [spineRefreshTick, setSpineRefreshTick] = useState(0);
   useEffect(() => {
     if (state.kind !== "ready" || state.sessions.length === 0) return;
     let cancelled = false;
@@ -531,7 +539,7 @@ function ShelfBody(props: {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [state]);
+  }, [state, spineRefreshTick]);
 
   if (state.kind === "loading" || state.kind === "idle") {
     return (
@@ -599,25 +607,42 @@ function ShelfBody(props: {
             {g.source}
           </span>
           <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{g.items.length} 本</span>
-          {g.items.length >= 1 && !compareMode && onClusterReport && (
-            <button
-              type="button"
-              onClick={() => onClusterReport(g.items.map((e) => e.session), g.source)}
-              title={`出「${g.source}」的簇总览报告`}
-              className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
-            >
-              簇总览
-            </button>
-          )}
-          {g.items.length >= 2 && !compareMode && (
-            <button
-              type="button"
-              onClick={() => onCompareMany(g.items.map((e) => e.session))}
-              title={`把「${g.source}」这 ${g.items.length} 本一键生成跨文本对照报告`}
-              className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
-            >
-              整组对照
-            </button>
+          {!compareMode && (
+            <div className="ml-auto flex items-center gap-1.5">
+              {onPrewarmGroup && g.items.length >= 1 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void onPrewarmGroup(g.items.map((e) => e.session));
+                    setSpineRefreshTick((t) => t + 1);
+                  }}
+                  title={`把「${g.source}」这 ${g.items.length} 本没建章脉的一键排进后台预建`}
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+                >
+                  预建整组
+                </button>
+              )}
+              {onClusterReport && g.items.length >= 1 && (
+                <button
+                  type="button"
+                  onClick={() => onClusterReport(g.items.map((e) => e.session), g.source)}
+                  title={`出「${g.source}」的簇总览报告`}
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+                >
+                  簇总览
+                </button>
+              )}
+              {g.items.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => onCompareMany(g.items.map((e) => e.session))}
+                  title={`把「${g.source}」这 ${g.items.length} 本一键生成跨文本对照报告`}
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+                >
+                  整组对照
+                </button>
+              )}
+            </div>
           )}
         </div>
         <ul className="flex flex-col rounded border border-[var(--color-rule)] overflow-hidden divide-y divide-[var(--color-rule)]">

@@ -2026,6 +2026,63 @@ export function App() {
     }
   }, [apiKey, provider, model, baseUrl]);
 
+  /** 预建整组：来源组/报告中心一键把没建章脉的书全部排进后台，立刻返回。 */
+  const handlePrewarmGroup = useCallback(
+    async (sessions: SessionMetadata[]): Promise<void> => {
+      if (!apiKey) {
+        alert("先配置 LLM key（设置里）再预建");
+        return;
+      }
+      if (sessions.length === 0) return;
+      try {
+        const resp = await fetch("/api/agent/prewarm-spine/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_ids: sessions.map((x) => x.session_id),
+            provider,
+            api_key: apiKey,
+            model: model.trim() || undefined,
+            base_url: effectiveBaseUrl() || undefined,
+          }),
+        });
+        if (!resp.ok) {
+          let msg = `预建失败（${resp.status}）`;
+          try {
+            const d = (await resp.json()) as { detail?: { message?: string } };
+            if (d?.detail?.message) msg = d.detail.message;
+          } catch {
+            /* 非 JSON 错误体 */
+          }
+          alert(msg);
+          return;
+        }
+        const data = (await resp.json()) as {
+          started?: string[];
+          building?: string[];
+          cached?: string[];
+          failed?: string[];
+          errors?: Record<string, string>;
+        };
+        const started = data.started?.length ?? 0;
+        const building = data.building?.length ?? 0;
+        const cached = data.cached?.length ?? 0;
+        const failed = data.failed?.length ?? 0;
+        const parts = [
+          started > 0 ? `新起 ${started} 本` : "",
+          building > 0 ? `已在建 ${building} 本` : "",
+          cached > 0 ? `已就绪 ${cached} 本` : "",
+          failed > 0 ? `失败 ${failed} 本` : "",
+        ].filter(Boolean);
+        alert(`预建已开始：${parts.join("，") || "没有需要预建的书"}`);
+        setShelfRefresh((n) => n + 1);
+      } catch {
+        alert("预建失败：网络错误");
+      }
+    },
+    [apiKey, provider, model, baseUrl],
+  );
+
   /** 出书鉴报告：/agent/book/report 拿 HTML → 下载。章脉没建过后端 404，弹提示。 */
   const openReport = useCallback(async (s: SessionMetadata) => {
     if (!apiKey) {
@@ -2496,6 +2553,7 @@ export function App() {
                 onCompareMany={handleCompareMany}
                 onAskBooks={handleAskBooks}
                 onClusterReport={handleClusterReport}
+                onPrewarmGroup={(list) => void handlePrewarmGroup(list)}
                 onReopenReport={(e) => void handleReopenReport(e)}
                 onImportFolder={handleImportFolder}
                 importProgress={importProgress}
@@ -3285,6 +3343,7 @@ export function App() {
           onReopen={(e) => void handleReopenReport(e)}
           onCompareMany={(list) => void handleCompareMany(list)}
           onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
+          onPrewarmGroup={(list) => handlePrewarmGroup(list)}
           onClose={() => setReportCenterOpen(false)}
         />
       )}

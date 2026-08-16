@@ -21,18 +21,22 @@ export function ReportCenter({
   onReopen,
   onCompareMany,
   onClusterDiscover,
+  onPrewarmGroup,
   onClose,
 }: {
   onOpenReport: (session: SessionMetadata) => void;
   onReopen: (entry: ReportHistoryEntry) => void;
   onCompareMany: (sessions: SessionMetadata[]) => void;
   onClusterDiscover: (sessions: SessionMetadata[], clusterName: string) => void;
+  onPrewarmGroup: (sessions: SessionMetadata[]) => Promise<void> | void;
   onClose: () => void;
 }) {
   const [sessions, setSessions] = useState<SessionMetadata[] | null>(null);
   const [progress, setProgress] = useState<Record<string, SpineState>>({});
   const [history] = useState<ReportHistoryEntry[]>(() => loadReportHistory());
   const [error, setError] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [prewarming, setPrewarming] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +65,7 @@ export function ReportCenter({
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshTick]);
 
   const readyCount = sessions?.filter((s) => progress[s.session_id]?.ready).length ?? 0;
   const recentBySession = new Map<string, ReportHistoryEntry>();
@@ -126,24 +130,45 @@ export function ReportCenter({
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-bold text-[var(--color-ink-muted)]">{src}</span>
                     <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{list.length} 本</span>
-                    {list.length >= 2 && (
-                      <>
-                      <button
-                        type="button"
-                        onClick={() => onCompareMany(list)}
-                        className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
-                      >
-                        整组对照
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onClusterDiscover(list, src)}
-                        title={`自动发现「${src}」两两关系（最多 8 本）`}
-                        className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
-                      >
-                        发现关系
-                      </button>
-                      </>
+                    {list.length >= 1 && (
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={prewarming}
+                          onClick={() => {
+                            setPrewarming(true);
+                            Promise.resolve(onPrewarmGroup(list))
+                              .catch(() => {})
+                              .finally(() => {
+                                setPrewarming(false);
+                                setRefreshTick((t) => t + 1);
+                              });
+                          }}
+                          title={`把「${src}」这 ${list.length} 本没建章脉的一键排进后台预建`}
+                          className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-50"
+                        >
+                          {prewarming ? "预建中…" : "预建整组"}
+                        </button>
+                        {list.length >= 2 && (
+                          <>
+                          <button
+                            type="button"
+                            onClick={() => onCompareMany(list)}
+                            className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                          >
+                            整组对照
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onClusterDiscover(list, src)}
+                            title={`自动发现「${src}」两两关系（最多 8 本）`}
+                            className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                          >
+                            发现关系
+                          </button>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
