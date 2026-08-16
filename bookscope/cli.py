@@ -483,32 +483,43 @@ def cmd_version(args: argparse.Namespace) -> int:
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     """检查本地环境：Python/Node/key/前端依赖/缓存目录。"""
+    import json
     import shutil
     import sys
 
     ok = True
+    checks: list[dict] = []
 
     def check(name: str, passed: bool, detail: str = "") -> None:
         nonlocal ok
-        mark = "✓" if passed else "✗"
-        print(f"  {mark} {name}" + (f" — {detail}" if detail else ""))
+        checks.append({"name": name, "ok": bool(passed), "detail": detail})
         if not passed:
             ok = False
 
     def warn(name: str, detail: str = "") -> None:
-        print(f"  ○ {name}" + (f" — {detail}" if detail else ""))
+        checks.append({"name": name, "ok": True, "optional": True, "detail": detail})
 
-    print("BookScope 环境自检")
-    print(f"  Python: {sys.version.split()[0]}")
-    check("Python >= 3.12", sys.version_info >= (3, 12))
+    check("Python >= 3.12", sys.version_info >= (3, 12), sys.version.split()[0])
     check("Node.js", shutil.which("node") is not None, shutil.which("node") or "未找到")
     check("npm", shutil.which("npm") is not None, shutil.which("npm") or "未找到")
     warn("LLM key（可选）", "未配置也不影响基础功能；深度分析/问答需要时才配置")
     web_node_modules = Path("web/node_modules")
     check("web/node_modules", web_node_modules.exists(), "已安装" if web_node_modules.exists() else "请先 make install")
     cache_dir = Path(".bookscope_cache")
-    check(".bookscope_cache", cache_dir.exists() or cache_dir.mkdir(parents=True, exist_ok=True) is None, "可写" if cache_dir.exists() else "已创建")
-    print("基础环境就绪；LLM 深度功能为可选项。")
+    cache_ok = cache_dir.exists() or cache_dir.mkdir(parents=True, exist_ok=True) is None
+    check(".bookscope_cache", cache_ok, "可写" if cache_ok else "无法创建")
+
+    if getattr(args, "json", False):
+        print(json.dumps({"ok": ok, "checks": checks}, ensure_ascii=False, indent=2))
+    else:
+        print("BookScope 环境自检")
+        for c in checks:
+            if c.get("optional"):
+                print(f"  ○ {c['name']} — {c['detail']}")
+            else:
+                mark = "✓" if c["ok"] else "✗"
+                print(f"  {mark} {c['name']}" + (f" — {c['detail']}" if c["detail"] else ""))
+        print("基础环境就绪；LLM 深度功能为可选项。")
     return 0 if ok else 1
 
 
@@ -685,6 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_version.set_defaults(func=cmd_version)
 
     p_doctor = sub.add_parser("doctor", help="检查本地环境")
+    p_doctor.add_argument("--json", action="store_true", help="以 JSON 输出检查结果")
     p_doctor.set_defaults(func=cmd_doctor)
 
     p_summary = sub.add_parser("summary", help="零配置：在终端打印书的结构/章节摘要")

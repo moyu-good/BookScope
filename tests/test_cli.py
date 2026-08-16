@@ -249,3 +249,13 @@ def test_cmd_catalog_json_output(tmp_path: Path, capsys) -> None:
     captured = capsys.readouterr()
     assert '"index"' in captured.out
     assert '"entries"' in captured.out
+
+
+def test_cmd_doctor_json_output(capsys) -> None:
+    import argparse
+
+    import bookscope.cli as cli
+
+    assert cli.cmd_doctor(argparse.Namespace(json=True)) == 0
+    out = capsys.readouterr().out
+    assert '"checks"' in out
