@@ -1736,6 +1736,7 @@ export function App() {
           url,
           title: `簇关系网 · ${clusterName}`,
           fileName: `簇关系网-${clusterName.replace(/[\/:*?"<>|]/g, "_")}.html`,
+          sessionIds: sessions.map((x) => x.session_id),
           coverage: "full",
         });
       } catch {
