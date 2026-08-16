@@ -22,6 +22,7 @@ export function ReportCenter({
   onCompareMany,
   onClusterDiscover,
   onPrewarmGroup,
+  onDeleteBook,
   onClose,
 }: {
   onOpenReport: (session: SessionMetadata) => void;
@@ -29,6 +30,7 @@ export function ReportCenter({
   onCompareMany: (sessions: SessionMetadata[]) => void;
   onClusterDiscover: (sessions: SessionMetadata[], clusterName: string) => void;
   onPrewarmGroup: (sessions: SessionMetadata[]) => Promise<void> | void;
+  onDeleteBook: (sessionId: string, bookTitle: string) => void;
   onClose: () => void;
 }) {
   const [sessions, setSessions] = useState<SessionMetadata[] | null>(null);
@@ -37,6 +39,16 @@ export function ReportCenter({
   const [error, setError] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
   const [prewarming, setPrewarming] = useState(false);
+
+  const handleDeleteBook = (sessionId: string, bookTitle: string) => {
+    onDeleteBook(sessionId, bookTitle);
+    setSessions((prev) => (prev ? prev.filter((x) => x.session_id !== sessionId) : prev));
+    setProgress((prev) => {
+      const next = { ...prev };
+      delete next[sessionId];
+      return next;
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -213,6 +225,14 @@ export function ReportCenter({
                         最近报告
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBook(s.session_id, s.book_title)}
+                      title={`从书库删除《${s.book_title}》`}
+                      className="text-xs px-2.5 py-1 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] shrink-0"
+                    >
+                      删除
+                    </button>
                   </div>
                 );
               })}

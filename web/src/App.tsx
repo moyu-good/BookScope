@@ -1486,6 +1486,28 @@ export function App() {
     setPendingAutoSelectId(null);
   }, []);
 
+  /** 报告中心删除一本书：调 DELETE /api/sessions/{id}，成功后同步书柜/当前书。 */
+  const handleDeleteBookFromCenter = useCallback(
+    async (sessionId: string, bookTitle: string) => {
+      if (!window.confirm(`删除《${bookTitle}》？这会从书库移除这本书（报告历史保留）。`)) {
+        return;
+      }
+      try {
+        const resp = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+          method: "DELETE",
+        });
+        if (resp.status !== 204 && resp.status !== 404) {
+          alert(`删除失败（${resp.status}）`);
+          return;
+        }
+        handleDeletedShelfBook(sessionId);
+      } catch {
+        alert("删除失败：网络错误");
+      }
+    },
+    [handleDeletedShelfBook],
+  );
+
   // 注销账号（WP-reading-workspace Phase B）：DELETE /api/auth/me（CASCADE 连带删
   // 名下文档 + 标注，不可逆，二次确认在 MyDesk 里）。成功后清令牌 + 回未登录态 + 退回书库。
   // 失败抛出去给 MyDesk 显错。删完书柜数据也没了，顺手触发一次刷新。
@@ -3344,6 +3366,7 @@ export function App() {
           onCompareMany={(list) => void handleCompareMany(list)}
           onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
           onPrewarmGroup={(list) => handlePrewarmGroup(list)}
+          onDeleteBook={(sid, title) => void handleDeleteBookFromCenter(sid, title)}
           onClose={() => setReportCenterOpen(false)}
         />
       )}
