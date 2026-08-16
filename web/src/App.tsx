@@ -1667,6 +1667,53 @@ export function App() {
     [apiKey, provider, model, baseUrl],
   );
 
+  /** 簇总览报告：来源组所有书的聚合清单（纯聚合，秒出）。 */
+  const handleClusterReport = useCallback(
+    async (sessions: SessionMetadata[], clusterName: string) => {
+      if (!apiKey) {
+        alert("先配置 LLM key（设置里）再出簇总览");
+        return;
+      }
+      if (sessions.length === 0) return;
+      try {
+        const resp = await fetch("/api/agent/cluster/report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_ids: sessions.map((x) => x.session_id),
+            cluster_name: clusterName,
+            provider,
+            api_key: apiKey,
+            model: model.trim() || undefined,
+            base_url: effectiveBaseUrl() || undefined,
+          }),
+        });
+        if (!resp.ok) {
+          let msg = `簇总览失败（${resp.status}）`;
+          try {
+            const d = (await resp.json()) as { detail?: { message?: string } };
+            if (d?.detail?.message) msg = d.detail.message;
+          } catch {
+            /* 非 JSON 错误体 */
+          }
+          alert(msg);
+          return;
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        setReportPreview({
+          url,
+          title: `簇总览 · ${clusterName}`,
+          fileName: `簇总览-${clusterName.replace(/[\/:*?"<>|]/g, "_")}.html`,
+          coverage: "full",
+        });
+      } catch {
+        alert("簇总览失败：网络错误");
+      }
+    },
+    [apiKey, provider, model, baseUrl],
+  );
+
   /** 文档簇问答：对选中的多本书直接提问（跨书回答，锚到各书）。 */
   const handleAskBooks = useCallback(
     async (question: string, sessions: SessionMetadata[]): Promise<string> => {
@@ -2392,6 +2439,7 @@ export function App() {
                 onCompare={handleCompare}
                 onCompareMany={handleCompareMany}
                 onAskBooks={handleAskBooks}
+                onClusterReport={handleClusterReport}
                 onImportFolder={handleImportFolder}
                 importProgress={importProgress}
                 onOpenHistory={() => setHistoryOpen(true)}

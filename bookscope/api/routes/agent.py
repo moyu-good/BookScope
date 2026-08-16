@@ -164,6 +164,7 @@ from bookscope.api.schemas import (
     CrossBookReportRequest,
     CrossBookAskRequest,
     CrossBookAskResponse,
+    ClusterReportRequest,
     AnnotationsRequest,
     AnnotationsResponse,
     ArgumentStructureRequest,
@@ -4578,6 +4579,74 @@ def agent_spine_progress(
         except Exception:  # noqa: BLE001 — 单本失败给空，不阻断批量
             out.append({"session_id": sid, "built": 0, "total": 0, "ready": False})
     return {"books": out}
+
+
+@agent_router.post("/agent/cluster/report")
+def agent_cluster_report(
+    request: ClusterReportRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> Response:
+    """来源组（簇）总览报告：列组内每本书 + 章脉状态，纯聚合秒出。
+
+    不调 LLM；给文档簇管理一个可分享的交付物（书鉴风格 HTML）。
+    """
+    model = request.model or default_model_for(request.provider)
+    nodes = []
+    spines = {}
+    e1 = {}
+    ready = 0
+    for sid in request.book_session_ids:
+        try:
+            assembler = _resolve_assembler(store, sid)
+            _full_text, chunks = _long_context_inputs(assembler)
+            progress = spine_build_progress(chunks=chunks, model=model, genre="fiction")
+            book_title, _ = _extract_book_meta(assembler)
+            slug = sid[-8:]
+            status = (
+                "章脉就绪"
+                if progress["total"] > 0 and progress["built"] >= progress["total"]
+                else f"章脉 {progress['built']}/{progress['total']}"
+                if progress["total"] > 0
+                else "待构建"
+            )
+            if progress["total"] > 0 and progress["built"] >= progress["total"]:
+                ready += 1
+            nodes.append({"slug": slug, "label": (book_title or sid)[:20], "stance": status})
+            spines[slug] = {
+                "_title": book_title or sid,
+                "_slug": slug,
+                "core_thesis": f"{status} · 来源：{getattr(assembler, 'source_folder', '手动上传')}",
+                "theoretical_stance": {"label": "", "inference": False},
+                "method": "",
+                "key_citations": [],
+            }
+            e1[slug] = {"quotes": []}
+        except Exception:  # noqa: BLE001 — 单本失败跳过
+            continue
+
+    total = len(request.book_session_ids)
+    inp = {
+        "layout": "crossdoc",
+        "meta": {
+            "title": f"簇总览 · {request.cluster_name}",
+            "subtitle": f"{len(nodes)}/{total} 本 · {ready} 本就绪 · 可整组对照 / 逐本出报告",
+            "seal": "书 鉴",
+            "nav_title": "簇 · 总览",
+            "unit_label": "本",
+            "generated_by": f"书鉴 BookScope · 簇总览（{request.cluster_name}）",
+        },
+        "nodes": nodes,
+        "edges": [],
+        "concept_evolution": [],
+        "disagreements": [],
+        "narrative": f"来源组《{request.cluster_name}》共 {total} 本。就绪 {ready} 本，"
+                     f"可对这些书做跨文本对照、逐本出书鉴报告、文档簇问答。",
+        "spines": spines,
+        "e1": e1,
+        "quality": {"e2_mean": 0, "e3": None},
+    }
+    html = render_report(inp)
+    return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": "full"})
 
 
 __all__ = ["agent_router"]

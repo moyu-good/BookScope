@@ -58,6 +58,8 @@ export interface BookShelfProps {
   onOpenHistory?: () => void;
   /** 文档簇问答：对选中的多本书直接提问 */
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
+  /** 簇总览报告：来源组聚合清单 */
+  onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -212,6 +214,7 @@ export function BookShelf({
   importProgress,
   onOpenHistory,
   onAskBooks,
+  onClusterReport,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -376,6 +379,7 @@ export function BookShelf({
         onToggleSelect={toggleCompareSelect}
         onCompareMany={onCompareMany}
         onAskBooks={onAskBooks}
+        onClusterReport={onClusterReport}
         onSelect={onSelect}
         onRead={onRead}
         onReport={onReport}
@@ -397,6 +401,7 @@ function ShelfBody(props: {
   onToggleSelect: (id: string) => void;
   onCompareMany: (sessions: SessionMetadata[]) => void;
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
+  onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
   onSelect: (session: SessionMetadata) => void;
   onRead: (session: SessionMetadata) => void;
   onReport: (session: SessionMetadata) => void;
@@ -414,6 +419,7 @@ function ShelfBody(props: {
     onToggleSelect,
     onCompareMany,
     onAskBooks,
+    onClusterReport,
     onSelect,
     onRead,
     onReport,
@@ -450,22 +456,41 @@ function ShelfBody(props: {
     }
   };
 
-  // 章脉进度徽章：批量查询每本书 built/total（纯读缓存）
+  // 章脉进度徽章：批量查询每本书 built/total（纯读缓存），后台预建时 15s 自动刷新
   const [spineProgress, setSpineProgress] = useState<Record<string, { built: number; total: number; ready: boolean }>>({});
   useEffect(() => {
     if (state.kind !== "ready" || state.sessions.length === 0) return;
     let cancelled = false;
     const ids = state.sessions.map((x) => x.session_id).join(",");
-    fetch(`/api/agent/spine-progress?ids=${encodeURIComponent(ids)}&model=deepseek-v4-flash`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { books?: { session_id: string; built: number; total: number; ready: boolean }[] } | null) => {
-        if (cancelled || !data?.books) return;
-        const map: Record<string, { built: number; total: number; ready: boolean }> = {};
-        for (const b of data.books) map[b.session_id] = { built: b.built, total: b.total, ready: b.ready };
-        setSpineProgress(map);
-      })
-      .catch(() => { /* 进度查询失败不打扰 */ });
-    return () => { cancelled = true; };
+    const fetchOnce = () =>
+      fetch(`/api/agent/spine-progress?ids=${encodeURIComponent(ids)}&model=deepseek-v4-flash`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: { books?: { session_id: string; built: number; total: number; ready: boolean }[] } | null) => {
+          if (cancelled || !data?.books) return;
+          const map: Record<string, { built: number; total: number; ready: boolean }> = {};
+          for (const b of data.books) map[b.session_id] = { built: b.built, total: b.total, ready: b.ready };
+          setSpineProgress(map);
+          // 全部就绪后停止轮询
+          const allReady = data.books.every((b) => b.total === 0 || b.ready);
+          return allReady;
+        })
+        .catch(() => false);
+    let timer: ReturnType<typeof setInterval> | null = null;
+    void fetchOnce().then((allReady) => {
+      if (cancelled || allReady) return;
+      timer = setInterval(() => {
+        void fetchOnce().then((done) => {
+          if (done && timer) {
+            clearInterval(timer);
+            timer = null;
+          }
+        });
+      }, 15000);
+    });
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
   }, [state]);
 
   if (state.kind === "loading" || state.kind === "idle") {
@@ -518,6 +543,16 @@ function ShelfBody(props: {
             {g.source}
           </span>
           <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{g.items.length} 本</span>
+          {g.items.length >= 1 && !compareMode && onClusterReport && (
+            <button
+              type="button"
+              onClick={() => onClusterReport(g.items.map((e) => e.session), g.source)}
+              title={`出「${g.source}」的簇总览报告`}
+              className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+            >
+              簇总览
+            </button>
+          )}
           {g.items.length >= 2 && !compareMode && (
             <button
               type="button"

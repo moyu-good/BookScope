@@ -658,6 +658,24 @@ class CrossBookAskResponse(BaseModel):
     sources: list[str] = Field(default_factory=list, description="来源（书名/章号）。")
 
 
+class ClusterReportRequest(BaseModel):
+    """POST /api/agent/cluster/report 请求体：来源组（簇）总览报告。
+
+    纯聚合（不调 LLM）：列组内每本书 + 章脉状态，秒出可分享 HTML。
+    """
+
+    book_session_ids: list[str] = Field(
+        ..., min_length=1, description="同一来源组的 session_id 列表。"
+    )
+    cluster_name: str = Field(default="文档簇", description="组名（来源文件夹名）。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
 class PrewarmSpineStatusResponse(BaseModel):
     """GET /api/agent/prewarm-spine/status 响应体：轮询后台预建进度。
 
