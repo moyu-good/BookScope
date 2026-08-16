@@ -1,0 +1,280 @@
+"""BookScope 本地工具 API（零配置、不需要 LLM key）。
+
+给脚本/其他软件一个最轻的入口：
+- ``POST /api/tools/report``：给一个本地文件路径，直接返回结构版 HTML 报告
+- ``POST /api/tools/import``：给一个本地文件/文件夹路径，导入书库并返回 session_id
+
+这些端点只用本地文件系统 + 零 LLM 能力，适合“工具自己就能用”的定位。
+"""
+
+from __future__ import annotations
+
+import os
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
+
+from bookscope.api.book_sessions import BookSessionStore
+from bookscope.api.dependencies import get_book_session_store
+from bookscope.local_tools import local_search
+
+tools_router = APIRouter(prefix="/tools", tags=["tools"])
+
+_IMPORT_EXTS = {".txt", ".epub", ".pdf", ".docx", ".md", ".markdown"}
+
+
+class ReportRequest(BaseModel):
+    path: str = Field(..., description="本地文件绝对路径")
+    title: str | None = Field(default=None)
+
+
+class ImportRequest(BaseModel):
+    path: str = Field(..., description="本地文件或文件夹绝对路径")
+    title: str | None = Field(default=None)
+
+
+class AskLocalRequest(BaseModel):
+    session_id: str = Field(..., description="书库 session_id")
+    question: str = Field(..., min_length=1)
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+class CatalogRequest(BaseModel):
+    path: str = Field(..., description="书库文件夹绝对路径")
+    out: str = Field(default="bookscope-catalog", description="输出目录（默认 bookscope-catalog）")
+
+
+class SearchRequest(BaseModel):
+    path: str = Field(..., description="书库文件夹绝对路径")
+    query: str = Field(..., min_length=1)
+    top_k: int = Field(default=3, ge=1, le=20)
+
+
+class StatsRequest(BaseModel):
+    path: str = Field(..., description="书库文件夹绝对路径")
+
+
+class InvokeRequest(BaseModel):
+    tool: str = Field(..., description="工具名，如 bookscope_import / bookscope_ask")
+    arguments: dict = Field(default_factory=dict, description="工具参数")
+
+
+def _chunks_to_dicts(results) -> list[dict]:
+    return [
+        {
+            "chunk_id": f"c{idx}",
+            "chapter": getattr(c, "chapter", None),
+            "text": getattr(c, "text", ""),
+        }
+        for idx, c in enumerate(results)
+    ]
+
+
+@tools_router.post("/upload")
+async def tools_upload(
+    file: UploadFile = File(...),
+    book_title: str = Form(..., min_length=1),
+    language: str = Form("zh"),
+) -> dict:
+    """零配置单文件上传：不做 LLM KG，直接 ingest + BM25 入库。"""
+    filename = file.filename or ""
+    suffix = Path(filename).suffix.lower()
+    if suffix not in _IMPORT_EXTS:
+        raise HTTPException(status_code=400, detail=f"不支持的文件扩展名 {suffix!r}")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+
+    from bookscope.agent.backends.r0_assembler import R0BookAssembler
+    from bookscope.api.book_sessions import BookSessionStore
+    from bookscope.api.routes.books import _run_ingest_or_raise
+    from bookscope.api.session_storage import JSONFileSessionStorage
+    from bookscope.models.schemas import BookKnowledgeGraph
+    from bookscope.store.vector_store import SessionVectorStore
+
+    book_text, chunks, chapter_stats = _run_ingest_or_raise(
+        content, suffix, book_title, language,
+    )
+    kg = BookKnowledgeGraph(
+        book_title=book_text.title,
+        language=getattr(book_text, "language", language),
+        characters=[],
+    )
+    vector_store = SessionVectorStore(chunks=chunks, enable_vector=True)
+    assembler = R0BookAssembler(
+        book_text=book_text,
+        chunks=chunks,
+        knowledge_graph=kg,
+        session_vector_store=vector_store,
+    )
+    assembler.chapter_detection_stats = chapter_stats.to_dict()
+    data_dir = Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))
+    session_id = f"api-{uuid.uuid4().hex[:12]}"
+    storage = JSONFileSessionStorage(root=data_dir)
+    store = BookSessionStore(storage=storage)
+    store.register(session_id, assembler)
+    return {
+        "session_id": session_id,
+        "book_title": book_text.title,
+        "language": getattr(book_text, "language", language),
+        "chunk_count": len(chunks),
+        "character_count": len(getattr(book_text, "raw_text", "") or ""),
+        "message": "零配置导入完成（未做 LLM KG，深度分析需配置 key 后重新生成）",
+    }
+
+
+@tools_router.post("/ask-local")
+def tools_ask_local(
+    req: AskLocalRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> dict:
+    """零配置本地问答：对已导入 session 做本地检索，返回相关原文。"""
+    try:
+        assembler = store.get(req.session_id)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=404, detail=f"book session 不存在: {req.session_id}")
+    chunks = []
+    for i, c in enumerate(assembler._chunks):  # noqa: SLF001
+        chunks.append({
+            "chunk_id": f"c{i}",
+            "chapter": getattr(c, "chapter", None),
+            "text": getattr(c, "text", ""),
+        })
+    results = local_search(req.question, chunks, top_k=req.top_k)
+    return {"mode": "local", "results": results}
+
+
+@tools_router.get("/manifest")
+def tools_manifest() -> dict:
+    """返回 AI 助手可用的工具清单（function calling schema）。"""
+    import json
+    from pathlib import Path as _P
+
+    manifest_path = _P(__file__).resolve().parents[2] / "tools_manifest.json"
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+@tools_router.post("/invoke")
+def tools_invoke(req: InvokeRequest) -> dict:
+    """AI 助手工具调用入口：按 tool 名 + 参数执行本地零配置能力。"""
+    from bookscope.local_tools import (
+        generate_catalog,
+        import_file,
+        local_search,
+        search_folder,
+        stats_folder,
+        structure_report_html,
+    )
+
+    args = req.arguments or {}
+    data_dir = Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))
+    try:
+        if req.tool == "bookscope_import":
+            path = Path(args["path"])
+            sid = import_file(path, data_dir, title=args.get("title"))
+            return {"session_id": sid, "book_title": args.get("title") or path.stem}
+        if req.tool == "bookscope_report":
+            path = Path(args["path"])
+            return {"html": structure_report_html(path, title=args.get("title"))}
+        if req.tool == "bookscope_ask":
+            # 零配置：先按 session 取 chunks 做本地检索；如需 LLM 由上层再接 /api/agent/ask
+            from bookscope.api.book_sessions import BookSessionStore
+            from bookscope.api.session_storage import JSONFileSessionStorage
+
+            store = BookSessionStore(storage=JSONFileSessionStorage(root=data_dir))
+            assembler = store.get(args["session_id"])
+            chunks = []
+            for i, c in enumerate(assembler._chunks):  # noqa: SLF001
+                chunks.append({"chunk_id": f"c{i}", "chapter": getattr(c, "chapter", None), "text": getattr(c, "text", "")})
+            return {"mode": "local", "results": local_search(args["question"], chunks)}
+        if req.tool == "bookscope_search":
+            return {"results": search_folder(Path(args["path"]), args["query"], top_k=int(args.get("top_k", 3)))}
+        if req.tool == "bookscope_stats":
+            return stats_folder(Path(args["path"]))
+        if req.tool == "bookscope_catalog":
+            index_path, entries = generate_catalog(Path(args["path"]), Path(args.get("out", "bookscope-catalog")))
+            return {"index": str(index_path.resolve()), "count": len(entries), "entries": entries}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"{req.tool} 调用失败: {exc}")
+    raise HTTPException(status_code=400, detail=f"未知工具: {req.tool}")
+
+
+@tools_router.post("/stats")
+def tools_stats(req: StatsRequest) -> dict:
+    """零配置：统计书库规模。"""
+    from bookscope.local_tools import stats_folder
+
+    try:
+        return stats_folder(Path(req.path))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@tools_router.post("/search")
+def tools_search(req: SearchRequest) -> dict:
+    """零配置：在文件夹里跨书本地检索关键词。"""
+    from bookscope.local_tools import search_folder
+
+    try:
+        results = search_folder(Path(req.path), req.query, top_k=req.top_k)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"query": req.query, "results": results, "count": len(results)}
+
+
+@tools_router.post("/catalog")
+def tools_catalog(req: CatalogRequest) -> dict:
+    """零配置生成 HTML 书库目录。"""
+    from bookscope.local_tools import generate_catalog
+
+    try:
+        index_path, entries = generate_catalog(Path(req.path), Path(req.out))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {
+        "index": str(index_path.resolve()),
+        "count": len(entries),
+        "entries": entries,
+    }
+
+
+@tools_router.post("/report")
+def tools_report(req: ReportRequest) -> Response:
+    path = Path(req.path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {path}")
+    from bookscope.local_tools import structure_report_html
+
+    html = structure_report_html(path, title=req.title)
+    return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": "structure"})
+
+
+def _import_one(path: Path, data_dir: Path, title: str | None = None) -> str:
+    from bookscope.local_tools import import_file
+
+    return import_file(path, data_dir, title=title)
+
+
+@tools_router.post("/import")
+def tools_import(req: ImportRequest) -> dict:
+    path = Path(req.path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"路径不存在: {path}")
+    data_dir = Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))
+    if path.is_dir():
+        files = [p for p in path.rglob("*") if p.is_file() and p.suffix.lower() in _IMPORT_EXTS]
+        if not files:
+            raise HTTPException(status_code=400, detail="文件夹里没有支持的文件")
+        imported = []
+        for f in sorted(files):
+            try:
+                sid = _import_one(f, data_dir)
+                imported.append({"session_id": sid, "file": str(f), "book_title": f.stem})
+            except Exception as exc:  # noqa: BLE001
+                imported.append({"session_id": None, "file": str(f), "error": str(exc)})
+        return {"imported": imported, "count": sum(1 for x in imported if x["session_id"])}
+    sid = _import_one(path, data_dir, title=req.title)
+    return {"session_id": sid, "book_title": req.title or path.stem}
