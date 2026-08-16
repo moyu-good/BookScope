@@ -138,6 +138,17 @@ export function CrossWorkbench({
     }
   };
 
+  const exportJson = () => {
+    if (!data) return;
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "cross-workbench.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div
       className="fixed inset-0 z-[210] flex flex-col bg-[var(--color-paper)]"
@@ -156,6 +167,15 @@ export function CrossWorkbench({
         <span className="text-xs text-[var(--color-ink-muted)] truncate">
           {data ? data.titles : "加载中…"}
         </span>
+        {data && (
+          <button
+            type="button"
+            onClick={exportJson}
+            className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition"
+          >
+            导出 JSON
+          </button>
+        )}
         {onGenerateReport && (
           <button
             type="button"
