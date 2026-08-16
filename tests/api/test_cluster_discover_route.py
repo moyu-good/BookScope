@@ -144,3 +144,20 @@ def test_cluster_discover_partial_ready_returns_409(
     detail = resp.json()["detail"]
     assert detail["error_type"] == "SpineNotReady"
     assert len(detail["progress"]) == 2
+
+
+def test_cluster_discover_too_many_books_returns_422(
+    client_and_store: tuple[TestClient, BookSessionStore],
+) -> None:
+    """超过 8 本由 schema 直接拒掉（422），不用等后端逻辑。"""
+    client, _store = client_and_store
+    resp = client.post(
+        "/api/agent/cluster/discover",
+        json={
+            "book_session_ids": [f"s{i}" for i in range(9)],
+            "cluster_name": "超大组",
+            "provider": "deepseek",
+            "api_key": "k" * 12,
+        },
+    )
+    assert resp.status_code == 422, resp.text
