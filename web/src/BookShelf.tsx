@@ -50,6 +50,8 @@ export interface BookShelfProps {
   onCompareMany: (sessions: SessionMetadata[]) => void;
   /** 批量导入本地书库（仅本地模式） */
   onImportFolder?: () => void;
+  /** 批量导入进度（书柜内进度条） */
+  importProgress?: { done: number; total: number; current: string | null } | null;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -111,6 +113,31 @@ async function deleteSession(sessionId: string): Promise<void> {
  * 先按 last_accessed_at 倒序（最近用过的排前面），再把同 book_title 的多份
  * 收成一张卡——卡指向最近那份 session，dupeCount 记总份数。
  */
+/** 导入来源映射（localStorage：session_id -> 文件夹名）。批量导入时由 App 记录。 */
+const IMPORT_SOURCES_KEY = "bookscope_import_sources";
+
+function getImportSources(): Record<string, string> {
+  try {
+    const raw = window.localStorage.getItem(IMPORT_SOURCES_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw) as Record<string, string>;
+    return data && typeof data === "object" ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+export function rememberImportSources(entries: { session_id: string; source_folder: string }[]): void {
+  if (entries.length === 0) return;
+  try {
+    const cur = getImportSources();
+    for (const e of entries) cur[e.session_id] = e.source_folder;
+    window.localStorage.setItem(IMPORT_SOURCES_KEY, JSON.stringify(cur));
+  } catch {
+    /* localStorage 不可用时静默 */
+  }
+}
+
 function buildShelf(sessions: SessionMetadata[]): ShelfEntry[] {
   const sorted = [...sessions].sort((a, b) =>
     b.last_accessed_at.localeCompare(a.last_accessed_at),
@@ -126,6 +153,23 @@ function buildShelf(sessions: SessionMetadata[]): ShelfEntry[] {
     }
   }
   return [...byTitle.values()];
+}
+
+/** 按导入来源分组；手动上传放最后。 */
+function groupBySource(entries: ShelfEntry[]): { source: string; items: ShelfEntry[] }[] {
+  const sources = getImportSources();
+  const groups = new Map<string, ShelfEntry[]>();
+  for (const e of entries) {
+    const src = sources[e.session.session_id]?.trim() || "手动上传";
+    if (!groups.has(src)) groups.set(src, []);
+    groups.get(src)!.push(e);
+  }
+  const order = [...groups.keys()].sort((a, b) => {
+    if (a === "手动上传") return 1;
+    if (b === "手动上传") return -1;
+    return a.localeCompare(b, "zh-Hans-CN");
+  });
+  return order.map((k) => ({ source: k, items: groups.get(k)! }));
 }
 
 /**
@@ -156,6 +200,7 @@ export function BookShelf({
   onCompare,
   onCompareMany,
   onImportFolder,
+  importProgress,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -275,6 +320,31 @@ export function BookShelf({
           {compareMode ? "退出对照" : "对照"}
         </button>
       </div>
+      {importProgress && (
+        <div
+          className="mb-3 flex items-center gap-3 rounded-md border px-3 py-2 text-xs"
+          style={{
+            background: "var(--color-seal-soft)",
+            borderColor: "color-mix(in oklch, var(--color-seal) 30%, transparent)",
+          }}
+        >
+          <span className="font-bold text-[var(--color-seal)]">
+            导入书库 · {importProgress.done}/{importProgress.total}
+          </span>
+          <span className="text-[var(--color-ink-muted)] truncate">
+            {importProgress.current ? `正在导入 ${importProgress.current}` : "准备中…"}
+          </span>
+          <div className="ml-auto h-1.5 w-32 overflow-hidden rounded-full" style={{ background: "color-mix(in oklch, var(--color-seal) 15%, transparent)" }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${importProgress.total > 0 ? Math.round((importProgress.done / importProgress.total) * 100) : 0}%`,
+                background: "var(--color-seal)",
+              }}
+            />
+          </div>
+        </div>
+      )}
       <ShelfBody
         state={state}
         activeSessionId={activeSessionId}
@@ -357,12 +427,21 @@ function ShelfBody(props: {
   }
 
   const shelf = buildShelf(state.sessions);
+  const groups = groupBySource(shelf);
 
-  // 一份目录：行与行之间用极细 rule 隔开（像书目的栏线），外面一圈函套描边。
+  // 一份目录：按导入来源分组（手动上传 / D:\书…），组内行与行之间用极细 rule 隔开。
   return (
     <>
-    <ul className="flex flex-col rounded border border-[var(--color-rule)] overflow-hidden divide-y divide-[var(--color-rule)]">
-      {shelf.map((entry) => {
+    {groups.map((g) => (
+      <div key={g.source} className="mb-4">
+        <div className="flex items-baseline gap-2 px-1 mb-1.5">
+          <span className="text-xs font-bold text-[var(--color-ink-muted)]" style={{ fontFamily: "var(--font-display)" }}>
+            {g.source}
+          </span>
+          <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{g.items.length} 本</span>
+        </div>
+        <ul className="flex flex-col rounded border border-[var(--color-rule)] overflow-hidden divide-y divide-[var(--color-rule)]">
+      {g.items.map((entry) => {
         const s = entry.session;
         const isActive = s.session_id === activeSessionId;
         const isConfirming = s.session_id === confirmingId;
@@ -385,7 +464,9 @@ function ShelfBody(props: {
           />
         );
       })}
-    </ul>
+        </ul>
+      </div>
+    ))}
     {compareMode && (
       <div
         className="mt-3 flex items-center gap-3 rounded-md border px-3 py-2 text-xs"

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { BookShelf } from "./BookShelf";
+import { BookShelf, rememberImportSources } from "./BookShelf";
 import { ReportPreview, type ReportPreviewState } from "./ReportPreview";
 import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
@@ -1539,6 +1539,8 @@ export function App() {
   const [compareTarget, setCompareTarget] = useState<SessionMetadata | null>(null);
   /** 报告预览：出报告/对照报告后应用内 iframe 预览（可下载）。 */
   const [reportPreview, setReportPreview] = useState<ReportPreviewState | null>(null);
+  /** 批量导入进度（书柜内进度条） */
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number; current: string | null } | null>(null);
   const handleCompare = useCallback(
     async (s: SessionMetadata) => {
       if (!apiKey) {
@@ -1714,22 +1716,37 @@ export function App() {
         return;
       }
       const data = (await resp.json()) as { job_id: string; total: number };
-      alert(`开始导入 ${data.total} 本（秒级入库，章脉后台渐进构建）`);
+      setImportProgress({ done: 0, total: data.total, current: null });
       // 轮询直到完成
       const timer = setInterval(async () => {
         try {
           const st = (await (await fetch(`/api/books/import-folder/status?job_id=${data.job_id}`)).json()) as {
-            status: string; done: number; total: number; error?: string | null;
+            status: string; done: number; total: number; current?: string | null;
+            results?: { session_id?: string | null; file?: string; book_title?: string | null; error?: string | null }[];
+            error?: string | null;
           };
-          if (st.status === "done" || st.status === "error") {
-            clearInterval(timer);
-            alert(st.status === "done" ? `导入完成：${st.done}/${st.total} 本` : `导入失败：${st.error || "未知"}`);
+          if (st.status === "running") {
+            setImportProgress({ done: st.done, total: st.total, current: st.current ?? null });
+            return;
+          }
+          clearInterval(timer);
+          setImportProgress(null);
+          if (st.status === "done") {
+            // 记录导入来源（session_id -> 文件夹名），书柜分组用
+            rememberImportSources(
+              (st.results ?? [])
+                .filter((r) => r.session_id && !r.error)
+                .map((r) => ({ session_id: r.session_id!, source_folder: path })),
+            );
+            alert(`导入完成：${st.done}/${st.total} 本`);
             setShelfRefresh((n) => n + 1);
+          } else {
+            alert(`导入失败：${st.error || "未知"}`);
           }
         } catch {
           /* 网络抖动：下一轮再试 */
         }
-      }, 1500);
+      }, 1200);
     } catch {
       alert("导入失败：网络错误");
     }
@@ -2178,6 +2195,7 @@ export function App() {
                 onCompare={handleCompare}
                 onCompareMany={handleCompareMany}
                 onImportFolder={handleImportFolder}
+                importProgress={importProgress}
                 onDeleted={handleDeletedShelfBook}
                 refreshTrigger={shelfRefresh}
                 pendingAutoSelectId={pendingAutoSelectId}
