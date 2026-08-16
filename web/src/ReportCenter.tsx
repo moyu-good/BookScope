@@ -17,6 +17,14 @@ interface SpineState {
   error?: string | null;
 }
 
+function coverColor(genre?: string): string {
+  const g = (genre ?? "").trim().toLowerCase();
+  if (/(小说|novel|fiction|网文|历史|架空|玄幻|history)/.test(g)) return "#b4763a";
+  if (/(理论|论文|paper|哲学|philosophy|工具书|nonfiction|学术|工具)/.test(g)) return "#3a6378";
+  if (/(诗|poem|poetry|散文|verse)/.test(g)) return "#6f6391";
+  return "var(--color-rule)";
+}
+
 export function ReportCenter({
   onOpenReport,
   onReopen,
@@ -330,6 +338,21 @@ export function ReportCenter({
                     className="rounded-md border border-[var(--color-rule)] p-3 flex items-center gap-3 transition-shadow hover:shadow-[var(--shadow-raised)]"
                     style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
                   >
+                    <div
+                      aria-hidden
+                      className="shrink-0 w-9 h-12 rounded-md flex items-center justify-center"
+                      style={{
+                        background: `linear-gradient(135deg, ${coverColor(s.genre)}, color-mix(in oklch, ${coverColor(s.genre)} 62%, var(--color-paper)))`,
+                        boxShadow: "inset 0 0 0 1px rgba(0,0,0,.06), var(--shadow-soft)",
+                      }}
+                    >
+                      <span
+                        className="text-sm font-bold leading-none select-none"
+                        style={{ color: "rgba(255,255,255,.88)", fontFamily: "var(--font-display)" }}
+                      >
+                        {s.book_title.trim().slice(0, 1) || "书"}
+                      </span>
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-bold text-[var(--color-ink)] truncate">{s.book_title}</div>
                       <div className="text-[10px] text-[var(--color-ink-muted)]">
