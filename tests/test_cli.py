@@ -215,3 +215,22 @@ def test_cmd_self_test_passes(capsys) -> None:
     assert cli.cmd_self_test(argparse.Namespace()) == 0
     out = capsys.readouterr().out
     assert "零配置核心链路自检通过" in out
+
+
+def test_cmd_report_stdout_prints_html(tmp_path: Path, capsys) -> None:
+    import bookscope.cli as cli
+
+    f = tmp_path / "a.txt"
+    f.write_text("第一章 开端\n甲。\n", encoding="utf-8")
+    import argparse
+
+    args = argparse.Namespace(
+        path=str(f), out=str(tmp_path / "r.html"), title="测试书", deep=False,
+        provider="deepseek", api_key=None, model=None, base_url=None,
+        open=False, json=False, stdout=True,
+    )
+    assert cli.cmd_report(args) == 0
+    captured = capsys.readouterr()
+    assert "<!DOCTYPE html>" in captured.out
+    # stdout 模式不应写文件
+    assert not (tmp_path / "r.html").exists()

@@ -84,7 +84,7 @@ def cmd_cross(args: argparse.Namespace) -> int:
             print(f"文件不存在: {path}", file=sys.stderr)
             return 1
         title, chunks = _load_chunks(path, getattr(args, f"title{idx + 1}", None))
-        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…")
+        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…", file=sys.stderr)
         spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
         slug = f"b{idx}"
         perspectives.append(build_book_perspective(
@@ -201,7 +201,7 @@ def cmd_cluster(args: argparse.Namespace) -> int:
             print(f"文件不存在: {path}", file=sys.stderr)
             return 1
         title, chunks = _load_chunks(path, getattr(args, f"title{idx + 1}", None))
-        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…")
+        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…", file=sys.stderr)
         spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
         perspectives.append(build_book_perspective(
             spine=spine, book_title=title, slug=f"b{idx}",
@@ -593,9 +593,9 @@ def cmd_report(args: argparse.Namespace) -> int:
         print(f"文件不存在: {path}", file=sys.stderr)
         return 1
     title = args.title or path.stem
-    print(f"正在读取 {path} …")
+    print(f"正在读取 {path} …", file=sys.stderr)
     book = load_text(path, title=title)
-    print("正在分章/切块 …")
+    print("正在分章/切块 …", file=sys.stderr)
     results, stats = chunk_book_with_stats(book)
     chunks = _chunks_to_dicts(results)
 
@@ -614,7 +614,7 @@ def cmd_report(args: argparse.Namespace) -> int:
         from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
         from bookscope.report.builders import build_book_report
 
-        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…")
+        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…", file=sys.stderr)
         spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
         meta = {
             "title": f"《{title}》书鉴报告",
@@ -636,6 +636,9 @@ def cmd_report(args: argparse.Namespace) -> int:
         }
         inp = build_structure_report(chunks, meta)
     html = render_report(inp)
+    if getattr(args, "stdout", False):
+        sys.stdout.write(html)
+        return 0
     out = Path(args.out)
     out.write_text(html, encoding="utf-8")
     if getattr(args, "json", False):
@@ -704,6 +707,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_report.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
     p_report.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
     p_report.add_argument("--json", action="store_true", help="以 JSON 输出生成结果元数据")
+    p_report.add_argument("--stdout", action="store_true", help="把 HTML 输出到 stdout（不写文件）")
     p_report.set_defaults(func=cmd_report)
 
     p_prewarm = sub.add_parser("prewarm", help="预建一本书的章脉缓存（后续操作秒出）")

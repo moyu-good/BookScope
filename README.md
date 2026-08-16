@@ -72,6 +72,9 @@ bookscope self-test
 # 深度版书鉴报告（需要 LLM key）
 bookscope report 书.epub --deep --out 书鉴深度.html --api-key sk-...
 
+# 把 HTML 直接输出到 stdout（管道/脚本用）
+bookscope report 书.epub --stdout > 书鉴.html
+
 # 对一本书直接提问；没配置 key 时自动降级为本地检索（返回相关原文）
 bookscope ask 书.epub "这本书的核心主张是什么？" --api-key sk-...
 bookscope ask 书.epub "市场与政府"
