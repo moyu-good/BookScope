@@ -2639,7 +2639,8 @@ export function App() {
               className="mb-6 w-full text-left rounded-lg border border-[var(--color-seal)]/40 px-4 py-3 text-sm text-[var(--color-ink)] hover:border-[var(--color-seal)] transition-colors"
               style={{ background: "var(--color-seal-soft)" }}
             >
-              先填一个 LLM 的 API key 才能用，点这里去
+              基础功能（结构报告/导入/列表）不需要 key；深度分析/问答需要时再填。
+              点这里去
               <span style={{ color: "var(--color-seal)" }}>设置</span>
               （左栏底部，自带的 key、不上传服务器）。
             </button>
