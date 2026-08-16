@@ -514,6 +514,7 @@ def render_visual_report(data: dict) -> str:
 </head>
 <body>
 <header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button><button class="data-btn" onclick="downloadReportData()">⬇️ 数据 JSON</button></header>
+<div class="search-box" style="max-width:1200px;margin:16px auto 0;padding:0 16px"><input type="search" id="global-search" placeholder="🔍 全局搜索：输入人物 / 概念 / 关键词，只显示相关板块…"></div>
 <div class="stats">{stat_html}</div>
 {sections}
 <button class="toc-btn" onclick="document.getElementById('toc-panel').classList.add('open')">☰ 目录</button>
@@ -552,6 +553,12 @@ document.querySelectorAll('[data-filter]').forEach(input=>{{
 }});
 document.querySelectorAll('.toc-panel a').forEach(a=>{{
   a.addEventListener('click',()=>document.getElementById('toc-panel').classList.remove('open'));
+}});
+document.getElementById('global-search').addEventListener('input',e=>{{
+  const q=e.target.value.trim().toLowerCase();
+  document.querySelectorAll('main section, body > section').forEach(sec=>{{
+    sec.style.display=(!q||(sec.textContent||'').toLowerCase().includes(q))?'':'none';
+  }});
 }});
 function downloadReportData(){{
   const data=JSON.parse(document.getElementById('report-data').textContent);
