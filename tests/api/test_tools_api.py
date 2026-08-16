@@ -127,6 +127,7 @@ def test_tools_manifest_lists_tools(client: TestClient) -> None:
     assert "bookscope_verify" in names
     assert "bookscope_analyze" in names
     assert "bookscope_deep_report" in names
+    assert "bookscope_visualize" in names
 
 
 def test_tools_invoke_stats(client: TestClient, tmp_path: Path) -> None:
@@ -261,3 +262,25 @@ def test_tools_invoke_deep_report_structure_fallback(client: TestClient, tmp_pat
     assert body["session_id"].startswith("api-")
     assert "报告导航" in body["html"]
     assert "prewarm_status" not in body
+
+
+def test_tools_invoke_visualize_with_precomputed_data_returns_html(client: TestClient) -> None:
+    data = {
+        "meta": {"book": "测试书", "title": "测试书逻辑梳理"},
+        "narrative_curve": {"chapters": [{"chapter": 1, "event_count": 3, "turning_count": 0, "is_turning": False}]},
+        "character_graph": {"nodes": ["甲", "乙"], "edges": [{"source": "甲", "target": "乙", "strength": 2}]},
+        "timeline": {"events": [{"order": 1, "chapter": 1, "event": "事件", "evidence": "原文", "verified": True}]},
+        "recap": {"points": [{"order": 1, "point": "主线", "snippet": "原文", "verified": True}]},
+        "argument_structure": {"claims": [{"order": 1, "claim": "论点", "evidence": "原文", "verified": True}]},
+        "foreshadow_arcs": {"arcs": [{"description": "伏笔", "setup_chapter": 1, "payoff_chapter": 2, "status": "resolved", "setup_evidence": "原文"}]},
+        "consistency_scan": {"contradictions": []},
+    }
+    resp = client.post("/api/tools/invoke", json={
+        "tool": "bookscope_visualize",
+        "arguments": {"data": data},
+    })
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["mode"] == "precomputed"
+    assert "逻辑主线" in body["html"]
+    assert "人物/概念关系图" in body["html"]

@@ -17,6 +17,7 @@ AI 助手（如 Claude / GPT / 本地 agent）可以通过统一的工具调用�
 | --- | --- |
 | `bookscope_analyze` | 一键分析：结构版 + 渐进进度 + 导入书库 + 可选本地检索，自动启用深度预建 |
 | `bookscope_deep_report` | 认真版书鉴 HTML：深度就绪给完整报告，未就绪先给结构版并自动预建 |
+| `bookscope_visualize` | 逻辑梳理 + 可视化：叙事曲线/人物关系图/时间线/论证结构/伏笔回收，输出移动端 HTML |
 | `bookscope_import` | 导入本地文件/文件夹，返回 session_id |
 | `bookscope_report` | 生成结构版 HTML 书鉴报告 |
 | `bookscope_ask` | 对书提问（AI 助手有 LLM 时智能回答，本地检索兜底） |
@@ -60,6 +61,7 @@ POST /api/tools/invoke     {"tool": "bookscope_progress", "arguments": {"path": 
 POST /api/tools/invoke     {"tool": "bookscope_verify", "arguments": {"path": "/path/to/book.epub", "quote": "要核验的引文"}}
 POST /api/tools/invoke     {"tool": "bookscope_analyze", "arguments": {"path": "/path/to/book.epub", "question": "这本书的核心主张？"}}
 POST /api/tools/invoke     {"tool": "bookscope_deep_report", "arguments": {"path": "/path/to/book.epub"}}
+POST /api/tools/invoke     {"tool": "bookscope_visualize", "arguments": {"path": "/path/to/book.epub", "concept": "忠义"}}
 POST /api/tools/invoke     {"tool": "bookscope_prewarm", "arguments": {"session_id": "..."}}
 ```
 

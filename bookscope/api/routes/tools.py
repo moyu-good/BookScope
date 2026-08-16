@@ -203,6 +203,110 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 model=args.get("model", "deepseek-v4-flash"),
                 genre=args.get("genre", "fiction"),
             )
+        if req.tool == "bookscope_visualize":
+            from bookscope.report.visual_report import render_visual_report
+
+            if args.get("data"):
+                return {"html": render_visual_report(args["data"]), "mode": "precomputed"}
+
+            import os as _os
+
+            api_key = args.get("api_key") or _os.environ.get("DEEPSEEK_API_KEY") or _os.environ.get("OPENAI_API_KEY") or ""
+            if not api_key:
+                raise ValueError("可视化分析需要 AI 助手提供 LLM 能力（api_key 或环境变量）")
+            from bookscope.api.book_sessions import BookSessionStore
+            from bookscope.api.routes import agent as agent_routes
+            from bookscope.api.schemas import (
+                ArgumentStructureRequest,
+                CharacterGraphRequest,
+                ConsistencyScanRequest,
+                ForeshadowArcsRequest,
+                NarrativeCurveRequest,
+                RecapRequest,
+                TimelineRequest,
+            )
+            from bookscope.api.session_storage import JSONFileSessionStorage
+
+            sid = args.get("session_id")
+            if not sid:
+                sid = import_file(Path(args["path"]), data_dir, title=args.get("title"))
+            store = BookSessionStore(storage=JSONFileSessionStorage(root=data_dir))
+            provider = args.get("provider", "deepseek")
+            model = args.get("model", "deepseek-v4-flash")
+            base_url = args.get("base_url")
+
+            def _mk(cls, **extra):
+                return cls(
+                    book_session_id=sid,
+                    provider=provider,
+                    api_key=api_key,
+                    model=model,
+                    base_url=base_url,
+                    **extra,
+                )
+
+            data: dict = {}
+            errors: dict[str, str] = {}
+            try:
+                data["narrative_curve"] = agent_routes.agent_narrative_curve(
+                    _mk(NarrativeCurveRequest), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["narrative_curve"] = f"{type(exc).__name__}: {exc}"
+            try:
+                data["character_graph"] = agent_routes.agent_character_graph(
+                    _mk(CharacterGraphRequest, unit=args.get("unit", "person")), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["character_graph"] = f"{type(exc).__name__}: {exc}"
+            try:
+                data["timeline"] = agent_routes.agent_timeline(
+                    _mk(TimelineRequest), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["timeline"] = f"{type(exc).__name__}: {exc}"
+            try:
+                chapters = data.get("narrative_curve", {}).get("chapters", [])
+                up_to = max([c.get("chapter", 1) for c in chapters] or [1])
+                data["recap"] = agent_routes.agent_recap(
+                    _mk(RecapRequest, up_to_chapter=up_to), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["recap"] = f"{type(exc).__name__}: {exc}"
+            concept = args.get("concept")
+            if concept:
+                try:
+                    from bookscope.api.schemas import ConceptEvolutionRequest
+
+                    data["concept_evolution"] = agent_routes.agent_concept_evolution(
+                        _mk(ConceptEvolutionRequest, concept=concept), store
+                    ).model_dump()
+                except Exception as exc:  # noqa: BLE001
+                    errors["concept_evolution"] = f"{type(exc).__name__}: {exc}"
+            try:
+                data["argument_structure"] = agent_routes.agent_argument_structure(
+                    _mk(ArgumentStructureRequest), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["argument_structure"] = f"{type(exc).__name__}: {exc}"
+            try:
+                data["foreshadow_arcs"] = agent_routes.agent_foreshadow_arcs(
+                    _mk(ForeshadowArcsRequest), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["foreshadow_arcs"] = f"{type(exc).__name__}: {exc}"
+            try:
+                data["consistency_scan"] = agent_routes.agent_consistency_scan(
+                    _mk(ConsistencyScanRequest), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["consistency_scan"] = f"{type(exc).__name__}: {exc}"
+
+            meta = {"book": args.get("title") or Path(args.get("path", "")).stem or sid, "title": args.get("title") or "长文档逻辑梳理"}
+            data["meta"] = meta
+            html = render_visual_report(data)
+            return {"html": html, "session_id": sid, "mode": "live", "errors": errors}
+
         if req.tool == "bookscope_deep_report":
             import os as _os
 

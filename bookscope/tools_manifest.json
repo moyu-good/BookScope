@@ -170,6 +170,52 @@
       }
     },
     {
+      "name": "bookscope_visualize",
+      "description": "逻辑梳理 + 可视化综合报告：从长文档提取叙事曲线、人物/概念关系图、事件时间线、逻辑主线、论证结构、伏笔回收、前后一致性，输出一份移动端友好的 HTML。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "已导入书库的 session_id（与 path 二选一）"
+          },
+          "path": {
+            "type": "string",
+            "description": "本地文件路径（与 session_id 二选一）"
+          },
+          "concept": {
+            "type": "string",
+            "description": "要追踪的核心概念（可选，如 忠义 / 法治 / 市场）"
+          },
+          "unit": {
+            "type": "string",
+            "enum": ["person", "concept"],
+            "description": "关系图分析单位，默认 person"
+          },
+          "api_key": {
+            "type": "string",
+            "description": "LLM API key（可选，AI 助手环境通常已自动提供）"
+          },
+          "provider": {
+            "type": "string",
+            "description": "默认 deepseek"
+          },
+          "model": {
+            "type": "string",
+            "description": "默认 deepseek-v4-flash"
+          },
+          "base_url": {
+            "type": "string",
+            "description": "OpenAI 兼容 base_url（可选）"
+          },
+          "data": {
+            "type": "object",
+            "description": "预计算的分析结果 JSON（可选；用于离线/演示渲染）"
+          }
+        }
+      }
+    },
+    {
       "name": "bookscope_deep_report",
       "description": "出一份认真版书鉴 HTML：深度章脉已就绪时直接给完整书鉴报告；未就绪时先给结构版并自动后台预建深度章脉（AI 助手有 LLM 能力时自动启用）。",
       "parameters": {
