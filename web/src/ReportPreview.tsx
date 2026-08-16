@@ -6,7 +6,7 @@
 // 静态报告获得"可追问"能力（答案由 App 调后端生成，展示在预览下方）。
 // ---------------------------------------------------------------------------
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface ReportPreviewState {
   url: string;
@@ -39,6 +39,42 @@ export function ReportPreview({
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
   const [regenerating, setRegenerating] = useState(false);
+  const [buildProgress, setBuildProgress] = useState<{ built: number; total: number } | null>(null);
+  const [buildReady, setBuildReady] = useState(false);
+
+  // 结构版/部分版：后台章脉预建中，轮询 spine-progress 显示实时进度
+  useEffect(() => {
+    const sessionId = preview.sessionId;
+    const isBuilding = preview.coverage === "structure" || preview.coverage?.startsWith("partial:");
+    if (!sessionId || !isBuilding) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const fetchOnce = async () => {
+      try {
+        const resp = await fetch(`/api/agent/spine-progress?ids=${encodeURIComponent(sessionId)}&model=deepseek-v4-flash`);
+        if (!resp.ok || cancelled) return;
+        const data = (await resp.json()) as { books?: { session_id: string; built: number; total: number; ready: boolean }[] };
+        const b = data.books?.find((x) => x.session_id === sessionId);
+        if (!b || cancelled) return;
+        setBuildProgress({ built: b.built, total: b.total });
+        if (b.ready) {
+          setBuildReady(true);
+          if (timer) {
+            clearInterval(timer);
+            timer = null;
+          }
+        }
+      } catch {
+        /* 轮询失败下一轮再试 */
+      }
+    };
+    void fetchOnce();
+    timer = setInterval(() => void fetchOnce(), 5000);
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [preview.sessionId, preview.coverage]);
 
   const download = () => {
     const a = document.createElement("a");
@@ -113,6 +149,16 @@ export function ReportPreview({
         {preview.coverage && preview.coverage.startsWith("partial:") && (
           <span className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-gold,#9C7A2E)] text-[var(--color-gold,#9C7A2E)]">
             已覆盖 {preview.coverage.slice("partial:".length)} 章 · 后台补建中
+          </span>
+        )}
+        {buildProgress && buildProgress.total > 0 && !buildReady && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-gold,#9C7A2E)] text-[var(--color-gold,#9C7A2E)]">
+            深度构建中 {buildProgress.built}/{buildProgress.total}
+          </span>
+        )}
+        {buildReady && preview.coverage && preview.coverage !== "full" && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-seal)] text-[var(--color-seal)]">
+            深度构建完成 · 可重新生成完整版
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
