@@ -225,6 +225,7 @@ export function BookShelf({
   // 对照模式：多选若干本 → 生成跨文本对照报告
   const [compareMode, setCompareMode] = useState(false);
   const [compareSelected, setCompareSelected] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
 
   const toggleCompareMode = () => {
     setCompareMode((v) => !v);
@@ -376,6 +377,8 @@ export function BookShelf({
         confirmingId={confirmingId}
         compareMode={compareMode}
         compareSelected={compareSelected}
+        query={query}
+        onQueryChange={setQuery}
         onToggleSelect={toggleCompareSelect}
         onCompareMany={onCompareMany}
         onAskBooks={onAskBooks}
@@ -398,6 +401,8 @@ function ShelfBody(props: {
   confirmingId: string | null;
   compareMode: boolean;
   compareSelected: Set<string>;
+  query: string;
+  onQueryChange: (q: string) => void;
   onToggleSelect: (id: string) => void;
   onCompareMany: (sessions: SessionMetadata[]) => void;
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
@@ -416,6 +421,8 @@ function ShelfBody(props: {
     confirmingId,
     compareMode,
     compareSelected,
+    query,
+    onQueryChange,
     onToggleSelect,
     onCompareMany,
     onAskBooks,
@@ -518,15 +525,28 @@ function ShelfBody(props: {
   }
 
   const shelf = buildShelf(state.sessions);
-  const groups = groupBySource(shelf);
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? shelf.filter((e) => e.session.book_title.toLowerCase().includes(q))
+    : shelf;
+  const groups = groupBySource(filtered);
 
   // 一份目录：按导入来源分组（手动上传 / D:\书…），组内行与行之间用极细 rule 隔开。
   const readyCount = Object.values(spineProgress).filter((p) => p.ready).length;
   const sourceGroupCount = groups.filter((g) => g.source !== "手动上传").length;
   return (
     <>
+    <div className="mb-2">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        placeholder="🔍 搜索书柜…"
+        className="w-full max-w-xs px-2.5 py-1.5 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-seal)]"
+      />
+    </div>
     <div className="mb-2 flex items-center gap-3 text-xs text-[var(--color-ink-muted)]">
-      <span>共 {shelf.length} 本</span>
+      <span>共 {filtered.length}{q ? ` / ${shelf.length}` : ""} 本</span>
       <span>·</span>
       <span>章脉就绪 {readyCount}/{shelf.length}</span>
       {sourceGroupCount > 0 && (
@@ -536,6 +556,9 @@ function ShelfBody(props: {
         </>
       )}
     </div>
+    {groups.length === 0 && q ? (
+      <p className="text-sm text-[var(--color-ink-muted)] italic">没有匹配「{query}」的书。</p>
+    ) : null}
     {groups.map((g) => (
       <div key={g.source} className="mb-4">
         <div className="flex items-baseline gap-2 px-1 mb-1.5">
