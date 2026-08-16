@@ -45,7 +45,7 @@ def _load_chunks(path: Path, title: str | None = None) -> tuple[str, list[dict]]
 
 
 def _build_client(provider: str, api_key: str, base_url: str | None, model: str):
-    from bookscope.agent import build_llm_client_from_params
+    from bookscope.api.dependencies import build_llm_client_from_params
 
     return build_llm_client_from_params(
         provider=provider,
@@ -378,12 +378,45 @@ def cmd_import(args: argparse.Namespace) -> int:
     return 0 if count else 1
 
 
+def _local_ask(question: str, chunks: list[dict], json_out: bool) -> int:
+    """零配置本地检索问答：没有 LLM key 时用词重叠返回最相关原文片段。"""
+    import json
+
+    import jieba
+
+    query_tokens = set(jieba.lcut(question))
+    scored: list[tuple[float, int]] = []
+    for i, c in enumerate(chunks):
+        text = str(c.get("text", ""))
+        toks = set(jieba.lcut(text))
+        overlap = len(query_tokens & toks)
+        if overlap > 0:
+            scored.append((float(overlap), i))
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    results = []
+    for score, i in scored[:5]:
+        c = chunks[i]
+        results.append({
+            "chapter": c.get("chapter"),
+            "text": str(c.get("text", ""))[:300],
+            "score": score,
+        })
+    if not results:
+        print("本地检索没有找到相关片段（可配置 LLM key 获得智能回答）")
+        return 1
+    if json_out:
+        print(json.dumps({"mode": "local", "results": results}, ensure_ascii=False, indent=2))
+    else:
+        print("本地检索结果（未配置 LLM key，仅返回相关原文）")
+        for r in results:
+            print(f"\n[第{r['chapter']}章 · 命中 {int(r['score'])} 个词]")
+            print(r["text"])
+    return 0
+
+
 def cmd_ask(args: argparse.Namespace) -> int:
-    """对一本书直接提问，输出带原文引用的答案。"""
+    """对一本书直接提问，输出带原文引用的答案；没 key 时自动降级为本地检索。"""
     api_key = args.api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        print("需要 LLM key：--api-key 或环境变量 DEEPSEEK_API_KEY / OPENAI_API_KEY", file=sys.stderr)
-        return 2
     path = Path(args.path)
     if not path.exists():
         print(f"文件不存在: {path}", file=sys.stderr)
@@ -399,6 +432,9 @@ def cmd_ask(args: argparse.Namespace) -> int:
     from bookscope.agent.long_context import run_long_context
 
     title, chunks = _load_chunks(path, args.title)
+    if not api_key:
+        print(f"未配置 LLM key，使用本地检索问答《{title}》…")
+        return _local_ask(args.question, chunks, args.json)
     book = load_text(path, title=title)
     print(f"正在问《{title}》：{args.question}")
     result = run_long_context(

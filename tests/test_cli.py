@@ -163,3 +163,16 @@ def test_cmd_import_folder_imports_all(tmp_path: Path, capsys) -> None:
     assert "成功 2/2" in out
     assert "a.txt" in out
     assert "b.md" in out
+
+
+def test_local_ask_returns_results(capsys) -> None:
+    import bookscope.cli as cli
+
+    chunks = [
+        {"chunk_id": "c0", "chapter": 1, "text": "这是关于经济改革的讨论。"},
+        {"chunk_id": "c1", "chapter": 2, "text": "这里提到市场与政府的关系。"},
+    ]
+    assert cli._local_ask("市场与政府", chunks, json_out=False) == 0
+    out = capsys.readouterr().out
+    assert "本地检索结果" in out
+    assert "市场与政府" in out or "第2章" in out
