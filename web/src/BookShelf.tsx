@@ -51,6 +51,8 @@ export interface BookShelfProps {
   onCompare: (session: SessionMetadata) => void;
   /** 对照模式多选后生成：至少两本 */
   onCompareMany: (sessions: SessionMetadata[]) => void;
+  /** 打开跨文本对照工作台（结构化面板） */
+  onOpenWorkbench?: (sessions: SessionMetadata[]) => void;
   /** 批量导入本地书库（仅本地模式） */
   onImportFolder?: () => void;
   /** 批量导入进度（书柜内进度条） */
@@ -242,6 +244,7 @@ export function BookShelf({
   onReport,
   onCompare,
   onCompareMany,
+  onOpenWorkbench,
   onImportFolder,
   importProgress,
   onOpenHistory,
@@ -443,6 +446,7 @@ export function BookShelf({
         }}
         onClearSelection={() => setCompareSelected(new Set())}
         onCompareMany={onCompareMany}
+        onOpenWorkbench={onOpenWorkbench}
         onAskBooks={onAskBooks}
         onClusterReport={onClusterReport}
         onClusterDiscover={onClusterDiscover}
@@ -476,6 +480,7 @@ function ShelfBody(props: {
   onSelectAll: () => void;
   onClearSelection: () => void;
   onCompareMany: (sessions: SessionMetadata[]) => void;
+  onOpenWorkbench?: (sessions: SessionMetadata[]) => void;
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
   onClusterDiscover?: (sessions: SessionMetadata[], clusterName: string) => void;
@@ -505,6 +510,7 @@ function ShelfBody(props: {
     onSelectAll,
     onClearSelection,
     onCompareMany,
+    onOpenWorkbench,
     onAskBooks,
     onClusterReport,
     onClusterDiscover,
@@ -847,6 +853,20 @@ function ShelfBody(props: {
           >
             生成对照报告
           </button>
+          {onOpenWorkbench && (
+            <button
+              type="button"
+              disabled={compareSelected.size < 2}
+              onClick={() => {
+                const chosen = state.sessions.filter((x) => compareSelected.has(x.session_id));
+                onOpenWorkbench(chosen);
+              }}
+              className="px-3 py-1.5 rounded-md border border-[var(--color-seal)] text-[var(--color-seal)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              对照工作台
+            </button>
+          )}
         </div>
         {onAskBooks && (
           <div className="flex flex-col gap-1.5 rounded-md border px-2.5 py-2" style={{ borderColor: "color-mix(in oklch, var(--color-seal) 25%, transparent)" }}>

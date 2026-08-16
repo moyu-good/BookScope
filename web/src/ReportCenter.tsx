@@ -21,6 +21,7 @@ export function ReportCenter({
   onReopen,
   onCompareMany,
   onClusterDiscover,
+  onOpenWorkbench,
   onPrewarmGroup,
   onDeleteBook,
   progressProvider,
@@ -31,6 +32,7 @@ export function ReportCenter({
   onReopen: (entry: ReportHistoryEntry) => void;
   onCompareMany: (sessions: SessionMetadata[]) => void;
   onClusterDiscover: (sessions: SessionMetadata[], clusterName: string) => void;
+  onOpenWorkbench?: (sessions: SessionMetadata[]) => void;
   onPrewarmGroup: (sessions: SessionMetadata[]) => Promise<void> | void;
   onDeleteBook: (sessionId: string, bookTitle: string) => void;
   progressProvider?: string;
@@ -204,6 +206,17 @@ export function ReportCenter({
                         </button>
                         {list.length >= 2 && (
                           <>
+                          {onOpenWorkbench && (
+                            <button
+                              type="button"
+                              disabled={!groupReady}
+                              onClick={() => onOpenWorkbench(list)}
+                              title={groupReady ? `打开「${src}」这 ${list.length} 本的对照工作台` : "章脉未全就绪，先预建整组"}
+                              className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              工作台
+                            </button>
+                          )}
                           <button
                             type="button"
                             disabled={!groupReady}

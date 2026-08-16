@@ -116,3 +116,29 @@ def test_cross_book_report_returns_html(
     assert resp.headers.get("X-Report-Coverage") == "full"
     assert "text/html" in resp.headers["content-type"]
     assert "<html>ok</html>" in resp.text
+
+
+def test_cross_book_data_returns_json(
+    client_and_store: tuple[TestClient, BookSessionStore],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """JSON 工作台端点：直接复用 _cross_book_payload，返回结构化数据。"""
+    monkeypatch.setattr(
+        agent_routes,
+        "_cross_book_payload",
+        lambda _request, _store: (
+            [{"title": "甲", "slug": "a", "stance": "实证", "summary": "主旨", "claims": []}],
+            {"nodes": [], "edges": [], "concept_evolution": [], "disagreements": [], "narrative": ""},
+            "甲",
+        ),
+    )
+    client, _store = client_and_store
+    resp = client.post(
+        "/api/agent/cross-book/data",
+        json={"book_session_ids": ["s1", "s2"], "provider": "deepseek", "api_key": "k" * 12},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["titles"] == "甲"
+    assert body["perspectives"][0]["title"] == "甲"
+    assert body["reason"]["edges"] == []

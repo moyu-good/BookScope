@@ -4537,15 +4537,13 @@ def agent_book_report(
         return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": coverage})
 
 
-@agent_router.post("/agent/cross-book/report")
-def agent_cross_book_report(
+def _cross_book_payload(
     request: CrossBookReportRequest,
-    store: BookSessionStore = Depends(get_book_session_store),
-) -> Response:
-    """多本书 / 文档簇对照报告（P2 跨文本泛化）。
+    store: BookSessionStore,
+) -> tuple[list[dict], dict, str]:
+    """跨文本对照共用逻辑：校验全就绪 → 建 client → 每本 perspective → 全局 reason。
 
-    每本先取章脉（全部命中才继续；没全建返回 409 + 进度），提炼书级主张（轻 LLM），
-    再做一次跨文本对照推理，出书鉴对照报告。跨文本关系是研判（不盖「鉴」印）。
+    返回 ``(perspectives, reason, titles)``，供 HTML 报告与 JSON 工作台复用。
     """
     model = request.model or default_model_for(request.provider)
     assemblers = []
@@ -4566,18 +4564,11 @@ def agent_cross_book_report(
             )
         assemblers.append((sid, assembler, chunks))
 
-    try:
-        client = build_llm_client_from_params(
-            provider=request.provider,
-            api_key=request.api_key,
-            base_url=request.base_url,
-        )
-    except ImportError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error_type": "ProviderSdkMissing", "message": str(exc)},
-        ) from exc
-
+    client = _build_prewarm_client(
+        provider=request.provider,
+        api_key=request.api_key,
+        base_url=request.base_url,
+    )
     perspectives = []
     for sid, assembler, chunks in assemblers:
         spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
@@ -4590,6 +4581,20 @@ def agent_cross_book_report(
 
     reason = cross_book_reason(perspectives=perspectives, llm_client=client, model=model)
     titles = " × ".join(p.get("title", "") for p in perspectives)
+    return perspectives, reason, titles
+
+
+@agent_router.post("/agent/cross-book/report")
+def agent_cross_book_report(
+    request: CrossBookReportRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> Response:
+    """多本书 / 文档簇对照报告（P2 跨文本泛化）。
+
+    每本先取章脉（全部命中才继续；没全建返回 409 + 进度），提炼书级主张（轻 LLM），
+    再做一次跨文本对照推理，出书鉴对照报告。跨文本关系是研判（不盖「鉴」印）。
+    """
+    perspectives, reason, titles = _cross_book_payload(request, store)
     inp = build_cross_book_report_input(
         perspectives=perspectives, reason=reason,
         meta={
@@ -4602,6 +4607,24 @@ def agent_cross_book_report(
     )
     html = render_report(inp)
     return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": "full"})
+
+
+@agent_router.post("/agent/cross-book/data")
+def agent_cross_book_data(
+    request: CrossBookReportRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> dict:
+    """跨文本对照 JSON 数据端点：给前端「对照工作台」用。
+
+    与 /agent/cross-book/report 同一套逻辑，只返回结构化数据
+    （perspectives + reason + titles），不渲染 HTML。
+    """
+    perspectives, reason, titles = _cross_book_payload(request, store)
+    return {
+        "perspectives": perspectives,
+        "reason": reason,
+        "titles": titles,
+    }
 
 
 @agent_router.post("/agent/cross-book/ask", response_model=CrossBookAskResponse)

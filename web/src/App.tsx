@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { BookShelf, rememberImportSources } from "./BookShelf";
 import { ReportPreview, type ReportPreviewState } from "./ReportPreview";
 import { ReportHistoryModal, clearReportHistory, deleteReportHistoryEntry, loadReportHistory, saveReportHistory, type ReportHistoryEntry } from "./ReportHistory";
+import { CrossWorkbench } from "./CrossWorkbench";
 import { ReportCenter } from "./ReportCenter";
 import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
@@ -1565,6 +1566,8 @@ export function App() {
   const [reportPreview, setReportPreview] = useState<ReportPreviewState | null>(null);
   /** 跨文本/簇发现生成中的提示文案（等待 LLM 时给用户反馈） */
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
+  /** 跨文本对照工作台：结构化对照面板 */
+  const [workbenchSessions, setWorkbenchSessions] = useState<SessionMetadata[] | null>(null);
   /** 批量导入进度（书柜内进度条） */
   const [importProgress, setImportProgress] = useState<{ done: number; total: number; current: string | null } | null>(null);
   /** 报告历史（localStorage）+ 历史弹窗 */
@@ -1637,6 +1640,18 @@ export function App() {
   );
 
   /** 对照模式多选：一次生成多本书的跨文本对照报告（预览）。 */
+  const openCrossWorkbench = useCallback(
+    (sessions: SessionMetadata[]) => {
+      if (!apiKey) {
+        alert("先配置 LLM key（设置里）再开对照工作台");
+        return;
+      }
+      if (sessions.length < 2) return;
+      setWorkbenchSessions(sessions);
+    },
+    [apiKey],
+  );
+
   const handleCompareMany = useCallback(
     async (sessions: SessionMetadata[]) => {
       if (!apiKey) {
@@ -2603,6 +2618,7 @@ export function App() {
                 onReport={openReport}
                 onCompare={handleCompare}
                 onCompareMany={handleCompareMany}
+                onOpenWorkbench={openCrossWorkbench}
                 onAskBooks={handleAskBooks}
                 onClusterReport={handleClusterReport}
                 onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
@@ -3398,6 +3414,7 @@ export function App() {
           onReopen={(e) => void handleReopenReport(e)}
           onCompareMany={(list) => void handleCompareMany(list)}
           onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
+          onOpenWorkbench={(list) => openCrossWorkbench(list)}
           onPrewarmGroup={(list) => handlePrewarmGroup(list)}
           onDeleteBook={(sid, title) => void handleDeleteBookFromCenter(sid, title)}
           progressProvider={provider}
@@ -3418,6 +3435,16 @@ export function App() {
             setReportHistory(loadReportHistory());
           }}
           onClose={() => setHistoryOpen(false)}
+        />
+      )}
+      {workbenchSessions && (
+        <CrossWorkbench
+          sessions={workbenchSessions}
+          provider={provider}
+          apiKey={apiKey}
+          model={model}
+          baseUrl={effectiveBaseUrl()}
+          onClose={() => setWorkbenchSessions(null)}
         />
       )}
       {generatingReport && (
