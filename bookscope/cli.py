@@ -312,18 +312,11 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_import(args: argparse.Namespace) -> int:
-    """把本地文件导入书库（Web 直接可见）。"""
-    path = Path(args.path)
-    if not path.exists():
-        print(f"文件不存在: {path}", file=sys.stderr)
-        return 1
-    title = args.title or path.stem
-    print(f"正在导入 {path} …")
-    book = load_text(path, title=title)
-    results, _stats = chunk_book_with_stats(book)
-    print(f"  读取 {len(results)} 个片段")
+_IMPORT_EXTS = {".txt", ".epub", ".pdf", ".docx", ".md", ".markdown"}
 
+
+def _import_one(path: Path, data_dir: Path, title: str | None = None) -> str:
+    """导入单个文件，返回 session_id。"""
     import uuid
 
     from bookscope.agent.backends.r0_assembler import R0BookAssembler
@@ -331,26 +324,58 @@ def cmd_import(args: argparse.Namespace) -> int:
     from bookscope.api.session_storage import JSONFileSessionStorage
     from bookscope.models.schemas import BookKnowledgeGraph
 
-    kg = BookKnowledgeGraph(book_title=title, language=getattr(book, "language", "zh"), characters=[])
+    name = title or path.stem
+    book = load_text(path, title=name)
+    results, _stats = chunk_book_with_stats(book)
+    kg = BookKnowledgeGraph(book_title=name, language=getattr(book, "language", "zh"), characters=[])
     assembler = R0BookAssembler(
         book_text=book,
         chunks=results,
         knowledge_graph=kg,
         session_vector_store=None,
     )
-    # 让 Web 端能按来源文件夹分组
     try:
         assembler.source_folder = str(path.parent.resolve())
     except Exception:  # noqa: BLE001
         pass
-
     session_id = f"cli-{uuid.uuid4().hex[:12]}"
-    storage = JSONFileSessionStorage(root=Path(args.data_dir))
+    storage = JSONFileSessionStorage(root=data_dir)
     store = BookSessionStore(storage=storage)
     store.register(session_id, assembler)
-    print(f"已导入书库：{session_id} · 《{title}》")
-    print(f"  数据目录：{Path(args.data_dir).resolve()}")
-    return 0
+    return session_id
+
+
+def cmd_import(args: argparse.Namespace) -> int:
+    """把本地文件/文件夹导入书库（Web 直接可见）。"""
+    path = Path(args.path)
+    if not path.exists():
+        print(f"文件不存在: {path}", file=sys.stderr)
+        return 1
+
+    files: list[Path] = []
+    if path.is_dir():
+        files = [p for p in path.rglob("*") if p.is_file() and p.suffix.lower() in _IMPORT_EXTS]
+        if not files:
+            print(f"文件夹里没有支持的文件: {path}", file=sys.stderr)
+            return 1
+    else:
+        files = [path]
+
+    data_dir = Path(args.data_dir)
+    count = 0
+    for f in sorted(files):
+        print(f"正在导入 {f} …")
+        try:
+            session_id = _import_one(f, data_dir, title=args.title if len(files) == 1 else None)
+        except Exception as exc:  # noqa: BLE001
+            print(f"  导入失败: {exc}", file=sys.stderr)
+            continue
+        print(f"  已导入书库：{session_id} · 《{f.stem}》")
+        count += 1
+
+    print(f"完成：成功 {count}/{len(files)} 本")
+    print(f"  数据目录：{data_dir.resolve()}")
+    return 0 if count else 1
 
 
 def cmd_ask(args: argparse.Namespace) -> int:

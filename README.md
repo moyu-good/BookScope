@@ -74,6 +74,7 @@ bookscope cluster 书A.epub 书B.pdf 书C.txt --name "政治学组" --out 簇关
 # 预建章脉缓存 / 导入书库 / 查看书库
 bookscope prewarm 书.epub --api-key sk-...
 bookscope import 书.epub --title "书名"
+bookscope import ./我的书库
 bookscope list
 ```
 

@@ -145,3 +145,21 @@ def test_cmd_list_shows_imported_book(tmp_path: Path, capsys) -> None:
     assert cli.cmd_list(argparse.Namespace(data_dir=str(data_dir))) == 0
     out = capsys.readouterr().out
     assert "测试书" in out
+
+
+def test_cmd_import_folder_imports_all(tmp_path: Path, capsys) -> None:
+    import bookscope.cli as cli
+
+    folder = tmp_path / "books"
+    folder.mkdir()
+    (folder / "a.txt").write_text("第一章\n甲。\n", encoding="utf-8")
+    (folder / "b.md").write_text("# 第一章\n乙。\n", encoding="utf-8")
+    (folder / "ignore.log").write_text("not supported", encoding="utf-8")
+    data_dir = tmp_path / "sessions"
+    import argparse
+
+    assert cli.cmd_import(argparse.Namespace(path=str(folder), title=None, data_dir=str(data_dir))) == 0
+    out = capsys.readouterr().out
+    assert "成功 2/2" in out
+    assert "a.txt" in out
+    assert "b.md" in out
