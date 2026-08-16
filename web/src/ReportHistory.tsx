@@ -135,7 +135,11 @@ export function ReportHistoryModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onDelete(h.id)}
+                  onClick={() => {
+                    if (window.confirm(`删除「${h.title}」这份历史？`)) {
+                      onDelete(h.id);
+                    }
+                  }}
                   title="删除这条历史"
                   className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] shrink-0"
                 >

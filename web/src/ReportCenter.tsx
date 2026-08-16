@@ -346,8 +346,10 @@ export function ReportCenter({
                   <button
                     type="button"
                     onClick={() => {
-                      deleteReportHistoryEntry(h.id);
-                      setHistory(loadReportHistory());
+                      if (window.confirm(`删除「${h.title}」这份历史？`)) {
+                        deleteReportHistoryEntry(h.id);
+                        setHistory(loadReportHistory());
+                      }
                     }}
                     title={`删除这份报告历史`}
                     className="text-xs px-2.5 py-1 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] shrink-0"
