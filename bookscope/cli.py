@@ -555,30 +555,14 @@ def cmd_stats(args: argparse.Namespace) -> int:
     """零配置：统计书库规模（本数/章数/字数）。"""
     import json
 
-    from bookscope.local_tools import load_chunks
+    from bookscope.local_tools import stats_folder
 
     folder = Path(args.path)
-    if not folder.is_dir():
-        print(f"文件夹不存在: {folder}", file=sys.stderr)
+    try:
+        stats = stats_folder(folder)
+    except Exception as exc:  # noqa: BLE001
+        print(f"统计失败: {exc}", file=sys.stderr)
         return 1
-    files = [p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in _IMPORT_EXTS]
-    if not files:
-        print(f"文件夹里没有支持的文件: {folder}", file=sys.stderr)
-        return 1
-    total_chapters = 0
-    total_chars = 0
-    per_book = []
-    for f in sorted(files):
-        try:
-            _name, _book, _results, chunks = load_chunks(f, title=f.stem)
-        except Exception:  # noqa: BLE001
-            continue
-        chapters = len({c.get("chapter") or 0 for c in chunks})
-        chars = sum(len(str(c.get("text", ""))) for c in chunks)
-        total_chapters += chapters
-        total_chars += chars
-        per_book.append({"book": f.stem, "chapters": chapters, "chars": chars})
-    stats = {"books": len(per_book), "chapters": total_chapters, "chars": total_chars, "per_book": per_book}
     if getattr(args, "json", False):
         print(json.dumps(stats, ensure_ascii=False, indent=2))
     else:

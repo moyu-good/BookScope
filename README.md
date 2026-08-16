@@ -137,6 +137,11 @@ curl -X POST http://localhost:8000/api/tools/catalog \
 curl -X POST http://localhost:8000/api/tools/search \
   -H 'Content-Type: application/json' \
   -d '{"path":"/path/to/books","query":"市场与政府"}'
+
+# 零配置统计书库规模
+curl -X POST http://localhost:8000/api/tools/stats \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"/path/to/books"}'
 ```
 
 ---

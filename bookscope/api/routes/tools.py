@@ -53,6 +53,10 @@ class SearchRequest(BaseModel):
     top_k: int = Field(default=3, ge=1, le=20)
 
 
+class StatsRequest(BaseModel):
+    path: str = Field(..., description="书库文件夹绝对路径")
+
+
 def _chunks_to_dicts(results) -> list[dict]:
     return [
         {
@@ -136,6 +140,17 @@ def tools_ask_local(
         })
     results = local_search(req.question, chunks, top_k=req.top_k)
     return {"mode": "local", "results": results}
+
+
+@tools_router.post("/stats")
+def tools_stats(req: StatsRequest) -> dict:
+    """零配置：统计书库规模。"""
+    from bookscope.local_tools import stats_folder
+
+    try:
+        return stats_folder(Path(req.path))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @tools_router.post("/search")

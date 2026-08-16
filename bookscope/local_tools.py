@@ -112,6 +112,27 @@ def local_search(question: str, chunks: list[dict], top_k: int = 5) -> list[dict
     return results
 
 
+def stats_folder(folder: Path) -> dict:
+    """统计书库规模（本数/章数/字数）。"""
+    if not folder.is_dir():
+        raise ValueError(f"文件夹不存在: {folder}")
+    files = [p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in IMPORT_EXTS]
+    total_chapters = 0
+    total_chars = 0
+    per_book = []
+    for f in sorted(files):
+        try:
+            _name, _book, _results, chunks = load_chunks(f, title=f.stem)
+        except Exception:  # noqa: BLE001
+            continue
+        chapters = len({c.get("chapter") or 0 for c in chunks})
+        chars = sum(len(str(c.get("text", ""))) for c in chunks)
+        total_chapters += chapters
+        total_chars += chars
+        per_book.append({"book": f.stem, "chapters": chapters, "chars": chars})
+    return {"books": len(per_book), "chapters": total_chapters, "chars": total_chars, "per_book": per_book}
+
+
 def search_folder(folder: Path, query: str, top_k: int = 3) -> list[dict]:
     """在一个文件夹里跨书本地检索关键词。"""
     if not folder.is_dir():

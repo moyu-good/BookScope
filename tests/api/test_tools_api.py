@@ -100,3 +100,14 @@ def test_tools_search_returns_results(client: TestClient, tmp_path: Path) -> Non
     body = resp.json()
     assert body["count"] >= 1
     assert body["results"][0]["book"] == "a"
+
+
+def test_tools_stats_returns_counts(client: TestClient, tmp_path: Path) -> None:
+    folder = tmp_path / "books"
+    folder.mkdir()
+    (folder / "a.txt").write_text("第一章 开端\n甲。\n第二章 发展\n乙。\n", encoding="utf-8")
+    resp = client.post("/api/tools/stats", json={"path": str(folder)})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["books"] == 1
+    assert body["chapters"] >= 1
