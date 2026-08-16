@@ -623,6 +623,29 @@ function ShelfBody(props: {
           borderColor: "color-mix(in oklch, var(--color-seal) 30%, transparent)",
         }}
       >
+        {compareSelected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {state.kind === "ready" &&
+              state.sessions
+                .filter((x) => compareSelected.has(x.session_id))
+                .map((x) => (
+                  <span
+                    key={x.session_id}
+                    className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-seal)] text-[var(--color-seal)] bg-[var(--color-paper)]"
+                  >
+                    {x.book_title}
+                    <button
+                      type="button"
+                      onClick={() => onToggleSelect(x.session_id)}
+                      title={`移除《${x.book_title}》`}
+                      className="hover:text-[var(--color-ink)]"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <span className="font-bold text-[var(--color-seal)]">
             已选 {compareSelected.size} 本
