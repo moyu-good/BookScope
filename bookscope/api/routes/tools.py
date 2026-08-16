@@ -218,6 +218,7 @@ def tools_invoke(req: InvokeRequest) -> dict:
             from bookscope.api.routes import agent as agent_routes
             from bookscope.api.schemas import (
                 ArgumentStructureRequest,
+                CharacterArcRequest,
                 CharacterGraphRequest,
                 ConsistencyScanRequest,
                 ForeshadowArcsRequest,
@@ -259,6 +260,12 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 ).model_dump()
             except Exception as exc:  # noqa: BLE001
                 errors["character_graph"] = f"{type(exc).__name__}: {exc}"
+            try:
+                data["character_arc"] = agent_routes.agent_character_arc(
+                    _mk(CharacterArcRequest), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["character_arc"] = f"{type(exc).__name__}: {exc}"
             try:
                 data["timeline"] = agent_routes.agent_timeline(
                     _mk(TimelineRequest), store

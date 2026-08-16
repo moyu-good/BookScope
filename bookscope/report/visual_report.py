@@ -228,6 +228,48 @@ def _concept_html(concept: dict) -> str:
         )
     return f'<div class="card"><h3 style="color:var(--cinnabar);margin-bottom:10px">「{_esc(concept.get("concept",""))}」的演变</h3>{"".join(items)}</div>'
 
+def _character_arc_html(arc: dict) -> str:
+    characters = arc.get("characters", [])
+    if not characters:
+        return '<p style="color:var(--ink-3)">暂无角色弧线数据。</p>'
+    # 按出场点数量/最高戏份取核心角色
+    def _score(c: dict) -> int:
+        pts = c.get("points", [])
+        return max([p.get("presence", 0) for p in pts] or [0]) * 100 + len(pts)
+
+    top = sorted(characters, key=_score, reverse=True)[:8]
+    cards = []
+    for c in top:
+        name = c.get("name", "?")
+        pts = c.get("points", [])
+        if not pts:
+            continue
+        W, H = 320, 100
+        pad = 8
+        max_f = max([abs(p.get("fortune", 0)) for p in pts] + [1])
+        xs = [pad + i * (W - 2 * pad) / max(len(pts) - 1, 1) for i in range(len(pts))]
+        ys = [H / 2 - (p.get("fortune", 0) / max_f) * (H / 2 - 12) for p in pts]
+        line = " ".join(f"{xs[i]:.1f},{ys[i]:.1f}" for i in range(len(pts)))
+        points_html = ""
+        for p in pts[-4:]:
+            v = p.get("verified", False)
+            note = p.get("note") or p.get("evidence") or ""
+            points_html += (
+                f'<div class="point"><span class="badge">第{p.get("chapter","?")}章</span>'
+                f'<div><div style="font-size:14px">{_esc(note)}</div>'
+                f'<div class="quote{" unverified" if not v else ""}" style="font-size:13px"><span class="seal">{"鉴" if v else "研判"}</span>{_esc(p.get("evidence",""))}</div></div></div>'
+            )
+        cards.append(
+            f'<div class="card"><h3 style="color:var(--cinnabar);margin-bottom:6px">{_esc(name)}</h3>'
+            f'<svg viewBox="0 0 {W} {H}" style="width:100%;height:auto;background:var(--paper-card)">'
+            f'<line x1="{pad}" y1="{H/2}" x2="{W-pad}" y2="{H/2}" stroke="var(--border)" stroke-dasharray="4 4"/>'
+            f'<polyline points="{line}" fill="none" stroke="var(--cinnabar)" stroke-width="2"/>'
+            f'</svg>'
+            f'<div style="margin-top:8px">{points_html}</div></div>'
+        )
+    return '<div class="grid">' + "".join(cards) + "</div>"
+
+
 
 def _argument_html(argument: dict) -> str:
     claims = argument.get("claims", [])
@@ -296,6 +338,7 @@ def render_visual_report(data: dict) -> str:
     argument = data.get("argument_structure", {})
     foreshadow = data.get("foreshadow_arcs", {})
     consistency = data.get("consistency_scan", {})
+    character_arc = data.get("character_arc", {})
 
     stats = [
         ("章", len(curve.get("chapters", [])) or len(timeline.get("events", []))),
@@ -316,11 +359,12 @@ def render_visual_report(data: dict) -> str:
 <section id="recap"><h2><span class="no">壹</span>逻辑主线</h2>{_recap_html(recap)}</section>
 <section id="curve"><h2><span class="no">贰</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
 <section id="graph"><h2><span class="no">叁</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
-<section id="timeline"><h2><span class="no">肆</span>事件时间线</h2>{_timeline_html(timeline)}</section>
-<section id="concept"><h2><span class="no">伍</span>概念演变</h2>{_concept_html(concept)}</section>
-<section id="argument"><h2><span class="no">陆</span>论证结构</h2>{_argument_html(argument)}</section>
-<section id="foreshadow"><h2><span class="no">柒</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
-<section id="consistency"><h2><span class="no">捌</span>前后一致性</h2>{_consistency_html(consistency)}</section>
+<section id="character-arc"><h2><span class="no">肆</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
+<section id="timeline"><h2><span class="no">伍</span>事件时间线</h2>{_timeline_html(timeline)}</section>
+<section id="concept"><h2><span class="no">陆</span>概念演变</h2>{_concept_html(concept)}</section>
+<section id="argument"><h2><span class="no">柒</span>论证结构</h2>{_argument_html(argument)}</section>
+<section id="foreshadow"><h2><span class="no">捌</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
+<section id="consistency"><h2><span class="no">玖</span>前后一致性</h2>{_consistency_html(consistency)}</section>
 """
 
     return f"""<!DOCTYPE html>
