@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BookShelf } from "./BookShelf";
+import { ReportPreview, type ReportPreviewState } from "./ReportPreview";
 import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
 import type { DrillInfo } from "./AgentOrchestrate";
@@ -1536,6 +1537,8 @@ export function App() {
 
   /** 跨文本对照：先选一本，再点另一本触发对照报告下载。 */
   const [compareTarget, setCompareTarget] = useState<SessionMetadata | null>(null);
+  /** 报告预览：出报告/对照报告后应用内 iframe 预览（可下载）。 */
+  const [reportPreview, setReportPreview] = useState<ReportPreviewState | null>(null);
   const handleCompare = useCallback(
     async (s: SessionMetadata) => {
       if (!apiKey) {
@@ -1578,13 +1581,11 @@ export function App() {
         }
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${target.book_title || "book"}×${s.book_title || "book"}-对照报告.html`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
+        setReportPreview({
+          url,
+          title: `跨文本对照 · ${target.book_title || "A"} × ${s.book_title || "B"}`,
+          fileName: `${target.book_title || "A"}×${s.book_title || "B"}-对照报告.html`,
+        });
       } catch {
         alert("对照报告失败：网络错误");
       }
@@ -1623,13 +1624,11 @@ export function App() {
       }
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${s.book_title || "book"}-书鉴报告.html`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      setReportPreview({
+        url,
+        title: `《${s.book_title || "本书"}》书鉴报告`,
+        fileName: `${s.book_title || "book"}-书鉴报告.html`,
+      });
     } catch {
       alert("出报告失败：网络错误");
     }
@@ -2812,6 +2811,15 @@ export function App() {
           <Footer />
         </div>
       </main>
+      {reportPreview && (
+        <ReportPreview
+          preview={reportPreview}
+          onClose={() => {
+            URL.revokeObjectURL(reportPreview.url);
+            setReportPreview(null);
+          }}
+        />
+      )}
       </VizFocusProvider>
       </div>
     </div>
