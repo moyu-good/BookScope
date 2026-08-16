@@ -234,3 +234,18 @@ def test_cmd_report_stdout_prints_html(tmp_path: Path, capsys) -> None:
     assert "<!DOCTYPE html>" in captured.out
     # stdout 模式不应写文件
     assert not (tmp_path / "r.html").exists()
+
+
+def test_cmd_catalog_json_output(tmp_path: Path, capsys) -> None:
+    import bookscope.cli as cli
+
+    folder = tmp_path / "books"
+    folder.mkdir()
+    (folder / "a.txt").write_text("第一章\n甲。\n", encoding="utf-8")
+    out = tmp_path / "out"
+    import argparse
+
+    assert cli.cmd_catalog(argparse.Namespace(path=str(folder), out=str(out), json=True)) == 0
+    captured = capsys.readouterr()
+    assert '"index"' in captured.out
+    assert '"entries"' in captured.out

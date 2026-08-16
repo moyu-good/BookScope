@@ -542,6 +542,8 @@ def cmd_summary(args: argparse.Namespace) -> int:
 
 def cmd_catalog(args: argparse.Namespace) -> int:
     """零配置：把一个文件夹生成可浏览的 HTML 书库目录。"""
+    import json
+
     from bookscope.local_tools import generate_catalog
 
     folder = Path(args.path)
@@ -551,7 +553,10 @@ def cmd_catalog(args: argparse.Namespace) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"生成失败: {exc}", file=sys.stderr)
         return 1
-    print(f"已生成书库目录: {index_path.resolve()} ({len(entries)} 本)")
+    if getattr(args, "json", False):
+        print(json.dumps({"index": str(index_path.resolve()), "count": len(entries), "entries": entries}, ensure_ascii=False, indent=2))
+    else:
+        print(f"已生成书库目录: {index_path.resolve()} ({len(entries)} 本)")
     return 0
 
 
@@ -691,6 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_catalog = sub.add_parser("catalog", help="把一个文件夹生成可浏览的 HTML 书库目录")
     p_catalog.add_argument("path", help="书库文件夹路径")
     p_catalog.add_argument("--out", default="bookscope-catalog", help="输出目录（默认 bookscope-catalog）")
+    p_catalog.add_argument("--json", action="store_true", help="以 JSON 输出目录结果")
     p_catalog.set_defaults(func=cmd_catalog)
 
     p_self_test = sub.add_parser("self-test", help="零配置核心链路自检")
