@@ -2597,6 +2597,7 @@ export function App() {
                 onCompareMany={handleCompareMany}
                 onAskBooks={handleAskBooks}
                 onClusterReport={handleClusterReport}
+                onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
                 onPrewarmGroup={(list) => void handlePrewarmGroup(list)}
                 onReopenReport={(e) => void handleReopenReport(e)}
                 onImportFolder={handleImportFolder}

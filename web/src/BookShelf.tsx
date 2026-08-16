@@ -63,6 +63,8 @@ export interface BookShelfProps {
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   /** 簇总览报告：来源组聚合清单 */
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
+  /** 簇关系自动发现：两两对照聚合关系网 */
+  onClusterDiscover?: (sessions: SessionMetadata[], clusterName: string) => void;
   /** 预建整组章脉：一键把来源组没建的书排进后台 */
   onPrewarmGroup?: (sessions: SessionMetadata[]) => void;
   /** 快捷重开最近报告 */
@@ -223,6 +225,7 @@ export function BookShelf({
   onOpenReportCenter,
   onAskBooks,
   onClusterReport,
+  onClusterDiscover,
   onPrewarmGroup,
   onReopenReport,
   onDeleted,
@@ -409,6 +412,7 @@ export function BookShelf({
         onCompareMany={onCompareMany}
         onAskBooks={onAskBooks}
         onClusterReport={onClusterReport}
+        onClusterDiscover={onClusterDiscover}
         onPrewarmGroup={onPrewarmGroup}
         onReopenReport={onReopenReport}
         reportHistory={reportHistory}
@@ -438,6 +442,7 @@ function ShelfBody(props: {
   onCompareMany: (sessions: SessionMetadata[]) => void;
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
+  onClusterDiscover?: (sessions: SessionMetadata[], clusterName: string) => void;
   onPrewarmGroup?: (sessions: SessionMetadata[]) => void;
   onReopenReport?: (entry: ReportHistoryEntry) => void;
   reportHistory: ReportHistoryEntry[];
@@ -463,6 +468,7 @@ function ShelfBody(props: {
     onCompareMany,
     onAskBooks,
     onClusterReport,
+    onClusterDiscover,
     onPrewarmGroup,
     onReopenReport,
     reportHistory,
@@ -645,6 +651,17 @@ function ShelfBody(props: {
                   className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   整组对照
+                </button>
+              )}
+              {onClusterDiscover && g.items.length >= 2 && g.items.length <= 8 && (
+                <button
+                  type="button"
+                  disabled={!groupReady}
+                  onClick={() => onClusterDiscover(g.items.map((e) => e.session), g.source)}
+                  title={groupReady ? `自动发现「${g.source}」两两关系（最多 8 本）` : "章脉未全就绪，先预建整组"}
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  发现关系
                 </button>
               )}
             </div>
