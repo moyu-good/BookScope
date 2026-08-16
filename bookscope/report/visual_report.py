@@ -405,6 +405,21 @@ def _top_characters_html(graph: dict, arc: dict) -> str:
         )
     return '<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">' + "".join(items) + "</div>"
 
+def _next_steps_html() -> str:
+    items = [
+        ("📖 深读追问", "对某个角色/概念继续提问，答案会挂原文出处。"),
+        ("🔀 跨文本对照", "如果还有第二本书，用 bookscope_cross 做两本逻辑对照。"),
+        ("🗂️ 簇关系发现", "2-8 本书一起用 bookscope_cluster 找继承/反驳/补充关系。"),
+        ("📥 数据再利用", "点“数据 JSON”下载完整结构化结果，供其他工具二次加工。"),
+        ("🖨️ 导出归档", "点“导出”生成 PDF，方便存档或分享。"),
+    ]
+    cards = "".join(
+        f'<div class="card"><b style="color:var(--cinnabar)">{_esc(t)}</b><p style="font-size:14px;color:var(--ink-2);margin-top:4px">{_esc(d)}</p></div>'
+        for t, d in items
+    )
+    return '<div class="grid">' + cards + "</div>"
+
+
 
 
 
@@ -539,6 +554,7 @@ def render_visual_report(data: dict) -> str:
 <section id="motif"><h2><span class="no">拾叁</span>母题追踪</h2>{_motif_html(motif)}</section>
 <section id="foreshadow"><h2><span class="no">拾肆</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
 <section id="consistency"><h2><span class="no">拾伍</span>前后一致性</h2>{_consistency_html(consistency)}</section>
+<section id="next"><h2><span class="no">拾陆</span>下一步可以做什么</h2>{_next_steps_html()}</section>
 """
 
     return f"""<!DOCTYPE html>
@@ -572,6 +588,7 @@ def render_visual_report(data: dict) -> str:
 <a href="#motif">拾叁 · 母题追踪</a>
 <a href="#foreshadow">拾肆 · 伏笔与回收</a>
 <a href="#consistency">拾伍 · 前后一致性</a>
+<a href="#next">拾陆 · 下一步可以做什么</a>
 </div>
 <button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
 <button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
