@@ -58,6 +58,9 @@ section h2 .no{font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--
 .graph-wrap svg{display:block;width:100%;height:auto}
 .chart-wrap{background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;overflow-x:auto}
 .chart-wrap svg{min-width:680px;width:100%;height:auto}
+.curve-detail{background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-top:12px;box-shadow:var(--shadow)}
+.curve-detail h4{color:var(--cinnabar);margin-bottom:8px}
+.curve-detail .event{font-size:14px;padding:6px 0;border-bottom:1px dashed var(--border)}
 footer{text-align:center;padding:32px 16px;color:var(--ink-3);font-size:13px;border-top:1px solid var(--border);margin-top:32px;font-family:"Noto Sans SC",sans-serif}
 @media(max-width:640px){body{font-size:15px}.hero{padding:28px 14px 22px}.hero h1{font-size:22px}.hero .subtitle{font-size:13px}.stats{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}.stat{padding:12px 8px}.stat .num{font-size:22px}section{padding:20px 14px}section h2{font-size:18px}.card{padding:14px}.grid{grid-template-columns:1fr}.graph-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.graph-wrap svg{min-width:600px}.theme-toggle{width:40px;height:40px;bottom:12px;right:12px;font-size:16px}.print-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;right:62px}}
 """
@@ -79,18 +82,35 @@ def _curve_svg(chapters: list[dict]) -> str:
         y = bottom - (bottom - top) * i / 4
         parts.append(f'<line x1="30" y1="{y:.1f}" x2="{W-20}" y2="{y:.1f}" stroke="var(--border)" stroke-dasharray="4 4"/>')
     for i, c in enumerate(chapters):
+        ch = c.get("chapter", i + 1)
         x = 50 + i * (W - 80) / max(n - 1, 1)
         h = max(2, (c.get("event_count", 0) + c.get("turning_count", 0)) / max_h * (bottom - top))
         y = bottom - h
         color = "var(--cinnabar)" if c.get("is_turning") else "var(--gold)"
         parts.append(
-            f'<rect x="{x-8:.1f}" y="{y:.1f}" width="16" height="{h:.1f}" rx="3" fill="{color}" opacity="0.85">'
-            f'<title>第{c.get("chapter","?")}章 · {c.get("event_count",0)}事件</title></rect>'
+            f'<rect class="curve-bar" data-curve="{ch}" x="{x-8:.1f}" y="{y:.1f}" width="16" height="{h:.1f}" rx="3" fill="{color}" opacity="0.85" style="cursor:pointer">'
+            f'<title>第{ch}章 · {c.get("event_count",0)}事件</title></rect>'
         )
         if c.get("is_turning"):
             parts.append(f'<circle cx="{x:.1f}" cy="{max(top-4, y-6):.1f}" r="5" fill="var(--cinnabar)"><title>转折章</title></circle>')
     parts.append("</svg>")
-    return '<div class="chart-wrap">' + "".join(parts) + "</div>"
+    details = []
+    for c in chapters[:60]:
+        ch = c.get("chapter", 0)
+        events = c.get("events", []) or []
+        ev_html = "".join(
+            f'<div class="event"><span class="seal" style="color:var(--cinnabar);border:1px solid var(--cinnabar);padding:0 5px;border-radius:4px;font-size:11px;margin-right:6px">{"鉴" if e.get("verified") else "研判"}</span>{_esc(e.get("text",""))}</div>'
+            for e in events[:20]
+        )
+        if not ev_html:
+            ev_html = '<div style="color:var(--ink-3);font-size:13px">本章暂无事件明细。</div>'
+        details.append(
+            f'<div class="curve-detail" id="curve-detail-{ch}" style="display:none">'
+            f'<h4>第{ch}章 · 事件明细</h4>{ev_html}</div>'
+        )
+    return ('<div class="chart-wrap">' + "".join(parts) + "</div>"
+            + "".join(details)
+            + '<script>document.querySelectorAll(".curve-bar").forEach(bar=>{bar.addEventListener("click",()=>{const ch=bar.dataset.curve;document.querySelectorAll(".curve-detail").forEach(d=>d.style.display="none");const el=document.getElementById("curve-detail-"+ch);if(el)el.style.display="block";});});</script>')
 
 
 def _graph_svg(graph: dict, limit: int = 36) -> str:
