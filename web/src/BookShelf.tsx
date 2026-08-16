@@ -601,7 +601,11 @@ function ShelfBody(props: {
   const shelf = buildShelf(state.sessions);
   const q = query.trim().toLowerCase();
   const filtered = q
-    ? shelf.filter((e) => e.session.book_title.toLowerCase().includes(q))
+    ? shelf.filter(
+        (e) =>
+          e.session.book_title.toLowerCase().includes(q) ||
+          (e.session.source_folder ?? "").toLowerCase().includes(q),
+      )
     : shelf;
   const groups = groupBySource(filtered);
 
