@@ -120,6 +120,7 @@ def test_tools_manifest_lists_tools(client: TestClient) -> None:
     names = [t["name"] for t in body["tools"]]
     assert "bookscope_import" in names
     assert "bookscope_ask" in names
+    assert "bookscope_cross" in names
 
 
 def test_tools_invoke_stats(client: TestClient, tmp_path: Path) -> None:
@@ -129,3 +130,17 @@ def test_tools_invoke_stats(client: TestClient, tmp_path: Path) -> None:
     resp = client.post("/api/tools/invoke", json={"tool": "bookscope_stats", "arguments": {"path": str(folder)}})
     assert resp.status_code == 200, resp.text
     assert resp.json()["books"] == 1
+
+
+def test_tools_invoke_cross_without_key_returns_400(client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    f1 = tmp_path / "a.txt"
+    f2 = tmp_path / "b.txt"
+    f1.write_text("第一章\n甲。\n", encoding="utf-8")
+    f2.write_text("第一章\n乙。\n", encoding="utf-8")
+    resp = client.post("/api/tools/invoke", json={
+        "tool": "bookscope_cross",
+        "arguments": {"file1": str(f1), "file2": str(f2)},
+    })
+    assert resp.status_code == 400, resp.text

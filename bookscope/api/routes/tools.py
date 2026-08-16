@@ -161,6 +161,7 @@ def tools_manifest() -> dict:
 def tools_invoke(req: InvokeRequest) -> dict:
     """AI 助手工具调用入口：按 tool 名 + 参数执行本地零配置能力。"""
     from bookscope.local_tools import (
+        cross_files,
         generate_catalog,
         import_file,
         local_search,
@@ -197,6 +198,21 @@ def tools_invoke(req: InvokeRequest) -> dict:
         if req.tool == "bookscope_catalog":
             index_path, entries = generate_catalog(Path(args["path"]), Path(args.get("out", "bookscope-catalog")))
             return {"index": str(index_path.resolve()), "count": len(entries), "entries": entries}
+        if req.tool == "bookscope_cross":
+            import os as _os
+
+            api_key = args.get("api_key") or _os.environ.get("DEEPSEEK_API_KEY") or _os.environ.get("OPENAI_API_KEY") or ""
+            if not api_key:
+                raise ValueError("跨文本对照需要 LLM key（api_key 或环境变量）")
+            html = cross_files(
+                Path(args["file1"]),
+                Path(args["file2"]),
+                api_key=api_key,
+                provider=args.get("provider", "deepseek"),
+                model=args.get("model", "deepseek-v4-flash"),
+                base_url=args.get("base_url"),
+            )
+            return {"html": html}
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=f"{req.tool} 调用失败: {exc}")
     raise HTTPException(status_code=400, detail=f"未知工具: {req.tool}")

@@ -21,6 +21,7 @@ AI 助手（如 Claude / GPT / 本地 agent）可以通过统一的工具调用�
 | `bookscope_search` | 文件夹跨书本地检索 |
 | `bookscope_stats` | 统计书库规模 |
 | `bookscope_catalog` | 生成 HTML 书库目录 |
+| `bookscope_cross` | 两个文件直接出跨文本对照 HTML 报告（需要 LLM key） |
 
 ## 调用方式
 

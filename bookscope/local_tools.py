@@ -196,5 +196,47 @@ def generate_catalog(folder: Path, out_dir: Path) -> tuple[Path, list[dict]]:
     return index_path, entries
 
 
+def cross_files(
+    file1: Path,
+    file2: Path,
+    api_key: str,
+    provider: str = "deepseek",
+    model: str = "deepseek-v4-flash",
+    base_url: str | None = None,
+) -> str:
+    """两个本地文件直接出跨文本对照 HTML 报告（需要 LLM key）。"""
+    from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
+    from bookscope.agent.book_cross import (
+        build_book_perspective,
+        build_cross_book_report_input,
+        cross_book_reason,
+    )
+    from bookscope.api.dependencies import build_llm_client_from_params
+
+    client = build_llm_client_from_params(provider=provider, api_key=api_key, base_url=base_url)
+    perspectives = []
+    for idx, path in enumerate([file1, file2]):
+        name, _book, _results, chunks = load_chunks(path)
+        spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
+        perspectives.append(build_book_perspective(
+            spine=spine, book_title=name, slug=f"b{idx}",
+            llm_client=client, model=model,
+        ))
+    reason = cross_book_reason(perspectives=perspectives, llm_client=client, model=model)
+    titles = " × ".join(p.get("title", "") for p in perspectives)
+    inp = build_cross_book_report_input(
+        perspectives=perspectives, reason=reason,
+        meta={
+            "title": f"跨文本对照 · {titles}",
+            "subtitle": f"{len(perspectives)} 份文档 · 跨文本逻辑对照 · 关系为研判",
+            "seal": "书 鉴",
+            "nav_title": "对照 · 报告导航",
+            "unit_label": "份",
+            "generated_by": "书鉴 BookScope",
+        },
+    )
+    return render_report(inp)
+
+
 def default_data_dir() -> Path:
     return Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))

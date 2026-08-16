@@ -9,10 +9,18 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "path": { "type": "string", "description": "本地文件或文件夹绝对路径" },
-          "title": { "type": "string", "description": "书名（可选，单文件时有效）" }
+          "path": {
+            "type": "string",
+            "description": "本地文件或文件夹绝对路径"
+          },
+          "title": {
+            "type": "string",
+            "description": "书名（可选，单文件时有效）"
+          }
         },
-        "required": ["path"]
+        "required": [
+          "path"
+        ]
       }
     },
     {
@@ -21,10 +29,18 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "path": { "type": "string", "description": "本地文件绝对路径" },
-          "title": { "type": "string", "description": "书名（可选）" }
+          "path": {
+            "type": "string",
+            "description": "本地文件绝对路径"
+          },
+          "title": {
+            "type": "string",
+            "description": "书名（可选）"
+          }
         },
-        "required": ["path"]
+        "required": [
+          "path"
+        ]
       }
     },
     {
@@ -33,10 +49,19 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "session_id": { "type": "string", "description": "书库 session_id（来自 bookscope_import）" },
-          "question": { "type": "string", "description": "用户问题" }
+          "session_id": {
+            "type": "string",
+            "description": "书库 session_id（来自 bookscope_import）"
+          },
+          "question": {
+            "type": "string",
+            "description": "用户问题"
+          }
         },
-        "required": ["session_id", "question"]
+        "required": [
+          "session_id",
+          "question"
+        ]
       }
     },
     {
@@ -45,11 +70,23 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "path": { "type": "string", "description": "书库文件夹绝对路径" },
-          "query": { "type": "string", "description": "关键词" },
-          "top_k": { "type": "integer", "description": "每本书返回条数，默认 3" }
+          "path": {
+            "type": "string",
+            "description": "书库文件夹绝对路径"
+          },
+          "query": {
+            "type": "string",
+            "description": "关键词"
+          },
+          "top_k": {
+            "type": "integer",
+            "description": "每本书返回条数，默认 3"
+          }
         },
-        "required": ["path", "query"]
+        "required": [
+          "path",
+          "query"
+        ]
       }
     },
     {
@@ -58,9 +95,14 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "path": { "type": "string", "description": "书库文件夹绝对路径" }
+          "path": {
+            "type": "string",
+            "description": "书库文件夹绝对路径"
+          }
         },
-        "required": ["path"]
+        "required": [
+          "path"
+        ]
       }
     },
     {
@@ -69,10 +111,55 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "path": { "type": "string", "description": "书库文件夹绝对路径" },
-          "out": { "type": "string", "description": "输出目录，默认 bookscope-catalog" }
+          "path": {
+            "type": "string",
+            "description": "书库文件夹绝对路径"
+          },
+          "out": {
+            "type": "string",
+            "description": "输出目录，默认 bookscope-catalog"
+          }
         },
-        "required": ["path"]
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "bookscope_cross",
+      "description": "两个本地文件直接出跨文本对照 HTML 报告（需要 LLM key）。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file1": {
+            "type": "string",
+            "description": "第一本书/文档路径"
+          },
+          "file2": {
+            "type": "string",
+            "description": "第二本书/文档路径"
+          },
+          "api_key": {
+            "type": "string",
+            "description": "LLM API key（可选，默认读环境变量）"
+          },
+          "provider": {
+            "type": "string",
+            "description": "默认 deepseek"
+          },
+          "model": {
+            "type": "string",
+            "description": "默认 deepseek-v4-flash"
+          },
+          "base_url": {
+            "type": "string",
+            "description": "OpenAI 兼容 base_url（可选）"
+          }
+        },
+        "required": [
+          "file1",
+          "file2"
+        ]
       }
     }
   ]
