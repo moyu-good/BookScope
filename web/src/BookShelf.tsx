@@ -439,6 +439,16 @@ function ShelfBody(props: {
             {g.source}
           </span>
           <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{g.items.length} 本</span>
+          {g.items.length >= 2 && !compareMode && (
+            <button
+              type="button"
+              onClick={() => onCompareMany(g.items.map((e) => e.session))}
+              title={`把「${g.source}」这 ${g.items.length} 本一键生成跨文本对照报告`}
+              className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+            >
+              整组对照
+            </button>
+          )}
         </div>
         <ul className="flex flex-col rounded border border-[var(--color-rule)] overflow-hidden divide-y divide-[var(--color-rule)]">
       {g.items.map((entry) => {
