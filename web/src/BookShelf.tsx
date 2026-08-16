@@ -46,6 +46,8 @@ export interface BookShelfProps {
   onReport: (session: SessionMetadata) => void;
   /** 点「对照」：把这本书加入跨文本对照（两本时出对照报告） */
   onCompare: (session: SessionMetadata) => void;
+  /** 对照模式多选后生成：至少两本 */
+  onCompareMany: (sessions: SessionMetadata[]) => void;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -150,6 +152,7 @@ export function BookShelf({
   onRead,
   onReport,
   onCompare,
+  onCompareMany,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -157,6 +160,22 @@ export function BookShelf({
 }: BookShelfProps) {
   const [state, setState] = useState<LoadState>({ kind: "idle" });
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // 对照模式：多选若干本 → 生成跨文本对照报告
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareSelected, setCompareSelected] = useState<Set<string>>(new Set());
+
+  const toggleCompareMode = () => {
+    setCompareMode((v) => !v);
+    setCompareSelected(new Set());
+  };
+  const toggleCompareSelect = (id: string) => {
+    setCompareSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -229,11 +248,27 @@ export function BookShelf({
         <span className="text-xs text-[var(--color-ink-muted)]">
           一架函套列成目录 · 每本两种用法：「读」沉浸读原文 ·「进分析台」AI 深读那套
         </span>
+        <button
+          type="button"
+          onClick={toggleCompareMode}
+          className={`ml-auto text-xs px-2.5 py-1 rounded-full border transition-colors ${
+            compareMode
+              ? "bg-[var(--color-seal)] text-white border-[var(--color-seal)]"
+              : "border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)]"
+          }`}
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {compareMode ? "退出对照" : "对照"}
+        </button>
       </div>
       <ShelfBody
         state={state}
         activeSessionId={activeSessionId}
         confirmingId={confirmingId}
+        compareMode={compareMode}
+        compareSelected={compareSelected}
+        onToggleSelect={toggleCompareSelect}
+        onCompareMany={onCompareMany}
         onSelect={onSelect}
         onRead={onRead}
         onReport={onReport}
@@ -250,6 +285,10 @@ function ShelfBody(props: {
   state: LoadState;
   activeSessionId: string | null;
   confirmingId: string | null;
+  compareMode: boolean;
+  compareSelected: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onCompareMany: (sessions: SessionMetadata[]) => void;
   onSelect: (session: SessionMetadata) => void;
   onRead: (session: SessionMetadata) => void;
   onReport: (session: SessionMetadata) => void;
@@ -262,6 +301,10 @@ function ShelfBody(props: {
     state,
     activeSessionId,
     confirmingId,
+    compareMode,
+    compareSelected,
+    onToggleSelect,
+    onCompareMany,
     onSelect,
     onRead,
     onReport,
@@ -303,6 +346,7 @@ function ShelfBody(props: {
 
   // 一份目录：行与行之间用极细 rule 隔开（像书目的栏线），外面一圈函套描边。
   return (
+    <>
     <ul className="flex flex-col rounded border border-[var(--color-rule)] overflow-hidden divide-y divide-[var(--color-rule)]">
       {shelf.map((entry) => {
         const s = entry.session;
@@ -315,7 +359,9 @@ function ShelfBody(props: {
             noteCount={annotationStore.list(s.session_id).length}
             isActive={isActive}
             isConfirming={isConfirming}
-            onSelect={() => onSelect(s)}
+            compareMode={compareMode}
+            isSelected={compareSelected.has(s.session_id)}
+            onSelect={() => (compareMode ? onToggleSelect(s.session_id) : onSelect(s))}
             onRead={() => onRead(s)}
             onReport={() => onReport(s)}
             onCompare={() => onCompare(s)}
@@ -326,6 +372,35 @@ function ShelfBody(props: {
         );
       })}
     </ul>
+    {compareMode && (
+      <div
+        className="mt-3 flex items-center gap-3 rounded-md border px-3 py-2 text-xs"
+        style={{
+          background: "var(--color-seal-soft)",
+          borderColor: "color-mix(in oklch, var(--color-seal) 30%, transparent)",
+        }}
+      >
+        <span className="font-bold text-[var(--color-seal)]">
+          已选 {compareSelected.size} 本
+        </span>
+        <span className="text-[var(--color-ink-muted)]">
+          选至少 2 本，生成跨文本对照报告（同一领域两本书的继承 / 反驳 / 补充 / 落地 / 检验）。
+        </span>
+        <button
+          type="button"
+          disabled={compareSelected.size < 2}
+          onClick={() => {
+            const chosen = state.sessions.filter((x) => compareSelected.has(x.session_id));
+            onCompareMany(chosen);
+          }}
+          className="ml-auto px-3 py-1.5 rounded-md bg-[var(--color-seal)] text-white hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          生成对照报告
+        </button>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -335,6 +410,8 @@ function BookRow(props: {
   noteCount: number;
   isActive: boolean;
   isConfirming: boolean;
+  compareMode: boolean;
+  isSelected: boolean;
   onSelect: () => void;
   onRead: () => void;
   onReport: () => void;
@@ -348,6 +425,8 @@ function BookRow(props: {
     noteCount,
     isActive,
     isConfirming,
+    compareMode,
+    isSelected,
     onSelect,
     onRead,
     onReport,
@@ -364,9 +443,11 @@ function BookRow(props: {
   // active：整行朱砂淡底 + 左缘朱砂细线（与书脊条并列，强调"这本正在用"）。
   const rowClass = [
     "group relative flex items-stretch transition-colors",
-    isActive
-      ? "bg-[var(--color-seal-soft)]"
-      : "bg-[var(--color-paper-raised)] hover:bg-[var(--color-paper-sunken)]",
+    isSelected
+      ? "ring-1 ring-inset ring-[var(--color-seal)] bg-[var(--color-seal-soft)]"
+      : isActive
+        ? "bg-[var(--color-seal-soft)]"
+        : "bg-[var(--color-paper-raised)] hover:bg-[var(--color-paper-sunken)]",
   ].join(" ");
 
   return (
@@ -455,7 +536,8 @@ function BookRow(props: {
           </div>
         </div>
 
-        {/* 行内动作：两个门 + 删除。移动端竖排铺满、桌面端横排贴右 */}
+        {/* 行内动作：两个门 + 删除。移动端竖排铺满、桌面端横排贴右。对照模式下隐藏，避免误触。 */}
+        {!compareMode && (
         <div className="flex flex-col items-stretch gap-2 shrink-0 sm:flex-row sm:items-center">
           <button
             type="button"
@@ -521,6 +603,7 @@ function BookRow(props: {
             </button>
           )}
         </div>
+        )}
       </div>
     </li>
   );

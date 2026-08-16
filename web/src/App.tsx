@@ -1593,6 +1593,52 @@ export function App() {
     [apiKey, provider, model, baseUrl, compareTarget],
   );
 
+  /** 对照模式多选：一次生成多本书的跨文本对照报告（预览）。 */
+  const handleCompareMany = useCallback(
+    async (sessions: SessionMetadata[]) => {
+      if (!apiKey) {
+        alert("先配置 LLM key（设置里）再出对照报告");
+        return;
+      }
+      if (sessions.length < 2) return;
+      try {
+        const resp = await fetch("/api/agent/cross-book/report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_ids: sessions.map((x) => x.session_id),
+            provider,
+            api_key: apiKey,
+            model: model.trim() || undefined,
+            base_url: effectiveBaseUrl() || undefined,
+          }),
+        });
+        if (!resp.ok) {
+          let msg = `对照报告失败（${resp.status}）`;
+          try {
+            const d = (await resp.json()) as { detail?: { message?: string } };
+            if (d?.detail?.message) msg = d.detail.message;
+          } catch {
+            /* 非 JSON 错误体，用默认文案 */
+          }
+          alert(msg);
+          return;
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const titles = sessions.map((x) => x.book_title || "书").join(" × ");
+        setReportPreview({
+          url,
+          title: `跨文本对照 · ${titles}`,
+          fileName: `跨文本对照-${titles.replace(/[\/:*?"<>|]/g, "_")}.html`,
+        });
+      } catch {
+        alert("对照报告失败：网络错误");
+      }
+    },
+    [apiKey, provider, model, baseUrl],
+  );
+
   /** 出书鉴报告：/agent/book/report 拿 HTML → 下载。章脉没建过后端 404，弹提示。 */
   const openReport = useCallback(async (s: SessionMetadata) => {
     if (!apiKey) {
@@ -2033,6 +2079,7 @@ export function App() {
                 onRead={openReader}
                 onReport={openReport}
                 onCompare={handleCompare}
+                onCompareMany={handleCompareMany}
                 onDeleted={handleDeletedShelfBook}
                 refreshTrigger={shelfRefresh}
                 pendingAutoSelectId={pendingAutoSelectId}
