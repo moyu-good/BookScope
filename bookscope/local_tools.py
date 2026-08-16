@@ -407,5 +407,32 @@ def cluster_files(
     return render_report(inp)
 
 
+def spine_progress(
+    path: Path,
+    model: str = "deepseek-v4-flash",
+    genre: str = "fiction",
+) -> dict:
+    """零配置看一本书的章脉构建进度（只读缓存，绝不触发 LLM）。"""
+    from bookscope.agent._internal.chapter_spine_cache import spine_build_progress
+
+    name, _book, _results, chunks = load_chunks(path)
+    progress = spine_build_progress(chunks=chunks, model=model, genre=genre)
+    total = progress["total"]
+    built = progress["built"]
+    return {
+        "book": name,
+        "path": str(path),
+        "model": model,
+        "genre": genre,
+        "total": total,
+        "built": built,
+        "ready": total > 0 and built >= total,
+        "built_chapters": progress["built_chapters"],
+        "missing_chapters": progress["missing_chapters"],
+        "mode": "structure" if built == 0 else ("deep" if built >= total else "progressive"),
+        "hint": "深度章脉未开始" if built == 0 else ("深度版已就绪" if built >= total else f"深度版已建 {built}/{total} 章，可先看结构版/部分深度版"),
+    }
+
+
 def default_data_dir() -> Path:
     return Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))

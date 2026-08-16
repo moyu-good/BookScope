@@ -93,3 +93,15 @@ def test_cluster_merge_groups_concepts() -> None:
     out = _merge_concepts(items)
     assert out[0]["concept"] == "法治"
     assert len(out[0]["stages"]) == 2
+
+
+def test_spine_progress_effect_reports_built_total(tmp_path: Path) -> None:
+    from bookscope.local_tools import spine_progress
+
+    f = tmp_path / "a.txt"
+    f.write_text("第一章 开端\n甲。\n第二章 发展\n乙。\n", encoding="utf-8")
+    progress = spine_progress(f)
+    assert progress["book"] == "a"
+    assert progress["total"] >= 1
+    assert progress["built"] >= 0
+    assert set(progress) >= {"built_chapters", "missing_chapters", "ready", "mode"}

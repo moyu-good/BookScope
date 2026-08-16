@@ -122,6 +122,8 @@ def test_tools_manifest_lists_tools(client: TestClient) -> None:
     assert "bookscope_ask" in names
     assert "bookscope_cross" in names
     assert "bookscope_cluster" in names
+    assert "bookscope_progress" in names
+    assert "bookscope_prewarm" in names
 
 
 def test_tools_invoke_stats(client: TestClient, tmp_path: Path) -> None:
@@ -157,5 +159,36 @@ def test_tools_invoke_cluster_without_key_returns_400(client: TestClient, tmp_pa
     resp = client.post("/api/tools/invoke", json={
         "tool": "bookscope_cluster",
         "arguments": {"files": [str(f1), str(f2)]},
+    })
+    assert resp.status_code == 400, resp.text
+
+
+def test_tools_invoke_progress_returns_progressive_state(client: TestClient, tmp_path: Path) -> None:
+    f = tmp_path / "a.txt"
+    f.write_text("第一章 开端\n甲。\n第二章 发展\n乙。\n", encoding="utf-8")
+    resp = client.post("/api/tools/invoke", json={
+        "tool": "bookscope_progress",
+        "arguments": {"path": str(f)},
+    })
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["book"] == "a"
+    assert body["total"] >= 1
+    assert 0 <= body["built"] <= body["total"]
+    assert body["mode"] in {"structure", "progressive", "deep"}
+
+
+def test_tools_invoke_prewarm_without_key_returns_400(client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    data_dir = tmp_path / "sessions"
+    monkeypatch.setenv("BOOKSCOPE_DATA_DIR", str(data_dir))
+    f = tmp_path / "a.txt"
+    f.write_text("第一章\n甲。\n", encoding="utf-8")
+    imp = client.post("/api/tools/import", json={"path": str(f), "title": "测试书"})
+    sid = imp.json()["session_id"]
+    resp = client.post("/api/tools/invoke", json={
+        "tool": "bookscope_prewarm",
+        "arguments": {"session_id": sid},
     })
     assert resp.status_code == 400, resp.text

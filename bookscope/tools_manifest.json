@@ -126,6 +126,62 @@
       }
     },
     {
+      "name": "bookscope_prewarm",
+      "description": "对已导入书库的一本书后台预建深度章脉（渐进交付：先返回，后台按章构建，之后用 bookscope_progress 看进度）。需要 LLM key。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "书库 session_id（来自 bookscope_import）"
+          },
+          "api_key": {
+            "type": "string",
+            "description": "LLM API key（可选，默认读环境变量）"
+          },
+          "provider": {
+            "type": "string",
+            "description": "默认 deepseek"
+          },
+          "model": {
+            "type": "string",
+            "description": "默认 deepseek-v4-flash"
+          },
+          "base_url": {
+            "type": "string",
+            "description": "OpenAI 兼容 base_url（可选）"
+          }
+        },
+        "required": [
+          "session_id"
+        ]
+      }
+    },
+    {
+      "name": "bookscope_progress",
+      "description": "查看一本书的深度章脉构建进度（只读缓存，零配置，不需要 LLM key）。用于渐进交付：没建完时先给结构版，建完再给深度版。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "本地文件绝对路径"
+          },
+          "model": {
+            "type": "string",
+            "description": "章脉缓存使用的模型名，默认 deepseek-v4-flash"
+          },
+          "genre": {
+            "type": "string",
+            "description": "章脉体裁，默认 fiction"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
       "name": "bookscope_cross",
       "description": "两个本地文件直接出跨文本对照 HTML 报告（需要 LLM key）。",
       "parameters": {

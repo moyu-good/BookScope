@@ -167,6 +167,7 @@ def tools_invoke(req: InvokeRequest) -> dict:
         import_file,
         local_search,
         search_folder,
+        spine_progress,
         stats_folder,
         structure_report_html,
     )
@@ -194,6 +195,36 @@ def tools_invoke(req: InvokeRequest) -> dict:
             return {"mode": "local", "results": local_search(args["question"], chunks)}
         if req.tool == "bookscope_search":
             return {"results": search_folder(Path(args["path"]), args["query"], top_k=int(args.get("top_k", 3)))}
+        if req.tool == "bookscope_progress":
+            return spine_progress(
+                Path(args["path"]),
+                model=args.get("model", "deepseek-v4-flash"),
+                genre=args.get("genre", "fiction"),
+            )
+        if req.tool == "bookscope_prewarm":
+            import os as _os
+
+            api_key = args.get("api_key") or _os.environ.get("DEEPSEEK_API_KEY") or _os.environ.get("OPENAI_API_KEY") or ""
+            if not api_key:
+                raise ValueError("预建章脉需要 LLM key（api_key 或环境变量）")
+            from bookscope.api.book_sessions import BookSessionStore
+            from bookscope.api.routes.agent import _build_prewarm_client, _start_prewarm_for_session
+            from bookscope.api.session_storage import JSONFileSessionStorage
+
+            store = BookSessionStore(storage=JSONFileSessionStorage(root=data_dir))
+            client = _build_prewarm_client(
+                provider=args.get("provider", "deepseek"),
+                api_key=api_key,
+                base_url=args.get("base_url"),
+            )
+            model = args.get("model") or "deepseek-v4-flash"
+            status = _start_prewarm_for_session(
+                store=store,
+                book_session_id=args["session_id"],
+                client=client,
+                model=model,
+            )
+            return {"status": status, "book_session_id": args["session_id"], "model": model}
         if req.tool == "bookscope_stats":
             return stats_folder(Path(args["path"]))
         if req.tool == "bookscope_catalog":
