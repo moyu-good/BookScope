@@ -1142,12 +1142,18 @@ export function App() {
         if (!resp.ok || cancelled) return;
         const data = (await resp.json()) as {
           status: "idle" | "building" | "done" | "error";
+          built_chapters?: number;
+          total_chapters?: number;
         };
         if (cancelled) return;
         if (data.status === "building") {
-          setWarmupPhase("building");
+          setWarmupPhase({
+            status: "building",
+            built: data.built_chapters ?? 0,
+            total: data.total_chapters ?? 0,
+          });
         } else if (data.status === "done") {
-          setWarmupPhase("done");
+          setWarmupPhase({ status: "done" });
           stopPolling();
         } else {
           // idle / error：静默收起，不弹错（各 viz 还能按需现建，预建失败不该吓用户）。
@@ -1183,7 +1189,7 @@ export function App() {
           return;
         }
         // building / started：进入轮询，每 ~4 秒查一次，直到 done / error / idle 停。
-        setWarmupPhase("building");
+        setWarmupPhase({ status: "building", built: 0, total: 0 });
         timer = setInterval(() => void pollOnce(), 4000);
       } catch {
         // 起建失败：静默，不弹错（预建是后台事，各功能仍可按需现建）。
@@ -1198,7 +1204,7 @@ export function App() {
 
   // 建好后横幅"全书已通读，分析秒出"短暂显示几秒就收起，不长期占地方。
   useEffect(() => {
-    if (warmupPhase !== "done") return;
+    if (warmupPhase?.status !== "done") return;
     const t = setTimeout(() => setWarmupPhase(null), 4000);
     return () => clearTimeout(t);
   }, [warmupPhase]);

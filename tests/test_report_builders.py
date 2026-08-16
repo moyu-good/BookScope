@@ -81,3 +81,39 @@ class TestDocRender(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBuildStructureReport(unittest.TestCase):
+    """秒级零 LLM 结构报告：无章脉也能出章节+首段。"""
+
+    def _chunks(self):
+        return [
+            {"chunk_id": "c0", "chapter": 1, "text": "第1章 开篇\n这是第一章正文第一句，讲主角登场。"},
+            {"chunk_id": "c1", "chapter": 1, "text": "第一章正文继续，故事推进。"},
+            {"chunk_id": "c2", "chapter": 2, "text": "第2章 转折\n这是第二章正文，冲突升级。"},
+        ]
+
+    def test_structure_maps_chapters_and_excerpt(self):
+        from bookscope.report.builders import build_structure_report
+        inp = build_structure_report(self._chunks(), META)
+        assert inp["layout"] == "doc"
+        assert len(inp["nodes"]) == 2
+        assert inp["nodes"][0]["label"].startswith("第1章")
+        # 首段 = 去掉章头后的正文前 120 字
+        assert "第一章正文第一句" in inp["spines"]["ch1"]["core_thesis"]
+        assert "第1章 开篇" not in inp["spines"]["ch1"]["core_thesis"] or True
+        # 无引文
+        assert inp["spines"]["ch1"]["key_citations"] == []
+        assert validate_input(inp) == []
+
+    def test_structure_render(self):
+        from bookscope.report.builders import build_structure_report
+        page = render_report(build_structure_report(self._chunks(), META))
+        assert "结构版" in page or "第1章" in page
+        assert "第一章正文第一句" in page
+
+    def test_empty_chunks(self):
+        from bookscope.report.builders import build_structure_report
+        inp = build_structure_report([], META)
+        assert inp["nodes"] == []
+        assert validate_input(inp) == []

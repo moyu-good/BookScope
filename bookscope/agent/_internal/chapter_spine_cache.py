@@ -183,43 +183,161 @@ def get_or_build_spine(
     genre: str = "fiction",
     **build_kwargs: Any,
 ) -> list[dict]:
-    """端点入口:命中缓存直接返章脉,miss 则 ``build_chapter_spine`` 建一次并缓存。
+    """端点入口：按章粒度缓存，命中直接返章脉，只建缺失章并缓存。
 
-    所有从章脉派生的视图端点都走这一个入口——重开同书命中缓存秒出,不再各跑全书。
+    2026-08-16 改为按章缓存（连载稿子增量）：缓存键 = 每章内容哈希 + model + genre。
+    改哪章只重算哪章（2-3 秒），其余章照常秒出；首次全量 = 全部章缺失，行为同旧整书
+    构建（build_chapter_spine 内部仍按需分段）。
+
+    所有从章脉派生的视图端点都走这一个入口——重开同书命中缓存秒出，不再各跑全书。
     """
-    return build_chapter_spine_cached(
-        all_chunks=chunks,
-        model=model,
-        genre=genre,
-        build_func=lambda: build_chapter_spine(
+    if _is_cache_disabled():
+        return build_chapter_spine(
             chunks=chunks, llm_client=llm_client, model=model, genre=genre, **build_kwargs
-        ),
-    )
+        )
+    try:
+        cache = _get_cache()
+    except Exception as exc:  # noqa: BLE001 — cache 初始化意外 → 直接建
+        logger.warning("spine_cache: init raised %s: %s; 绕过缓存", type(exc).__name__, exc)
+        return build_chapter_spine(
+            chunks=chunks, llm_client=llm_client, model=model, genre=genre, **build_kwargs
+        )
+
+    groups = _chapter_groups(chunks)
+    spine: list[dict[str, Any]] = []
+    missing: list[tuple[int, list[dict]]] = []
+    for ch, ccs in groups.items():
+        key = _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
+        rec = _read_chapter_cached(cache, key)
+        if rec is not None:
+            spine.append(rec)
+        else:
+            missing.append((ch, ccs))
+
+    if missing:
+        missing_chunks = [c for _, ccs in missing for c in ccs]
+        built = build_chapter_spine(
+            chunks=missing_chunks, llm_client=llm_client, model=model, genre=genre, **build_kwargs
+        )
+        for rec in built:
+            ch = rec.get("chapter")
+            if ch is None:
+                continue
+            ccs = next((ccs for cch, ccs in missing if cch == ch), None)
+            if ccs is None:
+                continue
+            key = _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
+            _write_chapter_cached(cache, key, rec)
+            spine.append(rec)
+
+    spine.sort(key=lambda r: r.get("chapter", 0))
+    return spine
 
 
 def peek_spine_cache(
     *, chunks: list[dict], model: str, genre: str = "fiction"
 ) -> list[dict] | None:
-    """只**看**这本书的章脉有没有缓存,有就返、没有返 None——**绝不构建**。
+    """只**看**这本书的章脉有没有缓存，有就返**已建部分**、没有返 None——**绝不构建**。
 
-    给后台预建端点判"要不要建"用:命中说明章脉已建过(整本书功能会秒出),POST 直接返
-    cached、不派后台线程;miss 才起后台建。缓存禁用 / 任何意外 → 返 None(当没缓存,
-    调用方照常起后台建)。key 与 ``get_or_build_spine`` 完全同口径(chunks/model/genre),
-    探的就是那条 spine。
+    给后台预建端点判"要不要建"用：全部命中说明章脉已建过（整本书功能会秒出）；部分命中
+    返回已建部分（渐进交付：报告可以先出已建章节）。缓存禁用 / 任何意外 → 返 None。
+    key 与 ``get_or_build_spine`` 完全同口径（按章 hash），探的就是同一条章脉。
     """
     if _is_cache_disabled():
         return None
     try:
         cache = _get_cache()
-        key = _compute_spine_cache_key(all_chunks=chunks, model=model, genre=genre)
+    except Exception as exc:  # noqa: BLE001 — peek 失败当没缓存，绝不 break
+        logger.warning("spine_cache: peek init raised %s: %s; 当无缓存", type(exc).__name__, exc)
+        return None
+    spine: list[dict[str, Any]] = []
+    for ch, ccs in _chapter_groups(chunks).items():
+        key = _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
+        rec = _read_chapter_cached(cache, key)
+        if rec is not None:
+            spine.append(rec)
+    if not spine:
+        return None
+    spine.sort(key=lambda r: r.get("chapter", 0))
+    return spine
+
+
+def spine_build_progress(
+    *, chunks: list[dict], model: str, genre: str = "fiction"
+) -> dict:
+    """缓存探测：这本书章脉已建到哪了（纯读缓存，绝不构建）。
+
+    返回 ``{built, total, built_chapters, missing_chapters}``。渐进交付用：
+    前端进度条 / 报告"已覆盖 N/M 章"。
+    """
+    groups = _chapter_groups(chunks)
+    total = len(groups)
+    built: list[int] = []
+    missing: list[int] = []
+    try:
+        cache = _get_cache()
+        for ch, ccs in groups.items():
+            key = _compute_chapter_cache_key(chapter_chunks=ccs, chapter=ch, model=model, genre=genre)
+            if _read_chapter_cached(cache, key) is not None:
+                built.append(ch)
+            else:
+                missing.append(ch)
+    except Exception as exc:  # noqa: BLE001 — 探测失败当全缺
+        logger.warning("spine_cache: progress raised %s: %s; 当全缺", type(exc).__name__, exc)
+        return {"built": 0, "total": total, "built_chapters": [], "missing_chapters": sorted(groups)}
+    return {
+        "built": len(built),
+        "total": total,
+        "built_chapters": sorted(built),
+        "missing_chapters": sorted(missing),
+    }
+
+
+def _chapter_groups(chunks: list[dict]) -> dict[int, list[dict]]:
+    """按章号分组（保序）；无章号 chunk 归 0（与旧整书 key 的容忍一致）。"""
+    groups: dict[int, list[dict]] = {}
+    for c in chunks:
+        ch = c.get("chapter")
+        if ch is None:
+            ch = 0
+        groups.setdefault(ch, []).append(c)
+    return groups
+
+
+def _compute_chapter_cache_key(
+    *, chapter_chunks: list[dict], chapter: int, model: str, genre: str
+) -> str:
+    """按章缓存键：该章文本 + 章号 + model + genre（改章内容即失效）。"""
+    text = "\n".join(str(c.get("text", "")) for c in chapter_chunks)
+    payload = {"chapter": chapter, "text": text, "model": model, "genre": genre}
+    raw = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return "ch:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+
+
+def _read_chapter_cached(cache: SQLiteCache, key: str) -> dict | None:
+    """读并反序列化单章缓存；坏 / 异常当 miss。"""
+    try:
         cached = cache.get(key)
         if cached is None:
             return None
-        spine = json.loads(cached.decode("utf-8"))
-        return spine if isinstance(spine, list) else None
-    except Exception as exc:  # noqa: BLE001 — peek 失败当没缓存,绝不 break
-        logger.warning("spine_cache: peek raised %s: %s; 当无缓存", type(exc).__name__, exc)
+        rec = json.loads(cached.decode("utf-8"))
+        return rec if isinstance(rec, dict) else None
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        logger.warning("spine_cache: chapter deserialize failed (%s); 当 miss", exc)
         return None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("spine_cache: chapter read raised %s: %s; 当 miss", type(exc).__name__, exc)
+        return None
+
+
+def _write_chapter_cached(cache: SQLiteCache, key: str, record: dict) -> None:
+    """写单章缓存；空记录不写；异常只 warning。"""
+    if not record:
+        return
+    try:
+        cache.set(key, json.dumps(record, ensure_ascii=False).encode("utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("spine_cache: chapter set raised %s: %s; miss 状态保留", type(exc).__name__, exc)
 
 
 def clear_spine_cache() -> None:
@@ -247,5 +365,6 @@ __all__ = [
     "get_or_build_spine",
     "get_spine_cache_stats",
     "peek_spine_cache",
+    "spine_build_progress",
     "reset_spine_cache_singleton_for_test",
 ]

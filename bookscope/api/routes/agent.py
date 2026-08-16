@@ -48,12 +48,13 @@ from bookscope.agent import (
     route_question,
     run_fast_path,
 )
-from bookscope.report.builders import build_book_report
+from bookscope.report.builders import build_book_report, build_structure_report
 from bookscope.report.service import render_report
 
 from bookscope.agent._internal.chapter_spine_cache import (
     get_or_build_spine,
     peek_spine_cache,
+    spine_build_progress,
 )
 from bookscope.agent._internal.doc_spine_cache import (
     get_or_build_doc_spine,
@@ -365,6 +366,8 @@ def _run_prewarm_build(
             _PREWARM_STATE[key] = {
                 "status": "done",
                 "chapters": len(spine),
+                "built_chapters": len(spine),
+                "total_chapters": None,
                 "error": None,
             }
     except Exception as exc:  # noqa: BLE001 — 后台建失败要记进状态,不能静默吞
@@ -378,6 +381,8 @@ def _run_prewarm_build(
             _PREWARM_STATE[key] = {
                 "status": "error",
                 "chapters": None,
+                "built_chapters": None,
+                "total_chapters": None,
                 "error": f"{type(exc).__name__}: {exc}",
             }
 
@@ -424,14 +429,18 @@ def agent_prewarm_spine(
     key = _prewarm_key(request.book_session_id, model)
     _full_text, chunks = _long_context_inputs(assembler)
 
-    # 幂等 1:缓存已命中 → 不用建,直接返 cached(不占 building 坑、不派线程)。
-    # peek 只**看**缓存、绝不触发构建,同 get_or_build_spine 口径(chunks/model/genre)。
-    cached = peek_spine_cache(chunks=chunks, model=model, genre=_PREWARM_GENRE)
-    if cached is not None:
+    # 幂等 1:缓存全命中 → 不用建,直接返 cached(不占 building 坑、不派线程)。
+    # 按章渐进:部分命中(progress.built < total)不算完成,继续只建缺章。
+    # peek/progress 只**看**缓存、绝不触发构建,同 get_or_build_spine 口径。
+    progress = spine_build_progress(chunks=chunks, model=model, genre=_PREWARM_GENRE)
+    if progress["built"] >= progress["total"] > 0:
+        cached = peek_spine_cache(chunks=chunks, model=model, genre=_PREWARM_GENRE)
         with _PREWARM_LOCK:
             _PREWARM_STATE[key] = {
                 "status": "done",
-                "chapters": len(cached),
+                "chapters": len(cached or []),
+                "built_chapters": progress["built"],
+                "total_chapters": progress["total"],
                 "error": None,
             }
         return PrewarmSpineResponse(
@@ -446,7 +455,13 @@ def agent_prewarm_spine(
             return PrewarmSpineResponse(
                 status="building", book_session_id=request.book_session_id
             )
-        _PREWARM_STATE[key] = {"status": "building", "chapters": None, "error": None}
+        _PREWARM_STATE[key] = {
+            "status": "building",
+            "chapters": None,
+            "built_chapters": progress["built"],
+            "total_chapters": progress["total"],
+            "error": None,
+        }
 
     # 派后台线程建;别用会随请求结束就取消的机制(BackgroundTasks / 事件循环任务),
     # 十几分钟的构建要独立于本 HTTP 请求活着。立刻返 started,前端轮询 status。
@@ -469,6 +484,7 @@ def agent_prewarm_spine_status(
     book_session_id: str,
     model: str | None = None,
     provider: str = "deepseek",
+    store: BookSessionStore = Depends(get_book_session_store),
 ) -> PrewarmSpineStatusResponse:
     """轮询章脉后台预建进度。
 
@@ -479,13 +495,26 @@ def agent_prewarm_spine_status(
     """
     resolved_model = model or default_model_for(provider)
     key = _prewarm_key(book_session_id, resolved_model)
+    # 实时缓存进度（building 中也涨：后台按章增量，每章写缓存后这里就能读到）
+    try:
+        assembler = _resolve_assembler(store, book_session_id)
+        _full_text, chunks = _long_context_inputs(assembler)
+        progress = spine_build_progress(chunks=chunks, model=resolved_model, genre=_PREWARM_GENRE)
+    except Exception:
+        progress = {"built": 0, "total": 0}
     with _PREWARM_LOCK:
         cur = _PREWARM_STATE.get(key)
         if cur is None:
-            return PrewarmSpineStatusResponse(status="idle", chapters=None, error=None)
+            return PrewarmSpineStatusResponse(
+                status="idle", chapters=None,
+                built_chapters=progress["built"], total_chapters=progress["total"],
+                error=None,
+            )
         return PrewarmSpineStatusResponse(
             status=cur["status"],
             chapters=cur.get("chapters"),
+            built_chapters=progress["built"] or cur.get("built_chapters") or 0,
+            total_chapters=progress["total"] or cur.get("total_chapters") or 0,
             error=cur.get("error"),
         )
 
@@ -4369,24 +4398,35 @@ def agent_book_report(
     assembler = _resolve_assembler(store, request.book_session_id)
     model = request.model or default_model_for(request.provider)
     _, chunks = _long_context_inputs(assembler)
-    spine = peek_spine_cache(chunks=chunks, model=model, genre="fiction")
-    if not spine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error_type": "SpineNotBuilt",
-                "message": "章脉未建：先跑一次整本书分析（或预建章脉）再出报告",
-            },
-        )
+    # 按章渐进：有部分缓存就出部分报告（报告里标"已覆盖 N/M 章"）；一章都没有就出
+    # 秒级零 LLM 结构版（章节 + 首段），绝不干等——深度版由后台预建补上。
     book_title, _ = _extract_book_meta(assembler)
     display_title = book_title if book_title and book_title != "unknown" else "本书"
-    inp = build_book_report(spine, {
-        "title": f"《{display_title}》书鉴报告",
-        "seal": "书 鉴",
-        "nav_title": "书鉴 · 报告导航",
-        "unit_label": "章",
-        "generated_by": f"书鉴 BookScope · 《{display_title}》",
-    })
+    progress = spine_build_progress(chunks=chunks, model=model, genre="fiction")
+    total = progress["total"]
+    built = progress["built"]
+    spine = peek_spine_cache(chunks=chunks, model=model, genre="fiction")
+
+    if not spine:
+        inp = build_structure_report(chunks, {
+            "title": f"《{display_title}》书鉴报告（结构版）",
+            "seal": "书 鉴",
+            "nav_title": "书鉴 · 报告导航",
+            "unit_label": "章",
+            "generated_by": f"书鉴 BookScope · 《{display_title}》",
+        })
+    else:
+        subtitle = f"已覆盖 {built}/{total} 章" if total else f"{len(spine)} 章"
+        if built < total:
+            subtitle += "（后台继续补建中，可稍后重新生成查看更全版本）"
+        inp = build_book_report(spine, {
+            "title": f"《{display_title}》书鉴报告",
+            "subtitle": subtitle,
+            "seal": "书 鉴",
+            "nav_title": "书鉴 · 报告导航",
+            "unit_label": "章",
+            "generated_by": f"书鉴 BookScope · 《{display_title}》",
+        })
     html = render_report(inp)
     return Response(content=html, media_type="text/html; charset=utf-8")
 

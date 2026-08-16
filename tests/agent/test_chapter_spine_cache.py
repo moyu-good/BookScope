@@ -19,6 +19,10 @@ _CHUNKS = [
     {"chunk_id": "c1", "chapter": 2, "text": "乙"},
 ]
 _SPINE = [{"chapter": 1, "tension": 5, "present": ["甲"], "evidence": "x"}]
+_SPINE_TWO = [
+    {"chapter": 1, "tension": 5, "present": ["甲"], "evidence": "x"},
+    {"chapter": 2, "tension": 6, "present": ["乙"], "evidence": "y"},
+]
 
 
 def _counted(ret):  # noqa: ANN001, ANN202 — 返 (build_func, calls dict)
@@ -79,13 +83,68 @@ def test_get_or_build_spine_builds_once_then_caches(monkeypatch, tmp_path) -> No
 
     def _fake_build(**kwargs):  # noqa: ANN003, ANN202
         calls["n"] += 1
-        return _SPINE
+        return _SPINE_TWO
 
     monkeypatch.setattr(sc, "build_chapter_spine", _fake_build)
     out1 = sc.get_or_build_spine(chunks=_CHUNKS, llm_client=object(), model="m")
     out2 = sc.get_or_build_spine(chunks=_CHUNKS, llm_client=object(), model="m")
-    assert out1 == _SPINE and out2 == _SPINE
+    assert out1 == _SPINE_TWO and out2 == _SPINE_TWO
     assert calls["n"] == 1                       # facade 也走缓存:建一次,第二次命中
+
+
+def test_chapter_level_incremental_only_builds_changed_chapter(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    """按章增量：改第 2 章内容 → 只重跑第 2 章，第 1 章缓存照用。"""
+    _setup_temp(monkeypatch, tmp_path)
+    calls: list[list[dict]] = []
+
+    def _fake_build(**kwargs):  # noqa: ANN003, ANN202
+        built = []
+        for rec in _SPINE_TWO:
+            # 只返回这次传入 chunks 里出现的章（模拟真实 build 只处理子集）
+            if any(c["chapter"] == rec["chapter"] for c in kwargs["chunks"]):
+                built.append(dict(rec))
+        calls.append(kwargs["chunks"])
+        return built
+
+    monkeypatch.setattr(sc, "build_chapter_spine", _fake_build)
+
+    # 首次：两章都缺 → 一次建两章
+    sc.get_or_build_spine(chunks=_CHUNKS, llm_client=object(), model="m")
+    assert len(calls) == 1
+    assert {c["chapter"] for c in calls[0]} == {1, 2}
+
+    # 第 2 章改了（文本乙→乙2）
+    changed = [
+        {"chunk_id": "c0", "chapter": 1, "text": "甲"},
+        {"chunk_id": "c1", "chapter": 2, "text": "乙2"},
+    ]
+    out = sc.get_or_build_spine(chunks=changed, llm_client=object(), model="m")
+    # 只多建了一次，且这次只传了第 2 章的 chunks
+    assert len(calls) == 2
+    assert {c["chapter"] for c in calls[1]} == {2}
+    # 返回 = 第 1 章旧缓存 + 第 2 章新建
+    by_ch = {r["chapter"]: r for r in out}
+    assert by_ch[1]["tension"] == 5  # 第 1 章来自旧缓存（没重跑）
+    assert by_ch[2]["tension"] == 6
+    assert len(out) == 2
+
+
+def test_peek_returns_partial_spine(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    """渐进：只建了第 1 章时 peek 返回部分，spine_build_progress 报 1/2。"""
+    _setup_temp(monkeypatch, tmp_path)
+    calls = {"n": 0}
+
+    def _fake_build(**kwargs):  # noqa: ANN003, ANN202
+        calls["n"] += 1
+        return [dict(_SPINE[0])]  # 只返回第 1 章
+
+    monkeypatch.setattr(sc, "build_chapter_spine", _fake_build)
+    sc.get_or_build_spine(chunks=_CHUNKS, llm_client=object(), model="m")
+    partial = sc.peek_spine_cache(chunks=_CHUNKS, model="m")
+    assert [r["chapter"] for r in partial] == [1]
+    prog = sc.spine_build_progress(chunks=_CHUNKS, model="m")
+    assert prog["built"] == 1 and prog["total"] == 2
+    assert prog["missing_chapters"] == [2]
 
 
 def test_single_flight_concurrent_same_key_builds_once(monkeypatch, tmp_path) -> None:  # noqa: ANN001

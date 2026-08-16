@@ -629,6 +629,12 @@ class PrewarmSpineStatusResponse(BaseModel):
     chapters: int | None = Field(
         default=None, description="done 时的章脉章数；其它状态为 null。"
     )
+    built_chapters: int = Field(
+        default=0, description="已建成的章数（渐进：building 中也实时可读）。"
+    )
+    total_chapters: int = Field(
+        default=0, description="全书总章数（渐进：building 中也实时可读）。"
+    )
     error: str | None = Field(
         default=None, description="error 时的失败原因（type: message）；其它状态为 null。"
     )

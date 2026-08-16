@@ -7,6 +7,8 @@ verified 等），输出：可直接喂 ``bookscope.report.service.render_report
 
 from __future__ import annotations
 
+import re
+
 from typing import Any
 
 
@@ -29,6 +31,81 @@ def _thesis(rec: dict) -> str:
         if s and s not in parts:
             parts.append(s)
     return "；".join(parts) if parts else "（本章无要点记录）"
+
+
+def build_structure_report(chunks: list[dict], meta: dict) -> dict:
+    """秒级零 LLM 结构报告：章节结构 + 每章首段（无章脉也能出）。
+
+    给渐进交付当快速层：用户丢书进来立刻有东西看（结构版），深度章脉后台补建后
+    同一入口自动升级成完整书鉴报告。纯本地、零 token、零 LLM。
+    """
+    # 按章分组，保序
+    groups: dict[int, list[dict]] = {}
+    for c in chunks:
+        ch = c.get("chapter")
+        if ch is None:
+            ch = 0
+        groups.setdefault(ch, []).append(c)
+
+    nodes: list[dict[str, Any]] = []
+    spines: dict[str, dict[str, Any]] = {}
+    e1: dict[str, dict[str, Any]] = {}
+
+    for ch in sorted(groups):
+        ccs = groups[ch]
+        slug = f"ch{ch}"
+        text = "\n".join(str(c.get("text", "")) for c in ccs)
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        title = ""
+        if lines:
+            # 首行像章头（第X章 / 序章 等）就当标题，正文从第二行起
+            head = lines[0]
+            if re.match(r"^(第[0-9零一二三四五六七八九十百千]+章|序章|楔子|引子|尾声)", head):
+                title = head[:30]
+                body = "\n".join(lines[1:])
+            else:
+                body = text
+        else:
+            body = ""
+        # 首段摘要：取正文前 ~120 字（零 LLM）
+        excerpt = re.sub(r"\s+", " ", body).strip()[:120]
+        label = title or f"第{ch}章"
+        nodes.append({"slug": slug, "label": label[:20], "stance": ""})
+        spines[slug] = {
+            "_title": label,
+            "_slug": slug,
+            "core_thesis": excerpt or "（本章暂无正文）",
+            "theoretical_stance": {"label": "", "inference": False},
+            "method": "",
+            "key_citations": [],
+        }
+        e1[slug] = {"quotes": []}
+
+    total = len(groups)
+    return {
+        "layout": "doc",
+        "meta": {
+            "title": meta["title"],
+            "subtitle": meta.get(
+                "subtitle", f"结构版 · 共 {total} 章 · 深度章脉后台构建中，可先看章节结构与首段"
+            ),
+            "seal": meta.get("seal", "书 鉴"),
+            "nav_title": meta.get("nav_title", "书鉴 · 报告导航"),
+            "unit_label": meta.get("unit_label", "章"),
+            "generated_by": meta.get("generated_by", "书鉴 BookScope"),
+        },
+        "nodes": nodes,
+        "edges": [],
+        "concept_evolution": [],
+        "disagreements": [],
+        "narrative": meta.get(
+            "narrative", f"结构版报告：全书 {total} 章。深度章脉（每章要点 + 引文核验）"
+                          f"后台构建中，构建完成后同一入口自动升级为完整书鉴报告。"
+        ),
+        "spines": spines,
+        "e1": e1,
+        "quality": {"e2_mean": 0, "e3": None},
+    }
 
 
 def build_book_report(spine: list[dict], meta: dict) -> dict:
