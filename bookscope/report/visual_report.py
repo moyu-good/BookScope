@@ -603,7 +603,7 @@ def render_visual_report(data: dict) -> str:
 <style>{_build_css()}</style>
 </head>
 <body>
-<header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button><button class="data-btn" onclick="downloadReportData()">⬇️ 数据 JSON</button><button class="md-btn" onclick="copyMarkdown()">📋 Markdown 摘要</button></header>
+<header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button><button class="data-btn" onclick="downloadReportData()">⬇️ 数据 JSON</button><button class="md-btn" onclick="copyMarkdown()">📋 Markdown 摘要</button><button class="md-btn" onclick="downloadMarkdown()">⬇️ Markdown</button></header>
 <div class="search-box" style="max-width:1200px;margin:16px auto 0;padding:0 16px"><input type="search" id="global-search" placeholder="🔍 全局搜索：输入人物 / 概念 / 关键词，只显示相关板块…"></div>
 <div class="stats">{stat_html}</div>
 {sections}
@@ -654,42 +654,55 @@ document.getElementById('global-search').addEventListener('input',e=>{{
     sec.style.display=(!q||(sec.textContent||'').toLowerCase().includes(q))?'':'none';
   }});
 }});
-function copyMarkdown(){{
-  const data=JSON.parse(document.getElementById('report-data').textContent);
-  const lines=[];
-  lines.push('# '+((data.meta&&data.meta.title)||'BookScope 分析报告'));
-  lines.push('');
-  const recap=(data.recap&&data.recap.points)||[];
-  if(recap.length){{
-    lines.push('## 逻辑主线');
-    recap.slice(0,10).forEach(p=>lines.push('- '+((p.point)||'')));
+  function buildMarkdown(){{
+    const data=JSON.parse(document.getElementById('report-data').textContent);
+    const lines=[];
+    lines.push('# '+((data.meta&&data.meta.title)||'BookScope 分析报告'));
     lines.push('');
+    const recap=(data.recap&&data.recap.points)||[];
+    if(recap.length){{
+      lines.push('## 逻辑主线');
+      recap.slice(0,10).forEach(p=>lines.push('- '+((p.point)||'')));
+      lines.push('');
+    }}
+    const phases=(data.narrative_phases&&data.narrative_phases.phases)||[];
+    if(phases.length){{
+      lines.push('## 情节阶段');
+      phases.forEach((p,i)=>lines.push((i+1)+'. '+p.name+'（第'+p.start_ch+'-'+p.end_ch+'章）'));
+      lines.push('');
+    }}
+    const pairs=(data.relationship_timeline&&data.relationship_timeline.pairs)||[];
+    if(pairs.length){{
+      lines.push('## 核心关系');
+      pairs.slice(0,10).forEach(p=>lines.push('- '+p.a+' × '+p.b+'：'+p.count+' 章互动'));
+      lines.push('');
+    }}
+    const timeline=(data.timeline&&data.timeline.events)||[];
+    if(timeline.length){{
+      lines.push('## 关键事件');
+      timeline.slice(0,10).forEach(e=>lines.push('- 第'+e.chapter+'章：'+(e.event||'')));
+      lines.push('');
+    }}
+    return lines.join('\\n');
   }}
-  const phases=(data.narrative_phases&&data.narrative_phases.phases)||[];
-  if(phases.length){{
-    lines.push('## 情节阶段');
-    phases.forEach((p,i)=>lines.push((i+1)+'. '+p.name+'（第'+p.start_ch+'-'+p.end_ch+'章）'));
-    lines.push('');
+  function copyMarkdown(){{
+    const md=buildMarkdown();
+    if(navigator.clipboard&&navigator.clipboard.writeText){{
+      navigator.clipboard.writeText(md).then(()=>alert('Markdown 摘要已复制'));
+    }}else{{
+      prompt('复制 Markdown 摘要：',md);
+    }}
   }}
-  const pairs=(data.relationship_timeline&&data.relationship_timeline.pairs)||[];
-  if(pairs.length){{
-    lines.push('## 核心关系');
-    pairs.slice(0,10).forEach(p=>lines.push('- '+p.a+' × '+p.b+'：'+p.count+' 章互动'));
-    lines.push('');
+  function downloadMarkdown(){{
+    const md=buildMarkdown();
+    const blob=new Blob([md],{{type:'text/markdown;charset=utf-8'}});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='bookscope-report-summary.md';
+    a.click();
+    URL.revokeObjectURL(url);
   }}
-  const timeline=(data.timeline&&data.timeline.events)||[];
-  if(timeline.length){{
-    lines.push('## 关键事件');
-    timeline.slice(0,10).forEach(e=>lines.push('- 第'+e.chapter+'章：'+(e.event||'')));
-    lines.push('');
-  }}
-  const md=lines.join('\\n');
-  if(navigator.clipboard&&navigator.clipboard.writeText){{
-    navigator.clipboard.writeText(md).then(()=>alert('Markdown 摘要已复制'));
-  }}else{{
-    prompt('复制 Markdown 摘要：',md);
-  }}
-}}
 function downloadReportData(){{
   const data=JSON.parse(document.getElementById('report-data').textContent);
   const blob=new Blob([JSON.stringify(data,null,2)],{{type:'application/json'}});
