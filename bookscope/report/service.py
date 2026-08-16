@@ -106,6 +106,12 @@ main{{min-width:0}}
 .hero .subtitle{{color:var(--ink-2);font-size:15px;max-width:720px;margin:0 auto}}
 .hero .seal{{display:inline-block;color:var(--cinnabar);border:2px solid var(--cinnabar);padding:2px 12px;border-radius:6px;font-weight:bold;font-size:14px;margin-top:12px;letter-spacing:.2em}}
 
+/* 入场 + 层次 */
+@keyframes report-fade-up{{from{{opacity:0;transform:translateY(10px)}}to{{opacity:1;transform:none}}}}
+.card,.dispute,details.spine,.stat{{animation:report-fade-up .45s ease both}}
+.card:hover,.dispute:hover,details.spine:hover{{box-shadow:0 10px 30px rgba(43,38,34,.14);transform:translateY(-1px)}}
+details.spine,.card,.dispute{{transition:box-shadow .2s,transform .2s}}
+
 /* 摘要卡 */
 .stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;max-width:1280px;margin:24px auto;padding:0 24px}}
 .stat{{background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 16px;box-shadow:var(--shadow);text-align:center}}
