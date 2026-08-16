@@ -57,6 +57,11 @@ class StatsRequest(BaseModel):
     path: str = Field(..., description="书库文件夹绝对路径")
 
 
+class InvokeRequest(BaseModel):
+    tool: str = Field(..., description="工具名，如 bookscope_import / bookscope_ask")
+    arguments: dict = Field(default_factory=dict, description="工具参数")
+
+
 def _chunks_to_dicts(results) -> list[dict]:
     return [
         {
@@ -140,6 +145,61 @@ def tools_ask_local(
         })
     results = local_search(req.question, chunks, top_k=req.top_k)
     return {"mode": "local", "results": results}
+
+
+@tools_router.get("/manifest")
+def tools_manifest() -> dict:
+    """返回 AI 助手可用的工具清单（function calling schema）。"""
+    import json
+    from pathlib import Path as _P
+
+    manifest_path = _P(__file__).resolve().parents[2] / "tools_manifest.json"
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+@tools_router.post("/invoke")
+def tools_invoke(req: InvokeRequest) -> dict:
+    """AI 助手工具调用入口：按 tool 名 + 参数执行本地零配置能力。"""
+    from bookscope.local_tools import (
+        generate_catalog,
+        import_file,
+        local_search,
+        search_folder,
+        stats_folder,
+        structure_report_html,
+    )
+
+    args = req.arguments or {}
+    data_dir = Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))
+    try:
+        if req.tool == "bookscope_import":
+            path = Path(args["path"])
+            sid = import_file(path, data_dir, title=args.get("title"))
+            return {"session_id": sid, "book_title": args.get("title") or path.stem}
+        if req.tool == "bookscope_report":
+            path = Path(args["path"])
+            return {"html": structure_report_html(path, title=args.get("title"))}
+        if req.tool == "bookscope_ask":
+            # 零配置：先按 session 取 chunks 做本地检索；如需 LLM 由上层再接 /api/agent/ask
+            from bookscope.api.book_sessions import BookSessionStore
+            from bookscope.api.session_storage import JSONFileSessionStorage
+
+            store = BookSessionStore(storage=JSONFileSessionStorage(root=data_dir))
+            assembler = store.get(args["session_id"])
+            chunks = []
+            for i, c in enumerate(assembler._chunks):  # noqa: SLF001
+                chunks.append({"chunk_id": f"c{i}", "chapter": getattr(c, "chapter", None), "text": getattr(c, "text", "")})
+            return {"mode": "local", "results": local_search(args["question"], chunks)}
+        if req.tool == "bookscope_search":
+            return {"results": search_folder(Path(args["path"]), args["query"], top_k=int(args.get("top_k", 3)))}
+        if req.tool == "bookscope_stats":
+            return stats_folder(Path(args["path"]))
+        if req.tool == "bookscope_catalog":
+            index_path, entries = generate_catalog(Path(args["path"]), Path(args.get("out", "bookscope-catalog")))
+            return {"index": str(index_path.resolve()), "count": len(entries), "entries": entries}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"{req.tool} 调用失败: {exc}")
+    raise HTTPException(status_code=400, detail=f"未知工具: {req.tool}")
 
 
 @tools_router.post("/stats")

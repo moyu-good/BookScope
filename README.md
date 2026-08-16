@@ -23,14 +23,16 @@
 
 ## 它是什么
 
-**不是平台，不是服务器，是一个跑在你电脑上的工具。**
+**不是平台，不是服务器，也不是一个让用户去学 CLI 的产品——它是一个可以嵌入 AI 助手的 tool / 插件 / 辅助 skill。**
 
-- 本地起一个轻量服务，浏览器里拖文件就能用；
-- 也可以完全不用浏览器：一条 CLI 命令直接出报告、提问、跨文本对照；
+- 本地起一个轻量服务，AI 助手通过 `/api/tools/invoke` 调用它；
+- 也可以被脚本/其他软件直接调用（CLI 只是内部调试/脚本的一种方式）；
 - 自带 BYOK，默认 DeepSeek，也兼容任何 OpenAI 兼容接口；
 - 不收集你的书，不碰你的 key。
 
 核验是立身之本：每条引文都翻回原文逐字比对，对得上才盖「鉴」印；推断明确标「研判」。
+
+> 🤖 **作为 AI 助手 Skill 使用**：工具清单在 `bookscope/tools_manifest.json`，统一调用入口是 `POST /api/tools/invoke`。接入说明见 [docs/ASSISTANT_SKILL.md](docs/ASSISTANT_SKILL.md)。
 
 <p align="center">
   <img src="docs/images/hero-bookshelf.png" width="820" alt="书柜：每本书一卷书脊，按题材上色">

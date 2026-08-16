@@ -111,3 +111,21 @@ def test_tools_stats_returns_counts(client: TestClient, tmp_path: Path) -> None:
     body = resp.json()
     assert body["books"] == 1
     assert body["chapters"] >= 1
+
+
+def test_tools_manifest_lists_tools(client: TestClient) -> None:
+    resp = client.get("/api/tools/manifest")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    names = [t["name"] for t in body["tools"]]
+    assert "bookscope_import" in names
+    assert "bookscope_ask" in names
+
+
+def test_tools_invoke_stats(client: TestClient, tmp_path: Path) -> None:
+    folder = tmp_path / "books"
+    folder.mkdir()
+    (folder / "a.txt").write_text("第一章 开端\n甲。\n", encoding="utf-8")
+    resp = client.post("/api/tools/invoke", json={"tool": "bookscope_stats", "arguments": {"path": str(folder)}})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["books"] == 1
