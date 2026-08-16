@@ -662,6 +662,25 @@ class CrossBookAskResponse(BaseModel):
     sources: list[str] = Field(default_factory=list, description="来源（书名/章号）。")
 
 
+class ClusterDiscoverRequest(BaseModel):
+    """POST /api/agent/cluster/discover 请求体：自动发现簇内两两关系。
+
+    对组内每对书各做一次跨文本对照（perspective 缓存），聚合所有关系
+    成一张簇关系网。成本 = C(n,2) 次轻 LLM 对照；适合中小簇（≤8 本）。
+    """
+
+    book_session_ids: list[str] = Field(
+        ..., min_length=2, max_length=8, description="同一来源组的 session_id 列表（2-8 本）。"
+    )
+    cluster_name: str = Field(default="文档簇", description="组名。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
 class ClusterReportRequest(BaseModel):
     """POST /api/agent/cluster/report 请求体：来源组（簇）总览报告。
 

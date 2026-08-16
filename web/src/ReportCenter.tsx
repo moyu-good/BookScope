@@ -20,11 +20,13 @@ export function ReportCenter({
   onOpenReport,
   onReopen,
   onCompareMany,
+  onClusterDiscover,
   onClose,
 }: {
   onOpenReport: (session: SessionMetadata) => void;
   onReopen: (entry: ReportHistoryEntry) => void;
   onCompareMany: (sessions: SessionMetadata[]) => void;
+  onClusterDiscover: (sessions: SessionMetadata[], clusterName: string) => void;
   onClose: () => void;
 }) {
   const [sessions, setSessions] = useState<SessionMetadata[] | null>(null);
@@ -125,6 +127,7 @@ export function ReportCenter({
                     <span className="text-[10px] font-bold text-[var(--color-ink-muted)]">{src}</span>
                     <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{list.length} 本</span>
                     {list.length >= 2 && (
+                      <>
                       <button
                         type="button"
                         onClick={() => onCompareMany(list)}
@@ -132,6 +135,15 @@ export function ReportCenter({
                       >
                         整组对照
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => onClusterDiscover(list, src)}
+                        title={`自动发现「${src}」两两关系（最多 8 本）`}
+                        className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                      >
+                        发现关系
+                      </button>
+                      </>
                     )}
                   </div>
                 </div>

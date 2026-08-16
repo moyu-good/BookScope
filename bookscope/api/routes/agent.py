@@ -165,6 +165,7 @@ from bookscope.api.schemas import (
     CrossBookAskRequest,
     CrossBookAskResponse,
     ClusterReportRequest,
+    ClusterDiscoverRequest,
     AnnotationsRequest,
     AnnotationsResponse,
     ArgumentStructureRequest,
@@ -4673,6 +4674,119 @@ def agent_cluster_report(
                      f"可对这些书做跨文本对照、逐本出书鉴报告、文档簇问答。",
         "spines": spines,
         "e1": e1,
+        "quality": {"e2_mean": 0, "e3": None},
+    }
+    html = render_report(inp)
+    return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": "full"})
+
+
+@agent_router.post("/agent/cluster/discover")
+def agent_cluster_discover(
+    request: ClusterDiscoverRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> Response:
+    """自动发现簇内两两关系：每对书一次跨文本对照，聚合关系网。
+
+    成本 = C(n,2) 次轻 LLM（perspective 缓存命中则只付 reason）。输出书鉴风格
+    对照报告：nodes=全部书，edges=所有 pair 的继承/反驳/补充/落地/检验。
+    """
+    model = request.model or default_model_for(request.provider)
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_type": "ProviderSdkMissing", "message": str(exc)},
+        ) from exc
+
+    # 取每本 perspective（缓存命中秒出）
+    perspectives = []
+    for sid in request.book_session_ids:
+        assembler = _resolve_assembler(store, sid)
+        _full_text, chunks = _long_context_inputs(assembler)
+        spine = peek_spine_cache(chunks=chunks, model=model, genre="fiction")
+        if not spine:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error_type": "SpineNotReady",
+                    "message": "有文档章脉未建完，先等预建完成再自动发现",
+                },
+            )
+        book_title, _ = _extract_book_meta(assembler)
+        perspectives.append(build_book_perspective(
+            spine=spine, book_title=book_title or sid, slug=sid[-8:],
+            llm_client=client, model=model,
+        ))
+
+    # 两两对照聚合
+    from itertools import combinations
+
+    nodes = []
+    seen_slugs = set()
+    edges = []
+    concepts = []
+    disputes = []
+    pair_count = 0
+    for a, b in combinations(perspectives, 2):
+        reason = cross_book_reason(perspectives=[a, b], llm_client=client, model=model)
+        for n in reason.get("nodes", []):
+            if n.get("slug") not in seen_slugs:
+                seen_slugs.add(n["slug"])
+                nodes.append(n)
+        edges.extend(reason.get("edges", []))
+        concepts.extend(reason.get("concept_evolution", []))
+        disputes.extend(reason.get("disagreements", []))
+        pair_count += 1
+
+    if not nodes:
+        # 兜底：perspective 本身当节点
+        nodes = [
+            {"slug": p.get("slug", ""), "label": p.get("title", ""), "stance": p.get("stance", "")}
+            for p in perspectives if p.get("slug")
+        ]
+
+    title = f"簇关系网 · {request.cluster_name}"
+    inp = {
+        "layout": "crossdoc",
+        "meta": {
+            "title": title,
+            "subtitle": f"{len(nodes)} 本 · {len(edges)} 条关系（{pair_count} 对两两对照）· 关系为研判",
+            "seal": "书 鉴",
+            "nav_title": "簇关系 · 导航",
+            "unit_label": "本",
+            "generated_by": f"书鉴 BookScope · 自动发现（{request.cluster_name}）",
+        },
+        "nodes": nodes,
+        "edges": edges,
+        "concept_evolution": concepts[:3],
+        "disagreements": disputes[:3],
+        "narrative": f"《{request.cluster_name}》共 {len(nodes)} 本，两两对照 {pair_count} 对，"
+                     f"发现 {len(edges)} 条关系（继承/反驳/补充/落地/检验）。关系为 LLM 研判，锚到各书主张。",
+        "spines": {
+            p.get("slug", f"b{i}"): {
+                "_title": p.get("title", ""),
+                "_slug": p.get("slug", f"b{i}"),
+                "core_thesis": p.get("summary", ""),
+                "theoretical_stance": {"label": p.get("stance", ""), "inference": True},
+                "method": "",
+                "key_citations": [
+                    {"quote": c.get("claim", ""), "role": f"第{c.get('chapter','?')}章"}
+                    for c in p.get("claims", [])[:5] if c.get("claim")
+                ],
+            }
+            for i, p in enumerate(perspectives)
+        },
+        "e1": {
+            p.get("slug", f"b{i}"): {
+                "quotes": [{"quote": c.get("claim", ""), "verified": False} for c in p.get("claims", [])[:5] if c.get("claim")]
+            }
+            for i, p in enumerate(perspectives)
+        },
         "quality": {"e2_mean": 0, "e3": None},
     }
     html = render_report(inp)

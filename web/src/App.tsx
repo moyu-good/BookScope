@@ -1669,6 +1669,60 @@ export function App() {
     [apiKey, provider, model, baseUrl],
   );
 
+  /** 簇关系自动发现：两两对照聚合关系网（C(n,2) 次轻 LLM）。 */
+  const handleClusterDiscover = useCallback(
+    async (sessions: SessionMetadata[], clusterName: string) => {
+      if (!apiKey) {
+        alert("先配置 LLM key（设置里）再自动发现");
+        return;
+      }
+      if (sessions.length < 2) {
+        alert("至少 2 本才能自动发现");
+        return;
+      }
+      if (sessions.length > 8) {
+        alert("自动发现一次最多 8 本（两两对照成本高），请分批");
+        return;
+      }
+      try {
+        const resp = await fetch("/api/agent/cluster/discover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_ids: sessions.map((x) => x.session_id),
+            cluster_name: clusterName,
+            provider,
+            api_key: apiKey,
+            model: model.trim() || undefined,
+            base_url: effectiveBaseUrl() || undefined,
+          }),
+        });
+        if (!resp.ok) {
+          let msg = `自动发现失败（${resp.status}）`;
+          try {
+            const d = (await resp.json()) as { detail?: { message?: string } };
+            if (d?.detail?.message) msg = d.detail.message;
+          } catch {
+            /* 非 JSON 错误体 */
+          }
+          alert(msg);
+          return;
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        setReportPreview({
+          url,
+          title: `簇关系网 · ${clusterName}`,
+          fileName: `簇关系网-${clusterName.replace(/[\/:*?"<>|]/g, "_")}.html`,
+          coverage: "full",
+        });
+      } catch {
+        alert("自动发现失败：网络错误");
+      }
+    },
+    [apiKey, provider, model, baseUrl],
+  );
+
   /** 簇总览报告：来源组所有书的聚合清单（纯聚合，秒出）。 */
   const handleClusterReport = useCallback(
     async (sessions: SessionMetadata[], clusterName: string) => {
@@ -3230,6 +3284,7 @@ export function App() {
           onOpenReport={(s) => void openReport(s)}
           onReopen={(e) => void handleReopenReport(e)}
           onCompareMany={(list) => void handleCompareMany(list)}
+          onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
           onClose={() => setReportCenterOpen(false)}
         />
       )}
