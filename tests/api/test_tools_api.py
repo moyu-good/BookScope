@@ -272,6 +272,7 @@ def test_tools_manifest_visualize_has_mode(client: TestClient) -> None:
     assert vis["parameters"]["properties"]["mode"]["enum"] == ["full", "quick"]
     assert "title" in vis["parameters"]["properties"]
     assert "motif" in vis["parameters"]["properties"]
+    assert "save_path" in vis["parameters"]["properties"]
 
 
 def test_tools_invoke_visualize_with_precomputed_data_returns_html(client: TestClient) -> None:
@@ -294,3 +295,22 @@ def test_tools_invoke_visualize_with_precomputed_data_returns_html(client: TestC
     assert body["mode"] == "precomputed"
     assert "逻辑主线" in body["html"]
     assert "人物/概念关系图" in body["html"]
+
+
+def test_tools_invoke_visualize_save_path_writes_file(client: TestClient, tmp_path: Path) -> None:
+    data = {
+        "meta": {"book": "测试书", "title": "测试书逻辑梳理"},
+        "narrative_curve": {"chapters": [{"chapter": 1, "event_count": 1}]},
+        "character_graph": {"nodes": ["甲"], "edges": []},
+        "recap": {"points": [{"order": 1, "point": "主线", "snippet": "原文", "verified": True}]},
+    }
+    out = tmp_path / "report.html"
+    resp = client.post("/api/tools/invoke", json={
+        "tool": "bookscope_visualize",
+        "arguments": {"data": data, "save_path": str(out)},
+    })
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["saved_to"] == str(out.resolve())
+    assert out.exists()
+    assert "测试书逻辑梳理" in out.read_text(encoding="utf-8")

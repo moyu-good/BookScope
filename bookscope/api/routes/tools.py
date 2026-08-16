@@ -207,7 +207,14 @@ def tools_invoke(req: InvokeRequest) -> dict:
             from bookscope.report.visual_report import render_visual_report
 
             if args.get("data"):
-                return {"html": render_visual_report(args["data"]), "mode": "precomputed"}
+                html = render_visual_report(args["data"])
+                result = {"html": html, "mode": "precomputed"}
+                if args.get("save_path"):
+                    save = Path(args["save_path"])
+                    save.parent.mkdir(parents=True, exist_ok=True)
+                    save.write_text(html, encoding="utf-8")
+                    result["saved_to"] = str(save.resolve())
+                return result
 
             import os as _os
 
@@ -349,7 +356,13 @@ def tools_invoke(req: InvokeRequest) -> dict:
             meta = {"book": args.get("title") or Path(args.get("path", "")).stem or sid, "title": args.get("title") or "长文档逻辑梳理"}
             data["meta"] = meta
             html = render_visual_report(data)
-            return {"html": html, "session_id": sid, "mode": "live", "errors": errors}
+            result = {"html": html, "session_id": sid, "mode": "live", "errors": errors}
+            if args.get("save_path"):
+                save = Path(args["save_path"])
+                save.parent.mkdir(parents=True, exist_ok=True)
+                save.write_text(html, encoding="utf-8")
+                result["saved_to"] = str(save.resolve())
+            return result
 
         if req.tool == "bookscope_deep_report":
             import os as _os

@@ -224,6 +224,10 @@
           "data": {
             "type": "object",
             "description": "预计算的分析结果 JSON（可选；用于离线/演示渲染）"
+          },
+          "save_path": {
+            "type": "string",
+            "description": "可选：把生成的 HTML 写到本地文件路径"
           }
         }
       }
