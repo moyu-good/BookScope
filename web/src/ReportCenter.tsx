@@ -17,6 +17,12 @@ interface SpineState {
   error?: string | null;
 }
 
+function historyColor(type: string): string {
+  if (type === "cross") return "#3D5A99";
+  if (type === "cluster") return "#6A4E8E";
+  return "#B03A2E";
+}
+
 function coverColor(genre?: string): string {
   const g = (genre ?? "").trim().toLowerCase();
   if (/(小说|novel|fiction|网文|历史|架空|玄幻|history)/.test(g)) return "#b4763a";
@@ -461,7 +467,7 @@ export function ReportCenter({
                 <div
                   key={h.id}
                   className="rounded-md border border-[var(--color-rule)] px-3 py-2 flex items-center gap-3 transition-shadow hover:shadow-[var(--shadow-raised)]"
-                  style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
+                  style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)", borderLeft: `3px solid ${historyColor(h.type)}` }}
                 >
                   <span className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] shrink-0">
                     {h.type === "cluster" ? "簇网" : h.type === "cross" ? "对照" : "书鉴"}
