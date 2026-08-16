@@ -534,6 +534,26 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_summary(args: argparse.Namespace) -> int:
+    """零配置：在终端打印书的结构/章节摘要。"""
+    path = Path(args.path)
+    if not path.exists():
+        print(f"文件不存在: {path}", file=sys.stderr)
+        return 1
+    title = args.title or path.stem
+    _name, chunks = _load_chunks(path, title)
+    groups: dict[int, list[dict]] = {}
+    for c in chunks:
+        ch = c.get("chapter") or 0
+        groups.setdefault(ch, []).append(c)
+    print(f"《{title}》 · {len(groups)} 章")
+    for ch in sorted(groups):
+        text = " ".join(str(c.get("text", "")) for c in groups[ch])
+        excerpt = " ".join(text.split())[:80]
+        print(f"  第{ch}章：{excerpt}")
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     path = Path(args.path)
     if not path.exists():
@@ -615,6 +635,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_doctor = sub.add_parser("doctor", help="检查本地环境")
     p_doctor.set_defaults(func=cmd_doctor)
+
+    p_summary = sub.add_parser("summary", help="零配置：在终端打印书的结构/章节摘要")
+    p_summary.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
+    p_summary.add_argument("--title", default=None, help="书名（默认取文件名）")
+    p_summary.set_defaults(func=cmd_summary)
 
     p_report = sub.add_parser("report", help="把一本书秒出结构版 HTML 报告")
     p_report.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")

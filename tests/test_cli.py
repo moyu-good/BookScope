@@ -176,3 +176,16 @@ def test_local_ask_returns_results(capsys) -> None:
     out = capsys.readouterr().out
     assert "本地检索结果" in out
     assert "市场与政府" in out or "第2章" in out
+
+
+def test_cmd_summary_prints_chapters(tmp_path: Path, capsys) -> None:
+    import bookscope.cli as cli
+
+    f = tmp_path / "a.txt"
+    f.write_text("第一章 开端\n甲。\n第二章 发展\n乙。\n", encoding="utf-8")
+    import argparse
+
+    assert cli.cmd_summary(argparse.Namespace(path=str(f), title="测试书")) == 0
+    out = capsys.readouterr().out
+    assert "测试书" in out
+    assert "2 章" in out

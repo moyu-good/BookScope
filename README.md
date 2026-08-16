@@ -59,6 +59,9 @@ cd web && npm install && npm run dev
 # 一条命令把书变成可分享的 HTML 报告（零 LLM、秒出）
 bookscope report 书.epub --out 书鉴.html --open
 
+# 零配置：终端直接看书的章节摘要
+bookscope summary 书.epub
+
 # 深度版书鉴报告（需要 LLM key）
 bookscope report 书.epub --deep --out 书鉴深度.html --api-key sk-...
 
