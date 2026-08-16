@@ -106,6 +106,9 @@ cd web && npm install && npm run dev
 # 一条命令把书变成可分享的结构版 HTML 报告（零 LLM、秒出）
 bookscope report 书.epub --out 书鉴.html
 
+# 深度版书鉴报告（需要 LLM key，首次较慢）
+bookscope report 书.epub --deep --out 书鉴深度.html --api-key sk-...
+
 # 启动本地服务
 bookscope serve --port 8000
 

@@ -416,15 +416,43 @@ def cmd_report(args: argparse.Namespace) -> int:
     print("正在分章/切块 …")
     results, stats = chunk_book_with_stats(book)
     chunks = _chunks_to_dicts(results)
-    meta = {
-        "title": f"《{title}》书鉴报告（结构版）",
-        "subtitle": f"{len(chunks)} 个片段 · {stats.chapters_detected if hasattr(stats, 'chapters_detected') else '?'} 章 · 零 LLM 秒出",
-        "seal": "书 鉴",
-        "nav_title": "书鉴 · 报告导航",
-        "unit_label": "章",
-        "generated_by": "书鉴 BookScope CLI",
-    }
-    inp = build_structure_report(chunks, meta)
+
+    if getattr(args, "deep", False):
+        api_key = args.api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            print("深度报告需要 LLM key：--api-key 或环境变量 DEEPSEEK_API_KEY / OPENAI_API_KEY", file=sys.stderr)
+            return 2
+        provider = args.provider or "deepseek"
+        model = args.model or "deepseek-v4-flash"
+        try:
+            client = _build_client(provider, api_key, args.base_url, model)
+        except Exception as exc:  # noqa: BLE001
+            print(f"LLM client 构建失败: {exc}", file=sys.stderr)
+            return 2
+        from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
+        from bookscope.report.builders import build_book_report
+
+        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…")
+        spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
+        meta = {
+            "title": f"《{title}》书鉴报告",
+            "subtitle": f"{len(spine)} 章 · 深度版",
+            "seal": "书 鉴",
+            "nav_title": "书鉴 · 报告导航",
+            "unit_label": "章",
+            "generated_by": "书鉴 BookScope CLI",
+        }
+        inp = build_book_report(spine, meta)
+    else:
+        meta = {
+            "title": f"《{title}》书鉴报告（结构版）",
+            "subtitle": f"{len(chunks)} 个片段 · {stats.chapters_detected if hasattr(stats, 'chapters_detected') else '?'} 章 · 零 LLM 秒出",
+            "seal": "书 鉴",
+            "nav_title": "书鉴 · 报告导航",
+            "unit_label": "章",
+            "generated_by": "书鉴 BookScope CLI",
+        }
+        inp = build_structure_report(chunks, meta)
     html = render_report(inp)
     out = Path(args.out)
     out.write_text(html, encoding="utf-8")
@@ -463,6 +491,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_report.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
     p_report.add_argument("--out", default=DEFAULT_OUT, help=f"输出 HTML 路径（默认 {DEFAULT_OUT}）")
     p_report.add_argument("--title", default=None, help="书名（默认取文件名）")
+    p_report.add_argument("--deep", action="store_true", help="生成深度版（需要 LLM key，首次较慢）")
+    p_report.add_argument("--provider", default="deepseek", help="LLM 厂商（默认 deepseek）")
+    p_report.add_argument("--api-key", default=None, help="LLM API key（默认读 DEEPSEEK_API_KEY / OPENAI_API_KEY）")
+    p_report.add_argument("--model", default=None, help="模型名（默认 deepseek-v4-flash）")
+    p_report.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
     p_report.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
     p_report.set_defaults(func=cmd_report)
 

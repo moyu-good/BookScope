@@ -99,3 +99,19 @@ def test_cmd_version_returns_0(capsys) -> None:
     assert cli.cmd_version(argparse.Namespace()) == 0
     out = capsys.readouterr().out.strip()
     assert out
+
+
+def test_cmd_report_deep_without_key_returns_2(tmp_path: Path, monkeypatch) -> None:
+    import bookscope.cli as cli
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    f = tmp_path / "a.txt"
+    f.write_text("第一章\n甲。\n", encoding="utf-8")
+    import argparse
+
+    args = argparse.Namespace(
+        path=str(f), out=str(tmp_path / "r.html"), title="测试书", deep=True,
+        provider="deepseek", api_key=None, model=None, base_url=None, open=False,
+    )
+    assert cli.cmd_report(args) == 2
