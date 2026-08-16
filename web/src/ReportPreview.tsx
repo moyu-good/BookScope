@@ -52,6 +52,8 @@ export function ReportPreview({
     const sessionId = preview.sessionId;
     const isBuilding = preview.coverage === "structure" || preview.coverage?.startsWith("partial:");
     if (!sessionId || !isBuilding) return;
+    setBuildProgress(null);
+    setBuildReady(false);
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
     const fetchOnce = async () => {
