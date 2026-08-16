@@ -270,6 +270,8 @@ def test_tools_manifest_visualize_has_mode(client: TestClient) -> None:
     vis = next(t for t in body["tools"] if t["name"] == "bookscope_visualize")
     assert "mode" in vis["parameters"]["properties"]
     assert vis["parameters"]["properties"]["mode"]["enum"] == ["full", "quick"]
+    assert "title" in vis["parameters"]["properties"]
+    assert "motif" in vis["parameters"]["properties"]
 
 
 def test_tools_invoke_visualize_with_precomputed_data_returns_html(client: TestClient) -> None:

@@ -183,6 +183,14 @@
             "type": "string",
             "description": "本地文件路径（与 session_id 二选一）"
           },
+          "title": {
+            "type": "string",
+            "description": "书名/文档名（可选）"
+          },
+          "motif": {
+            "type": "string",
+            "description": "要追踪的母题（可选，默认沿用 concept）"
+          },
           "concept": {
             "type": "string",
             "description": "要追踪的核心概念（可选，如 忠义 / 法治 / 市场）"
