@@ -1534,6 +1534,64 @@ export function App() {
     setSidebarOpen(false);
   }, []);
 
+  /** 跨文本对照：先选一本，再点另一本触发对照报告下载。 */
+  const [compareTarget, setCompareTarget] = useState<SessionMetadata | null>(null);
+  const handleCompare = useCallback(
+    async (s: SessionMetadata) => {
+      if (!apiKey) {
+        alert("先配置 LLM key（设置里）再出对照报告");
+        return;
+      }
+      if (!compareTarget) {
+        setCompareTarget(s);
+        alert(`已选《${s.book_title}》为对照第一本，再点另一本书的「对照」`);
+        return;
+      }
+      if (compareTarget.session_id === s.session_id) {
+        alert("请选另一本不同的书");
+        return;
+      }
+      const target = compareTarget;
+      setCompareTarget(null);
+      try {
+        const resp = await fetch("/api/agent/cross-book/report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_ids: [target.session_id, s.session_id],
+            provider,
+            api_key: apiKey,
+            model: model.trim() || undefined,
+            base_url: effectiveBaseUrl() || undefined,
+          }),
+        });
+        if (!resp.ok) {
+          let msg = `对照报告失败（${resp.status}）`;
+          try {
+            const d = (await resp.json()) as { detail?: { message?: string } };
+            if (d?.detail?.message) msg = d.detail.message;
+          } catch {
+            /* 非 JSON 错误体，用默认文案 */
+          }
+          alert(msg);
+          return;
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${target.book_title || "book"}×${s.book_title || "book"}-对照报告.html`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        alert("对照报告失败：网络错误");
+      }
+    },
+    [apiKey, provider, model, baseUrl, compareTarget],
+  );
+
   /** 出书鉴报告：/agent/book/report 拿 HTML → 下载。章脉没建过后端 404，弹提示。 */
   const openReport = useCallback(async (s: SessionMetadata) => {
     if (!apiKey) {
@@ -1975,6 +2033,7 @@ export function App() {
                 onSelect={handleSelectShelfBook}
                 onRead={openReader}
                 onReport={openReport}
+                onCompare={handleCompare}
                 onDeleted={handleDeletedShelfBook}
                 refreshTrigger={shelfRefresh}
                 pendingAutoSelectId={pendingAutoSelectId}

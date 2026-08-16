@@ -44,6 +44,8 @@ export interface BookShelfProps {
   onRead: (session: SessionMetadata) => void;
   /** 点「出报告」：下载书鉴 HTML 报告 */
   onReport: (session: SessionMetadata) => void;
+  /** 点「对照」：把这本书加入跨文本对照（两本时出对照报告） */
+  onCompare: (session: SessionMetadata) => void;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -147,6 +149,7 @@ export function BookShelf({
   onSelect,
   onRead,
   onReport,
+  onCompare,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -234,6 +237,7 @@ export function BookShelf({
         onSelect={onSelect}
         onRead={onRead}
         onReport={onReport}
+        onCompare={onCompare}
         onAskDelete={(id) => setConfirmingId(id)}
         onCancelDelete={() => setConfirmingId(null)}
         onConfirmDelete={handleConfirmDelete}
@@ -249,6 +253,7 @@ function ShelfBody(props: {
   onSelect: (session: SessionMetadata) => void;
   onRead: (session: SessionMetadata) => void;
   onReport: (session: SessionMetadata) => void;
+  onCompare: (session: SessionMetadata) => void;
   onAskDelete: (id: string) => void;
   onCancelDelete: () => void;
   onConfirmDelete: (id: string) => void;
@@ -260,6 +265,7 @@ function ShelfBody(props: {
     onSelect,
     onRead,
     onReport,
+    onCompare,
     onAskDelete,
     onCancelDelete,
     onConfirmDelete,
@@ -312,6 +318,7 @@ function ShelfBody(props: {
             onSelect={() => onSelect(s)}
             onRead={() => onRead(s)}
             onReport={() => onReport(s)}
+            onCompare={() => onCompare(s)}
             onAskDelete={() => onAskDelete(s.session_id)}
             onCancelDelete={onCancelDelete}
             onConfirmDelete={() => onConfirmDelete(s.session_id)}
@@ -331,6 +338,7 @@ function BookRow(props: {
   onSelect: () => void;
   onRead: () => void;
   onReport: () => void;
+  onCompare: () => void;
   onAskDelete: () => void;
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
@@ -343,6 +351,7 @@ function BookRow(props: {
     onSelect,
     onRead,
     onReport,
+    onCompare,
     onAskDelete,
     onCancelDelete,
     onConfirmDelete,
@@ -473,6 +482,14 @@ function BookRow(props: {
             className="text-xs px-3 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors flex-1 sm:flex-none"
           >
             出报告
+          </button>
+          <button
+            type="button"
+            onClick={onCompare}
+            title={`把《${session.book_title}》加入跨文本对照`}
+            className="text-xs px-3 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors flex-1 sm:flex-none"
+          >
+            对照
           </button>
 
           {isConfirming ? (

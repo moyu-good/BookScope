@@ -49,6 +49,7 @@ from bookscope.agent import (
     run_fast_path,
 )
 from bookscope.report.builders import build_book_report, build_structure_report
+from bookscope.agent.book_cross import build_book_perspective, cross_book_reason, build_cross_book_report_input
 from bookscope.report.service import render_report
 
 from bookscope.agent._internal.chapter_spine_cache import (
@@ -160,6 +161,7 @@ from bookscope.api.schemas import (
     AgentAskRequest,
     AgentAskResponse,
     BookReportRequest,
+    CrossBookReportRequest,
     AnnotationsRequest,
     AnnotationsResponse,
     ArgumentStructureRequest,
@@ -4427,6 +4429,73 @@ def agent_book_report(
             "unit_label": "章",
             "generated_by": f"书鉴 BookScope · 《{display_title}》",
         })
+    html = render_report(inp)
+    return Response(content=html, media_type="text/html; charset=utf-8")
+
+
+@agent_router.post("/agent/cross-book/report")
+def agent_cross_book_report(
+    request: CrossBookReportRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> Response:
+    """多本书 / 文档簇对照报告（P2 跨文本泛化）。
+
+    每本先取章脉（全部命中才继续；没全建返回 409 + 进度），提炼书级主张（轻 LLM），
+    再做一次跨文本对照推理，出书鉴对照报告。跨文本关系是研判（不盖「鉴」印）。
+    """
+    model = request.model or default_model_for(request.provider)
+    assemblers = []
+    progress_list = []
+    for sid in request.book_session_ids:
+        assembler = _resolve_assembler(store, sid)
+        _full_text, chunks = _long_context_inputs(assembler)
+        progress = spine_build_progress(chunks=chunks, model=model, genre="fiction")
+        progress_list.append({"session_id": sid, **progress})
+        if progress["total"] == 0 or progress["built"] < progress["total"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error_type": "SpineNotReady",
+                    "message": "有文档章脉未建完，先等预建完成再对照",
+                    "progress": progress_list,
+                },
+            )
+        assemblers.append((sid, assembler, chunks))
+
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_type": "ProviderSdkMissing", "message": str(exc)},
+        ) from exc
+
+    perspectives = []
+    for sid, assembler, chunks in assemblers:
+        spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
+        book_title, _ = _extract_book_meta(assembler)
+        slug = sid[-8:]
+        perspectives.append(build_book_perspective(
+            spine=spine, book_title=book_title or sid, slug=slug,
+            llm_client=client, model=model,
+        ))
+
+    reason = cross_book_reason(perspectives=perspectives, llm_client=client, model=model)
+    titles = " × ".join(p.get("title", "") for p in perspectives)
+    inp = build_cross_book_report_input(
+        perspectives=perspectives, reason=reason,
+        meta={
+            "title": f"跨文本对照 · {titles}",
+            "seal": "书 鉴",
+            "nav_title": "对照 · 报告导航",
+            "unit_label": "份",
+            "generated_by": f"书鉴 BookScope · 跨文本对照（{len(perspectives)} 份）",
+        },
+    )
     html = render_report(inp)
     return Response(content=html, media_type="text/html; charset=utf-8")
 

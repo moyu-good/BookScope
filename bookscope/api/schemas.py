@@ -615,6 +615,24 @@ class BookReportRequest(BaseModel):
     base_url: str | None = Field(default=None)
 
 
+class CrossBookReportRequest(BaseModel):
+    """POST /api/agent/cross-book/report 请求体：多本书 / 文档簇对照报告。
+
+    每本从章脉提炼书级主张（轻 LLM），再做一次跨文本对照推理，出书鉴对照报告。
+    章脉未全建的书返回 409 + 进度提示（先预建/等后台补建）。
+    """
+
+    book_session_ids: list[str] = Field(
+        ..., min_length=2, description="至少两本书的 session_id（顺序即对照顺序）。"
+    )
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
 class PrewarmSpineStatusResponse(BaseModel):
     """GET /api/agent/prewarm-spine/status 响应体：轮询后台预建进度。
 
