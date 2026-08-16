@@ -45,6 +45,7 @@ export function CrossWorkbench({
   apiKey,
   model,
   baseUrl,
+  onGenerateReport,
   onClose,
 }: {
   sessions: SessionMetadata[];
@@ -52,6 +53,7 @@ export function CrossWorkbench({
   apiKey: string;
   model: string;
   baseUrl: string;
+  onGenerateReport?: (sessions: SessionMetadata[]) => void;
   onClose: () => void;
 }) {
   const [data, setData] = useState<WorkbenchData | null>(null);
@@ -153,10 +155,23 @@ export function CrossWorkbench({
         <span className="text-xs text-[var(--color-ink-muted)] truncate">
           {data ? data.titles : "加载中…"}
         </span>
+        {onGenerateReport && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onGenerateReport(sessions);
+            }}
+            className="ml-auto text-xs px-3 py-1.5 rounded-md bg-[var(--color-seal)] text-white hover:brightness-110 transition"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            生成 HTML 报告
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition"
+          className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition"
         >
           关闭
         </button>

@@ -3462,6 +3462,10 @@ export function App() {
           apiKey={apiKey}
           model={model}
           baseUrl={effectiveBaseUrl()}
+          onGenerateReport={(list, name) => {
+            setClusterWorkbench(null);
+            void handleClusterDiscover(list, name);
+          }}
           onClose={() => setClusterWorkbench(null)}
         />
       )}
@@ -3472,6 +3476,10 @@ export function App() {
           apiKey={apiKey}
           model={model}
           baseUrl={effectiveBaseUrl()}
+          onGenerateReport={(list) => {
+            setWorkbenchSessions(null);
+            void handleCompareMany(list);
+          }}
           onClose={() => setWorkbenchSessions(null)}
         />
       )}

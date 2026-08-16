@@ -42,6 +42,7 @@ export function ClusterWorkbench({
   apiKey,
   model,
   baseUrl,
+  onGenerateReport,
   onClose,
 }: {
   sessions: SessionMetadata[];
@@ -50,6 +51,7 @@ export function ClusterWorkbench({
   apiKey: string;
   model: string;
   baseUrl: string;
+  onGenerateReport?: (sessions: SessionMetadata[], clusterName: string) => void;
   onClose: () => void;
 }) {
   const [data, setData] = useState<ClusterData | null>(null);
@@ -151,10 +153,23 @@ export function ClusterWorkbench({
         <span className="text-xs text-[var(--color-ink-muted)] truncate">
           {data ? `《${data.cluster_name}》 · ${data.nodes.length} 本 · ${data.edges.length} 条关系` : "加载中…"}
         </span>
+        {onGenerateReport && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onGenerateReport(sessions, clusterName);
+            }}
+            className="ml-auto text-xs px-3 py-1.5 rounded-md bg-[var(--color-seal)] text-white hover:brightness-110 transition"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            生成 HTML 报告
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition"
+          className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition"
         >
           关闭
         </button>
