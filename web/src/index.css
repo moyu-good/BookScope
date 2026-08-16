@@ -98,6 +98,8 @@ body,
 
 body {
   margin: 0;
+  /* 暗/浅色主题切换时背景/文字/边框平滑过渡，不跳变 */
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   /* 案头底色——深一点的暖木调 + 极淡斜晕，让中间摊开的册页浮起来 */
   background-color: var(--color-desk);
   background-image: linear-gradient(
@@ -116,6 +118,7 @@ body {
 /* 册页：摊在案头上的那本善本——纸面 + 极淡墨点纹理（纹理放这层，不放案头） */
 .folio {
   background-color: var(--color-paper);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   background-image: radial-gradient(
     oklch(30% 0.03 40 / 0.012) 0.5px,
     transparent 0.6px
