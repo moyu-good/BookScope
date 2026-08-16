@@ -42,6 +42,8 @@ export interface BookShelfProps {
   onSelect: (session: SessionMetadata) => void;
   /** 点「读」门：进沉浸阅读器 */
   onRead: (session: SessionMetadata) => void;
+  /** 点「出报告」：下载书鉴 HTML 报告 */
+  onReport: (session: SessionMetadata) => void;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -144,6 +146,7 @@ export function BookShelf({
   activeSessionId,
   onSelect,
   onRead,
+  onReport,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -230,6 +233,7 @@ export function BookShelf({
         confirmingId={confirmingId}
         onSelect={onSelect}
         onRead={onRead}
+        onReport={onReport}
         onAskDelete={(id) => setConfirmingId(id)}
         onCancelDelete={() => setConfirmingId(null)}
         onConfirmDelete={handleConfirmDelete}
@@ -244,6 +248,7 @@ function ShelfBody(props: {
   confirmingId: string | null;
   onSelect: (session: SessionMetadata) => void;
   onRead: (session: SessionMetadata) => void;
+  onReport: (session: SessionMetadata) => void;
   onAskDelete: (id: string) => void;
   onCancelDelete: () => void;
   onConfirmDelete: (id: string) => void;
@@ -254,6 +259,7 @@ function ShelfBody(props: {
     confirmingId,
     onSelect,
     onRead,
+    onReport,
     onAskDelete,
     onCancelDelete,
     onConfirmDelete,
@@ -305,6 +311,7 @@ function ShelfBody(props: {
             isConfirming={isConfirming}
             onSelect={() => onSelect(s)}
             onRead={() => onRead(s)}
+            onReport={() => onReport(s)}
             onAskDelete={() => onAskDelete(s.session_id)}
             onCancelDelete={onCancelDelete}
             onConfirmDelete={() => onConfirmDelete(s.session_id)}
@@ -323,6 +330,7 @@ function BookRow(props: {
   isConfirming: boolean;
   onSelect: () => void;
   onRead: () => void;
+  onReport: () => void;
   onAskDelete: () => void;
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
@@ -334,6 +342,7 @@ function BookRow(props: {
     isConfirming,
     onSelect,
     onRead,
+    onReport,
     onAskDelete,
     onCancelDelete,
     onConfirmDelete,
@@ -456,6 +465,14 @@ function BookRow(props: {
             className="text-xs px-3 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors flex-1 sm:flex-none"
           >
             进分析台
+          </button>
+          <button
+            type="button"
+            onClick={onReport}
+            title={`出《${session.book_title}》书鉴报告（下载 HTML）`}
+            className="text-xs px-3 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors flex-1 sm:flex-none"
+          >
+            出报告
           </button>
 
           {isConfirming ? (

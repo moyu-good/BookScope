@@ -1528,6 +1528,49 @@ export function App() {
     setSidebarOpen(false);
   }, []);
 
+  /** 出书鉴报告：/agent/book/report 拿 HTML → 下载。章脉没建过后端 404，弹提示。 */
+  const openReport = useCallback(async (s: SessionMetadata) => {
+    if (!apiKey) {
+      alert("先配置 LLM key（设置里）再出报告");
+      return;
+    }
+    try {
+      const resp = await fetch("/api/agent/book/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          book_session_id: s.session_id,
+          provider,
+          api_key: apiKey,
+          model: model.trim() || undefined,
+          base_url: effectiveBaseUrl() || undefined,
+        }),
+      });
+      if (!resp.ok) {
+        let msg = `出报告失败（${resp.status}）`;
+        try {
+          const d = (await resp.json()) as { detail?: { message?: string } };
+          if (d?.detail?.message) msg = d.detail.message;
+        } catch {
+          /* 非 JSON 错误体，用默认文案 */
+        }
+        alert(msg);
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${s.book_title || "book"}-书鉴报告.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("出报告失败：网络错误");
+    }
+  }, [apiKey, provider, model, baseUrl]);
+
   function effectiveBaseUrl(): string {
     // 仅 deepseek 走 base_url（代理 / 其他 OpenAI 兼容 endpoint）；anthropic 后端会忽略
     if (provider === "anthropic") return "";
@@ -1925,6 +1968,7 @@ export function App() {
                 activeSessionId={currentSession?.session_id ?? null}
                 onSelect={handleSelectShelfBook}
                 onRead={openReader}
+                onReport={openReport}
                 onDeleted={handleDeletedShelfBook}
                 refreshTrigger={shelfRefresh}
                 pendingAutoSelectId={pendingAutoSelectId}
