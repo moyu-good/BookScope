@@ -39,12 +39,15 @@ const REL_COLORS: Record<string, string> = {
   检验: "#6A4E8E",
 };
 
-function coverColor(genre?: string): string {
-  const g = (genre ?? "").trim().toLowerCase();
+function coverColor(seed = ""): string {
+  const g = seed.trim().toLowerCase();
   if (/(小说|novel|fiction|网文|历史|架空|玄幻|history)/.test(g)) return "#b4763a";
   if (/(理论|论文|paper|哲学|philosophy|工具书|nonfiction|学术|工具)/.test(g)) return "#3a6378";
   if (/(诗|poem|poetry|散文|verse)/.test(g)) return "#6f6391";
-  return "var(--color-rule)";
+  const palette = ["#B03A2E", "#3A6378", "#6F6391", "#9C7A2E", "#2E7D5B", "#8A5A44"];
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
 }
 
 export function CrossWorkbench({
@@ -233,7 +236,7 @@ export function CrossWorkbench({
                       aria-hidden
                       className="shrink-0 w-8 h-10 rounded-md flex items-center justify-center"
                       style={{
-                        background: `linear-gradient(135deg, ${coverColor()}, color-mix(in oklch, ${coverColor()} 62%, var(--color-paper)))`,
+                        background: `linear-gradient(135deg, ${coverColor(p.title)}, color-mix(in oklch, ${coverColor(p.title)} 62%, var(--color-paper)))`,
                         boxShadow: "inset 0 0 0 1px rgba(0,0,0,.06), var(--shadow-soft)",
                       }}
                     >
