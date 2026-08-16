@@ -125,7 +125,7 @@ def test_cmd_import_creates_session(tmp_path: Path, capsys) -> None:
     data_dir = tmp_path / "sessions"
     import argparse
 
-    args = argparse.Namespace(path=str(f), title="测试书", data_dir=str(data_dir))
+    args = argparse.Namespace(paths=[str(f)], title="测试书", data_dir=str(data_dir))
     assert cli.cmd_import(args) == 0
     out = capsys.readouterr().out
     assert "已导入书库" in out
@@ -141,7 +141,7 @@ def test_cmd_list_shows_imported_book(tmp_path: Path, capsys) -> None:
     data_dir = tmp_path / "sessions"
     import argparse
 
-    assert cli.cmd_import(argparse.Namespace(path=str(f), title="测试书", data_dir=str(data_dir))) == 0
+    assert cli.cmd_import(argparse.Namespace(paths=[str(f)], title="测试书", data_dir=str(data_dir))) == 0
     assert cli.cmd_list(argparse.Namespace(data_dir=str(data_dir))) == 0
     out = capsys.readouterr().out
     assert "测试书" in out
@@ -158,7 +158,7 @@ def test_cmd_import_folder_imports_all(tmp_path: Path, capsys) -> None:
     data_dir = tmp_path / "sessions"
     import argparse
 
-    assert cli.cmd_import(argparse.Namespace(path=str(folder), title=None, data_dir=str(data_dir))) == 0
+    assert cli.cmd_import(argparse.Namespace(paths=[str(folder)], title=None, data_dir=str(data_dir))) == 0
     out = capsys.readouterr().out
     assert "成功 2/2" in out
     assert "a.txt" in out

@@ -329,22 +329,24 @@ def _import_one(path: Path, data_dir: Path, title: str | None = None) -> str:
 
 
 def cmd_import(args: argparse.Namespace) -> int:
-    """把本地文件/文件夹导入书库（Web 直接可见）。"""
-    path = Path(args.path)
-    if not path.exists():
-        print(f"文件不存在: {path}", file=sys.stderr)
-        return 1
+    """把本地文件/文件夹导入书库（Web 直接可见），支持多个路径。"""
+    import json
 
     files: list[Path] = []
-    if path.is_dir():
-        files = [p for p in path.rglob("*") if p.is_file() and p.suffix.lower() in _IMPORT_EXTS]
-        if not files:
-            print(f"文件夹里没有支持的文件: {path}", file=sys.stderr)
-            return 1
-    else:
-        files = [path]
-
-    import json
+    for raw in args.paths:
+        path = Path(raw)
+        if not path.exists():
+            print(f"路径不存在: {path}", file=sys.stderr)
+            continue
+        if path.is_dir():
+            found = [p for p in path.rglob("*") if p.is_file() and p.suffix.lower() in _IMPORT_EXTS]
+            if not found:
+                print(f"文件夹里没有支持的文件: {path}", file=sys.stderr)
+            files.extend(found)
+        else:
+            files.append(path)
+    if not files:
+        return 1
 
     data_dir = Path(args.data_dir)
     imported = []
@@ -762,7 +764,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_list.set_defaults(func=cmd_list)
 
     p_import = sub.add_parser("import", help="把本地文件导入书库（Web 直接可见）")
-    p_import.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
+    p_import.add_argument("paths", nargs="+", help="一个或多个文件/文件夹路径（txt / epub / pdf / docx / md）")
     p_import.add_argument("--title", default=None, help="书名（默认取文件名）")
     p_import.add_argument("--data-dir", default="data/sessions", help="书库数据目录（默认 data/sessions）")
     p_import.add_argument("--json", action="store_true", help="以 JSON 输出导入结果")
