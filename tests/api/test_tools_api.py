@@ -62,3 +62,17 @@ def test_tools_upload_zero_config(client: TestClient, tmp_path: Path, monkeypatc
     assert body["book_title"] == "测试书"
     assert body["chunk_count"] >= 1
     assert any(data_dir.iterdir())
+
+
+def test_tools_ask_local_returns_results(client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    data_dir = tmp_path / "sessions"
+    monkeypatch.setenv("BOOKSCOPE_DATA_DIR", str(data_dir))
+    f = tmp_path / "a.txt"
+    f.write_text("第一章 开端\n这是关于经济改革的讨论。\n第二章 发展\n这里提到市场与政府的关系。\n", encoding="utf-8")
+    imp = client.post("/api/tools/import", json={"path": str(f), "title": "测试书"})
+    sid = imp.json()["session_id"]
+    resp = client.post("/api/tools/ask-local", json={"session_id": sid, "question": "市场与政府"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["mode"] == "local"
+    assert len(body["results"]) >= 1

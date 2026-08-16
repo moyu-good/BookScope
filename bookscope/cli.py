@@ -356,28 +356,12 @@ def cmd_import(args: argparse.Namespace) -> int:
 
 
 def _local_ask(question: str, chunks: list[dict], json_out: bool) -> int:
-    """零配置本地检索问答：没有 LLM key 时用词重叠返回最相关原文片段。"""
+    """零配置本地检索问答：没有 LLM key 时返回最相关原文片段。"""
     import json
 
-    import jieba
+    from bookscope.local_tools import local_search
 
-    query_tokens = set(jieba.lcut(question))
-    scored: list[tuple[float, int]] = []
-    for i, c in enumerate(chunks):
-        text = str(c.get("text", ""))
-        toks = set(jieba.lcut(text))
-        overlap = len(query_tokens & toks)
-        if overlap > 0:
-            scored.append((float(overlap), i))
-    scored.sort(key=lambda x: (-x[0], x[1]))
-    results = []
-    for score, i in scored[:5]:
-        c = chunks[i]
-        results.append({
-            "chapter": c.get("chapter"),
-            "text": str(c.get("text", ""))[:300],
-            "score": score,
-        })
+    results = local_search(question, chunks, top_k=5)
     if not results:
         print("本地检索没有找到相关片段（可配置 LLM key 获得智能回答）")
         return 1

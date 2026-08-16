@@ -2028,6 +2028,32 @@ export function App() {
   /** 报告内追问：调 /agent/ask（单书报告），答案展示在预览下方。 */
   const handleReportAsk = useCallback(
     async (question: string, preview: ReportPreviewState, chapter?: number) => {
+      // 零配置：单书追问没有 key 时走本地检索
+      if (!apiKey && preview.sessionId) {
+        const lresp = await fetch("/api/tools/ask-local", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: preview.sessionId, question }),
+        });
+        if (!lresp.ok) {
+          let msg = `本地追问失败（${lresp.status}）`;
+          try {
+            const d = (await lresp.json()) as { detail?: string };
+            if (typeof d?.detail === "string") msg = d.detail;
+          } catch {
+            /* 非 JSON */
+          }
+          throw new Error(msg);
+        }
+        const data = (await lresp.json()) as { results?: { chapter?: number; text?: string; score?: number }[] };
+        if (!data.results || data.results.length === 0) {
+          return "本地检索没有找到相关片段（配置 LLM key 可获得智能回答）";
+        }
+        return (
+          "本地检索结果（未配置 LLM key）：\n\n" +
+          data.results.map((r) => `[第${r.chapter ?? "?"}章] ${r.text ?? ""}`).join("\n\n")
+        );
+      }
       const common = {
         provider,
         api_key: apiKey,

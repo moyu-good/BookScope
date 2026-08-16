@@ -104,6 +104,11 @@ curl -X POST http://localhost:8000/api/tools/import \
 curl -X POST http://localhost:8000/api/tools/upload \
   -F 'file=@/path/to/book.epub' \
   -F 'book_title=书名'
+
+# 零配置本地问答（对已导入 session 做本地检索）
+curl -X POST http://localhost:8000/api/tools/ask-local \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"...","question":"市场与政府"}'
 ```
 
 ---

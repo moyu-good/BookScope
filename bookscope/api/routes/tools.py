@@ -13,9 +13,13 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+
+from bookscope.api.book_sessions import BookSessionStore
+from bookscope.api.dependencies import get_book_session_store
+from bookscope.local_tools import local_search
 
 tools_router = APIRouter(prefix="/tools", tags=["tools"])
 
@@ -30,6 +34,12 @@ class ReportRequest(BaseModel):
 class ImportRequest(BaseModel):
     path: str = Field(..., description="本地文件或文件夹绝对路径")
     title: str | None = Field(default=None)
+
+
+class AskLocalRequest(BaseModel):
+    session_id: str = Field(..., description="书库 session_id")
+    question: str = Field(..., min_length=1)
+    top_k: int = Field(default=5, ge=1, le=20)
 
 
 def _chunks_to_dicts(results) -> list[dict]:
@@ -94,6 +104,27 @@ async def tools_upload(
         "character_count": len(getattr(book_text, "raw_text", "") or ""),
         "message": "零配置导入完成（未做 LLM KG，深度分析需配置 key 后重新生成）",
     }
+
+
+@tools_router.post("/ask-local")
+def tools_ask_local(
+    req: AskLocalRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> dict:
+    """零配置本地问答：对已导入 session 做本地检索，返回相关原文。"""
+    try:
+        assembler = store.get(req.session_id)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=404, detail=f"book session 不存在: {req.session_id}")
+    chunks = []
+    for i, c in enumerate(assembler._chunks):  # noqa: SLF001
+        chunks.append({
+            "chunk_id": f"c{i}",
+            "chapter": getattr(c, "chapter", None),
+            "text": getattr(c, "text", ""),
+        })
+    results = local_search(req.question, chunks, top_k=req.top_k)
+    return {"mode": "local", "results": results}
 
 
 @tools_router.post("/report")

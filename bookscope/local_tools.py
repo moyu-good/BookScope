@@ -88,5 +88,29 @@ def import_file(path: Path, data_dir: Path, title: str | None = None) -> str:
     return session_id
 
 
+def local_search(question: str, chunks: list[dict], top_k: int = 5) -> list[dict]:
+    """零配置本地检索：jieba 词重叠打分，返回最相关原文片段。"""
+    import jieba
+
+    query_tokens = set(jieba.lcut(question))
+    scored: list[tuple[float, int]] = []
+    for i, c in enumerate(chunks):
+        text = str(c.get("text", ""))
+        toks = set(jieba.lcut(text))
+        overlap = len(query_tokens & toks)
+        if overlap > 0:
+            scored.append((float(overlap), i))
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    results = []
+    for score, i in scored[:top_k]:
+        c = chunks[i]
+        results.append({
+            "chapter": c.get("chapter"),
+            "text": str(c.get("text", ""))[:300],
+            "score": score,
+        })
+    return results
+
+
 def default_data_dir() -> Path:
     return Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))
