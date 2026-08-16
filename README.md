@@ -83,6 +83,20 @@ bookscope list
 > 💡 **零配置可用**：结构报告、导入书库、列表、启动服务这些基础功能不需要任何 API key。
 > 深度分析 / 问答 / 跨文本对照属于可选 LLM 功能，需要时才配置自己的 key（默认 DeepSeek）。
 
+### 本地工具 API（零配置，不需要 key）
+
+```bash
+# 直接给一个本地文件路径，返回结构版 HTML 报告
+curl -X POST http://localhost:8000/api/tools/report \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"/path/to/book.epub"}'
+
+# 把本地文件/文件夹导入书库，返回 session_id
+curl -X POST http://localhost:8000/api/tools/import \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"/path/to/book.epub"}'
+```
+
 ---
 
 ## 适配各种热门工具

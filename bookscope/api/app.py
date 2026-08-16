@@ -32,6 +32,7 @@ from bookscope.api.routes import (
     books_router,
     health_router,
     sessions_router,
+    tools_router,
 )
 
 logger = logging.getLogger("bookscope.api")
@@ -118,6 +119,7 @@ def create_app() -> FastAPI:
     app.include_router(agent_router, prefix="/api")
     app.include_router(books_router, prefix="/api")
     app.include_router(sessions_router, prefix="/api")
+    app.include_router(tools_router, prefix="/api")
 
     # 托管版才挂账号路由(ADR-011)+ 标注路由(WP-reading-workspace Phase C)。
     # 懒 import:local 不挂、也不 import 这些模块,故启动不会把 argon2 /
