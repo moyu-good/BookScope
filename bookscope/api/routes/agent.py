@@ -30,7 +30,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from bookscope.agent import (
     AgentError,
@@ -4828,23 +4828,29 @@ def agent_cluster_discover(
         ) from exc
 
     # 取每本 perspective（缓存命中秒出）；必须整本全就绪——部分章脉做簇关系
-    # 会漏掉未建章的主张，误导整组关系网。
+    # 会漏掉未建章的主张，误导整组关系网。先扫一遍全部进度，未就绪一次报全。
     progress_list = []
-    perspectives = []
+    assemblers = []
+    not_ready = False
     for sid in request.book_session_ids:
         assembler = _resolve_assembler(store, sid)
         _full_text, chunks = _long_context_inputs(assembler)
         progress = spine_build_progress(chunks=chunks, model=model, genre="fiction")
         progress_list.append({"session_id": sid, **progress})
+        assemblers.append((sid, assembler, chunks))
         if progress["total"] == 0 or progress["built"] < progress["total"]:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "error_type": "SpineNotReady",
-                    "message": "有文档章脉未建完，先等预建完成再自动发现",
-                    "progress": progress_list,
-                },
-            )
+            not_ready = True
+    if not_ready:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error_type": "SpineNotReady",
+                "message": "有文档章脉未建完，先等预建完成再自动发现",
+                "progress": progress_list,
+            },
+        )
+    perspectives = []
+    for sid, assembler, chunks in assemblers:
         spine = peek_spine_cache(chunks=chunks, model=model, genre="fiction")
         book_title, _ = _extract_book_meta(assembler)
         perspectives.append(build_book_perspective(
