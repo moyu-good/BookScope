@@ -607,6 +607,18 @@ def _run_folder_import(
     用户打开书时可能已建好，不用干等首次分析。
     """
     imported: list[tuple[str, list]] = []  # (session_id, chunks)
+
+    # 去重：已入库的同名书跳过（避免批量导入重复刷屏）
+    existing_titles: set[str] = set()
+    try:
+        for sid in store.list_sessions():
+            meta = store.get_metadata(sid)
+            t = str(meta.get("book_title", "") or "").strip()
+            if t:
+                existing_titles.add(t)
+    except Exception:  # noqa: BLE001 — 查重失败不阻断导入（宁重复不丢书）
+        existing_titles = set()
+
     for i, path in enumerate(files):
         with _IMPORT_LOCK:
             state = _IMPORT_JOBS.get(job_id)
@@ -617,6 +629,21 @@ def _run_folder_import(
             book_text = load_text(path)
             if getattr(book_text, "language", "unknown") in ("unknown", ""):
                 book_text.language = "zh"
+            # 同名已入库 → 跳过（标记 duplicate）
+            if book_text.title.strip() in existing_titles:
+                result = {
+                    "file": path.name,
+                    "session_id": None,
+                    "book_title": book_text.title,
+                    "error": "duplicate",
+                }
+                with _IMPORT_LOCK:
+                    state = _IMPORT_JOBS.get(job_id)
+                    if state is None:
+                        return
+                    state["results"].append(result)
+                    state["done"] = i + 1
+                continue
             chunks, chapter_stats = chunk_book_with_stats(book_text)
             kg = BookKnowledgeGraph(book_title=book_text.title, language=book_text.language)
             vector_store = SessionVectorStore(chunks=chunks, enable_vector=True)
