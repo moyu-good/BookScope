@@ -59,6 +59,10 @@ def cmd_report(args: argparse.Namespace) -> int:
     out = Path(args.out)
     out.write_text(html, encoding="utf-8")
     print(f"已生成: {out.resolve()} ({len(html)} bytes)")
+    if getattr(args, "open", False):
+        import webbrowser
+
+        webbrowser.open(out.resolve().as_uri())
     return 0
 
 
@@ -83,6 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_report.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
     p_report.add_argument("--out", default=DEFAULT_OUT, help=f"输出 HTML 路径（默认 {DEFAULT_OUT}）")
     p_report.add_argument("--title", default=None, help="书名（默认取文件名）")
+    p_report.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
     p_report.set_defaults(func=cmd_report)
 
     p_serve = sub.add_parser("serve", help="启动本地 Web 服务")
