@@ -57,6 +57,22 @@ export function ReportCenter({
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const loadProgress = async (ids: string) => {
+      try {
+        const pr = await fetch(`/api/agent/spine-progress?ids=${encodeURIComponent(ids)}&model=deepseek-v4-flash`);
+        if (!pr.ok || cancelled) return;
+        const data = (await pr.json()) as { books?: { session_id: string; built: number; total: number; ready: boolean }[] };
+        if (!data.books) return;
+        const map: Record<string, SpineState> = {};
+        for (const b of data.books) map[b.session_id] = { built: b.built, total: b.total, ready: b.ready };
+        if (!cancelled) setProgress(map);
+      } catch {
+        /* 轮询失败下一轮再试，不打扰 */
+      }
+    };
+
     (async () => {
       try {
         const resp = await fetch("/api/sessions");
@@ -67,21 +83,19 @@ export function ReportCenter({
         setSessions(list);
         if (list.length > 0) {
           const ids = list.map((x) => x.session_id).join(",");
-          const pr = await fetch(`/api/agent/spine-progress?ids=${encodeURIComponent(ids)}&model=deepseek-v4-flash`);
-          if (pr.ok) {
-            const data = (await pr.json()) as { books?: { session_id: string; built: number; total: number; ready: boolean }[] };
-            if (!cancelled && data.books) {
-              const map: Record<string, SpineState> = {};
-              for (const b of data.books) map[b.session_id] = { built: b.built, total: b.total, ready: b.ready };
-              setProgress(map);
-            }
-          }
+          await loadProgress(ids);
+          // 后台预建是长任务，报告中心开着时每 15s 自动刷新进度
+          timer = setInterval(() => void loadProgress(ids), 15000);
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "加载失败");
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
   }, [refreshTick]);
 
   const readyCount = sessions?.filter((s) => progress[s.session_id]?.ready).length ?? 0;
