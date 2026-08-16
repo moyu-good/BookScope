@@ -117,6 +117,61 @@ def cmd_cross(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ask(args: argparse.Namespace) -> int:
+    """对一本书直接提问，输出带原文引用的答案。"""
+    api_key = args.api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("需要 LLM key：--api-key 或环境变量 DEEPSEEK_API_KEY / OPENAI_API_KEY", file=sys.stderr)
+        return 2
+    path = Path(args.path)
+    if not path.exists():
+        print(f"文件不存在: {path}", file=sys.stderr)
+        return 1
+    provider = args.provider or "deepseek"
+    model = args.model or "deepseek-v4-flash"
+    try:
+        client = _build_client(provider, api_key, args.base_url, model)
+    except Exception as exc:  # noqa: BLE001
+        print(f"LLM client 构建失败: {exc}", file=sys.stderr)
+        return 2
+
+    from bookscope.agent.long_context import run_long_context
+
+    title, chunks = _load_chunks(path, args.title)
+    book = load_text(path, title=title)
+    print(f"正在问《{title}》：{args.question}")
+    result = run_long_context(
+        args.question,
+        full_text=book.raw_text,
+        chunks=chunks,
+        llm_client=client,
+        model=model,
+        session_id=path.stem,
+    )
+    if result is None:
+        print("回答失败：long_context 返回空（书太大或模型暂不可用）", file=sys.stderr)
+        return 1
+
+    if args.json:
+        import json
+
+        print(json.dumps({
+            "answer": result.answer,
+            "citations": result.citations,
+        }, ensure_ascii=False, indent=2))
+    else:
+        print("\n" + result.answer)
+        if result.citations:
+            print("\n引用：")
+            for c in result.citations:
+                ch = c.get("chapter", "?")
+                snippet = c.get("snippet", "")
+                verified = c.get("verified", False)
+                mark = "鉴" if verified else "研判"
+                print(f"  [{mark}] 第{ch}章：{snippet}")
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     path = Path(args.path)
     if not path.exists():
@@ -171,6 +226,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_report.add_argument("--title", default=None, help="书名（默认取文件名）")
     p_report.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
     p_report.set_defaults(func=cmd_report)
+
+    p_ask = sub.add_parser("ask", help="对一本书直接提问，输出带原文引用的答案")
+    p_ask.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
+    p_ask.add_argument("question", help="要问的问题")
+    p_ask.add_argument("--title", default=None, help="书名（默认取文件名）")
+    p_ask.add_argument("--provider", default="deepseek", help="LLM 厂商（默认 deepseek）")
+    p_ask.add_argument("--api-key", default=None, help="LLM API key（默认读 DEEPSEEK_API_KEY / OPENAI_API_KEY）")
+    p_ask.add_argument("--model", default=None, help="模型名（默认 deepseek-v4-flash）")
+    p_ask.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
+    p_ask.add_argument("--json", action="store_true", help="以 JSON 输出 answer + citations")
+    p_ask.set_defaults(func=cmd_ask)
 
     p_cross = sub.add_parser("cross", help="两个文件直接出跨文本对照 HTML 报告")
     p_cross.add_argument("file1", help="第一本书/文档路径")
