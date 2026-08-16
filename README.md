@@ -117,6 +117,9 @@ bookscope ask 书.epub "这本书的核心主张是什么？" --api-key sk-...
 
 # 先预建章脉缓存，后续 report/cross/ask 会更快
 bookscope prewarm 书.epub --api-key sk-...
+
+# 多个文件直接出簇关系网 HTML 报告（两两对照聚合，2-8 本）
+bookscope cluster 书A.epub 书B.pdf 书C.txt --name "政治学组" --out 簇关系.html --api-key sk-...
 ```
 
 > 💡 默认使用 **DeepSeek `deepseek-v4-flash`**：国内可直连、便宜、适合长文本批量分析。也支持 OpenAI 兼容接口，自己搭的代理/网关都能接。

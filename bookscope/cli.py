@@ -117,6 +117,177 @@ def cmd_cross(args: argparse.Namespace) -> int:
     return 0
 
 
+def _dedupe_edges(edges: list[dict]) -> list[dict]:
+    seen: set[tuple[str, str, str]] = set()
+    out: list[dict] = []
+    for e in edges:
+        key = (str(e.get("from", "")), str(e.get("to", "")), str(e.get("relation", "")))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(e)
+    return out
+
+
+def _merge_concepts(items: list[dict]) -> list[dict]:
+    merged: dict[str, list[dict]] = {}
+    for item in items:
+        name = str(item.get("concept", "")).strip()
+        if not name:
+            continue
+        stages = merged.setdefault(name, [])
+        existing = {(str(x.get("paper", "")), str(x.get("stage", ""))) for x in stages}
+        for st in item.get("stages", []):
+            key = (str(st.get("paper", "")), str(st.get("stage", "")))
+            if key not in existing:
+                stages.append(st)
+                existing.add(key)
+    arr = [{"concept": k, "stages": v} for k, v in merged.items()]
+    arr.sort(key=lambda x: len(x["stages"]), reverse=True)
+    return arr[:5]
+
+
+def _merge_disputes(items: list[dict]) -> list[dict]:
+    merged: dict[str, list[dict]] = {}
+    for item in items:
+        q = str(item.get("question", "")).strip()
+        if not q:
+            continue
+        sides = merged.setdefault(q, [])
+        existing = {(str(x.get("paper", "")), str(x.get("stance", ""))) for x in sides}
+        for sd in item.get("sides", []):
+            key = (str(sd.get("paper", "")), str(sd.get("stance", "")))
+            if key not in existing:
+                sides.append(sd)
+                existing.add(key)
+    arr = [{"question": k, "sides": v} for k, v in merged.items()]
+    arr.sort(key=lambda x: len(x["sides"]), reverse=True)
+    return arr[:5]
+
+
+def cmd_cluster(args: argparse.Namespace) -> int:
+    """多个文件直接出簇关系网 HTML 报告（两两对照聚合）。"""
+    api_key = args.api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("需要 LLM key：--api-key 或环境变量 DEEPSEEK_API_KEY / OPENAI_API_KEY", file=sys.stderr)
+        return 2
+    files = [Path(x) for x in args.files]
+    if len(files) < 2:
+        print("至少需要 2 个文件", file=sys.stderr)
+        return 2
+    if len(files) > 8:
+        print("一次最多 8 个文件（两两对照成本高），请分批", file=sys.stderr)
+        return 2
+    provider = args.provider or "deepseek"
+    model = args.model or "deepseek-v4-flash"
+    try:
+        client = _build_client(provider, api_key, args.base_url, model)
+    except Exception as exc:  # noqa: BLE001
+        print(f"LLM client 构建失败: {exc}", file=sys.stderr)
+        return 2
+
+    from itertools import combinations
+
+    from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
+    from bookscope.agent.book_cross import (
+        build_book_perspective,
+        cross_book_reason,
+    )
+    from bookscope.report.service import render_report
+
+    perspectives = []
+    for idx, path in enumerate(files):
+        if not path.exists():
+            print(f"文件不存在: {path}", file=sys.stderr)
+            return 1
+        title, chunks = _load_chunks(path, getattr(args, f"title{idx + 1}", None))
+        print(f"正在构建《{title}》章脉（首次较慢，之后走缓存）…")
+        spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
+        perspectives.append(build_book_perspective(
+            spine=spine, book_title=title, slug=f"b{idx}",
+            llm_client=client, model=model,
+        ))
+
+    nodes: list[dict] = []
+    seen_slugs: set[str] = set()
+    edges: list[dict] = []
+    concepts: list[dict] = []
+    disputes: list[dict] = []
+    pair_count = 0
+    for a, b in combinations(perspectives, 2):
+        reason = cross_book_reason(perspectives=[a, b], llm_client=client, model=model)
+        for n in reason.get("nodes", []):
+            slug = n.get("slug")
+            if slug and slug not in seen_slugs:
+                seen_slugs.add(slug)
+                nodes.append(n)
+        edges.extend(reason.get("edges", []))
+        concepts.extend(reason.get("concept_evolution", []))
+        disputes.extend(reason.get("disagreements", []))
+        pair_count += 1
+
+    if not nodes:
+        nodes = [
+            {"slug": p.get("slug", ""), "label": p.get("title", ""), "stance": p.get("stance", "")}
+            for p in perspectives if p.get("slug")
+        ]
+    edges = _dedupe_edges(edges)
+    concepts = _merge_concepts(concepts)
+    disputes = _merge_disputes(disputes)
+
+    cluster_name = args.name or "文档簇"
+    narrative = (
+        f"《{cluster_name}》共 {len(nodes)} 本，两两对照 {pair_count} 对，"
+        f"发现 {len(edges)} 条关系（继承/反驳/补充/落地/检验）。关系为 LLM 研判。"
+    )
+    inp = {
+        "layout": "crossdoc",
+        "meta": {
+            "title": f"簇关系网 · {cluster_name}",
+            "subtitle": f"{len(nodes)} 本 · {len(edges)} 条关系（{pair_count} 对两两对照）· 关系为研判",
+            "seal": "书 鉴",
+            "nav_title": "簇关系 · 导航",
+            "unit_label": "本",
+            "generated_by": "书鉴 BookScope CLI",
+        },
+        "nodes": nodes,
+        "edges": edges,
+        "concept_evolution": concepts,
+        "disagreements": disputes,
+        "narrative": narrative,
+        "spines": {
+            p.get("slug", f"b{i}"): {
+                "_title": p.get("title", ""),
+                "_slug": p.get("slug", f"b{i}"),
+                "core_thesis": p.get("summary", ""),
+                "theoretical_stance": {"label": p.get("stance", ""), "inference": True},
+                "method": "",
+                "key_citations": [
+                    {"quote": c.get("claim", ""), "role": f"第{c.get('chapter','?')}章"}
+                    for c in p.get("claims", [])[:5] if c.get("claim")
+                ],
+            }
+            for i, p in enumerate(perspectives)
+        },
+        "e1": {
+            p.get("slug", f"b{i}"): {
+                "quotes": [{"quote": c.get("claim", ""), "verified": False} for c in p.get("claims", [])[:5] if c.get("claim")]
+            }
+            for i, p in enumerate(perspectives)
+        },
+        "quality": {"e2_mean": 0, "e3": None},
+    }
+    html = render_report(inp)
+    out = Path(args.out)
+    out.write_text(html, encoding="utf-8")
+    print(f"已生成: {out.resolve()} ({len(html)} bytes)")
+    if getattr(args, "open", False):
+        import webbrowser
+
+        webbrowser.open(out.resolve().as_uri())
+    return 0
+
+
 def cmd_ask(args: argparse.Namespace) -> int:
     """对一本书直接提问，输出带原文引用的答案。"""
     api_key = args.api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
@@ -262,6 +433,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_prewarm.add_argument("--model", default=None, help="模型名（默认 deepseek-v4-flash）")
     p_prewarm.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
     p_prewarm.set_defaults(func=cmd_prewarm)
+
+    p_cluster = sub.add_parser("cluster", help="多个文件直接出簇关系网 HTML 报告（两两对照聚合）")
+    p_cluster.add_argument("files", nargs="+", help="2-8 个书/文档路径")
+    p_cluster.add_argument("--name", default=None, help="簇/组名（默认 文档簇）")
+    p_cluster.add_argument("--out", default="bookscope-cluster.html", help="输出 HTML 路径（默认 bookscope-cluster.html）")
+    p_cluster.add_argument("--provider", default="deepseek", help="LLM 厂商（默认 deepseek）")
+    p_cluster.add_argument("--api-key", default=None, help="LLM API key（默认读 DEEPSEEK_API_KEY / OPENAI_API_KEY）")
+    p_cluster.add_argument("--model", default=None, help="模型名（默认 deepseek-v4-flash）")
+    p_cluster.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
+    p_cluster.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
+    p_cluster.set_defaults(func=cmd_cluster)
 
     p_ask = sub.add_parser("ask", help="对一本书直接提问，输出带原文引用的答案")
     p_ask.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")

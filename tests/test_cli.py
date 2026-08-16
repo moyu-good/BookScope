@@ -71,3 +71,21 @@ def test_cmd_prewarm_without_key_returns_2(tmp_path: Path, monkeypatch) -> None:
         api_key=None, model=None, base_url=None,
     )
     assert cli.cmd_prewarm(args) == 2
+
+
+def test_cmd_cluster_without_key_returns_2(tmp_path: Path, monkeypatch) -> None:
+    import bookscope.cli as cli
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    f1 = tmp_path / "a.txt"
+    f2 = tmp_path / "b.txt"
+    f1.write_text("第一章\n甲。\n", encoding="utf-8")
+    f2.write_text("第一章\n乙。\n", encoding="utf-8")
+    import argparse
+
+    args = argparse.Namespace(
+        files=[str(f1), str(f2)], name="组", out=str(tmp_path / "x.html"),
+        provider="deepseek", api_key=None, model=None, base_url=None, open=False,
+    )
+    assert cli.cmd_cluster(args) == 2
