@@ -135,7 +135,7 @@ export function ReportPreview({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex flex-col bg-[var(--color-paper)]"
+      className="fixed inset-0 z-[200] flex flex-col bg-[var(--color-paper)] reveal"
       role="dialog"
       aria-modal="true"
       aria-label={`报告预览：${preview.title}`}
@@ -143,7 +143,7 @@ export function ReportPreview({
       {/* 顶栏：标题 + 下载 + 关闭 */}
       <div
         className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--color-rule)]"
-        style={{ background: "var(--color-paper-raised)" }}
+        style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
       >
         <span className="text-sm font-bold text-[var(--color-seal)] truncate" style={{ fontFamily: "var(--font-display)" }}>
           📜 {preview.title}
