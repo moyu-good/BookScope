@@ -131,3 +131,17 @@ def test_cmd_import_creates_session(tmp_path: Path, capsys) -> None:
     assert "已导入书库" in out
     # storage 目录应有至少一个 session 子目录
     assert any(data_dir.iterdir())
+
+
+def test_cmd_list_shows_imported_book(tmp_path: Path, capsys) -> None:
+    import bookscope.cli as cli
+
+    f = tmp_path / "a.txt"
+    f.write_text("第一章\n甲。\n", encoding="utf-8")
+    data_dir = tmp_path / "sessions"
+    import argparse
+
+    assert cli.cmd_import(argparse.Namespace(path=str(f), title="测试书", data_dir=str(data_dir))) == 0
+    assert cli.cmd_list(argparse.Namespace(data_dir=str(data_dir))) == 0
+    out = capsys.readouterr().out
+    assert "测试书" in out

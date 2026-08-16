@@ -126,6 +126,9 @@ bookscope cluster 书A.epub 书B.pdf 书C.txt --name "政治学组" --out 簇关
 
 # 把本地文件导入书库，Web 直接可见
 bookscope import 书.epub --title "书名"
+
+# 查看书库里已导入的书
+bookscope list
 ```
 
 > 💡 默认使用 **DeepSeek `deepseek-v4-flash`**：国内可直连、便宜、适合长文本批量分析。也支持 OpenAI 兼容接口，自己搭的代理/网关都能接。

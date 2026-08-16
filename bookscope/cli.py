@@ -288,6 +288,30 @@ def cmd_cluster(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list(args: argparse.Namespace) -> int:
+    """列出书库里已导入的书。"""
+    from bookscope.api.session_storage import JSONFileSessionStorage
+
+    storage = JSONFileSessionStorage(root=Path(args.data_dir))
+    ids = storage.list_all()
+    if not ids:
+        print("书库为空")
+        return 0
+    for sid in sorted(ids):
+        meta_path = Path(args.data_dir) / sid / "metadata.json"
+        title = sid
+        if meta_path.exists():
+            import json
+
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                title = meta.get("book_title", sid)
+            except Exception:  # noqa: BLE001
+                pass
+        print(f"{sid}	{title}")
+    return 0
+
+
 def cmd_import(args: argparse.Namespace) -> int:
     """把本地文件导入书库（Web 直接可见）。"""
     path = Path(args.path)
@@ -559,6 +583,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_cluster.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
     p_cluster.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
     p_cluster.set_defaults(func=cmd_cluster)
+
+    p_list = sub.add_parser("list", help="列出书库里已导入的书")
+    p_list.add_argument("--data-dir", default="data/sessions", help="书库数据目录（默认 data/sessions）")
+    p_list.set_defaults(func=cmd_list)
 
     p_import = sub.add_parser("import", help="把本地文件导入书库（Web 直接可见）")
     p_import.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
