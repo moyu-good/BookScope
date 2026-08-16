@@ -58,3 +58,14 @@ def test_import_then_list_sees_book(tmp_path: Path, monkeypatch) -> None:
     books = list_sessions(data_dir)
     assert any(b["session_id"] == session_id for b in books)
     assert any("效果测试书" in b["book_title"] for b in books)
+
+
+def test_local_search_ranks_higher_frequency_first() -> None:
+    from bookscope.local_tools import local_search
+
+    chunks = [
+        {"chapter": 1, "text": "土地财政、土地财政、土地财政与地方债务。"},
+        {"chapter": 2, "text": "这里提到土地财政。"},
+    ]
+    hits = local_search("土地财政", chunks, top_k=2)
+    assert hits[0]["chapter"] == 1

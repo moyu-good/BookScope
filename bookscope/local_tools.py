@@ -89,17 +89,16 @@ def import_file(path: Path, data_dir: Path, title: str | None = None) -> str:
 
 
 def local_search(question: str, chunks: list[dict], top_k: int = 5) -> list[dict]:
-    """零配置本地检索：jieba 词重叠打分，返回最相关原文片段。"""
+    """零配置本地检索：jieba 分词 + 词频加权，返回最相关原文片段。"""
     import jieba
 
-    query_tokens = set(jieba.lcut(question))
+    query_tokens = [t for t in jieba.lcut(question) if t.strip()]
     scored: list[tuple[float, int]] = []
     for i, c in enumerate(chunks):
         text = str(c.get("text", ""))
-        toks = set(jieba.lcut(text))
-        overlap = len(query_tokens & toks)
-        if overlap > 0:
-            scored.append((float(overlap), i))
+        score = sum(text.count(t) for t in query_tokens)
+        if score > 0:
+            scored.append((float(score), i))
     scored.sort(key=lambda x: (-x[0], x[1]))
     results = []
     for score, i in scored[:top_k]:
