@@ -144,6 +144,18 @@ curl -X POST http://localhost:8000/api/tools/stats \
   -d '{"path":"/path/to/books"}'
 ```
 
+### Tools API 一览（零配置，不需要 key）
+
+| 端点 | 作用 |
+| --- | --- |
+| `POST /api/tools/import` | 导入本地文件/文件夹，返回 session_id |
+| `POST /api/tools/report` | 给本地路径，返回结构版 HTML 报告 |
+| `POST /api/tools/upload` | multipart 单文件上传，零配置入库 |
+| `POST /api/tools/ask-local` | 对已导入 session 做本地检索问答 |
+| `POST /api/tools/catalog` | 生成 HTML 书库目录 |
+| `POST /api/tools/search` | 文件夹跨书本地检索 |
+| `POST /api/tools/stats` | 统计书库规模 |
+
 ---
 
 ## 适配各种热门工具
