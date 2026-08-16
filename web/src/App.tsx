@@ -1639,6 +1639,38 @@ export function App() {
     [apiKey, provider, model, baseUrl],
   );
 
+  /** 报告内追问：调 /agent/ask（单书报告），答案展示在预览下方。 */
+  const handleReportAsk = useCallback(
+    async (question: string, preview: ReportPreviewState) => {
+      if (!preview.sessionId) throw new Error("这份报告不支持追问（仅单书报告可追问）");
+      const resp = await fetch("/api/agent/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          book_session_id: preview.sessionId,
+          provider,
+          api_key: apiKey,
+          model: model.trim() || undefined,
+          base_url: effectiveBaseUrl() || undefined,
+        }),
+      });
+      if (!resp.ok) {
+        let msg = `追问失败（${resp.status}）`;
+        try {
+          const d = (await resp.json()) as { detail?: { message?: string } };
+          if (d?.detail?.message) msg = d.detail.message;
+        } catch {
+          /* 非 JSON 错误体，用默认文案 */
+        }
+        throw new Error(msg);
+      }
+      const data = (await resp.json()) as { answer?: string };
+      return data.answer ?? "";
+    },
+    [apiKey, provider, model, baseUrl],
+  );
+
   /** 出书鉴报告：/agent/book/report 拿 HTML → 下载。章脉没建过后端 404，弹提示。 */
   const openReport = useCallback(async (s: SessionMetadata) => {
     if (!apiKey) {
@@ -1674,6 +1706,7 @@ export function App() {
         url,
         title: `《${s.book_title || "本书"}》书鉴报告`,
         fileName: `${s.book_title || "book"}-书鉴报告.html`,
+        sessionId: s.session_id,
       });
     } catch {
       alert("出报告失败：网络错误");
@@ -2861,6 +2894,11 @@ export function App() {
       {reportPreview && (
         <ReportPreview
           preview={reportPreview}
+          onAsk={
+            reportPreview.sessionId
+              ? (q) => handleReportAsk(q, reportPreview)
+              : undefined
+          }
           onClose={() => {
             URL.revokeObjectURL(reportPreview.url);
             setReportPreview(null);

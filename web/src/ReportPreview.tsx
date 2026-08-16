@@ -2,22 +2,35 @@
 // ReportPreview —— 书鉴/对照报告预览（产品内交付物，不只是下载文件）
 //
 // 报告是主轴交付物：点「出报告」不再只下载，而是先在应用内 iframe 预览，
-// 可随时下载 / 关闭。解决"HTML 文件打不开/看不到"的断点。
+// 可随时下载 / 关闭 / 追问。解决"HTML 文件打不开/看不到"的断点，也让
+// 静态报告获得"可追问"能力（答案由 App 调后端生成，展示在预览下方）。
 // ---------------------------------------------------------------------------
+
+import { useState } from "react";
 
 export interface ReportPreviewState {
   url: string;
   title: string;
   fileName: string;
+  /** 单书报告带 session_id，用于报告内追问 */
+  sessionId?: string;
 }
 
 export function ReportPreview({
   preview,
+  onAsk,
   onClose,
 }: {
   preview: ReportPreviewState;
+  /** 追问回调：问题 → 答案文本（由 App 调 /agent/ask）；不传则隐藏追问框 */
+  onAsk?: (question: string) => Promise<string>;
   onClose: () => void;
 }) {
+  const [question, setQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [answer, setAnswer] = useState("");
+  const [error, setError] = useState("");
+
   const download = () => {
     const a = document.createElement("a");
     a.href = preview.url;
@@ -25,6 +38,21 @@ export function ReportPreview({
     document.body.appendChild(a);
     a.click();
     a.remove();
+  };
+
+  const submitAsk = async () => {
+    const q = question.trim();
+    if (!q || !onAsk || asking) return;
+    setAsking(true);
+    setError("");
+    try {
+      const ans = await onAsk(q);
+      setAnswer(ans);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "追问失败");
+    } finally {
+      setAsking(false);
+    }
   };
 
   return (
@@ -46,6 +74,29 @@ export function ReportPreview({
           书鉴报告 · 可下载后分享 / 存档
         </span>
         <div className="ml-auto flex items-center gap-2">
+          {onAsk && (
+            <div className="flex items-center gap-1.5 mr-2">
+              <input
+                type="text"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void submitAsk();
+                }}
+                placeholder="追问这份报告…"
+                className="w-52 text-xs px-2.5 py-1.5 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] outline-none focus:border-[var(--color-seal)]"
+              />
+              <button
+                type="button"
+                onClick={() => void submitAsk()}
+                disabled={asking || !question.trim()}
+                className="text-xs px-3 py-1.5 rounded-md bg-[var(--color-seal)] text-white hover:brightness-110 disabled:opacity-40 transition"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {asking ? "追问中…" : "追问"}
+              </button>
+            </div>
+          )}
           <button
             type="button"
             onClick={download}
@@ -63,6 +114,24 @@ export function ReportPreview({
           </button>
         </div>
       </div>
+      {/* 追问答案区（有答案才显示） */}
+      {(answer || error) && (
+        <div
+          className="px-4 py-2 border-b border-[var(--color-rule)] text-xs leading-relaxed"
+          style={{
+            background: error ? "color-mix(in oklch, var(--color-seal) 8%, transparent)" : "var(--color-seal-soft)",
+          }}
+        >
+          {error ? (
+            <span className="text-[var(--color-seal)]">⚠️ {error}</span>
+          ) : (
+            <>
+              <span className="font-bold text-[var(--color-seal)]">❓ {question}</span>
+              <div className="mt-1 text-[var(--color-ink)] whitespace-pre-wrap">{answer}</div>
+            </>
+          )}
+        </div>
+      )}
       {/* 报告本体：iframe 全屏预览 */}
       <iframe
         src={preview.url}
