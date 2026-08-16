@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useState } from "react";
-import { deleteReportHistoryEntry, loadReportHistory, type ReportHistoryEntry } from "./ReportHistory";
+import { clearReportHistory, deleteReportHistoryEntry, loadReportHistory, type ReportHistoryEntry } from "./ReportHistory";
 import type { SessionMetadata } from "./BookShelf";
 
 interface SpineState {
@@ -286,9 +286,25 @@ export function ReportCenter({
 
         {/* 右：报告历史 */}
         <div>
-          <h3 className="text-xs font-bold text-[var(--color-ink-muted)] mb-2" style={{ fontFamily: "var(--font-display)" }}>
-            报告历史
-          </h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-xs font-bold text-[var(--color-ink-muted)]" style={{ fontFamily: "var(--font-display)" }}>
+              报告历史
+            </h3>
+            {history.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("清空全部报告历史？此操作不可恢复。")) {
+                    clearReportHistory();
+                    setHistory([]);
+                  }
+                }}
+                className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+              >
+                清空
+              </button>
+            )}
+          </div>
           {history.length > 0 && (
             <input
               type="search"

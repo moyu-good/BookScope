@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BookShelf, rememberImportSources } from "./BookShelf";
 import { ReportPreview, type ReportPreviewState } from "./ReportPreview";
-import { ReportHistoryModal, deleteReportHistoryEntry, loadReportHistory, saveReportHistory, type ReportHistoryEntry } from "./ReportHistory";
+import { ReportHistoryModal, clearReportHistory, deleteReportHistoryEntry, loadReportHistory, saveReportHistory, type ReportHistoryEntry } from "./ReportHistory";
 import { ReportCenter } from "./ReportCenter";
 import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
@@ -3411,6 +3411,10 @@ export function App() {
           onReopen={(e) => void handleReopenReport(e)}
           onDelete={(id) => {
             deleteReportHistoryEntry(id);
+            setReportHistory(loadReportHistory());
+          }}
+          onClear={() => {
+            clearReportHistory();
             setReportHistory(loadReportHistory());
           }}
           onClose={() => setHistoryOpen(false)}

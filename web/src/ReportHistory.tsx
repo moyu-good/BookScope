@@ -50,15 +50,25 @@ export function deleteReportHistoryEntry(id: string): void {
   }
 }
 
+export function clearReportHistory(): void {
+  try {
+    window.localStorage.removeItem(HISTORY_KEY);
+  } catch {
+    /* localStorage 不可用时静默 */
+  }
+}
+
 export function ReportHistoryModal({
   history,
   onReopen,
   onDelete,
+  onClear,
   onClose,
 }: {
   history: ReportHistoryEntry[];
   onReopen: (entry: ReportHistoryEntry) => void;
   onDelete: (id: string) => void;
+  onClear?: () => void;
   onClose: () => void;
 }) {
   return (
@@ -79,6 +89,19 @@ export function ReportHistoryModal({
             📚 报告历史
           </span>
           <span className="text-xs text-[var(--color-ink-muted)]">最近 {history.length} 份</span>
+          {onClear && history.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("清空全部报告历史？此操作不可恢复。")) {
+                  onClear();
+                }
+              }}
+              className="text-xs px-2 py-1 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)]"
+            >
+              清空
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
