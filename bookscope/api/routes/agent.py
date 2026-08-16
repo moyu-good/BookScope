@@ -4548,4 +4548,33 @@ def agent_cross_book_ask(
     return CrossBookAskResponse(answer=result.get("answer", ""), sources=result.get("sources", []))
 
 
+@agent_router.get("/agent/spine-progress")
+def agent_spine_progress(
+    ids: str,
+    model: str | None = None,
+    provider: str = "deepseek",
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> dict:
+    """批量查询多本书章脉进度（纯读缓存，绝不构建）。书柜徽章用。
+
+    返回 {"books": [{session_id, built, total, ready}]}。
+    """
+    resolved_model = model or default_model_for(provider)
+    out = []
+    for sid in [x for x in ids.split(",") if x]:
+        try:
+            assembler = _resolve_assembler(store, sid)
+            _full_text, chunks = _long_context_inputs(assembler)
+            progress = spine_build_progress(chunks=chunks, model=resolved_model, genre="fiction")
+            out.append({
+                "session_id": sid,
+                "built": progress["built"],
+                "total": progress["total"],
+                "ready": progress["total"] > 0 and progress["built"] >= progress["total"],
+            })
+        except Exception:  # noqa: BLE001 — 单本失败给空，不阻断批量
+            out.append({"session_id": sid, "built": 0, "total": 0, "ready": False})
+    return {"books": out}
+
+
 __all__ = ["agent_router"]

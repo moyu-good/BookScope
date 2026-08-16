@@ -415,6 +415,23 @@ function ShelfBody(props: {
   // 订阅标注变化:托管缓存异步预热到位 / 增删改后重算每本的笔记角标(本地即时、托管预热后到位)。
   const [, forceTick] = useState(0);
   useEffect(() => annotationStore.subscribe(() => forceTick((n) => n + 1)), []);
+  // 章脉进度徽章：批量查询每本书 built/total（纯读缓存）
+  const [spineProgress, setSpineProgress] = useState<Record<string, { built: number; total: number; ready: boolean }>>({});
+  useEffect(() => {
+    if (state.kind !== "ready" || state.sessions.length === 0) return;
+    let cancelled = false;
+    const ids = state.sessions.map((x) => x.session_id).join(",");
+    fetch(`/api/agent/spine-progress?ids=${encodeURIComponent(ids)}&model=deepseek-v4-flash`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { books?: { session_id: string; built: number; total: number; ready: boolean }[] } | null) => {
+        if (cancelled || !data?.books) return;
+        const map: Record<string, { built: number; total: number; ready: boolean }> = {};
+        for (const b of data.books) map[b.session_id] = { built: b.built, total: b.total, ready: b.ready };
+        setSpineProgress(map);
+      })
+      .catch(() => { /* 进度查询失败不打扰 */ });
+    return () => { cancelled = true; };
+  }, [state]);
 
   if (state.kind === "loading" || state.kind === "idle") {
     return (
@@ -474,6 +491,7 @@ function ShelfBody(props: {
             key={s.session_id}
             entry={entry}
             noteCount={annotationStore.list(s.session_id).length}
+            progress={spineProgress[s.session_id]}
             isActive={isActive}
             isConfirming={isConfirming}
             compareMode={compareMode}
@@ -527,6 +545,7 @@ function BookRow(props: {
   entry: ShelfEntry;
   /** 这本书的标注数(书签 / 高亮 / 笔记 / 重点合计),>0 才显角标。 */
   noteCount: number;
+  progress?: { built: number; total: number; ready: boolean };
   isActive: boolean;
   isConfirming: boolean;
   compareMode: boolean;
@@ -542,6 +561,7 @@ function BookRow(props: {
   const {
     entry,
     noteCount,
+    progress,
     isActive,
     isConfirming,
     compareMode,
@@ -637,6 +657,30 @@ function BookRow(props: {
                 title={`你在这本书里标了 ${noteCount} 条`}
               >
                 {noteCount} 条笔记
+              </span>
+            ) : null}
+            {progress && progress.total > 0 && !progress.ready ? (
+              <span
+                className="shrink-0 text-caption px-1.5 py-0.5 rounded-full leading-none"
+                style={{
+                  background: "color-mix(in oklch, var(--color-seal) 12%, transparent)",
+                  color: "var(--color-seal)",
+                }}
+                title={`章脉已建 ${progress.built}/${progress.total} 章，后台继续`}
+              >
+                书鉴 {Math.round((progress.built / progress.total) * 100)}%
+              </span>
+            ) : null}
+            {progress && progress.ready ? (
+              <span
+                className="shrink-0 text-caption px-1.5 py-0.5 rounded-full leading-none"
+                style={{
+                  background: "color-mix(in oklch, var(--color-jade, #2E7D5B) 12%, transparent)",
+                  color: "var(--color-jade, #2E7D5B)",
+                }}
+                title="章脉已就绪，整本书分析秒出"
+              >
+                书鉴就绪
               </span>
             ) : null}
           </div>
