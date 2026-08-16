@@ -100,6 +100,16 @@ cd web && npm install && npm run dev
 
 打开 <http://localhost:5173>，左下角设置里填你自己的 AI key，拖一本 epub / txt / pdf 进去就能开始。
 
+### 不想开浏览器？直接命令行
+
+```bash
+# 一条命令把书变成可分享的结构版 HTML 报告（零 LLM、秒出）
+bookscope report 书.epub --out 书鉴.html
+
+# 启动本地服务
+bookscope serve --port 8000
+```
+
 > 💡 默认使用 **DeepSeek `deepseek-v4-flash`**：国内可直连、便宜、适合长文本批量分析。也支持 OpenAI 兼容接口，自己搭的代理/网关都能接。
 
 ---
