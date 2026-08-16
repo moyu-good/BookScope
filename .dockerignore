@@ -1,35 +1,18 @@
-# 构建产物 / 依赖缓存——容器内重新装，别从宿主机拷进去
-web/node_modules/
-web/dist/
-**/__pycache__/
-**/*.pyc
-**/*.pyo
-.git/
+.git
+.github
 .gitignore
-.github/
-.bookscope_cache/
-data/
-*.egg-info/
-.eggs/
-build/
-dist/
-
-# 本地环境 / 密钥（绝不进镜像）
-.env
-.env.*
-!.env.example
-venv/
-.venv/
-
-# 文档 / 设计稿 / 旧代码 / 脚本——镜像不需要
-docs/
-legacy/
-tests/
-*.md
-!README.md
-!web/README.md
-
-# IDE / OS
-.idea/
-.vscode/
-.DS_Store
+__pycache__
+*.py[cod]
+.venv
+venv
+data
+docs
+tests
+scripts
+legacy
+web/node_modules
+web/dist
+.bookscope_cache
+.pytest_cache
+.ruff_cache
+node_modules

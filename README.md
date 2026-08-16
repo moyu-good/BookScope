@@ -130,6 +130,14 @@ bookscope import 书.epub --title "书名"
 
 > 💡 默认使用 **DeepSeek `deepseek-v4-flash`**：国内可直连、便宜、适合长文本批量分析。也支持 OpenAI 兼容接口，自己搭的代理/网关都能接。
 
+### Docker 一键跑
+
+```bash
+docker build -t bookscope .
+docker run -p 8000:8000 -e DEEPSEEK_API_KEY=sk-... bookscope
+# 打开 http://localhost:8000
+```
+
 ---
 
 ## 🧩 生态适配 & 快捷使用
