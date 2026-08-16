@@ -574,7 +574,7 @@ function ShelfBody(props: {
   };
 
   // 章脉进度徽章：批量查询每本书 built/total（纯读缓存），后台预建时 15s 自动刷新
-  const [spineProgress, setSpineProgress] = useState<Record<string, { built: number; total: number; ready: boolean }>>({});
+  const [spineProgress, setSpineProgress] = useState<Record<string, { built: number; total: number; ready: boolean; error?: string | null }>>({});
   // 手动「预建整组」后立即重新拉一次进度（不用等 15s 轮询）
   const [spineRefreshTick, setSpineRefreshTick] = useState(0);
   useEffect(() => {
@@ -589,10 +589,10 @@ function ShelfBody(props: {
         return fetch(`/api/agent/spine-progress?${params.toString()}`);
       })()
         .then((r) => (r.ok ? r.json() : null))
-        .then((data: { books?: { session_id: string; built: number; total: number; ready: boolean }[] } | null) => {
+        .then((data: { books?: { session_id: string; built: number; total: number; ready: boolean; error?: string | null }[] } | null) => {
           if (cancelled || !data?.books) return;
-          const map: Record<string, { built: number; total: number; ready: boolean }> = {};
-          for (const b of data.books) map[b.session_id] = { built: b.built, total: b.total, ready: b.ready };
+          const map: Record<string, { built: number; total: number; ready: boolean; error?: string | null }> = {};
+          for (const b of data.books) map[b.session_id] = { built: b.built, total: b.total, ready: b.ready, error: b.error };
           setSpineProgress(map);
           // 全部就绪后停止轮询
           const allReady = data.books.every((b) => b.total === 0 || b.ready);
@@ -922,7 +922,7 @@ function BookRow(props: {
   entry: ShelfEntry;
   /** 这本书的标注数(书签 / 高亮 / 笔记 / 重点合计),>0 才显角标。 */
   noteCount: number;
-  progress?: { built: number; total: number; ready: boolean };
+  progress?: { built: number; total: number; ready: boolean; error?: string | null };
   isActive: boolean;
   isConfirming: boolean;
   compareMode: boolean;
@@ -1038,6 +1038,18 @@ function BookRow(props: {
                 title={`你在这本书里标了 ${noteCount} 条`}
               >
                 {noteCount} 条笔记
+              </span>
+            ) : null}
+            {progress?.error ? (
+              <span
+                className="shrink-0 text-caption px-1.5 py-0.5 rounded-full leading-none"
+                style={{
+                  background: "color-mix(in oklch, var(--color-seal) 12%, transparent)",
+                  color: "var(--color-seal)",
+                }}
+                title={`预建失败：${progress.error}`}
+              >
+                预建失败
               </span>
             ) : null}
             {progress && progress.total > 0 && !progress.ready ? (

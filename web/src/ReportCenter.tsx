@@ -14,6 +14,7 @@ interface SpineState {
   built: number;
   total: number;
   ready: boolean;
+  error?: string | null;
 }
 
 export function ReportCenter({
@@ -75,10 +76,10 @@ export function ReportCenter({
         if (progressProvider) params.set("provider", progressProvider);
         const pr = await fetch(`/api/agent/spine-progress?${params.toString()}`);
         if (!pr.ok || cancelled) return;
-        const data = (await pr.json()) as { books?: { session_id: string; built: number; total: number; ready: boolean }[] };
+        const data = (await pr.json()) as { books?: { session_id: string; built: number; total: number; ready: boolean; error?: string | null }[] };
         if (!data.books) return;
         const map: Record<string, SpineState> = {};
-        for (const b of data.books) map[b.session_id] = { built: b.built, total: b.total, ready: b.ready };
+        for (const b of data.books) map[b.session_id] = { built: b.built, total: b.total, ready: b.ready, error: b.error };
         if (!cancelled) setProgress(map);
       } catch {
         /* 轮询失败下一轮再试，不打扰 */
@@ -271,11 +272,13 @@ export function ReportCenter({
                       <div className="text-sm font-bold text-[var(--color-ink)] truncate">{s.book_title}</div>
                       <div className="text-[10px] text-[var(--color-ink-muted)]">
                         {s.source_folder ? `来源：${s.source_folder}` : "手动上传"}
-                        {p && p.total > 0
-                          ? p.ready
-                            ? " · 章脉就绪"
-                            : ` · 章脉 ${p.built}/${p.total}`
-                          : " · 章脉待建"}
+                        {p?.error
+                          ? " · 预建失败"
+                          : p && p.total > 0
+                            ? p.ready
+                              ? " · 章脉就绪"
+                              : ` · 章脉 ${p.built}/${p.total}`
+                            : " · 章脉待建"}
                       </div>
                     </div>
                     <button

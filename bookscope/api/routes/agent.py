@@ -4691,14 +4691,20 @@ def agent_spine_progress(
             assembler = _resolve_assembler(store, sid)
             _full_text, chunks = _long_context_inputs(assembler)
             progress = spine_build_progress(chunks=chunks, model=resolved_model, genre="fiction")
+            # 预建失败也带出来，前端可以显示「预建失败」而不是永远 not ready
+            key = _prewarm_key(sid, resolved_model)
+            with _PREWARM_LOCK:
+                cur = _PREWARM_STATE.get(key)
+            error = cur.get("error") if cur and cur.get("status") == "error" else None
             out.append({
                 "session_id": sid,
                 "built": progress["built"],
                 "total": progress["total"],
                 "ready": progress["total"] > 0 and progress["built"] >= progress["total"],
+                "error": error,
             })
         except Exception:  # noqa: BLE001 — 单本失败给空，不阻断批量
-            out.append({"session_id": sid, "built": 0, "total": 0, "ready": False})
+            out.append({"session_id": sid, "built": 0, "total": 0, "ready": False, "error": None})
     return {"books": out}
 
 
