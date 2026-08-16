@@ -239,7 +239,16 @@ export function ReportCenter({
           {!sessions ? (
             <p className="text-sm text-[var(--color-ink-muted)] italic">读取书柜…</p>
           ) : sessions.length === 0 ? (
-            <p className="text-sm text-[var(--color-ink-muted)] italic">还没有书。</p>
+            <div
+              className="rounded-xl border border-dashed border-[var(--color-rule)] px-6 py-10 text-center"
+              style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
+            >
+              <div className="text-4xl mb-2">🗂️</div>
+              <p className="text-sm font-bold text-[var(--color-ink)]">还没有书</p>
+              <p className="text-xs text-[var(--color-ink-muted)] mt-1">
+                先去书柜传一本书，或导入一个本地书库文件夹。
+              </p>
+            </div>
           ) : (
             <>
             {(() => {
