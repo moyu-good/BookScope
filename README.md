@@ -95,6 +95,11 @@ curl -X POST http://localhost:8000/api/tools/report \
 curl -X POST http://localhost:8000/api/tools/import \
   -H 'Content-Type: application/json' \
   -d '{"path":"/path/to/book.epub"}'
+
+# 零配置单文件上传（multipart，不需要 key）
+curl -X POST http://localhost:8000/api/tools/upload \
+  -F 'file=@/path/to/book.epub' \
+  -F 'book_title=书名'
 ```
 
 ---

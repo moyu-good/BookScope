@@ -2301,6 +2301,16 @@ export function App() {
    *  进度回调让外层把当前这条的进度条折出来。 */
   async function uploadOne(item: UploadItem): Promise<UploadResponse> {
     setIngestProgress(INGEST_PROGRESS_INITIAL);
+    // 零配置：没 key 时走本地 tools/upload（不做 LLM KG，只 ingest + BM25）
+    if (!apiKey) {
+      const fd = new FormData();
+      fd.append("file", item.file);
+      fd.append("book_title", item.title);
+      fd.append("language", language);
+      const resp = await fetch("/api/tools/upload", { method: "POST", body: fd });
+      if (!resp.ok) throw await parseError(resp);
+      return (await resp.json()) as UploadResponse;
+    }
     let finalResult: UploadResponse | null = null;
     const stream = streamUploadBook({
       file: item.file,
@@ -2344,7 +2354,7 @@ export function App() {
    *  且进度条是共享的一根，串行才说得清现在在传哪本。 */
   async function handleUpload(e: FormEvent) {
     e.preventDefault();
-    if (uploading || !apiKey) return;
+    if (uploading) return;
     // 只传还没成功的（queued / 之前失败过想重试的 error）
     const pending = queue.filter(
       (it) => it.status === "queued" || it.status === "error",

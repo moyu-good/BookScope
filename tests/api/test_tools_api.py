@@ -46,3 +46,19 @@ def test_tools_import_creates_session(client: TestClient, tmp_path: Path, monkey
     assert body["session_id"].startswith("api-")
     assert body["book_title"] == "测试书"
     assert any(data_dir.iterdir())
+
+
+def test_tools_upload_zero_config(client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    data_dir = tmp_path / "sessions"
+    monkeypatch.setenv("BOOKSCOPE_DATA_DIR", str(data_dir))
+    resp = client.post(
+        "/api/tools/upload",
+        data={"book_title": "测试书", "language": "zh"},
+        files={"file": ("a.txt", "第一章\n甲。\n".encode(), "text/plain")},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["session_id"].startswith("api-")
+    assert body["book_title"] == "测试书"
+    assert body["chunk_count"] >= 1
+    assert any(data_dir.iterdir())

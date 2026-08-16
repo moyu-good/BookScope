@@ -13,7 +13,7 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -46,6 +46,59 @@ def _chunks_to_dicts(results) -> list[dict]:
         }
         for idx, c in enumerate(results)
     ]
+
+
+@tools_router.post("/upload")
+async def tools_upload(
+    file: UploadFile = File(...),
+    book_title: str = Form(..., min_length=1),
+    language: str = Form("zh"),
+) -> dict:
+    """零配置单文件上传：不做 LLM KG，直接 ingest + BM25 入库。"""
+    filename = file.filename or ""
+    suffix = Path(filename).suffix.lower()
+    if suffix not in _IMPORT_EXTS:
+        raise HTTPException(status_code=400, detail=f"不支持的文件扩展名 {suffix!r}")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+
+    from bookscope.agent.backends.r0_assembler import R0BookAssembler
+    from bookscope.api.book_sessions import BookSessionStore
+    from bookscope.api.routes.books import _run_ingest_or_raise
+    from bookscope.api.session_storage import JSONFileSessionStorage
+    from bookscope.models.schemas import BookKnowledgeGraph
+    from bookscope.store.vector_store import SessionVectorStore
+
+    book_text, chunks, chapter_stats = _run_ingest_or_raise(
+        content, suffix, book_title, language,
+    )
+    kg = BookKnowledgeGraph(
+        book_title=book_text.title,
+        language=getattr(book_text, "language", language),
+        characters=[],
+    )
+    vector_store = SessionVectorStore(chunks=chunks, enable_vector=True)
+    assembler = R0BookAssembler(
+        book_text=book_text,
+        chunks=chunks,
+        knowledge_graph=kg,
+        session_vector_store=vector_store,
+    )
+    assembler.chapter_detection_stats = chapter_stats.to_dict()
+    data_dir = Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))
+    session_id = f"api-{uuid.uuid4().hex[:12]}"
+    storage = JSONFileSessionStorage(root=data_dir)
+    store = BookSessionStore(storage=storage)
+    store.register(session_id, assembler)
+    return {
+        "session_id": session_id,
+        "book_title": book_text.title,
+        "language": getattr(book_text, "language", language),
+        "chunk_count": len(chunks),
+        "character_count": len(getattr(book_text, "raw_text", "") or ""),
+        "message": "零配置导入完成（未做 LLM KG，深度分析需配置 key 后重新生成）",
+    }
 
 
 @tools_router.post("/report")
