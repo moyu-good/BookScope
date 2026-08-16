@@ -342,6 +342,28 @@ def _motif_html(motif: dict) -> str:
         )
     return f'<div class="card"><h3 style="color:var(--cinnabar);margin-bottom:10px">「{_esc(motif.get("motif",""))}」的母题追踪</h3>{"".join(items)}</div>'
 
+def _relationship_timeline_html(rt: dict) -> str:
+    pairs = rt.get("pairs", [])
+    if not pairs:
+        return '<p style="color:var(--ink-3)">暂无关系演变数据。</p>'
+    cards = []
+    for p in sorted(pairs, key=lambda x: x.get("count", 0), reverse=True)[:24]:
+        chapters = p.get("chapters", []) or []
+        ch_badges = "".join(
+            f'<span style="display:inline-block;font-size:11px;background:var(--cinnabar-soft);color:var(--cinnabar);border-radius:4px;padding:1px 5px;margin:2px">{c}</span>'
+            for c in chapters[:16]
+        )
+        more = f'<span style="font-size:11px;color:var(--ink-3);margin-left:4px">…共{len(chapters)}章</span>' if len(chapters) > 16 else ""
+        cards.append(
+            f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+            f'<h3 style="color:var(--cinnabar);font-size:16px">{_esc(p.get("a",""))} × {_esc(p.get("b",""))}</h3>'
+            f'<span class="badge">{p.get("count",0)} 章互动</span></div>'
+            f'<div style="font-size:13px;color:var(--ink-2);margin:6px 0">第{p.get("first","?")}-{p.get("last","?")}章</div>'
+            f'<div style="margin-top:4px">{ch_badges}{more}</div></div>'
+        )
+    return '<div class="grid">' + "".join(cards) + "</div>"
+
+
 
 
 def _chapters_overview_html(chapters: list[dict]) -> str:
@@ -439,6 +461,7 @@ def render_visual_report(data: dict) -> str:
     writing_technique = data.get("writing_technique", {})
     motif = data.get("motif_tracking", {})
     phases = data.get("narrative_phases", {})
+    relationship_timeline = data.get("relationship_timeline", {})
     verified_count, verified_total = _verified_stats(data)
 
     stats = [
@@ -447,7 +470,7 @@ def render_visual_report(data: dict) -> str:
         ("事件", len(timeline.get("events", []))),
         ("主线要点", len(recap.get("points", []))),
         ("论证", len(argument.get("claims", []))),
-        ("伏笔", len(foreshadow.get("arcs", []))),
+        ("关系对", len(relationship_timeline.get("pairs", []))),
         ("技法", len(writing_technique.get("techniques", []))),
         ("核验", f'{verified_count}/{verified_total}'),
     ]
@@ -455,7 +478,7 @@ def render_visual_report(data: dict) -> str:
         f'<div class="stat"><div class="num">{_esc(v)}</div><div class="label">{_esc(k)}</div></div>'
         for k, v in stats
     )
-    report_json = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    report_json = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
     sections = f"""
 <section id="recap"><h2><span class="no">壹</span>逻辑主线</h2>{_recap_html(recap)}</section>
@@ -464,13 +487,14 @@ def render_visual_report(data: dict) -> str:
 <section id="curve"><h2><span class="no">肆</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
 <section id="graph"><h2><span class="no">伍</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
 <section id="character-arc"><h2><span class="no">陆</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
-<section id="timeline"><h2><span class="no">柒</span>事件时间线</h2>{_timeline_html(timeline)}</section>
-<section id="concept"><h2><span class="no">捌</span>概念演变</h2>{_concept_html(concept)}</section>
-<section id="argument"><h2><span class="no">玖</span>论证结构</h2>{_argument_html(argument)}</section>
-<section id="writing"><h2><span class="no">拾</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
-<section id="motif"><h2><span class="no">拾壹</span>母题追踪</h2>{_motif_html(motif)}</section>
-<section id="foreshadow"><h2><span class="no">拾贰</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
-<section id="consistency"><h2><span class="no">拾叁</span>前后一致性</h2>{_consistency_html(consistency)}</section>
+<section id="relationship"><h2><span class="no">柒</span>关系演变</h2>{_relationship_timeline_html(relationship_timeline)}</section>
+<section id="timeline"><h2><span class="no">捌</span>事件时间线</h2>{_timeline_html(timeline)}</section>
+<section id="concept"><h2><span class="no">玖</span>概念演变</h2>{_concept_html(concept)}</section>
+<section id="argument"><h2><span class="no">拾</span>论证结构</h2>{_argument_html(argument)}</section>
+<section id="writing"><h2><span class="no">拾壹</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
+<section id="motif"><h2><span class="no">拾贰</span>母题追踪</h2>{_motif_html(motif)}</section>
+<section id="foreshadow"><h2><span class="no">拾叁</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
+<section id="consistency"><h2><span class="no">拾肆</span>前后一致性</h2>{_consistency_html(consistency)}</section>
 """
 
     return f"""<!DOCTYPE html>

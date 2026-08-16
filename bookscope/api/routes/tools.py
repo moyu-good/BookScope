@@ -226,6 +226,7 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 NarrativeCurveRequest,
                 NarrativePhasesRequest,
                 RecapRequest,
+                RelationshipTimelineRequest,
                 TimelineRequest,
                 WritingTechniqueRequest,
             )
@@ -278,6 +279,12 @@ def tools_invoke(req: InvokeRequest) -> dict:
                     ).model_dump()
                 except Exception as exc:  # noqa: BLE001
                     errors["character_arc"] = f"{type(exc).__name__}: {exc}"
+                try:
+                    data["relationship_timeline"] = agent_routes.agent_relationship_timeline(
+                        _mk(RelationshipTimelineRequest), store
+                    ).model_dump()
+                except Exception as exc:  # noqa: BLE001
+                    errors["relationship_timeline"] = f"{type(exc).__name__}: {exc}"
             try:
                 data["timeline"] = agent_routes.agent_timeline(
                     _mk(TimelineRequest), store
