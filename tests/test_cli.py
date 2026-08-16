@@ -285,3 +285,13 @@ def test_cmd_stats_returns_counts(tmp_path: Path, capsys) -> None:
     assert cli.cmd_stats(argparse.Namespace(path=str(folder), json=False)) == 0
     out = capsys.readouterr().out
     assert "1 本" in out
+
+
+def test_cmd_self_test_json_output(capsys) -> None:
+    import argparse
+
+    import bookscope.cli as cli
+
+    assert cli.cmd_self_test(argparse.Namespace(json=True)) == 0
+    out = capsys.readouterr().out
+    assert '"ok": true' in out
