@@ -168,7 +168,7 @@ export function ClusterWorkbench({
     >
       <div
         className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--color-rule)]"
-        style={{ background: "var(--color-paper-raised)" }}
+        style={{ background: "linear-gradient(135deg, var(--color-seal-soft), transparent 60%), var(--color-paper-raised)" }}
       >
         <span className="text-sm font-bold text-[var(--color-seal)] truncate" style={{ fontFamily: "var(--font-display)" }}>
           🕸️ 簇工作台

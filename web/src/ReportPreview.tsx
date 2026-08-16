@@ -143,7 +143,7 @@ export function ReportPreview({
       {/* 顶栏：标题 + 下载 + 关闭 */}
       <div
         className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--color-rule)]"
-        style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
+        style={{ background: "linear-gradient(135deg, var(--color-seal-soft), transparent 60%), var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
       >
         <span className="text-sm font-bold text-[var(--color-seal)] truncate" style={{ fontFamily: "var(--font-display)" }}>
           📜 {preview.title}
