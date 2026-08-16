@@ -42,6 +42,11 @@ class AskLocalRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20)
 
 
+class CatalogRequest(BaseModel):
+    path: str = Field(..., description="书库文件夹绝对路径")
+    out: str = Field(default="bookscope-catalog", description="输出目录（默认 bookscope-catalog）")
+
+
 def _chunks_to_dicts(results) -> list[dict]:
     return [
         {
@@ -125,6 +130,22 @@ def tools_ask_local(
         })
     results = local_search(req.question, chunks, top_k=req.top_k)
     return {"mode": "local", "results": results}
+
+
+@tools_router.post("/catalog")
+def tools_catalog(req: CatalogRequest) -> dict:
+    """零配置生成 HTML 书库目录。"""
+    from bookscope.local_tools import generate_catalog
+
+    try:
+        index_path, entries = generate_catalog(Path(req.path), Path(req.out))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {
+        "index": str(index_path.resolve()),
+        "count": len(entries),
+        "entries": entries,
+    }
 
 
 @tools_router.post("/report")

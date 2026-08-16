@@ -112,5 +112,46 @@ def local_search(question: str, chunks: list[dict], top_k: int = 5) -> list[dict
     return results
 
 
+def generate_catalog(folder: Path, out_dir: Path) -> tuple[Path, list[dict]]:
+    """把一个文件夹生成可浏览的 HTML 书库目录，返回 (index_path, entries)。"""
+    import re
+
+    if not folder.is_dir():
+        raise ValueError(f"文件夹不存在: {folder}")
+    files = [p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in IMPORT_EXTS]
+    if not files:
+        raise ValueError(f"文件夹里没有支持的文件: {folder}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    entries = []
+    for f in sorted(files):
+        safe = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_-]", "_", f.stem) or "book"
+        rel = f"{safe}.html"
+        try:
+            html = structure_report_html(f, title=f.stem)
+            (out_dir / rel).write_text(html, encoding="utf-8")
+            entries.append({"file": str(f), "title": f.stem, "link": rel})
+        except Exception as exc:  # noqa: BLE001
+            entries.append({"file": str(f), "title": f.stem, "error": str(exc)})
+
+    cards = "".join(
+        f'<div style="border:1px solid #E4DCCB;border-radius:10px;padding:14px 16px;margin:10px 0;'
+        f'background:#FFFCF5;box-shadow:0 1px 3px rgba(43,38,34,.06)">'
+        f'<a href="{e["link"]}" style="font-size:16px;color:#B03A2E;text-decoration:none;font-weight:bold">{e["title"]}</a>'
+        f'<div style="font-size:12px;color:#8A8278;margin-top:4px">{e.get("file","")}</div></div>'
+        for e in entries if "link" in e
+    )
+    index = f"""<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
+<title>BookScope 书库目录</title></head>
+<body style="max-width:760px;margin:40px auto;font-family:sans-serif;color:#2B2622">
+<h1 style="color:#B03A2E">📚 BookScope 书库目录</h1>
+<p style="color:#5A534C">{len([e for e in entries if 'link' in e])} 本 · {folder}</p>
+{cards}
+</body></html>"""
+    index_path = out_dir / "index.html"
+    index_path.write_text(index, encoding="utf-8")
+    return index_path, entries
+
+
 def default_data_dir() -> Path:
     return Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))

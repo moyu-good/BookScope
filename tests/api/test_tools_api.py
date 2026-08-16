@@ -76,3 +76,16 @@ def test_tools_ask_local_returns_results(client: TestClient, tmp_path: Path, mon
     body = resp.json()
     assert body["mode"] == "local"
     assert len(body["results"]) >= 1
+
+
+def test_tools_catalog_generates_index(client: TestClient, tmp_path: Path) -> None:
+    folder = tmp_path / "books"
+    folder.mkdir()
+    (folder / "a.txt").write_text("第一章\n甲。\n", encoding="utf-8")
+    out = tmp_path / "out"
+    resp = client.post("/api/tools/catalog", json={"path": str(folder), "out": str(out)})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["count"] == 1
+    assert (out / "index.html").exists()
+    assert (out / "a.html").exists()

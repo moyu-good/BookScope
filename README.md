@@ -117,6 +117,11 @@ curl -X POST http://localhost:8000/api/tools/upload \
 curl -X POST http://localhost:8000/api/tools/ask-local \
   -H 'Content-Type: application/json' \
   -d '{"session_id":"...","question":"市场与政府"}'
+
+# 零配置生成 HTML 书库目录
+curl -X POST http://localhost:8000/api/tools/catalog \
+  -H 'Content-Type: application/json' \
+  -d '{"path":"/path/to/books","out":"/tmp/catalog"}'
 ```
 
 ---
