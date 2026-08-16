@@ -80,9 +80,10 @@ body.verified-only .quote.unverified{display:none}
 .toc-panel a{display:block;padding:9px 10px;color:var(--ink-2);text-decoration:none;border-radius:8px;font-size:14px;font-family:"Noto Sans SC",sans-serif}
 .toc-panel a:hover{background:var(--cinnabar-soft);color:var(--cinnabar)}
 .toc-close{position:absolute;top:14px;right:14px;border:none;background:none;font-size:20px;cursor:pointer;color:var(--ink-2)}
+.top-btn{position:fixed;bottom:70px;right:16px;width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--paper-card);cursor:pointer;font-size:18px;box-shadow:var(--shadow);z-index:100}
 footer{text-align:center;padding:32px 16px;color:var(--ink-3);font-size:13px;border-top:1px solid var(--border);margin-top:32px;font-family:"Noto Sans SC",sans-serif}
-@media(max-width:640px){body{font-size:15px}.hero{padding:28px 14px 22px}.hero h1{font-size:22px}.hero .subtitle{font-size:13px}.stats{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}.stat{padding:12px 8px}.stat .num{font-size:22px}section{padding:20px 14px}section h2{font-size:18px}.card{padding:14px}.grid{grid-template-columns:1fr}.graph-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.graph-wrap svg{min-width:600px}.theme-toggle{width:40px;height:40px;bottom:12px;right:12px;font-size:16px}.print-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;right:62px}.toc-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;left:12px}}
-@media print{.toc-btn,.toc-panel{display:none!important}}
+@media(max-width:640px){body{font-size:15px}.hero{padding:28px 14px 22px}.hero h1{font-size:22px}.hero .subtitle{font-size:13px}.stats{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}.stat{padding:12px 8px}.stat .num{font-size:22px}section{padding:20px 14px}section h2{font-size:18px}.card{padding:14px}.grid{grid-template-columns:1fr}.graph-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.graph-wrap svg{min-width:600px}.theme-toggle{width:40px;height:40px;bottom:12px;right:12px;font-size:16px}.print-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;right:62px}.toc-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;left:12px}.top-btn{width:38px;height:38px;bottom:60px;right:12px;font-size:16px}}
+@media print{.toc-btn,.toc-panel,.top-btn{display:none!important}}
 """
 
 
@@ -608,6 +609,7 @@ def render_visual_report(data: dict) -> str:
 <div class="stats">{stat_html}</div>
 {sections}
 <button class="toc-btn" onclick="document.getElementById('toc-panel').classList.add('open')">☰ 目录</button>
+<button class="top-btn" onclick="window.scrollTo({{top:0,behavior:'smooth'}})" title="回到顶部">↑</button>
 <div class="toc-panel" id="toc-panel">
 <button class="toc-close" onclick="document.getElementById('toc-panel').classList.remove('open')">✕</button>
 <h3>📑 报告目录</h3>
