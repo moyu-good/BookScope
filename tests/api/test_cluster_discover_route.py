@@ -161,3 +161,34 @@ def test_cluster_discover_too_many_books_returns_422(
         },
     )
     assert resp.status_code == 422, resp.text
+
+
+def test_cluster_discover_data_returns_json(
+    client_and_store: tuple[TestClient, BookSessionStore],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """JSON 工作台端点：复用 _cluster_discover_payload，返回结构化数据。"""
+    monkeypatch.setattr(
+        agent_routes,
+        "_cluster_discover_payload",
+        lambda _request, _store: {
+            "cluster_name": "组",
+            "perspectives": [],
+            "nodes": [{"slug": "a", "label": "甲", "stance": "实证"}],
+            "edges": [{"from": "a", "to": "b", "relation": "继承", "rationale": "锚"}],
+            "concepts": [],
+            "disputes": [],
+            "pair_count": 1,
+            "narrative": "说明",
+        },
+    )
+    client, _store = client_and_store
+    resp = client.post(
+        "/api/agent/cluster/discover/data",
+        json={"book_session_ids": ["s1", "s2"], "cluster_name": "组", "provider": "deepseek", "api_key": "k" * 12},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["nodes"][0]["slug"] == "a"
+    assert body["edges"][0]["relation"] == "继承"
+    assert body["pair_count"] == 1

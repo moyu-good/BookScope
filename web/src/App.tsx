@@ -4,6 +4,7 @@ import { BookShelf, rememberImportSources } from "./BookShelf";
 import { ReportPreview, type ReportPreviewState } from "./ReportPreview";
 import { ReportHistoryModal, clearReportHistory, deleteReportHistoryEntry, loadReportHistory, saveReportHistory, type ReportHistoryEntry } from "./ReportHistory";
 import { CrossWorkbench } from "./CrossWorkbench";
+import { ClusterWorkbench } from "./ClusterWorkbench";
 import { ReportCenter } from "./ReportCenter";
 import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
@@ -1568,6 +1569,8 @@ export function App() {
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   /** 跨文本对照工作台：结构化对照面板 */
   const [workbenchSessions, setWorkbenchSessions] = useState<SessionMetadata[] | null>(null);
+  /** 簇关系工作台：两两聚合的结构化面板 */
+  const [clusterWorkbench, setClusterWorkbench] = useState<{ sessions: SessionMetadata[]; clusterName: string } | null>(null);
   /** 批量导入进度（书柜内进度条） */
   const [importProgress, setImportProgress] = useState<{ done: number; total: number; current: string | null } | null>(null);
   /** 报告历史（localStorage）+ 历史弹窗 */
@@ -1648,6 +1651,18 @@ export function App() {
       }
       if (sessions.length < 2) return;
       setWorkbenchSessions(sessions);
+    },
+    [apiKey],
+  );
+
+  const openClusterWorkbench = useCallback(
+    (sessions: SessionMetadata[], clusterName: string) => {
+      if (!apiKey) {
+        alert("先配置 LLM key（设置里）再开簇工作台");
+        return;
+      }
+      if (sessions.length < 2) return;
+      setClusterWorkbench({ sessions, clusterName });
     },
     [apiKey],
   );
@@ -2622,6 +2637,7 @@ export function App() {
                 onAskBooks={handleAskBooks}
                 onClusterReport={handleClusterReport}
                 onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
+                onOpenClusterWorkbench={(list, name) => openClusterWorkbench(list, name)}
                 onPrewarmGroup={(list) => void handlePrewarmGroup(list)}
                 progressProvider={provider}
                 progressModel={model.trim() || undefined}
@@ -3415,6 +3431,7 @@ export function App() {
           onCompareMany={(list) => void handleCompareMany(list)}
           onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
           onOpenWorkbench={(list) => openCrossWorkbench(list)}
+          onOpenClusterWorkbench={(list, name) => openClusterWorkbench(list, name)}
           onPrewarmGroup={(list) => handlePrewarmGroup(list)}
           onDeleteBook={(sid, title) => void handleDeleteBookFromCenter(sid, title)}
           progressProvider={provider}
@@ -3435,6 +3452,17 @@ export function App() {
             setReportHistory(loadReportHistory());
           }}
           onClose={() => setHistoryOpen(false)}
+        />
+      )}
+      {clusterWorkbench && (
+        <ClusterWorkbench
+          sessions={clusterWorkbench.sessions}
+          clusterName={clusterWorkbench.clusterName}
+          provider={provider}
+          apiKey={apiKey}
+          model={model}
+          baseUrl={effectiveBaseUrl()}
+          onClose={() => setClusterWorkbench(null)}
         />
       )}
       {workbenchSessions && (

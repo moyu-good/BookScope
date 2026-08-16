@@ -4827,15 +4827,13 @@ def _merge_cluster_disputes(items: list[dict]) -> list[dict]:
     return arr[:5]
 
 
-@agent_router.post("/agent/cluster/discover")
-def agent_cluster_discover(
+def _cluster_discover_payload(
     request: ClusterDiscoverRequest,
-    store: BookSessionStore = Depends(get_book_session_store),
-) -> Response:
-    """自动发现簇内两两关系：每对书一次跨文本对照，聚合关系网。
+    store: BookSessionStore,
+) -> dict:
+    """簇关系自动发现共用逻辑：全就绪校验 → perspectives → 两两聚合整理。
 
-    成本 = C(n,2) 次轻 LLM（perspective 缓存命中则只付 reason）。输出书鉴风格
-    对照报告：nodes=全部书，edges=所有 pair 的继承/反驳/补充/落地/检验。
+    返回 dict 供 HTML 报告与 JSON 工作台复用。
     """
     model = request.model or default_model_for(request.provider)
     client = _build_prewarm_client(
@@ -4906,7 +4904,39 @@ def agent_cluster_discover(
     edges = _dedupe_cluster_edges(edges)
     concepts = _merge_cluster_concepts(concepts)
     disputes = _merge_cluster_disputes(disputes)
+    narrative = (
+        f"《{request.cluster_name}》共 {len(nodes)} 本，两两对照 {pair_count} 对，"
+        f"发现 {len(edges)} 条关系（继承/反驳/补充/落地/检验）。关系为 LLM 研判，锚到各书主张。"
+    )
+    return {
+        "cluster_name": request.cluster_name,
+        "perspectives": perspectives,
+        "nodes": nodes,
+        "edges": edges,
+        "concepts": concepts,
+        "disputes": disputes,
+        "pair_count": pair_count,
+        "narrative": narrative,
+    }
 
+
+@agent_router.post("/agent/cluster/discover")
+def agent_cluster_discover(
+    request: ClusterDiscoverRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> Response:
+    """自动发现簇内两两关系：每对书一次跨文本对照，聚合关系网。
+
+    成本 = C(n,2) 次轻 LLM（perspective 缓存命中则只付 reason）。输出书鉴风格
+    对照报告：nodes=全部书，edges=所有 pair 的继承/反驳/补充/落地/检验。
+    """
+    payload = _cluster_discover_payload(request, store)
+    nodes = payload["nodes"]
+    edges = payload["edges"]
+    concepts = payload["concepts"]
+    disputes = payload["disputes"]
+    perspectives = payload["perspectives"]
+    pair_count = payload["pair_count"]
     title = f"簇关系网 · {request.cluster_name}"
     inp = {
         "layout": "crossdoc",
@@ -4922,8 +4952,7 @@ def agent_cluster_discover(
         "edges": edges,
         "concept_evolution": concepts,
         "disagreements": disputes,
-        "narrative": f"《{request.cluster_name}》共 {len(nodes)} 本，两两对照 {pair_count} 对，"
-                     f"发现 {len(edges)} 条关系（继承/反驳/补充/落地/检验）。关系为 LLM 研判，锚到各书主张。",
+        "narrative": payload["narrative"],
         "spines": {
             p.get("slug", f"b{i}"): {
                 "_title": p.get("title", ""),
@@ -4948,6 +4977,18 @@ def agent_cluster_discover(
     }
     html = render_report(inp)
     return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": "full"})
+
+
+@agent_router.post("/agent/cluster/discover/data")
+def agent_cluster_discover_data(
+    request: ClusterDiscoverRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> dict:
+    """簇关系发现 JSON 数据端点：给前端「簇工作台」用。
+
+    与 /agent/cluster/discover 同一套两两聚合逻辑，返回结构化数据不渲染 HTML。
+    """
+    return _cluster_discover_payload(request, store)
 
 
 __all__ = ["agent_router"]

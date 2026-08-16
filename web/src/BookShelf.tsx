@@ -70,6 +70,8 @@ export interface BookShelfProps {
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
   /** 簇关系自动发现：两两对照聚合关系网 */
   onClusterDiscover?: (sessions: SessionMetadata[], clusterName: string) => void;
+  /** 簇关系工作台：两两聚合的结构化面板 */
+  onOpenClusterWorkbench?: (sessions: SessionMetadata[], clusterName: string) => void;
   /** 预建整组章脉：一键把来源组没建的书排进后台 */
   onPrewarmGroup?: (sessions: SessionMetadata[]) => void;
   /** 快捷重开最近报告 */
@@ -254,6 +256,7 @@ export function BookShelf({
   onAskBooks,
   onClusterReport,
   onClusterDiscover,
+  onOpenClusterWorkbench,
   onPrewarmGroup,
   onReopenReport,
   onDeleted,
@@ -450,6 +453,7 @@ export function BookShelf({
         onAskBooks={onAskBooks}
         onClusterReport={onClusterReport}
         onClusterDiscover={onClusterDiscover}
+        onOpenClusterWorkbench={onOpenClusterWorkbench}
         onPrewarmGroup={onPrewarmGroup}
         progressProvider={progressProvider}
         progressModel={progressModel}
@@ -484,6 +488,7 @@ function ShelfBody(props: {
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
   onClusterDiscover?: (sessions: SessionMetadata[], clusterName: string) => void;
+  onOpenClusterWorkbench?: (sessions: SessionMetadata[], clusterName: string) => void;
   onPrewarmGroup?: (sessions: SessionMetadata[]) => void;
   progressProvider?: string;
   progressModel?: string;
@@ -514,6 +519,7 @@ function ShelfBody(props: {
     onAskBooks,
     onClusterReport,
     onClusterDiscover,
+    onOpenClusterWorkbench,
     onPrewarmGroup,
     progressProvider,
     progressModel,
@@ -747,6 +753,17 @@ function ShelfBody(props: {
                   className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   发现关系
+                </button>
+              )}
+              {onOpenClusterWorkbench && g.items.length >= 2 && g.items.length <= 8 && (
+                <button
+                  type="button"
+                  disabled={!groupReady}
+                  onClick={() => onOpenClusterWorkbench(g.items.map((e) => e.session), g.source)}
+                  title={groupReady ? `打开「${g.source}」的簇工作台` : "章脉未全就绪，先预建整组"}
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  簇工作台
                 </button>
               )}
             </div>
