@@ -1510,6 +1510,33 @@ export function App() {
     [handleDeletedShelfBook],
   );
 
+  /** 报告中心批量删除：一次确认后逐本删除，全部成功后再刷新。 */
+  const handleDeleteBooksFromCenter = useCallback(
+    async (sessions: SessionMetadata[]) => {
+      if (sessions.length === 0) return;
+      if (!window.confirm(`删除选中的 ${sessions.length} 本书？这会从书库移除（报告历史保留）。`)) {
+        return;
+      }
+      let failed = 0;
+      for (const s of sessions) {
+        try {
+          const resp = await fetch(`/api/sessions/${encodeURIComponent(s.session_id)}`, {
+            method: "DELETE",
+          });
+          if (resp.status !== 204 && resp.status !== 404) {
+            failed += 1;
+            continue;
+          }
+          handleDeletedShelfBook(s.session_id);
+        } catch {
+          failed += 1;
+        }
+      }
+      if (failed > 0) alert(`删除完成，但有 ${failed} 本失败`);
+    },
+    [handleDeletedShelfBook],
+  );
+
   // 注销账号（WP-reading-workspace Phase B）：DELETE /api/auth/me（CASCADE 连带删
   // 名下文档 + 标注，不可逆，二次确认在 MyDesk 里）。成功后清令牌 + 回未登录态 + 退回书库。
   // 失败抛出去给 MyDesk 显错。删完书柜数据也没了，顺手触发一次刷新。
@@ -3434,6 +3461,7 @@ export function App() {
           onOpenClusterWorkbench={(list, name) => openClusterWorkbench(list, name)}
           onPrewarmGroup={(list) => handlePrewarmGroup(list)}
           onDeleteBook={(sid, title) => void handleDeleteBookFromCenter(sid, title)}
+          onDeleteBooks={(list) => void handleDeleteBooksFromCenter(list)}
           progressProvider={provider}
           progressModel={model.trim() || undefined}
           onClose={() => setReportCenterOpen(false)}

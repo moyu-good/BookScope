@@ -26,6 +26,7 @@ export function ReportCenter({
   onOpenClusterWorkbench,
   onPrewarmGroup,
   onDeleteBook,
+  onDeleteBooks,
   progressProvider,
   progressModel,
   onClose,
@@ -38,6 +39,7 @@ export function ReportCenter({
   onOpenClusterWorkbench?: (sessions: SessionMetadata[], clusterName: string) => void;
   onPrewarmGroup: (sessions: SessionMetadata[]) => Promise<void> | void;
   onDeleteBook: (sessionId: string, bookTitle: string) => void;
+  onDeleteBooks?: (sessions: SessionMetadata[]) => void;
   progressProvider?: string;
   progressModel?: string;
   onClose: () => void;
@@ -49,6 +51,7 @@ export function ReportCenter({
   const [refreshTick, setRefreshTick] = useState(0);
   const [prewarming, setPrewarming] = useState(false);
   const [historyQuery, setHistoryQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleDeleteBook = (sessionId: string, bookTitle: string) => {
     onDeleteBook(sessionId, bookTitle);
@@ -63,6 +66,28 @@ export function ReportCenter({
         (h) => h.sessionId !== sessionId && !(h.sessionIds ?? []).includes(sessionId),
       ),
     );
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(sessionId);
+      return next;
+    });
+  };
+
+  const toggleSelected = (sessionId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  };
+
+  const selectedSessions = sessions?.filter((x) => selectedIds.has(x.session_id)) ?? [];
+
+  const handleDeleteSelected = () => {
+    if (selectedSessions.length === 0 || !onDeleteBooks) return;
+    onDeleteBooks(selectedSessions);
+    setSelectedIds(new Set());
   };
 
   useEffect(() => {
@@ -147,10 +172,38 @@ export function ReportCenter({
             ? `${sessions.length} 本 · ${readyCount} 本就绪 · ${new Set(sessions.map((x) => x.source_folder?.trim() || "手动上传")).size} 个来源组 · ${history.length} 份报告`
             : "加载中…"}
         </span>
+        {selectedIds.size > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-[var(--color-ink-muted)]">已选 {selectedIds.size} 本</span>
+            <button
+              type="button"
+              onClick={() => void onPrewarmGroup(selectedSessions)}
+              className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition"
+            >
+              预建所选
+            </button>
+            {onDeleteBooks && (
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-seal)] text-[var(--color-seal)] hover:brightness-110 transition"
+              >
+                删除所选
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition"
+            >
+              取消
+            </button>
+          </div>
+        )}
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition"
+          className={selectedIds.size > 0 ? "text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition" : "ml-auto text-xs px-3 py-1.5 rounded-md border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition"}
         >
           关闭
         </button>
@@ -281,6 +334,18 @@ export function ReportCenter({
                             : " · 章脉待建"}
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleSelected(s.session_id)}
+                      title={selectedIds.has(s.session_id) ? "取消选择" : "选择这本书（可批量预建/删除）"}
+                      className={`text-xs px-2.5 py-1 rounded border shrink-0 ${
+                        selectedIds.has(s.session_id)
+                          ? "border-[var(--color-seal)] text-[var(--color-seal)] bg-[var(--color-seal-soft)]"
+                          : "border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)]"
+                      }`}
+                    >
+                      {selectedIds.has(s.session_id) ? "✓ 已选" : "选择"}
+                    </button>
                     <button
                       type="button"
                       onClick={() => onOpenReport(s)}
