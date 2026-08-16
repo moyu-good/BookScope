@@ -419,6 +419,19 @@ def _next_steps_html() -> str:
     )
     return '<div class="grid">' + cards + "</div>"
 
+def _method_html() -> str:
+    return (
+        '<div class="card">'
+        '<h3 style="color:var(--cinnabar);margin-bottom:8px">📐 方法说明</h3>'
+        '<ul style="padding-left:18px;font-size:14px;color:var(--ink-2);line-height:1.8">'
+        '<li><b>数据来源</b>：本地长文档（epub/txt/pdf/docx/md）原文。</li>'
+        '<li><b>分析方法</b>：AI 从原文做分段抽取、跨章聚合、逻辑推理，再由核验器回原文逐字比对。</li>'
+        '<li><b>判定标识</b>：「鉴」= 原文逐字命中；「研判」= 模型推断，未当确定事实。</li>'
+        '<li><b>使用建议</b>：本报告是辅助梳理，重要结论请回到原文核对。</li>'
+        '</ul></div>'
+    )
+
+
 
 
 
@@ -554,7 +567,8 @@ def render_visual_report(data: dict) -> str:
 <section id="motif"><h2><span class="no">拾叁</span>母题追踪</h2>{_motif_html(motif)}</section>
 <section id="foreshadow"><h2><span class="no">拾肆</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
 <section id="consistency"><h2><span class="no">拾伍</span>前后一致性</h2>{_consistency_html(consistency)}</section>
-<section id="next"><h2><span class="no">拾陆</span>下一步可以做什么</h2>{_next_steps_html()}</section>
+<section id="method"><h2><span class="no">拾陆</span>方法说明</h2>{_method_html()}</section>
+<section id="next"><h2><span class="no">拾柒</span>下一步可以做什么</h2>{_next_steps_html()}</section>
 """
 
     return f"""<!DOCTYPE html>
@@ -588,7 +602,8 @@ def render_visual_report(data: dict) -> str:
 <a href="#motif">拾叁 · 母题追踪</a>
 <a href="#foreshadow">拾肆 · 伏笔与回收</a>
 <a href="#consistency">拾伍 · 前后一致性</a>
-<a href="#next">拾陆 · 下一步可以做什么</a>
+<a href="#method">拾陆 · 方法说明</a>
+<a href="#next">拾柒 · 下一步可以做什么</a>
 </div>
 <button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
 <button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
