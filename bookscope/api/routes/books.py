@@ -35,7 +35,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import tempfile
+import threading
 import time
 import uuid
 from dataclasses import asdict
@@ -60,10 +62,16 @@ from bookscope.api.dependencies import (
     default_model_for,
     get_book_session_store,
 )
-from bookscope.api.deployment import record_ownership, require_user
-from bookscope.api.schemas import BookUploadResponse
+from bookscope.api.deployment import is_hosted, record_ownership, require_user
+from bookscope.api.schemas import (
+    BookUploadResponse,
+    ImportFolderRequest,
+    ImportFolderResponse,
+    ImportFolderStatusResponse,
+)
 from bookscope.ingest.book_chunker import ChapterDetectionStats, chunk_book_with_stats
 from bookscope.ingest.loader import EmptyTextError, load_text, normalize_book_title
+from bookscope.models import BookKnowledgeGraph
 from bookscope.store.vector_store import SessionVectorStore
 
 logger = logging.getLogger(__name__)
@@ -562,3 +570,137 @@ def _extract_kg_or_raise(
 
 
 __all__ = ["books_router"]
+
+
+# ---------------------------------------------------------------------------
+# 本地书库批量导入（渐进可用：解析+分章秒级入库，跳过 KG，章脉后台补）
+# ---------------------------------------------------------------------------
+
+_IMPORT_JOBS: dict[str, dict] = {}
+_IMPORT_LOCK = threading.Lock()
+_IMPORT_EXECUTOR = None  # 懒建线程池
+
+
+def _import_executor():
+    global _IMPORT_EXECUTOR
+    if _IMPORT_EXECUTOR is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _IMPORT_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+    return _IMPORT_EXECUTOR
+
+
+def _run_folder_import(
+    *,
+    job_id: str,
+    files: list[Path],
+    store: BookSessionStore,
+) -> None:
+    """后台逐个导入：load_text → chunk → 空 KG → register。跳过 KG（秒级）。"""
+    for i, path in enumerate(files):
+        with _IMPORT_LOCK:
+            state = _IMPORT_JOBS.get(job_id)
+            if state is None:
+                return
+            state["current"] = path.name
+        try:
+            book_text = load_text(path)
+            if getattr(book_text, "language", "unknown") in ("unknown", ""):
+                book_text.language = "zh"
+            chunks, chapter_stats = chunk_book_with_stats(book_text)
+            kg = BookKnowledgeGraph(book_title=book_text.title, language=book_text.language)
+            vector_store = SessionVectorStore(chunks=chunks, enable_vector=True)
+            assembler = R0BookAssembler(
+                book_text=book_text,
+                chunks=chunks,
+                knowledge_graph=kg,
+                session_vector_store=vector_store,
+            )
+            assembler.chapter_detection_stats = chapter_stats.to_dict()
+            session_id = uuid.uuid4().hex[:16]
+            store.register(session_id, assembler)
+            result = {
+                "file": path.name,
+                "session_id": session_id,
+                "book_title": book_text.title,
+                "error": None,
+            }
+        except Exception as exc:  # noqa: BLE001 — 单本失败不阻断批量
+            result = {
+                "file": path.name,
+                "session_id": None,
+                "book_title": None,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        with _IMPORT_LOCK:
+            state = _IMPORT_JOBS.get(job_id)
+            if state is None:
+                return
+            state["results"].append(result)
+            state["done"] = i + 1
+    with _IMPORT_LOCK:
+        state = _IMPORT_JOBS.get(job_id)
+        if state is not None:
+            state["status"] = "done"
+            state["current"] = None
+
+
+@books_router.post("/books/import-folder", response_model=ImportFolderResponse)
+def import_folder(
+    request: ImportFolderRequest,
+    store: BookSessionStore = Depends(get_book_session_store),
+) -> ImportFolderResponse:
+    """批量导入本地文件夹（仅 local 模式；hosted 不允许读服务器任意路径）。
+
+    只解析+分章+注册（空 KG），秒级入库；章脉由 prewarm 后台渐进补。
+    """
+    if is_hosted():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error_type": "HostedOnly", "message": "批量导入本地文件夹仅本地模式可用"},
+        )
+    folder = Path(request.folder_path)
+    if not folder.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_type": "FolderNotFound", "message": f"文件夹不存在：{request.folder_path}"},
+        )
+    files = sorted(
+        p for p in folder.rglob("*")
+        if p.is_file() and p.suffix.lower() in _SUPPORTED_EXTENSIONS
+    )
+    if not files:
+        return ImportFolderResponse(job_id="", total=0, skipped=[])
+
+    job_id = uuid.uuid4().hex[:16]
+    with _IMPORT_LOCK:
+        _IMPORT_JOBS[job_id] = {
+            "status": "running",
+            "done": 0,
+            "total": len(files),
+            "current": None,
+            "results": [],
+            "error": None,
+        }
+    _import_executor().submit(
+        _run_folder_import, job_id=job_id, files=files, store=store
+    )
+    return ImportFolderResponse(job_id=job_id, total=len(files), skipped=[])
+
+
+@books_router.get("/books/import-folder/status", response_model=ImportFolderStatusResponse)
+def import_folder_status(job_id: str) -> ImportFolderStatusResponse:
+    """轮询批量导入进度。"""
+    with _IMPORT_LOCK:
+        state = _IMPORT_JOBS.get(job_id)
+        if state is None:
+            return ImportFolderStatusResponse(
+                status="idle", done=0, total=0, current=None, results=[], error=None
+            )
+        return ImportFolderStatusResponse(
+            status=state["status"],
+            done=state["done"],
+            total=state["total"],
+            current=state["current"],
+            results=list(state["results"]),
+            error=state.get("error"),
+        )

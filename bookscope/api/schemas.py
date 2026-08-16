@@ -2403,6 +2403,42 @@ class BookUploadResponse(BaseModel):
     )
 
 
+class ImportFolderRequest(BaseModel):
+    """POST /api/books/import-folder 请求体：批量导入本地文件夹（仅 local 模式）。
+
+    逐本走 ingest（解析+分章）注册为书库 session；跳过 KG 抽取（空 KG），
+    书立即可报告/对照/渐进章脉。章脉等深度由现有 prewarm 后台补。
+    """
+
+    folder_path: str = Field(..., min_length=1, description="本地文件夹绝对路径。")
+    provider: Literal["deepseek", "anthropic"] = Field(
+        default="deepseek", description="LLM provider。"
+    )
+    api_key: str = Field(..., min_length=8, description="BYOK API key；不持久化。")
+    model: str | None = Field(default=None)
+    base_url: str | None = Field(default=None)
+
+
+class ImportFolderResponse(BaseModel):
+    """POST /api/books/import-folder 响应体：立即返回 job_id + 接受文件数。"""
+
+    job_id: str = Field(..., description="导入任务 id，用于轮询 status。")
+    total: int = Field(..., description="接受的候选文件数。")
+    skipped: list[str] = Field(default_factory=list, description="跳过的文件（扩展名不支持/读取失败）。")
+
+
+class ImportFolderStatusResponse(BaseModel):
+    """GET /api/books/import-folder/status 响应体：轮询批量导入进度。"""
+
+    status: Literal["idle", "running", "done", "error"] = Field(
+        ..., description="idle=无此任务；running=导入中；done=完成；error=失败。"
+    )
+    done: int = Field(default=0, description="已完成本数。")
+    total: int = Field(default=0, description="总本数。")
+    current: str | None = Field(default=None, description="正在导入的文件名。")
+    results: list[dict] = Field(default_factory=list, description="每本结果：file/session_id/book_title/error。")
+    error: str | None = Field(default=None, description="任务级错误。")
+
 class SessionMetadata(BaseModel):
     """单个 book session 的元数据（用于 GET /api/sessions[/{id}] 返回体）。
 

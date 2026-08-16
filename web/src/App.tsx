@@ -1681,6 +1681,60 @@ export function App() {
     [apiKey, provider, model, baseUrl],
   );
 
+  /** 批量导入本地书库（仅本地模式）：输入路径 → 后台逐本导入 → 轮询 → 刷新书柜。 */
+  const handleImportFolder = useCallback(async () => {
+    const folder = window.prompt("输入本地书库文件夹绝对路径（如 D:\\书）");
+    if (!folder || !folder.trim()) return;
+    const path = folder.trim();
+    if (!apiKey) {
+      alert("先配置 LLM key（设置里）再导入");
+      return;
+    }
+    try {
+      const resp = await fetch("/api/books/import-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folder_path: path,
+          provider,
+          api_key: apiKey,
+          model: model.trim() || undefined,
+          base_url: effectiveBaseUrl() || undefined,
+        }),
+      });
+      if (!resp.ok) {
+        let msg = `导入失败（${resp.status}）`;
+        try {
+          const d = (await resp.json()) as { detail?: { message?: string } };
+          if (d?.detail?.message) msg = d.detail.message;
+        } catch {
+          /* 非 JSON 错误体 */
+        }
+        alert(msg);
+        return;
+      }
+      const data = (await resp.json()) as { job_id: string; total: number };
+      alert(`开始导入 ${data.total} 本（秒级入库，章脉后台渐进构建）`);
+      // 轮询直到完成
+      const timer = setInterval(async () => {
+        try {
+          const st = (await (await fetch(`/api/books/import-folder/status?job_id=${data.job_id}`)).json()) as {
+            status: string; done: number; total: number; error?: string | null;
+          };
+          if (st.status === "done" || st.status === "error") {
+            clearInterval(timer);
+            alert(st.status === "done" ? `导入完成：${st.done}/${st.total} 本` : `导入失败：${st.error || "未知"}`);
+            setShelfRefresh((n) => n + 1);
+          }
+        } catch {
+          /* 网络抖动：下一轮再试 */
+        }
+      }, 1500);
+    } catch {
+      alert("导入失败：网络错误");
+    }
+  }, [apiKey, provider, model, baseUrl]);
+
   /** 出书鉴报告：/agent/book/report 拿 HTML → 下载。章脉没建过后端 404，弹提示。 */
   const openReport = useCallback(async (s: SessionMetadata) => {
     if (!apiKey) {
@@ -2123,6 +2177,7 @@ export function App() {
                 onReport={openReport}
                 onCompare={handleCompare}
                 onCompareMany={handleCompareMany}
+                onImportFolder={handleImportFolder}
                 onDeleted={handleDeletedShelfBook}
                 refreshTrigger={shelfRefresh}
                 pendingAutoSelectId={pendingAutoSelectId}

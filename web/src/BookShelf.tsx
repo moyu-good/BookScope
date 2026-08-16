@@ -48,6 +48,8 @@ export interface BookShelfProps {
   onCompare: (session: SessionMetadata) => void;
   /** 对照模式多选后生成：至少两本 */
   onCompareMany: (sessions: SessionMetadata[]) => void;
+  /** 批量导入本地书库（仅本地模式） */
+  onImportFolder?: () => void;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -153,6 +155,7 @@ export function BookShelf({
   onReport,
   onCompare,
   onCompareMany,
+  onImportFolder,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -248,6 +251,17 @@ export function BookShelf({
         <span className="text-xs text-[var(--color-ink-muted)]">
           一架函套列成目录 · 每本两种用法：「读」沉浸读原文 ·「进分析台」AI 深读那套
         </span>
+        {onImportFolder && (
+          <button
+            type="button"
+            onClick={onImportFolder}
+            title="批量导入本地文件夹（如 D:\书）里的 epub / pdf / txt"
+            className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            导入书库
+          </button>
+        )}
         <button
           type="button"
           onClick={toggleCompareMode}
