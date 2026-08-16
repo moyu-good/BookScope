@@ -3229,6 +3229,7 @@ export function App() {
         <ReportCenter
           onOpenReport={(s) => void openReport(s)}
           onReopen={(e) => void handleReopenReport(e)}
+          onCompareMany={(list) => void handleCompareMany(list)}
           onClose={() => setReportCenterOpen(false)}
         />
       )}

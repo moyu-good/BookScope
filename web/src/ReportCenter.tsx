@@ -19,10 +19,12 @@ interface SpineState {
 export function ReportCenter({
   onOpenReport,
   onReopen,
+  onCompareMany,
   onClose,
 }: {
   onOpenReport: (session: SessionMetadata) => void;
   onReopen: (entry: ReportHistoryEntry) => void;
+  onCompareMany: (sessions: SessionMetadata[]) => void;
   onClose: () => void;
 }) {
   const [sessions, setSessions] = useState<SessionMetadata[] | null>(null);
@@ -109,6 +111,32 @@ export function ReportCenter({
           ) : sessions.length === 0 ? (
             <p className="text-sm text-[var(--color-ink-muted)] italic">还没有书。</p>
           ) : (
+            <>
+            {(() => {
+              const groups = new Map<string, SessionMetadata[]>();
+              for (const s of sessions) {
+                const src = s.source_folder?.trim() || "手动上传";
+                if (!groups.has(src)) groups.set(src, []);
+                groups.get(src)!.push(s);
+              }
+              return [...groups.entries()].map(([src, list]) => (
+                <div key={src} className="mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-[var(--color-ink-muted)]">{src}</span>
+                    <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{list.length} 本</span>
+                    {list.length >= 2 && (
+                      <button
+                        type="button"
+                        onClick={() => onCompareMany(list)}
+                        className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                      >
+                        整组对照
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ));
+            })()}
             <div className="flex flex-col gap-2">
               {sessions.map((s) => {
                 const p = progress[s.session_id];
@@ -152,6 +180,7 @@ export function ReportCenter({
                 );
               })}
             </div>
+            </>
           )}
         </div>
 
