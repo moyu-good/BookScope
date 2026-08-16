@@ -37,11 +37,11 @@ def _chunks_to_dicts(results: list) -> list[dict]:
 
 
 def _load_chunks(path: Path, title: str | None = None) -> tuple[str, list[dict]]:
-    """读取一本书并切成报告/章脉需要的 dict chunks。"""
-    book = load_text(path, title=title)
-    results, _stats = chunk_book_with_stats(book)
-    name = title or path.stem
-    return name, _chunks_to_dicts(results)
+    """读取一本书并切成报告/章脉需要的 dict chunks（复用 local_tools）。"""
+    from bookscope.local_tools import load_chunks as _load
+
+    name, _book, _results, chunks = _load(path, title)
+    return name, chunks
 
 
 def _build_client(provider: str, api_key: str, base_url: str | None, model: str):
@@ -316,33 +316,10 @@ _IMPORT_EXTS = {".txt", ".epub", ".pdf", ".docx", ".md", ".markdown"}
 
 
 def _import_one(path: Path, data_dir: Path, title: str | None = None) -> str:
-    """导入单个文件，返回 session_id。"""
-    import uuid
+    """导入单个文件，返回 session_id（复用 local_tools）。"""
+    from bookscope.local_tools import import_file
 
-    from bookscope.agent.backends.r0_assembler import R0BookAssembler
-    from bookscope.api.book_sessions import BookSessionStore
-    from bookscope.api.session_storage import JSONFileSessionStorage
-    from bookscope.models.schemas import BookKnowledgeGraph
-
-    name = title or path.stem
-    book = load_text(path, title=name)
-    results, _stats = chunk_book_with_stats(book)
-    kg = BookKnowledgeGraph(book_title=name, language=getattr(book, "language", "zh"), characters=[])
-    assembler = R0BookAssembler(
-        book_text=book,
-        chunks=results,
-        knowledge_graph=kg,
-        session_vector_store=None,
-    )
-    try:
-        assembler.source_folder = str(path.parent.resolve())
-    except Exception:  # noqa: BLE001
-        pass
-    session_id = f"cli-{uuid.uuid4().hex[:12]}"
-    storage = JSONFileSessionStorage(root=data_dir)
-    store = BookSessionStore(storage=storage)
-    store.register(session_id, assembler)
-    return session_id
+    return import_file(path, data_dir, title=title)
 
 
 def cmd_import(args: argparse.Namespace) -> int:

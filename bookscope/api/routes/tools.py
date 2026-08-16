@@ -17,11 +17,6 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from bookscope.ingest.book_chunker import chunk_book_with_stats
-from bookscope.ingest.loader import load_text
-from bookscope.report.builders import build_structure_report
-from bookscope.report.service import render_report
-
 tools_router = APIRouter(prefix="/tools", tags=["tools"])
 
 _IMPORT_EXTS = {".txt", ".epub", ".pdf", ".docx", ".md", ".markdown"}
@@ -106,47 +101,16 @@ def tools_report(req: ReportRequest) -> Response:
     path = Path(req.path)
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"文件不存在: {path}")
-    title = req.title or path.stem
-    book = load_text(path, title=title)
-    results, stats = chunk_book_with_stats(book)
-    chunks = _chunks_to_dicts(results)
-    meta = {
-        "title": f"《{title}》书鉴报告（结构版）",
-        "subtitle": f"{len(chunks)} 个片段 · {stats.chapters_detected if hasattr(stats, 'chapters_detected') else '?'} 章 · 零 LLM 秒出",
-        "seal": "书 鉴",
-        "nav_title": "书鉴 · 报告导航",
-        "unit_label": "章",
-        "generated_by": "书鉴 BookScope Tools API",
-    }
-    html = render_report(build_structure_report(chunks, meta))
+    from bookscope.local_tools import structure_report_html
+
+    html = structure_report_html(path, title=req.title)
     return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": "structure"})
 
 
 def _import_one(path: Path, data_dir: Path, title: str | None = None) -> str:
-    from bookscope.agent.backends.r0_assembler import R0BookAssembler
-    from bookscope.api.book_sessions import BookSessionStore
-    from bookscope.api.session_storage import JSONFileSessionStorage
-    from bookscope.models.schemas import BookKnowledgeGraph
+    from bookscope.local_tools import import_file
 
-    name = title or path.stem
-    book = load_text(path, title=name)
-    results, _stats = chunk_book_with_stats(book)
-    kg = BookKnowledgeGraph(book_title=name, language=getattr(book, "language", "zh"), characters=[])
-    assembler = R0BookAssembler(
-        book_text=book,
-        chunks=results,
-        knowledge_graph=kg,
-        session_vector_store=None,
-    )
-    try:
-        assembler.source_folder = str(path.parent.resolve())
-    except Exception:  # noqa: BLE001
-        pass
-    session_id = f"api-{uuid.uuid4().hex[:12]}"
-    storage = JSONFileSessionStorage(root=data_dir)
-    store = BookSessionStore(storage=storage)
-    store.register(session_id, assembler)
-    return session_id
+    return import_file(path, data_dir, title=title)
 
 
 @tools_router.post("/import")
