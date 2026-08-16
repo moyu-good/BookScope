@@ -239,20 +239,26 @@ export function ClusterWorkbench({
               簇关系网（{data.edges.length} 条 · {data.pair_count} 对两两对照）
             </h3>
             <div className="flex flex-wrap items-center gap-1 mb-2">
-              {["全部", "继承", "反驳", "补充", "落地", "检验"].map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRelationFilter(r)}
-                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                    relationFilter === r
-                      ? "border-[var(--color-seal)] text-[var(--color-seal)] bg-[var(--color-seal-soft)]"
-                      : "border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)]"
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
+              {(() => {
+                const counts = data.edges.reduce<Record<string, number>>((acc, e) => {
+                  acc[e.relation] = (acc[e.relation] || 0) + 1;
+                  return acc;
+                }, {});
+                return ["全部", "继承", "反驳", "补充", "落地", "检验"].map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRelationFilter(r)}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                      relationFilter === r
+                        ? "border-[var(--color-seal)] text-[var(--color-seal)] bg-[var(--color-seal-soft)]"
+                        : "border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)]"
+                    }`}
+                  >
+                    {r === "全部" ? `全部 ${data.edges.length}` : `${r} ${counts[r] || 0}`}
+                  </button>
+                ));
+              })()}
             </div>
             <div className="flex flex-col gap-2">
               {data.edges.filter((e) => relationFilter === "全部" || e.relation === relationFilter).length === 0 ? (
