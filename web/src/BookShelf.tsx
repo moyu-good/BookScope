@@ -57,6 +57,8 @@ export interface BookShelfProps {
   importProgress?: { done: number; total: number; current: string | null } | null;
   /** 打开报告历史 */
   onOpenHistory?: () => void;
+  /** 打开报告中心（聚合视图） */
+  onOpenReportCenter?: () => void;
   /** 文档簇问答：对选中的多本书直接提问 */
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   /** 簇总览报告：来源组聚合清单 */
@@ -216,6 +218,7 @@ export function BookShelf({
   onImportFolder,
   importProgress,
   onOpenHistory,
+  onOpenReportCenter,
   onAskBooks,
   onClusterReport,
   onReopenReport,
@@ -316,6 +319,17 @@ export function BookShelf({
         <span className="text-xs text-[var(--color-ink-muted)]">
           一架函套列成目录 · 每本两种用法：「读」沉浸读原文 ·「进分析台」AI 深读那套
         </span>
+        {onOpenReportCenter && (
+          <button
+            type="button"
+            onClick={onOpenReportCenter}
+            title="报告中心：全局书状态 + 报告历史"
+            className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            报告中心
+          </button>
+        )}
         {onOpenHistory && (
           <button
             type="button"

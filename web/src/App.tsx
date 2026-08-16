@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { BookShelf, rememberImportSources } from "./BookShelf";
 import { ReportPreview, type ReportPreviewState } from "./ReportPreview";
 import { ReportHistoryModal, deleteReportHistoryEntry, loadReportHistory, saveReportHistory, type ReportHistoryEntry } from "./ReportHistory";
+import { ReportCenter } from "./ReportCenter";
 import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
 import type { DrillInfo } from "./AgentOrchestrate";
@@ -1545,6 +1546,7 @@ export function App() {
   /** 报告历史（localStorage）+ 历史弹窗 */
   const [reportHistory, setReportHistory] = useState<ReportHistoryEntry[]>(() => loadReportHistory());
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [reportCenterOpen, setReportCenterOpen] = useState(false);
   const handleCompare = useCallback(
     async (s: SessionMetadata) => {
       if (!apiKey) {
@@ -2444,6 +2446,7 @@ export function App() {
                 onImportFolder={handleImportFolder}
                 importProgress={importProgress}
                 onOpenHistory={() => setHistoryOpen(true)}
+                onOpenReportCenter={() => setReportCenterOpen(true)}
                 onDeleted={handleDeletedShelfBook}
                 refreshTrigger={shelfRefresh}
                 pendingAutoSelectId={pendingAutoSelectId}
@@ -3222,6 +3225,13 @@ export function App() {
           <Footer />
         </div>
       </main>
+      {reportCenterOpen && (
+        <ReportCenter
+          onOpenReport={(s) => void openReport(s)}
+          onReopen={(e) => void handleReopenReport(e)}
+          onClose={() => setReportCenterOpen(false)}
+        />
+      )}
       {historyOpen && (
         <ReportHistoryModal
           history={reportHistory}
