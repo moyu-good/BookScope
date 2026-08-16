@@ -385,6 +385,10 @@ export function BookShelf({
         query={query}
         onQueryChange={setQuery}
         onToggleSelect={toggleCompareSelect}
+        onSelectAll={() => {
+          if (state.kind === "ready") setCompareSelected(new Set(state.sessions.map((x) => x.session_id)));
+        }}
+        onClearSelection={() => setCompareSelected(new Set())}
         onCompareMany={onCompareMany}
         onAskBooks={onAskBooks}
         onClusterReport={onClusterReport}
@@ -411,6 +415,8 @@ function ShelfBody(props: {
   query: string;
   onQueryChange: (q: string) => void;
   onToggleSelect: (id: string) => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
   onCompareMany: (sessions: SessionMetadata[]) => void;
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
@@ -433,6 +439,8 @@ function ShelfBody(props: {
     query,
     onQueryChange,
     onToggleSelect,
+    onSelectAll,
+    onClearSelection,
     onCompareMany,
     onAskBooks,
     onClusterReport,
@@ -663,6 +671,24 @@ function ShelfBody(props: {
           <span className="font-bold text-[var(--color-seal)]">
             已选 {compareSelected.size} 本
           </span>
+          {state.kind === "ready" && (
+            <>
+              <button
+                type="button"
+                onClick={onSelectAll}
+                className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+              >
+                全选
+              </button>
+              <button
+                type="button"
+                onClick={onClearSelection}
+                className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+              >
+                清空
+              </button>
+            </>
+          )}
           <span className="text-[var(--color-ink-muted)]">
             选至少 2 本，生成跨文本对照报告（同一领域两本书的继承 / 反驳 / 补充 / 落地 / 检验）。
           </span>
