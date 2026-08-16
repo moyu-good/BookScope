@@ -92,6 +92,32 @@ body{{background:var(--paper);color:var(--ink);font-family:var(--font-serif);lin
 .layout{{display:grid;grid-template-columns:220px 1fr;max-width:1280px;margin:0 auto;gap:32px;padding:24px}}
 main{{min-width:0}}
 @media(max-width:960px){{.layout{{grid-template-columns:1fr}}.sidebar{{display:none}}}}
+@media(max-width:640px){{
+  body{{font-size:15px}}
+  .layout{{padding:12px;gap:0}}
+  .hero{{padding:28px 14px 22px}}
+  .hero h1{{font-size:22px}}
+  .hero .subtitle{{font-size:13px}}
+  .hero .seal{{font-size:12px;padding:2px 10px}}
+  .stats{{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px;margin:16px auto}}
+  .stat{{padding:12px 8px}}
+  .stat .num{{font-size:22px}}
+  section{{padding:20px 14px}}
+  section h2{{font-size:18px}}
+  .card{{padding:14px}}
+  details.spine summary{{padding:12px 14px;flex-wrap:wrap}}
+  details.spine summary .meta-line{{margin-left:0;width:100%}}
+  details.spine .body{{padding:0 14px 14px}}
+  .quote{{padding:10px 12px}}
+  .evolution-stage{{grid-template-columns:1fr;gap:6px}}
+  .search-box input{{font-size:15px}}
+  .theme-toggle{{width:40px;height:40px;bottom:14px;right:14px;font-size:16px}}
+  .graph-wrap{{overflow-x:auto;-webkit-overflow-scrolling:touch}}
+  #graph-svg{{min-width:720px}}
+  .graph-toolbar{{padding:8px 10px}}
+  .graph-toolbar .hint{{display:none}}
+  .ask-entry{{padding:12px}}
+}}
 
 /* 侧边导航 */
 .sidebar{{position:sticky;top:24px;height:calc(100vh - 48px);overflow-y:auto;padding:20px;background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans)}}
