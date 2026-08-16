@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BookShelf, rememberImportSources } from "./BookShelf";
 import { ReportPreview, type ReportPreviewState } from "./ReportPreview";
+import { ReportHistoryModal, loadReportHistory, saveReportHistory, type ReportHistoryEntry } from "./ReportHistory";
 import type { SessionMetadata } from "./BookShelf";
 import { AgentOrchestrate } from "./AgentOrchestrate";
 import type { DrillInfo } from "./AgentOrchestrate";
@@ -1541,6 +1542,9 @@ export function App() {
   const [reportPreview, setReportPreview] = useState<ReportPreviewState | null>(null);
   /** 批量导入进度（书柜内进度条） */
   const [importProgress, setImportProgress] = useState<{ done: number; total: number; current: string | null } | null>(null);
+  /** 报告历史（localStorage）+ 历史弹窗 */
+  const [reportHistory, setReportHistory] = useState<ReportHistoryEntry[]>(() => loadReportHistory());
+  const [historyOpen, setHistoryOpen] = useState(false);
   const handleCompare = useCallback(
     async (s: SessionMetadata) => {
       if (!apiKey) {
@@ -1583,10 +1587,21 @@ export function App() {
         }
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
+        const entry: ReportHistoryEntry = {
+          id: `cross-${Date.now()}`,
+          title: `跨文本对照 · ${target.book_title || "A"} × ${s.book_title || "B"}`,
+          type: "cross",
+          sessionIds: [target.session_id, s.session_id],
+          fileName: `${target.book_title || "A"}×${s.book_title || "B"}-对照报告.html`,
+          createdAt: new Date().toISOString(),
+        };
+        saveReportHistory(entry);
+        setReportHistory(loadReportHistory());
         setReportPreview({
           url,
-          title: `跨文本对照 · ${target.book_title || "A"} × ${s.book_title || "B"}`,
-          fileName: `${target.book_title || "A"}×${s.book_title || "B"}-对照报告.html`,
+          title: entry.title,
+          fileName: entry.fileName,
+          sessionIds: entry.sessionIds,
         });
       } catch {
         alert("对照报告失败：网络错误");
@@ -1629,14 +1644,83 @@ export function App() {
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
         const titles = sessions.map((x) => x.book_title || "书").join(" × ");
+        const entry: ReportHistoryEntry = {
+          id: `cross-${Date.now()}`,
+          title: `跨文本对照 · ${titles}`,
+          type: "cross",
+          sessionIds: sessions.map((x) => x.session_id),
+          fileName: `跨文本对照-${titles.replace(/[\/:*?"<>|]/g, "_")}.html`,
+          createdAt: new Date().toISOString(),
+        };
+        saveReportHistory(entry);
+        setReportHistory(loadReportHistory());
         setReportPreview({
           url,
-          title: `跨文本对照 · ${titles}`,
-          fileName: `跨文本对照-${titles.replace(/[\/:*?"<>|]/g, "_")}.html`,
-          sessionIds: sessions.map((x) => x.session_id),
+          title: entry.title,
+          fileName: entry.fileName,
+          sessionIds: entry.sessionIds,
         });
       } catch {
         alert("对照报告失败：网络错误");
+      }
+    },
+    [apiKey, provider, model, baseUrl],
+  );
+
+  /** 从报告历史重新打开：按类型调对应端点重新生成 → 预览。 */
+  const handleReopenReport = useCallback(
+    async (entry: ReportHistoryEntry) => {
+      if (!apiKey) {
+        alert("先配置 LLM key（设置里）再打开报告");
+        return;
+      }
+      const common = {
+        provider,
+        api_key: apiKey,
+        model: model.trim() || undefined,
+        base_url: effectiveBaseUrl() || undefined,
+      };
+      try {
+        let resp: Response;
+        if (entry.type === "cross" && entry.sessionIds && entry.sessionIds.length >= 2) {
+          resp = await fetch("/api/agent/cross-book/report", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...common, book_session_ids: entry.sessionIds }),
+          });
+        } else if (entry.sessionId) {
+          resp = await fetch("/api/agent/book/report", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...common, book_session_id: entry.sessionId }),
+          });
+        } else {
+          alert("这份历史记录缺少会话信息，无法重新打开");
+          return;
+        }
+        if (!resp.ok) {
+          let msg = `重新打开失败（${resp.status}）`;
+          try {
+            const d = (await resp.json()) as { detail?: { message?: string } };
+            if (d?.detail?.message) msg = d.detail.message;
+          } catch {
+            /* 非 JSON 错误体 */
+          }
+          alert(msg);
+          return;
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        setHistoryOpen(false);
+        setReportPreview({
+          url,
+          title: entry.title,
+          fileName: entry.fileName,
+          sessionId: entry.sessionId,
+          sessionIds: entry.sessionIds,
+        });
+      } catch {
+        alert("重新打开失败：网络错误");
       }
     },
     [apiKey, provider, model, baseUrl],
@@ -1783,10 +1867,20 @@ export function App() {
       }
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
+      const entry: ReportHistoryEntry = {
+        id: `book-${s.session_id}-${Date.now()}`,
+        title: `《${s.book_title || "本书"}》书鉴报告`,
+        type: "book",
+        sessionId: s.session_id,
+        fileName: `${s.book_title || "book"}-书鉴报告.html`,
+        createdAt: new Date().toISOString(),
+      };
+      saveReportHistory(entry);
+      setReportHistory(loadReportHistory());
       setReportPreview({
         url,
-        title: `《${s.book_title || "本书"}》书鉴报告`,
-        fileName: `${s.book_title || "book"}-书鉴报告.html`,
+        title: entry.title,
+        fileName: entry.fileName,
         sessionId: s.session_id,
       });
     } catch {
@@ -2196,6 +2290,7 @@ export function App() {
                 onCompareMany={handleCompareMany}
                 onImportFolder={handleImportFolder}
                 importProgress={importProgress}
+                onOpenHistory={() => setHistoryOpen(true)}
                 onDeleted={handleDeletedShelfBook}
                 refreshTrigger={shelfRefresh}
                 pendingAutoSelectId={pendingAutoSelectId}
@@ -2974,6 +3069,13 @@ export function App() {
           <Footer />
         </div>
       </main>
+      {historyOpen && (
+        <ReportHistoryModal
+          history={reportHistory}
+          onReopen={(e) => void handleReopenReport(e)}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
       {reportPreview && (
         <ReportPreview
           preview={reportPreview}

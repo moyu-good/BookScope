@@ -52,6 +52,8 @@ export interface BookShelfProps {
   onImportFolder?: () => void;
   /** 批量导入进度（书柜内进度条） */
   importProgress?: { done: number; total: number; current: string | null } | null;
+  /** 打开报告历史 */
+  onOpenHistory?: () => void;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -201,6 +203,7 @@ export function BookShelf({
   onCompareMany,
   onImportFolder,
   importProgress,
+  onOpenHistory,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -296,6 +299,17 @@ export function BookShelf({
         <span className="text-xs text-[var(--color-ink-muted)]">
           一架函套列成目录 · 每本两种用法：「读」沉浸读原文 ·「进分析台」AI 深读那套
         </span>
+        {onOpenHistory && (
+          <button
+            type="button"
+            onClick={onOpenHistory}
+            title="已生成的报告历史（可重新打开）"
+            className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            报告历史
+          </button>
+        )}
         {onImportFolder && (
           <button
             type="button"
