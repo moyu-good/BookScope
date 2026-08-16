@@ -81,12 +81,35 @@ def build_structure_report(chunks: list[dict], meta: dict) -> dict:
         e1[slug] = {"quotes": []}
 
     total = len(groups)
+    # 全书高频主题（本地词频，不需要 LLM）：让结构版不是“只有目录”，而是先给一个可读的速览。
+    try:
+        from collections import Counter
+
+        import jieba
+
+        _stop = {
+            "这个", "那个", "我们", "你们", "他们", "什么", "一个", "没有", "就是",
+            "可以", "这样", "已经", "还是", "但是", "因为", "所以", "如果", "不是",
+            "以及", "对于", "通过", "进行", "成为", "这些", "那些", "本书", "本章",
+            "以及", "这里", "那里", "一种", "之间", "之后", "其中", "主要", "重要",
+        }
+        all_text = "\n".join(str(c.get("text", "")) for c in chunks)
+        words = [w for w in jieba.lcut(all_text) if len(w) >= 2 and w not in _stop and not w.isdigit()]
+        top_words = [w for w, _c in Counter(words).most_common(12)]
+        keyword_line = f"全书高频主题：{'、'.join(top_words)}。" if top_words else ""
+    except Exception:  # noqa: BLE001 — 词频失败不阻塞报告
+        keyword_line = ""
+    narrative = meta.get(
+        "narrative",
+        f"结构版报告：全书 {total} 章。{keyword_line}深度章脉（每章要点 + 引文核验）"
+        f"后台构建中，构建完成后同一入口自动升级为完整书鉴报告。"
+    )
     return {
         "layout": "doc",
         "meta": {
             "title": meta["title"],
             "subtitle": meta.get(
-                "subtitle", f"结构版 · 共 {total} 章 · 深度章脉后台构建中，可先看章节结构与首段"
+                "subtitle", f"结构版 · 共 {total} 章 · 高频主题速览 + 章节首段"
             ),
             "seal": meta.get("seal", "书 鉴"),
             "nav_title": meta.get("nav_title", "书鉴 · 报告导航"),
@@ -97,10 +120,7 @@ def build_structure_report(chunks: list[dict], meta: dict) -> dict:
         "edges": [],
         "concept_evolution": [],
         "disagreements": [],
-        "narrative": meta.get(
-            "narrative", f"结构版报告：全书 {total} 章。深度章脉（每章要点 + 引文核验）"
-                          f"后台构建中，构建完成后同一入口自动升级为完整书鉴报告。"
-        ),
+        "narrative": narrative,
         "spines": spines,
         "e1": e1,
         "quality": {"e2_mean": 0, "e3": None},
