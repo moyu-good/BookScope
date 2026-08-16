@@ -150,7 +150,7 @@ export function ClusterWorkbench({
 
   return (
     <div
-      className="fixed inset-0 z-[210] flex flex-col bg-[var(--color-paper)]"
+      className="fixed inset-0 z-[210] flex flex-col bg-[var(--color-paper)] reveal"
       role="dialog"
       aria-modal="true"
       aria-label="簇关系工作台"
@@ -210,9 +210,9 @@ export function ClusterWorkbench({
             <h3 className="text-xs font-bold text-[var(--color-ink-muted)] mb-2" style={{ fontFamily: "var(--font-display)" }}>
               各书观点
             </h3>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 stagger">
               {data.perspectives.map((p) => (
-                <div key={p.slug} className="rounded-md border border-[var(--color-rule)] p-3" style={{ background: "var(--color-paper-raised)" }}>
+                <div key={p.slug} className="rounded-md border border-[var(--color-rule)] p-3 transition-shadow hover:shadow-[var(--shadow-raised)]" style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}>
                   <div className="text-sm font-bold text-[var(--color-ink)]">{p.title}</div>
                   <div className="text-[10px] text-[var(--color-ink-muted)] mb-1">立场：{p.stance || "未标"}</div>
                   <p className="text-xs text-[var(--color-ink)] leading-relaxed mb-2">{p.summary}</p>
@@ -260,12 +260,12 @@ export function ClusterWorkbench({
                 ));
               })()}
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 stagger">
               {data.edges.filter((e) => relationFilter === "全部" || e.relation === relationFilter).length === 0 ? (
                 <p className="text-sm text-[var(--color-ink-muted)] italic">暂无明显关系。</p>
               ) : (
                 data.edges.filter((e) => relationFilter === "全部" || e.relation === relationFilter).map((e, i) => (
-                  <div key={i} className="rounded-md border border-[var(--color-rule)] px-3 py-2 text-xs" style={{ background: "var(--color-paper-raised)" }}>
+                  <div key={i} className="rounded-md border border-[var(--color-rule)] px-3 py-2 text-xs transition-shadow hover:shadow-[var(--shadow-raised)]" style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-[var(--color-ink)]">{e.from}</span>
                       <span style={{ color: REL_COLORS[e.relation] ?? "var(--color-ink-2)" }}>—{e.relation}→</span>

@@ -154,7 +154,7 @@ export function ReportCenter({
 
   return (
     <div
-      className="fixed inset-0 z-[210] flex flex-col bg-[var(--color-paper)]"
+      className="fixed inset-0 z-[210] flex flex-col bg-[var(--color-paper)] reveal"
       role="dialog"
       aria-modal="true"
       aria-label="报告中心"
@@ -327,8 +327,8 @@ export function ReportCenter({
                 return (
                   <div
                     key={s.session_id}
-                    className="rounded-md border border-[var(--color-rule)] p-3 flex items-center gap-3"
-                    style={{ background: "var(--color-paper-raised)" }}
+                    className="rounded-md border border-[var(--color-rule)] p-3 flex items-center gap-3 transition-shadow hover:shadow-[var(--shadow-raised)]"
+                    style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-bold text-[var(--color-ink)] truncate">{s.book_title}</div>
@@ -428,8 +428,8 @@ export function ReportCenter({
               {filteredHistory.map((h) => (
                 <div
                   key={h.id}
-                  className="rounded-md border border-[var(--color-rule)] px-3 py-2 flex items-center gap-3"
-                  style={{ background: "var(--color-paper-raised)" }}
+                  className="rounded-md border border-[var(--color-rule)] px-3 py-2 flex items-center gap-3 transition-shadow hover:shadow-[var(--shadow-raised)]"
+                  style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
                 >
                   <span className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] shrink-0">
                     {h.type === "cluster" ? "簇网" : h.type === "cross" ? "对照" : "书鉴"}
