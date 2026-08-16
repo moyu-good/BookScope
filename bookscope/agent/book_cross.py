@@ -41,6 +41,9 @@ _REASON_PROMPT = """你是一位跨文本对照分析专家。给你多本书（
 4. "disagreements"：数组，每项 {"question": "问题", "sides": [{"paper": "slug", "stance": "立场", "evidence": "锚到的主张"}]}
 5. "narrative"：一段 200 字内的总体逻辑说明
 
+**slug 铁律**：nodes 的 slug 必须严格使用输入里括号标注的 slug（如 vol0/vol1），
+不得自创、不得翻译、不得加前缀；edges 的 from/to 必须用这些 slug。
+
 关系定义：
 - 继承：后文沿用/发展前文的主张
 - 反驳：后文明确反对/推翻前文的主张
@@ -86,36 +89,45 @@ def _compact_spine(spine: list[dict], max_points_per_chapter: int = 3) -> str:
     return "\n".join(lines)
 
 
-def _ask_json(client: Any, model: str, system: str, user: str, max_tokens: int = 2000) -> dict:
-    """调一次 LLM 并解析 JSON；失败返回空 dict（调用方降级）。"""
-    resp = client._client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        max_tokens=max_tokens,
-        temperature=0.2,
-        response_format={"type": "json_object"},
-    )
-    content = resp.choices[0].message.content or ""
-    for _ in range(3):
-        if content:
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                pass
-        resp = client._client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            max_tokens=max_tokens,
-            temperature=0.2,
-            response_format={"type": "json_object"},
-        )
-        content = resp.choices[0].message.content or ""
+def _extract_json(content: str) -> dict:
+    """从 LLM 输出里提取 JSON：容忍 markdown 包裹 / 前后杂音；截断时不硬修，解析失败抛。"""
+    text = content.strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        text = text[start:end + 1]
+    data = json.loads(text)
+    if not isinstance(data, dict):
+        raise json.JSONDecodeError("not an object", text, 0)
+    return data
+
+
+def _ask_json(client: Any, model: str, system: str, user: str, max_tokens: int = 2000, retries: int = 5) -> dict:
+    """调一次 LLM 并解析 JSON；失败返回空 dict（调用方降级）。
+
+    DeepSeek 对长输出偶发空响应 / 截断（finish_reason=length 且 content 空），
+    重试 5 次 + 容忍 markdown 包裹；仍失败返回空，不 break 上层。
+    """
+    import time as _time
+
+    for _ in range(retries):
+        try:
+            resp = client._client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                max_tokens=max_tokens,
+                temperature=0.2,
+                response_format={"type": "json_object"},
+            )
+            content = resp.choices[0].message.content or ""
+            if content:
+                return _extract_json(content)
+        except Exception:  # noqa: BLE001 — 重试；解析失败 / 网络抖动都重来
+            pass
+        _time.sleep(1.0)
     return {}
 
 
@@ -162,7 +174,7 @@ def cross_book_reason(
     blocks = []
     for p in perspectives:
         claims = "；".join(f"{c.get('claim','')}(第{c.get('chapter','?')}章)" for c in p.get("claims", [])[:8])
-        blocks.append(f"《{p.get('title','')}》立场：{p.get('stance','')}；主旨：{p.get('summary','')}；主张：{claims}")
+        blocks.append(f"《{p.get('title','')}》(slug={p.get('slug','')}) 立场：{p.get('stance','')}；主旨：{p.get('summary','')}；主张：{claims}")
     user = "\n\n".join(blocks)
     data = _ask_json(llm_client, model, _REASON_PROMPT, user, max_tokens=3000)
     if not data or not isinstance(data, dict):
