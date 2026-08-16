@@ -319,6 +319,54 @@ def build_disputes_html(cd: dict, labels: dict) -> str:
     return "\n".join(out)
 
 
+def build_seq_graph_html(cd: dict) -> str:
+    """单文档（doc 模式）章节流图：章 1 → 章 2 → … 顺序链，可拖拽缩放。"""
+    nodes = cd.get("nodes", [])
+    n = len(nodes)
+    W = max(640, 60 + n * 150)
+    H = 220
+    y = 110
+    parts = [f'<svg id="graph-svg" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">']
+    for i, nd in enumerate(nodes):
+        x = 60 + i * 150
+        if i > 0:
+            px = 60 + (i - 1) * 150
+            parts.append(
+                f'<g class="edge" data-rel="顺序" opacity="0.7">'
+                f'<path d="M{px + 108},{y} L{x - 108},{y}" stroke="{TOKENS["ink-3"]}" stroke-width="1.5" marker-end="url(#arr)"/>'
+                f'</g>'
+            )
+        parts.append(
+            f'<g class="node">'
+            f'<rect x="{x - 108}" y="{y - 26}" width="216" height="52" rx="8" fill="var(--paper-card)" stroke="var(--cinnabar)" stroke-width="1.5"/>'
+            f'<text x="{x}" y="{y - 4}" font-size="12" fill="var(--ink)" text-anchor="middle" font-weight="bold" font-family="serif">{esc(nd.get("label",""))}</text>'
+            f'<text x="{x}" y="{y + 14}" font-size="10" fill="var(--ink-3)" text-anchor="middle" font-family="sans-serif">{esc((nd.get("stance","") or "")[:24])}</text>'
+            f'</g>'
+        )
+    parts.insert(1, '<defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">'
+                    f'<path d="M0,0 L8,4 L0,8 z" fill="{TOKENS["ink-3"]}"/></marker></defs>')
+    parts.append("</svg>")
+    svg = "\n".join(parts)
+    return f"""<div class="graph-wrap">
+  <div class="graph-toolbar"><span style="font-family:var(--font-sans);font-size:13px;color:var(--ink-2)">📖 章序流</span><span class="hint">拖拽平移 · 滚轮缩放</span></div>
+  {svg}
+</div>
+<script>
+(function(){{
+  const svg=document.getElementById('graph-svg');
+  let dragging=false, sx=0, sy=0, tx=0, ty=0, scale=1;
+  svg.addEventListener('mousedown',e=>{{dragging=true;sx=e.clientX;sy=e.clientY;}});
+  window.addEventListener('mousemove',e=>{{
+    if(!dragging)return;const dx=e.clientX-sx,dy=e.clientY-sy;tx+=dx;sy=e.clientY;ty+=dy;sx=e.clientX;
+    svg.style.transform=`translate(${{tx}}px,${{ty}}px) scale(${{scale}})`;
+    svg.style.transformOrigin='center';
+  }});
+  window.addEventListener('mouseup',()=>dragging=false);
+  svg.addEventListener('wheel',e=>{{e.preventDefault();scale=Math.max(.2,Math.min(3,scale+(e.deltaY<0?.1:-.1)));svg.style.transform=`translate(${{tx}}px,${{ty}}px) scale(${{scale}})`;}},{{passive:false}});
+}})();
+</script>"""
+
+
 def build_nav(cd: dict, n_spines: int, meta: dict) -> str:
     counts = {
         "nodes": len(cd.get("nodes", [])),
@@ -327,13 +375,19 @@ def build_nav(cd: dict, n_spines: int, meta: dict) -> str:
         "disputes": len(cd.get("disagreements", [])),
     }
     unit = meta.get("unit_label", "篇")
+    concepts_link = (
+        f'<a href="#concepts">🔄 概念演变 <span class="count">{counts["concepts"]}</span></a>\n'
+        if counts["concepts"] else ""
+    )
+    disputes_link = (
+        f'<a href="#disputes">⚔️ 观点分歧 <span class="count">{counts["disputes"]}</span></a>\n'
+        if counts["disputes"] else ""
+    )
     return f"""<nav class="sidebar"><h4>{esc(meta.get("nav_title","报告导航"))}</h4>
 <a href="#overview">📋 总览 <span class="count">{counts['nodes']} {unit}</span></a>
 <a href="#graph">🕸️ 脉络关系 <span class="count">{counts['edges']} 关系</span></a>
 <a href="#narrative">📖 总体逻辑</a>
-<a href="#concepts">🔄 概念演变 <span class="count">{counts['concepts']}</span></a>
-<a href="#disputes">⚔️ 观点分歧 <span class="count">{counts['disputes']}</span></a>
-<a href="#spines">📚 证据脊 <span class="count">{n_spines} {unit}</span></a>
+{concepts_link}{disputes_link}<a href="#spines">📚 证据脊 <span class="count">{n_spines} {unit}</span></a>
 </nav>"""
 
 
@@ -371,10 +425,12 @@ def render_report(inp: dict) -> str:
     ask = inp.get("ask") or {}
 
     labels = {n["slug"]: n["label"] for n in cd["nodes"]}
-    graph_html = build_graph_html(cd)
+    layout = inp.get("layout", "crossdoc")  # crossdoc=跨文本对照 / doc=单文档(章节流)
+    is_doc = layout == "doc"
+    graph_html = build_seq_graph_html(cd) if is_doc else build_graph_html(cd)
     spines_html, tv, tq = build_spines_html(spines, e1)
-    concepts_html = build_concepts_html(cd, labels)
-    disputes_html = build_disputes_html(cd, labels)
+    concepts_html = build_concepts_html(cd, labels) if not is_doc else ""
+    disputes_html = build_disputes_html(cd, labels) if not is_doc else ""
     nav_html = build_nav(cd, len(spines), meta)
 
     e2_mean = quality.get("e2_mean", 0)
@@ -394,6 +450,18 @@ def render_report(inp: dict) -> str:
 
     unit = meta.get("unit_label", "篇")
     title = meta.get("title", "书鉴报告")
+    spine_section_title = "各章要点" if is_doc else "各家证据脊"
+    graph_caption = (
+        "节点 = 章节 · 章序流（章脉已建，每章要点见证据脊）"
+        if is_doc else
+        "节点 = 单元 · 边 = 继承/反驳/补充/落地/检验（E3 独立核验）"
+    )
+    concepts_section = "" if is_doc else (
+        f'  <section id="concepts"><h2><span class="no">肆</span>概念演变</h2>{concepts_html}</section>\n'
+    )
+    disputes_section = "" if is_doc else (
+        f'  <section id="disputes"><h2><span class="no">伍</span>观点分歧</h2>{disputes_html}</section>\n'
+    )
 
     page = f"""<!DOCTYPE html>
 <html lang="zh" data-theme="light">
@@ -414,8 +482,7 @@ def render_report(inp: dict) -> str:
   <div class="stat pass"><div class="num">{tv}/{tq}</div><div class="label">引文核验（E1）</div></div>
   <div class="stat pass"><div class="num">{e2_mean:.1f}/5</div><div class="label">证据脊质量（E2）</div></div>
   <div class="stat pass"><div class="num">{e3_rate}</div><div class="label">关系核验（E3）</div></div>
-  <div class="stat"><div class="num">{len(cd["edges"])}</div><div class="label">关系边</div></div>
-  <div class="stat"><div class="num">{len(cd["disagreements"])}</div><div class="label">观点分歧</div></div>
+  {"" if is_doc else f'<div class="stat"><div class="num">{len(cd["edges"])}</div><div class="label">关系边</div></div><div class="stat"><div class="num">{len(cd["disagreements"])}</div><div class="label">观点分歧</div></div>'}
 </div>
 
 <div class="layout">{nav_html}
@@ -425,23 +492,22 @@ def render_report(inp: dict) -> str:
   </section>
 
   <section id="graph"><h2><span class="no">贰</span>脉络关系</h2>{graph_html}
-    <p style="font-size:13px;color:var(--ink-3);font-family:var(--font-sans);margin-top:10px">节点 = 单元 · 边 = 继承/反驳/补充/落地/检验（E3 独立核验）</p>
+    <p style="font-size:13px;color:var(--ink-3);font-family:var(--font-sans);margin-top:10px">{graph_caption}</p>
   </section>
 
   <section id="narrative"><h2><span class="no">叁</span>总体逻辑脉络</h2>
     <div class="card" style="font-size:16px">{esc(cd["narrative"])}</div>
   </section>
 
-  <section id="concepts"><h2><span class="no">肆</span>概念演变</h2>{concepts_html}</section>
+  {concepts_section}
+  {disputes_section}
 
-  <section id="disputes"><h2><span class="no">伍</span>观点分歧</h2>{disputes_html}</section>
-
-  <section id="spines"><h2><span class="no">陆</span>各家证据脊</h2>
+  <section id="spines"><h2><span class="no">{"肆" if is_doc else "陆"}</span>{spine_section_title}</h2>
     <div class="search-box" style="padding:0;margin-bottom:12px"><input id="spine-search" type="search" placeholder="🔍 搜索单元 / 论点 / 引文…"></div>
     {spines_html}
   </section>
 
-  <section id="ask"><h2><span class="no">柒</span>追问</h2>
+  <section id="ask"><h2><span class="no">{"伍" if is_doc else "柒"}</span>追问</h2>
     <div class="card">
       <p style="font-size:14px;color:var(--ink-2);margin-bottom:12px">基于已入库的结构与关系脉络回答（不重读全文，轻量 LLM）。</p>
       <div style="display:flex;gap:8px">
