@@ -340,6 +340,23 @@ def _motif_html(motif: dict) -> str:
 
 
 
+def _phases_html(phases: dict) -> str:
+    items = phases.get("phases", [])
+    if not items:
+        return '<p style="color:var(--ink-3)">暂无情节阶段数据（论述型文档通常不切阶段）。</p>'
+    cards = []
+    for i, p in enumerate(items, 1):
+        v = p.get("verified", False)
+        cards.append(
+            f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+            f'<h3 style="color:var(--cinnabar);font-size:17px">{i}. {_esc(p.get("name",""))}</h3>'
+            f'<span class="badge">第{p.get("start_ch","?")}-{p.get("end_ch","?")}章</span></div>'
+            f'<p style="font-size:15px;margin:8px 0">{_esc(p.get("gist",""))}</p>'
+            f'<div class="quote{" unverified" if not v else ""}"><span class="seal">{"鉴" if v else "研判"}</span>{_esc(p.get("evidence",""))}</div></div>'
+        )
+    return '<div class="grid">' + "".join(cards) + "</div>"
+
+
 def _consistency_html(consistency: dict) -> str:
     contradictions = consistency.get("contradictions", [])
     if not contradictions:
@@ -373,6 +390,7 @@ def render_visual_report(data: dict) -> str:
     character_arc = data.get("character_arc", {})
     writing_technique = data.get("writing_technique", {})
     motif = data.get("motif_tracking", {})
+    phases = data.get("narrative_phases", {})
 
     stats = [
         ("章", len(curve.get("chapters", [])) or len(timeline.get("events", []))),
@@ -391,16 +409,17 @@ def render_visual_report(data: dict) -> str:
 
     sections = f"""
 <section id="recap"><h2><span class="no">壹</span>逻辑主线</h2>{_recap_html(recap)}</section>
-<section id="curve"><h2><span class="no">贰</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
-<section id="graph"><h2><span class="no">叁</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
-<section id="character-arc"><h2><span class="no">肆</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
-<section id="timeline"><h2><span class="no">伍</span>事件时间线</h2>{_timeline_html(timeline)}</section>
-<section id="concept"><h2><span class="no">陆</span>概念演变</h2>{_concept_html(concept)}</section>
-<section id="argument"><h2><span class="no">柒</span>论证结构</h2>{_argument_html(argument)}</section>
-<section id="writing"><h2><span class="no">捌</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
-<section id="motif"><h2><span class="no">玖</span>母题追踪</h2>{_motif_html(motif)}</section>
-<section id="foreshadow"><h2><span class="no">拾</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
-<section id="consistency"><h2><span class="no">拾壹</span>前后一致性</h2>{_consistency_html(consistency)}</section>
+<section id="phases"><h2><span class="no">贰</span>情节阶段</h2>{_phases_html(phases)}</section>
+<section id="curve"><h2><span class="no">叁</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
+<section id="graph"><h2><span class="no">肆</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
+<section id="character-arc"><h2><span class="no">伍</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
+<section id="timeline"><h2><span class="no">陆</span>事件时间线</h2>{_timeline_html(timeline)}</section>
+<section id="concept"><h2><span class="no">柒</span>概念演变</h2>{_concept_html(concept)}</section>
+<section id="argument"><h2><span class="no">捌</span>论证结构</h2>{_argument_html(argument)}</section>
+<section id="writing"><h2><span class="no">玖</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
+<section id="motif"><h2><span class="no">拾</span>母题追踪</h2>{_motif_html(motif)}</section>
+<section id="foreshadow"><h2><span class="no">拾壹</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
+<section id="consistency"><h2><span class="no">拾贰</span>前后一致性</h2>{_consistency_html(consistency)}</section>
 """
 
     return f"""<!DOCTYPE html>

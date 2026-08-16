@@ -224,6 +224,7 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 ForeshadowArcsRequest,
                 MotifTrackingRequest,
                 NarrativeCurveRequest,
+                NarrativePhasesRequest,
                 RecapRequest,
                 TimelineRequest,
                 WritingTechniqueRequest,
@@ -256,6 +257,12 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 ).model_dump()
             except Exception as exc:  # noqa: BLE001
                 errors["narrative_curve"] = f"{type(exc).__name__}: {exc}"
+            try:
+                data["narrative_phases"] = agent_routes.agent_narrative_phases(
+                    _mk(NarrativePhasesRequest), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["narrative_phases"] = f"{type(exc).__name__}: {exc}"
             try:
                 data["character_graph"] = agent_routes.agent_character_graph(
                     _mk(CharacterGraphRequest, unit=args.get("unit", "person")), store
