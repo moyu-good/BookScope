@@ -340,6 +340,25 @@ def _motif_html(motif: dict) -> str:
 
 
 
+def _chapters_overview_html(chapters: list[dict]) -> str:
+    if not chapters:
+        return '<p style="color:var(--ink-3)">暂无章节速览数据。</p>'
+    shown = chapters[:200]
+    items = []
+    for c in shown:
+        ch = c.get("chapter", "?")
+        turn = " 🔺" if c.get("is_turning") else ""
+        pov = c.get("pov") or ""
+        items.append(
+            f'<div class="card" style="padding:10px 12px;margin:6px 0">'
+            f'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">'
+            f'<b>第{ch}章{turn}</b><span style="font-size:12px;color:var(--ink-3);font-family:sans-serif">{c.get("event_count",0)} 事件 · {_esc(pov)}</span></div>'
+            f'</div>'
+        )
+    note = f'<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">共 {len(chapters)} 章，先展示前 {len(shown)} 章速览。</p>' if len(chapters) > len(shown) else ""
+    return '<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">' + "".join(items) + "</div>" + note
+
+
 def _phases_html(phases: dict) -> str:
     items = phases.get("phases", [])
     if not items:
@@ -410,16 +429,17 @@ def render_visual_report(data: dict) -> str:
     sections = f"""
 <section id="recap"><h2><span class="no">壹</span>逻辑主线</h2>{_recap_html(recap)}</section>
 <section id="phases"><h2><span class="no">贰</span>情节阶段</h2>{_phases_html(phases)}</section>
-<section id="curve"><h2><span class="no">叁</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
-<section id="graph"><h2><span class="no">肆</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
-<section id="character-arc"><h2><span class="no">伍</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
-<section id="timeline"><h2><span class="no">陆</span>事件时间线</h2>{_timeline_html(timeline)}</section>
-<section id="concept"><h2><span class="no">柒</span>概念演变</h2>{_concept_html(concept)}</section>
-<section id="argument"><h2><span class="no">捌</span>论证结构</h2>{_argument_html(argument)}</section>
-<section id="writing"><h2><span class="no">玖</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
-<section id="motif"><h2><span class="no">拾</span>母题追踪</h2>{_motif_html(motif)}</section>
-<section id="foreshadow"><h2><span class="no">拾壹</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
-<section id="consistency"><h2><span class="no">拾贰</span>前后一致性</h2>{_consistency_html(consistency)}</section>
+<section id="chapters"><h2><span class="no">叁</span>章节速览</h2>{_chapters_overview_html(curve.get("chapters", []))}</section>
+<section id="curve"><h2><span class="no">肆</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
+<section id="graph"><h2><span class="no">伍</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
+<section id="character-arc"><h2><span class="no">陆</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
+<section id="timeline"><h2><span class="no">柒</span>事件时间线</h2>{_timeline_html(timeline)}</section>
+<section id="concept"><h2><span class="no">捌</span>概念演变</h2>{_concept_html(concept)}</section>
+<section id="argument"><h2><span class="no">玖</span>论证结构</h2>{_argument_html(argument)}</section>
+<section id="writing"><h2><span class="no">拾</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
+<section id="motif"><h2><span class="no">拾壹</span>母题追踪</h2>{_motif_html(motif)}</section>
+<section id="foreshadow"><h2><span class="no">拾贰</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
+<section id="consistency"><h2><span class="no">拾叁</span>前后一致性</h2>{_consistency_html(consistency)}</section>
 """
 
     return f"""<!DOCTYPE html>
