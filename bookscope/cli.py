@@ -456,17 +456,20 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         if not passed:
             ok = False
 
+    def warn(name: str, detail: str = "") -> None:
+        print(f"  ○ {name}" + (f" — {detail}" if detail else ""))
+
     print("BookScope 环境自检")
     print(f"  Python: {sys.version.split()[0]}")
     check("Python >= 3.12", sys.version_info >= (3, 12))
     check("Node.js", shutil.which("node") is not None, shutil.which("node") or "未找到")
     check("npm", shutil.which("npm") is not None, shutil.which("npm") or "未找到")
-    check("DEEPSEEK_API_KEY", bool(os.environ.get("DEEPSEEK_API_KEY")), "已设置" if os.environ.get("DEEPSEEK_API_KEY") else "未设置（可用 --api-key）")
-    check("OPENAI_API_KEY", bool(os.environ.get("OPENAI_API_KEY")), "已设置" if os.environ.get("OPENAI_API_KEY") else "未设置（可用 --api-key）")
+    warn("LLM key（可选）", "未配置也不影响基础功能；深度分析/问答需要时才配置")
     web_node_modules = Path("web/node_modules")
     check("web/node_modules", web_node_modules.exists(), "已安装" if web_node_modules.exists() else "请先 make install")
     cache_dir = Path(".bookscope_cache")
     check(".bookscope_cache", cache_dir.exists() or cache_dir.mkdir(parents=True, exist_ok=True) is None, "可写" if cache_dir.exists() else "已创建")
+    print("基础环境就绪；LLM 深度功能为可选项。")
     return 0 if ok else 1
 
 
