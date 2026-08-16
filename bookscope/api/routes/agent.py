@@ -4419,6 +4419,8 @@ def agent_book_report(
             "unit_label": "章",
             "generated_by": f"书鉴 BookScope · 《{display_title}》",
         })
+        html = render_report(inp)
+        return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": "structure"})
     else:
         subtitle = f"已覆盖 {built}/{total} 章" if total else f"{len(spine)} 章"
         if built < total:
@@ -4431,8 +4433,9 @@ def agent_book_report(
             "unit_label": "章",
             "generated_by": f"书鉴 BookScope · 《{display_title}》",
         })
-    html = render_report(inp)
-    return Response(content=html, media_type="text/html; charset=utf-8")
+        coverage = "full" if built >= total else f"partial:{built}/{total}"
+        html = render_report(inp)
+        return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": coverage})
 
 
 @agent_router.post("/agent/cross-book/report")
@@ -4499,7 +4502,7 @@ def agent_cross_book_report(
         },
     )
     html = render_report(inp)
-    return Response(content=html, media_type="text/html; charset=utf-8")
+    return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": "full"})
 
 
 @agent_router.post("/agent/cross-book/ask", response_model=CrossBookAskResponse)

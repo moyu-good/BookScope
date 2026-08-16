@@ -16,6 +16,8 @@ export interface ReportPreviewState {
   sessionId?: string;
   /** 对照报告带多本书 session_id，用于跨文本追问 */
   sessionIds?: string[];
+  /** 报告覆盖状态：structure=结构版 / partial:N/M=部分 / full=完整 */
+  coverage?: string;
 }
 
 export function ReportPreview({
@@ -75,6 +77,16 @@ export function ReportPreview({
         <span className="text-xs text-[var(--color-ink-muted)] hidden sm:inline">
           书鉴报告 · 可下载后分享 / 存档
         </span>
+        {preview.coverage === "structure" && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-gold,#9C7A2E)] text-[var(--color-gold,#9C7A2E)]">
+            结构版 · 深度分析后台构建中
+          </span>
+        )}
+        {preview.coverage && preview.coverage.startsWith("partial:") && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-gold,#9C7A2E)] text-[var(--color-gold,#9C7A2E)]">
+            已覆盖 {preview.coverage.slice("partial:".length)} 章 · 后台补建中
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-2">
           {onAsk && (
             <div className="flex items-center gap-1.5 mr-2">

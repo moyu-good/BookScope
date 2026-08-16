@@ -1744,6 +1744,7 @@ export function App() {
         }
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
+        const coverage = resp.headers.get("X-Report-Coverage") ?? undefined;
         setHistoryOpen(false);
         setReportPreview({
           url,
@@ -1751,6 +1752,7 @@ export function App() {
           fileName: entry.fileName,
           sessionId: entry.sessionId,
           sessionIds: entry.sessionIds,
+          coverage,
         });
       } catch {
         alert("重新打开失败：网络错误");
@@ -1900,6 +1902,7 @@ export function App() {
       }
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
+      const coverage = resp.headers.get("X-Report-Coverage") ?? undefined;
       const entry: ReportHistoryEntry = {
         id: `book-${s.session_id}-${Date.now()}`,
         title: `《${s.book_title || "本书"}》书鉴报告`,
@@ -1915,6 +1918,7 @@ export function App() {
         title: entry.title,
         fileName: entry.fileName,
         sessionId: s.session_id,
+        coverage,
       });
     } catch {
       alert("出报告失败：网络错误");
