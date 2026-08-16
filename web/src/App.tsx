@@ -1972,6 +1972,20 @@ export function App() {
         sessionId: s.session_id,
         coverage,
       });
+      // 结构版：自动触发后台章脉预建（渐进交付，构建完可重新生成更全版）
+      if (coverage === "structure") {
+        void fetch("/api/agent/prewarm-spine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_session_id: s.session_id,
+            provider,
+            api_key: apiKey,
+            model: model.trim() || undefined,
+            base_url: effectiveBaseUrl() || undefined,
+          }),
+        }).catch(() => { /* 预建失败不打扰 */ });
+      }
     } catch {
       alert("出报告失败：网络错误");
     }
