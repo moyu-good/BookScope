@@ -1,3 +1,7 @@
+> 🗄️ **历史内部文档 / HISTORICAL**
+> 本文是早期内部工作文档，可能包含已废弃方向（论文垂直、托管/Docker、沉浸阅读器等）。
+> **不是当前设计依据**；当前唯一设计依据：[docs/CURRENT_DESIGN.md](../../CURRENT_DESIGN.md)
+
 # BookScope 工作手册（WORKFLOW）
 
 怎么干活、什么自动做、什么停下问。**每 session 必读。**
