@@ -1732,11 +1732,22 @@ export function App() {
         }
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
+        const entry: ReportHistoryEntry = {
+          id: `cluster-${Date.now()}`,
+          title: `簇关系网 · ${clusterName}`,
+          type: "cluster",
+          sessionIds: sessions.map((x) => x.session_id),
+          clusterName,
+          fileName: `簇关系网-${clusterName.replace(/[\/:*?"<>|]/g, "_")}.html`,
+          createdAt: new Date().toISOString(),
+        };
+        saveReportHistory(entry);
+        setReportHistory(loadReportHistory());
         setReportPreview({
           url,
-          title: `簇关系网 · ${clusterName}`,
-          fileName: `簇关系网-${clusterName.replace(/[\/:*?"<>|]/g, "_")}.html`,
-          sessionIds: sessions.map((x) => x.session_id),
+          title: entry.title,
+          fileName: entry.fileName,
+          sessionIds: entry.sessionIds,
           coverage: "full",
         });
       } catch {
@@ -1841,7 +1852,17 @@ export function App() {
       };
       try {
         let resp: Response;
-        if (entry.type === "cross" && entry.sessionIds && entry.sessionIds.length >= 2) {
+        if (entry.type === "cluster" && entry.sessionIds && entry.sessionIds.length >= 2 && entry.clusterName) {
+          resp = await fetch("/api/agent/cluster/discover", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...common,
+              book_session_ids: entry.sessionIds,
+              cluster_name: entry.clusterName,
+            }),
+          });
+        } else if (entry.type === "cross" && entry.sessionIds && entry.sessionIds.length >= 2) {
           resp = await fetch("/api/agent/cross-book/report", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

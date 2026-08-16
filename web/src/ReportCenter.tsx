@@ -48,7 +48,11 @@ export function ReportCenter({
       delete next[sessionId];
       return next;
     });
-    setHistory((prev) => prev.filter((h) => !(h.type === "book" && h.sessionId === sessionId)));
+    setHistory((prev) =>
+      prev.filter(
+        (h) => h.sessionId !== sessionId && !(h.sessionIds ?? []).includes(sessionId),
+      ),
+    );
   };
 
   useEffect(() => {
@@ -258,7 +262,7 @@ export function ReportCenter({
                   style={{ background: "var(--color-paper-raised)" }}
                 >
                   <span className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] shrink-0">
-                    {h.type === "cross" ? "对照" : "书鉴"}
+                    {h.type === "cluster" ? "簇网" : h.type === "cross" ? "对照" : "书鉴"}
                   </span>
                   <span className="text-sm text-[var(--color-ink)] truncate flex-1">{h.title}</span>
                   <span className="text-[10px] text-[var(--color-ink-muted)] shrink-0">

@@ -8,9 +8,11 @@
 export interface ReportHistoryEntry {
   id: string;
   title: string;
-  type: "book" | "cross";
+  type: "book" | "cross" | "cluster";
   sessionId?: string;
   sessionIds?: string[];
+  /** 簇关系网报告保存的来源组名，重开时原样回传后端 */
+  clusterName?: string;
   fileName: string;
   createdAt: string;
 }
@@ -94,7 +96,7 @@ export function ReportHistoryModal({
             history.map((h) => (
               <div key={h.id} className="px-4 py-2.5 flex items-center gap-3">
                 <span className="text-xs px-1.5 py-0.5 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] shrink-0">
-                  {h.type === "cross" ? "对照" : "书鉴"}
+                  {h.type === "cluster" ? "簇网" : h.type === "cross" ? "对照" : "书鉴"}
                 </span>
                 <span className="text-sm text-[var(--color-ink)] truncate flex-1">{h.title}</span>
                 <span className="text-[10px] text-[var(--color-ink-muted)] shrink-0">
