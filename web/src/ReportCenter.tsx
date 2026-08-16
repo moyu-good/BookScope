@@ -151,6 +151,7 @@ export function ReportCenter({
   }, [refreshTick, progressProvider, progressModel]);
 
   const readyCount = sessions?.filter((s) => progress[s.session_id]?.ready).length ?? 0;
+  const sourceGroupCount = sessions ? new Set(sessions.map((x) => x.source_folder?.trim() || "手动上传")).size : 0;
   const recentBySession = new Map<string, ReportHistoryEntry>();
   for (const h of history) {
     if (h.type === "book" && h.sessionId && !recentBySession.has(h.sessionId)) {
@@ -231,6 +232,29 @@ export function ReportCenter({
           关闭
         </button>
       </div>
+
+      {/* 统计卡片条 */}
+      {sessions && (
+        <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 border-b border-[var(--color-rule)]">
+          {[
+            { label: "书", value: sessions.length, color: "var(--color-seal)" },
+            { label: "章脉就绪", value: readyCount, color: "var(--color-jade, #2E7D5B)" },
+            { label: "来源组", value: sourceGroupCount, color: "var(--color-gold, #9C7A2E)" },
+            { label: "报告", value: history.length, color: "var(--color-indigo, #3D5A99)" },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-md border border-[var(--color-rule)] px-3 py-2 text-center"
+              style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
+            >
+              <div className="text-xl font-bold leading-none" style={{ color: stat.color, fontFamily: "var(--font-display)" }}>
+                {stat.value}
+              </div>
+              <div className="text-[10px] text-[var(--color-ink-muted)] mt-1">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && (
         <div className="px-4 py-2 text-xs text-[var(--color-seal)]">⚠️ {error}</div>
