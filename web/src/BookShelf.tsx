@@ -491,8 +491,21 @@ function ShelfBody(props: {
   const groups = groupBySource(shelf);
 
   // 一份目录：按导入来源分组（手动上传 / D:\书…），组内行与行之间用极细 rule 隔开。
+  const readyCount = Object.values(spineProgress).filter((p) => p.ready).length;
+  const sourceGroupCount = groups.filter((g) => g.source !== "手动上传").length;
   return (
     <>
+    <div className="mb-2 flex items-center gap-3 text-xs text-[var(--color-ink-muted)]">
+      <span>共 {shelf.length} 本</span>
+      <span>·</span>
+      <span>章脉就绪 {readyCount}/{shelf.length}</span>
+      {sourceGroupCount > 0 && (
+        <>
+          <span>·</span>
+          <span>{sourceGroupCount} 个来源组</span>
+        </>
+      )}
+    </div>
     {groups.map((g) => (
       <div key={g.source} className="mb-4">
         <div className="flex items-baseline gap-2 px-1 mb-1.5">
