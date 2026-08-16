@@ -980,17 +980,24 @@ function BookRow(props: {
         />
       ) : null}
 
-      {/* 题材色书脊条：一条立着的小书脊，行的辨识度全靠它 */}
-      <span
+      {/* 题材色函套封面块：小方块渐变 + 首字，比细书脊更有「一本书」的辨识度 */}
+      <div
         aria-hidden
-        className="shrink-0 self-stretch my-1.5 ml-2 w-1.5 rounded-full"
+        className="shrink-0 self-stretch my-1.5 ml-2 w-9 rounded-md flex items-center justify-center"
         style={{
-          backgroundColor: spine,
-          // 选中 / hover 时书脊更实、略宽，像被抽出来一点
-          opacity: isActive ? 1 : 0.78,
+          background: `linear-gradient(135deg, ${spine}, color-mix(in oklch, ${spine} 62%, var(--color-paper)))`,
+          opacity: isActive ? 1 : 0.86,
+          boxShadow: "inset 0 0 0 1px rgba(0,0,0,.06), var(--shadow-soft)",
         }}
         title={genre ? `题材：${genre}` : "未分类"}
-      />
+      >
+        <span
+          className="text-sm font-bold leading-none select-none"
+          style={{ color: "rgba(255,255,255,.88)", fontFamily: "var(--font-display)" }}
+        >
+          {session.book_title.trim().slice(0, 1) || "书"}
+        </span>
+      </div>
 
       {/* 行主体：书名一行 + 找书线索一行，右侧贴行内动作 */}
       <div className="flex flex-1 items-center gap-3 min-w-0 pl-3 pr-3 py-2.5">
