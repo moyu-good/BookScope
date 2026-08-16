@@ -600,13 +600,17 @@ function ShelfBody(props: {
     {groups.length === 0 && q ? (
       <p className="text-sm text-[var(--color-ink-muted)] italic">没有匹配「{query}」的书。</p>
     ) : null}
-    {groups.map((g) => (
+    {groups.map((g) => {
+      const readyInGroup = g.items.filter((e) => spineProgress[e.session.session_id]?.ready).length;
+      const groupReady = g.items.length > 0 && readyInGroup === g.items.length;
+      return (
       <div key={g.source} className="mb-4">
         <div className="flex items-baseline gap-2 px-1 mb-1.5">
           <span className="text-xs font-bold text-[var(--color-ink-muted)]" style={{ fontFamily: "var(--font-display)" }}>
             {g.source}
           </span>
           <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{g.items.length} 本</span>
+          <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">· 就绪 {readyInGroup}/{g.items.length}</span>
           {!compareMode && (
             <div className="ml-auto flex items-center gap-1.5">
               {onPrewarmGroup && g.items.length >= 1 && (
@@ -635,9 +639,10 @@ function ShelfBody(props: {
               {g.items.length >= 2 && (
                 <button
                   type="button"
+                  disabled={!groupReady}
                   onClick={() => onCompareMany(g.items.map((e) => e.session))}
-                  title={`把「${g.source}」这 ${g.items.length} 本一键生成跨文本对照报告`}
-                  className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors"
+                  title={groupReady ? `把「${g.source}」这 ${g.items.length} 本一键生成跨文本对照报告` : "章脉未全就绪，先预建整组"}
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:border-[var(--color-seal)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   整组对照
                 </button>
@@ -674,7 +679,8 @@ function ShelfBody(props: {
       })}
         </ul>
       </div>
-    ))}
+      );
+    })}
     {compareMode && (
       <div
         className="mt-3 flex flex-col gap-2 rounded-md border px-3 py-2 text-xs"

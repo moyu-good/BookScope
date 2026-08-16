@@ -142,11 +142,15 @@ export function ReportCenter({
                 if (!groups.has(src)) groups.set(src, []);
                 groups.get(src)!.push(s);
               }
-              return [...groups.entries()].map(([src, list]) => (
+              return [...groups.entries()].map(([src, list]) => {
+                const readyInGroup = list.filter((s) => progress[s.session_id]?.ready).length;
+                const groupReady = list.length > 0 && readyInGroup === list.length;
+                return (
                 <div key={src} className="mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-bold text-[var(--color-ink-muted)]">{src}</span>
                     <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">{list.length} 本</span>
+                    <span className="text-[10px] text-[var(--color-ink-muted)] opacity-70">· 就绪 {readyInGroup}/{list.length}</span>
                     {list.length >= 1 && (
                       <div className="ml-auto flex items-center gap-1.5">
                         <button
@@ -170,16 +174,19 @@ export function ReportCenter({
                           <>
                           <button
                             type="button"
+                            disabled={!groupReady}
                             onClick={() => onCompareMany(list)}
-                            className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                            title={groupReady ? `把「${src}」这 ${list.length} 本一键生成跨文本对照报告` : "章脉未全就绪，先预建整组"}
+                            className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             整组对照
                           </button>
                           <button
                             type="button"
+                            disabled={!groupReady}
                             onClick={() => onClusterDiscover(list, src)}
-                            title={`自动发现「${src}」两两关系（最多 8 本）`}
-                            className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors"
+                            title={groupReady ? `自动发现「${src}」两两关系（最多 8 本）` : "章脉未全就绪，先预建整组"}
+                            className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             发现关系
                           </button>
@@ -189,7 +196,8 @@ export function ReportCenter({
                     )}
                   </div>
                 </div>
-              ));
+                );
+              });
             })()}
             <div className="flex flex-col gap-2">
               {sessions.map((s) => {
