@@ -71,6 +71,7 @@ from bookscope.api.schemas import (
 )
 from bookscope.ingest.book_chunker import ChapterDetectionStats, chunk_book_with_stats
 from bookscope.ingest.loader import EmptyTextError, load_text, normalize_book_title
+from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
 from bookscope.models import BookKnowledgeGraph
 from bookscope.store.vector_store import SessionVectorStore
 
@@ -589,13 +590,23 @@ def _import_executor():
     return _IMPORT_EXECUTOR
 
 
+_PREWARM_WORKERS = 2  # 导入后自动建章脉的并发上限（避免打爆 API / 占满磁盘 IO）
+
+
 def _run_folder_import(
     *,
     job_id: str,
     files: list[Path],
     store: BookSessionStore,
+    client: Any = None,
+    model: str | None = None,
 ) -> None:
-    """后台逐个导入：load_text → chunk → 空 KG → register。跳过 KG（秒级）。"""
+    """后台逐个导入：load_text → chunk → 空 KG → register。跳过 KG（秒级）。
+
+    全部入库后，若给了 client，自动后台预建章脉（限量并发，渐进交付）——
+    用户打开书时可能已建好，不用干等首次分析。
+    """
+    imported: list[tuple[str, list]] = []  # (session_id, chunks)
     for i, path in enumerate(files):
         with _IMPORT_LOCK:
             state = _IMPORT_JOBS.get(job_id)
@@ -618,6 +629,7 @@ def _run_folder_import(
             assembler.chapter_detection_stats = chapter_stats.to_dict()
             session_id = uuid.uuid4().hex[:16]
             store.register(session_id, assembler)
+            imported.append((session_id, chunks))
             result = {
                 "file": path.name,
                 "session_id": session_id,
@@ -642,6 +654,21 @@ def _run_folder_import(
         if state is not None:
             state["status"] = "done"
             state["current"] = None
+
+    # 自动预建章脉（限量并发；失败静默——用户打开书时 prewarm 会再试）
+    if client is not None and imported:
+        from concurrent.futures import ThreadPoolExecutor
+        resolved_model = model or "deepseek-v4-flash"
+
+        def _build_one(item: tuple[str, list]) -> None:
+            sid, chunks = item
+            try:
+                get_or_build_spine(chunks=chunks, llm_client=client, model=resolved_model, genre="fiction")
+            except Exception:  # noqa: BLE001 — 预建失败不影响导入结果
+                pass
+
+        with ThreadPoolExecutor(max_workers=_PREWARM_WORKERS) as pool:
+            list(pool.map(_build_one, imported))
 
 
 @books_router.post("/books/import-folder", response_model=ImportFolderResponse)
@@ -681,8 +708,19 @@ def import_folder(
             "results": [],
             "error": None,
         }
+    # 构造 client 用于导入后自动预建章脉；client 失败不阻断导入（跳过预建）
+    client = None
+    try:
+        client = build_llm_client_from_params(
+            provider=request.provider,
+            api_key=request.api_key,
+            base_url=request.base_url,
+        )
+    except Exception:  # noqa: BLE001 — 导入仍可用，只是不自动预建
+        client = None
     _import_executor().submit(
-        _run_folder_import, job_id=job_id, files=files, store=store
+        _run_folder_import, job_id=job_id, files=files, store=store,
+        client=client, model=request.model,
     )
     return ImportFolderResponse(job_id=job_id, total=len(files), skipped=[])
 
