@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useState } from "react";
-import { loadReportHistory, type ReportHistoryEntry } from "./ReportHistory";
+import { deleteReportHistoryEntry, loadReportHistory, type ReportHistoryEntry } from "./ReportHistory";
 import type { SessionMetadata } from "./BookShelf";
 
 interface SpineState {
@@ -35,7 +35,7 @@ export function ReportCenter({
 }) {
   const [sessions, setSessions] = useState<SessionMetadata[] | null>(null);
   const [progress, setProgress] = useState<Record<string, SpineState>>({});
-  const [history] = useState<ReportHistoryEntry[]>(() => loadReportHistory());
+  const [history, setHistory] = useState<ReportHistoryEntry[]>(() => loadReportHistory());
   const [error, setError] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
   const [prewarming, setPrewarming] = useState(false);
@@ -48,6 +48,7 @@ export function ReportCenter({
       delete next[sessionId];
       return next;
     });
+    setHistory((prev) => prev.filter((h) => !(h.type === "book" && h.sessionId === sessionId)));
   };
 
   useEffect(() => {
@@ -270,6 +271,17 @@ export function ReportCenter({
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     重开
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deleteReportHistoryEntry(h.id);
+                      setHistory(loadReportHistory());
+                    }}
+                    title={`删除这份报告历史`}
+                    className="text-xs px-2.5 py-1 rounded border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] shrink-0"
+                  >
+                    删除
                   </button>
                 </div>
               ))}
