@@ -244,7 +244,7 @@ export function ReportCenter({
           ].map((stat) => (
             <div
               key={stat.label}
-              className="rounded-md border border-[var(--color-rule)] px-3 py-2 text-center"
+              className="rounded-md border border-[var(--color-rule)] px-3 py-2 text-center transition-shadow hover:shadow-[var(--shadow-raised)]"
               style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
             >
               <div className="text-xl font-bold leading-none" style={{ color: stat.color, fontFamily: "var(--font-display)" }}>
