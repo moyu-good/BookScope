@@ -1667,6 +1667,39 @@ export function App() {
     [apiKey, provider, model, baseUrl],
   );
 
+  /** 文档簇问答：对选中的多本书直接提问（跨书回答，锚到各书）。 */
+  const handleAskBooks = useCallback(
+    async (question: string, sessions: SessionMetadata[]): Promise<string> => {
+      if (sessions.length < 2) throw new Error("至少选 2 本才能追问");
+      if (!apiKey) throw new Error("先配置 LLM key（设置里）再追问");
+      const resp = await fetch("/api/agent/cross-book/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          book_session_ids: sessions.map((x) => x.session_id),
+          question,
+          provider,
+          api_key: apiKey,
+          model: model.trim() || undefined,
+          base_url: effectiveBaseUrl() || undefined,
+        }),
+      });
+      if (!resp.ok) {
+        let msg = `追问失败（${resp.status}）`;
+        try {
+          const d = (await resp.json()) as { detail?: { message?: string } };
+          if (d?.detail?.message) msg = d.detail.message;
+        } catch {
+          /* 非 JSON 错误体 */
+        }
+        throw new Error(msg);
+      }
+      const data = (await resp.json()) as { answer?: string };
+      return data.answer ?? "（无回答）";
+    },
+    [apiKey, provider, model, baseUrl],
+  );
+
   /** 从报告历史重新打开：按类型调对应端点重新生成 → 预览。 */
   const handleReopenReport = useCallback(
     async (entry: ReportHistoryEntry) => {
@@ -2288,6 +2321,7 @@ export function App() {
                 onReport={openReport}
                 onCompare={handleCompare}
                 onCompareMany={handleCompareMany}
+                onAskBooks={handleAskBooks}
                 onImportFolder={handleImportFolder}
                 importProgress={importProgress}
                 onOpenHistory={() => setHistoryOpen(true)}

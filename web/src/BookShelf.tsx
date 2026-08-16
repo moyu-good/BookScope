@@ -54,6 +54,8 @@ export interface BookShelfProps {
   importProgress?: { done: number; total: number; current: string | null } | null;
   /** 打开报告历史 */
   onOpenHistory?: () => void;
+  /** 文档簇问答：对选中的多本书直接提问 */
+  onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   /** 删除完成后通知父组件；若删的是当前书，父组件应清空 active session */
   onDeleted: (deletedSessionId: string) => void;
   /** 父组件递增触发重新拉列表；上传成功后 + 自身删除成功后 */
@@ -204,6 +206,7 @@ export function BookShelf({
   onImportFolder,
   importProgress,
   onOpenHistory,
+  onAskBooks,
   onDeleted,
   refreshTrigger,
   pendingAutoSelectId,
@@ -367,6 +370,7 @@ export function BookShelf({
         compareSelected={compareSelected}
         onToggleSelect={toggleCompareSelect}
         onCompareMany={onCompareMany}
+        onAskBooks={onAskBooks}
         onSelect={onSelect}
         onRead={onRead}
         onReport={onReport}
@@ -387,6 +391,7 @@ function ShelfBody(props: {
   compareSelected: Set<string>;
   onToggleSelect: (id: string) => void;
   onCompareMany: (sessions: SessionMetadata[]) => void;
+  onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   onSelect: (session: SessionMetadata) => void;
   onRead: (session: SessionMetadata) => void;
   onReport: (session: SessionMetadata) => void;
@@ -403,6 +408,7 @@ function ShelfBody(props: {
     compareSelected,
     onToggleSelect,
     onCompareMany,
+    onAskBooks,
     onSelect,
     onRead,
     onReport,
@@ -415,6 +421,30 @@ function ShelfBody(props: {
   // 订阅标注变化:托管缓存异步预热到位 / 增删改后重算每本的笔记角标(本地即时、托管预热后到位)。
   const [, forceTick] = useState(0);
   useEffect(() => annotationStore.subscribe(() => forceTick((n) => n + 1)), []);
+  // 文档簇追问：输入 + 结果
+  const [askQuestion, setAskQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [askResult, setAskResult] = useState("");
+  const [askError, setAskError] = useState("");
+
+  const submitAsk = async () => {
+    if (!onAskBooks || compareSelected.size < 2 || asking || state.kind !== "ready") return;
+    const q = askQuestion.trim();
+    if (!q) return;
+    setAsking(true);
+    setAskError("");
+    setAskResult("");
+    try {
+      const chosen = state.sessions.filter((x) => compareSelected.has(x.session_id));
+      const ans = await onAskBooks(q, chosen);
+      setAskResult(ans);
+    } catch (e) {
+      setAskError(e instanceof Error ? e.message : "追问失败");
+    } finally {
+      setAsking(false);
+    }
+  };
+
   // 章脉进度徽章：批量查询每本书 built/total（纯读缓存）
   const [spineProgress, setSpineProgress] = useState<Record<string, { built: number; total: number; ready: boolean }>>({});
   useEffect(() => {
@@ -511,30 +541,59 @@ function ShelfBody(props: {
     ))}
     {compareMode && (
       <div
-        className="mt-3 flex items-center gap-3 rounded-md border px-3 py-2 text-xs"
+        className="mt-3 flex flex-col gap-2 rounded-md border px-3 py-2 text-xs"
         style={{
           background: "var(--color-seal-soft)",
           borderColor: "color-mix(in oklch, var(--color-seal) 30%, transparent)",
         }}
       >
-        <span className="font-bold text-[var(--color-seal)]">
-          已选 {compareSelected.size} 本
-        </span>
-        <span className="text-[var(--color-ink-muted)]">
-          选至少 2 本，生成跨文本对照报告（同一领域两本书的继承 / 反驳 / 补充 / 落地 / 检验）。
-        </span>
-        <button
-          type="button"
-          disabled={compareSelected.size < 2}
-          onClick={() => {
-            const chosen = state.sessions.filter((x) => compareSelected.has(x.session_id));
-            onCompareMany(chosen);
-          }}
-          className="ml-auto px-3 py-1.5 rounded-md bg-[var(--color-seal)] text-white hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          生成对照报告
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="font-bold text-[var(--color-seal)]">
+            已选 {compareSelected.size} 本
+          </span>
+          <span className="text-[var(--color-ink-muted)]">
+            选至少 2 本，生成跨文本对照报告（同一领域两本书的继承 / 反驳 / 补充 / 落地 / 检验）。
+          </span>
+          <button
+            type="button"
+            disabled={compareSelected.size < 2}
+            onClick={() => {
+              const chosen = state.sessions.filter((x) => compareSelected.has(x.session_id));
+              onCompareMany(chosen);
+            }}
+            className="ml-auto px-3 py-1.5 rounded-md bg-[var(--color-seal)] text-white hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            生成对照报告
+          </button>
+        </div>
+        {onAskBooks && (
+          <div className="flex flex-col gap-1.5 rounded-md border px-2.5 py-2" style={{ borderColor: "color-mix(in oklch, var(--color-seal) 25%, transparent)" }}>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={askQuestion}
+                onChange={(e) => setAskQuestion(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void submitAsk(); }}
+                placeholder={`追问已选的 ${compareSelected.size} 本（跨书回答）…`}
+                className="flex-1 min-w-0 px-2.5 py-1.5 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] outline-none focus:border-[var(--color-seal)]"
+              />
+              <button
+                type="button"
+                disabled={asking || compareSelected.size < 2 || !askQuestion.trim()}
+                onClick={() => void submitAsk()}
+                className="px-3 py-1.5 rounded-md bg-[var(--color-seal)] text-white hover:brightness-110 disabled:opacity-40 transition"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {asking ? "追问中…" : "追问"}
+              </button>
+            </div>
+            {askResult && (
+              <div className="whitespace-pre-wrap leading-relaxed text-[var(--color-ink)]">{askResult}</div>
+            )}
+            {askError && <div className="text-[var(--color-seal)]">⚠️ {askError}</div>}
+          </div>
+        )}
       </div>
     )}
     </>
