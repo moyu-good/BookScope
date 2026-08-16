@@ -39,6 +39,14 @@ const REL_COLORS: Record<string, string> = {
   检验: "#6A4E8E",
 };
 
+function coverColor(genre?: string): string {
+  const g = (genre ?? "").trim().toLowerCase();
+  if (/(小说|novel|fiction|网文|历史|架空|玄幻|history)/.test(g)) return "#b4763a";
+  if (/(理论|论文|paper|哲学|philosophy|工具书|nonfiction|学术|工具)/.test(g)) return "#3a6378";
+  if (/(诗|poem|poetry|散文|verse)/.test(g)) return "#6f6391";
+  return "var(--color-rule)";
+}
+
 export function CrossWorkbench({
   sessions,
   provider,
@@ -220,7 +228,24 @@ export function CrossWorkbench({
                   className="rounded-md border border-[var(--color-rule)] p-3 transition-shadow hover:shadow-[var(--shadow-raised)]"
                   style={{ background: "var(--color-paper-raised)", boxShadow: "var(--shadow-soft)" }}
                 >
-                  <div className="text-sm font-bold text-[var(--color-ink)]">{p.title}</div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      aria-hidden
+                      className="shrink-0 w-8 h-10 rounded-md flex items-center justify-center"
+                      style={{
+                        background: `linear-gradient(135deg, ${coverColor()}, color-mix(in oklch, ${coverColor()} 62%, var(--color-paper)))`,
+                        boxShadow: "inset 0 0 0 1px rgba(0,0,0,.06), var(--shadow-soft)",
+                      }}
+                    >
+                      <span
+                        className="text-xs font-bold leading-none select-none"
+                        style={{ color: "rgba(255,255,255,.88)", fontFamily: "var(--font-display)" }}
+                      >
+                        {p.title.trim().slice(0, 1) || "书"}
+                      </span>
+                    </div>
+                    <div className="text-sm font-bold text-[var(--color-ink)]">{p.title}</div>
+                  </div>
                   <div className="text-[10px] text-[var(--color-ink-muted)] mb-1">立场：{p.stance || "未标"}</div>
                   <p className="text-xs text-[var(--color-ink)] leading-relaxed mb-2">{p.summary}</p>
                   <ul className="flex flex-col gap-1">
