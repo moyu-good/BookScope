@@ -434,5 +434,62 @@ def spine_progress(
     }
 
 
+def _normalize_quote(text: str) -> str:
+    """把引文和原文都压成“无空白”形式，用于本地逐字核验。"""
+    import re
+
+    return re.sub(r"\s+", "", text)
+
+
+def verify_quote(path: Path, quote: str, context_chars: int = 120) -> dict:
+    """零配置核验一句引文是否能在原文里逐字找到。
+
+    先做“去空白精确匹配”；找不到再做“去空白+去常见标点”的宽松匹配。
+    返回 verified / match_type / chapter / snippet。这不是语义核验，
+    只做诚实的原文逐字核对；找不到就明确说找不到，不冒充已核验。
+    """
+    import re
+
+    if not quote or not quote.strip():
+        raise ValueError("quote 不能为空")
+    name, _book, _results, chunks = load_chunks(path)
+    norm_quote = _normalize_quote(quote)
+    _punct = "，。！？；：、,.!?;:'\"“”‘’《》「」()（）[]"
+    stripped_quote = re.sub(f"[{re.escape(_punct)}]", "", norm_quote)
+    for c in chunks:
+        text = str(c.get("text", ""))
+        norm_text = _normalize_quote(text)
+        idx = norm_text.find(norm_quote)
+        method = "exact"
+        if idx == -1 and len(stripped_quote) >= 4:
+            stripped_text = re.sub(f"[{re.escape(_punct)}]", "", norm_text)
+            idx = stripped_text.find(stripped_quote)
+            method = "punctuation_insensitive" if idx != -1 else "exact"
+        if idx != -1:
+            start = max(0, idx - context_chars // 2)
+            end = min(len(text), idx + len(quote) + context_chars)
+            return {
+                "book": name,
+                "path": str(path),
+                "quote": quote,
+                "verified": True,
+                "match_type": "quote",
+                "method": method,
+                "chapter": c.get("chapter"),
+                "snippet": text[start:end],
+            }
+    return {
+        "book": name,
+        "path": str(path),
+        "quote": quote,
+        "verified": False,
+        "match_type": "none",
+        "method": None,
+        "chapter": None,
+        "snippet": None,
+        "hint": "原文未找到逐字命中：可能是转述、跨段拼接，或引文与原文用字不同；建议用 LLM 核验或人工比对。",
+    }
+
+
 def default_data_dir() -> Path:
     return Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))

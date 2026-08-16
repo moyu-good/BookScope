@@ -105,3 +105,17 @@ def test_spine_progress_effect_reports_built_total(tmp_path: Path) -> None:
     assert progress["total"] >= 1
     assert progress["built"] >= 0
     assert set(progress) >= {"built_chapters", "missing_chapters", "ready", "mode"}
+
+
+def test_verify_quote_effect_honest_exact_and_missing(tmp_path: Path) -> None:
+    from bookscope.local_tools import verify_quote
+
+    f = tmp_path / "a.txt"
+    f.write_text("第一章 开端\n这里提到市场与政府的关系。\n", encoding="utf-8")
+    hit = verify_quote(f, "市场与政府的关系")
+    assert hit["verified"] is True
+    assert hit["method"] == "exact"
+    miss = verify_quote(f, "完全不存在的句子")
+    assert miss["verified"] is False
+    assert miss["match_type"] == "none"
+    assert "未找到" in miss["hint"]

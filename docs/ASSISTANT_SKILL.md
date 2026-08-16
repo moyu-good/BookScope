@@ -21,6 +21,7 @@ AI 助手（如 Claude / GPT / 本地 agent）可以通过统一的工具调用�
 | `bookscope_search` | 文件夹跨书本地检索 |
 | `bookscope_stats` | 统计书库规模 |
 | `bookscope_catalog` | 生成 HTML 书库目录 |
+| `bookscope_verify` | 对一句引文在原文里做逐字核验（零配置，找不到就明确说找不到） |
 | `bookscope_progress` | 查看一本书深度章脉构建进度（零配置，渐进交付） |
 | `bookscope_prewarm` | 对已导入的书后台预建深度章脉，立刻返回（需要 LLM key，配合 progress 轮询） |
 | `bookscope_cross` | 两个文件直接出跨文本对照 HTML 报告（需要 LLM key） |
@@ -54,6 +55,7 @@ POST /api/tools/stats     {"path": "/path/to/books"}
 POST /api/tools/catalog   {"path": "/path/to/books", "out": "/tmp/catalog"}
 POST /api/tools/invoke     {"tool": "bookscope_cluster", "arguments": {"files": ["a.txt", "b.txt", "c.txt"]}}
 POST /api/tools/invoke     {"tool": "bookscope_progress", "arguments": {"path": "/path/to/book.epub"}}
+POST /api/tools/invoke     {"tool": "bookscope_verify", "arguments": {"path": "/path/to/book.epub", "quote": "要核验的引文"}}
 POST /api/tools/invoke     {"tool": "bookscope_prewarm", "arguments": {"session_id": "...", "api_key": "sk-..."}}
 ```
 

@@ -170,6 +170,7 @@ def tools_invoke(req: InvokeRequest) -> dict:
         spine_progress,
         stats_folder,
         structure_report_html,
+        verify_quote,
     )
 
     args = req.arguments or {}
@@ -200,6 +201,12 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 Path(args["path"]),
                 model=args.get("model", "deepseek-v4-flash"),
                 genre=args.get("genre", "fiction"),
+            )
+        if req.tool == "bookscope_verify":
+            return verify_quote(
+                Path(args["path"]),
+                args["quote"],
+                context_chars=int(args.get("context_chars", 120)),
             )
         if req.tool == "bookscope_prewarm":
             import os as _os

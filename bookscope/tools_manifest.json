@@ -126,6 +126,31 @@
       }
     },
     {
+      "name": "bookscope_verify",
+      "description": "对一句引文在本地原文里做逐字核验（零配置，不需要 LLM key）。找到逐字命中返回 verified=true；找不到明确返回 false，不冒充已核验。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "本地原文文件绝对路径"
+          },
+          "quote": {
+            "type": "string",
+            "description": "要核验的引文"
+          },
+          "context_chars": {
+            "type": "integer",
+            "description": "返回上下文宽度，默认 120"
+          }
+        },
+        "required": [
+          "path",
+          "quote"
+        ]
+      }
+    },
+    {
       "name": "bookscope_prewarm",
       "description": "对已导入书库的一本书后台预建深度章脉（渐进交付：先返回，后台按章构建，之后用 bookscope_progress 看进度）。需要 LLM key。",
       "parameters": {

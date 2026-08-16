@@ -124,6 +124,7 @@ def test_tools_manifest_lists_tools(client: TestClient) -> None:
     assert "bookscope_cluster" in names
     assert "bookscope_progress" in names
     assert "bookscope_prewarm" in names
+    assert "bookscope_verify" in names
 
 
 def test_tools_invoke_stats(client: TestClient, tmp_path: Path) -> None:
@@ -192,3 +193,29 @@ def test_tools_invoke_prewarm_without_key_returns_400(client: TestClient, tmp_pa
         "arguments": {"session_id": sid},
     })
     assert resp.status_code == 400, resp.text
+
+
+def test_tools_invoke_verify_finds_exact_quote(client: TestClient, tmp_path: Path) -> None:
+    f = tmp_path / "a.txt"
+    f.write_text("第一章 开端\n这里提到市场与政府的关系，必须逐字核对。\n", encoding="utf-8")
+    resp = client.post("/api/tools/invoke", json={
+        "tool": "bookscope_verify",
+        "arguments": {"path": str(f), "quote": "市场与政府的关系"},
+    })
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["verified"] is True
+    assert body["match_type"] == "quote"
+
+
+def test_tools_invoke_verify_missing_quote_returns_false(client: TestClient, tmp_path: Path) -> None:
+    f = tmp_path / "a.txt"
+    f.write_text("第一章 开端\n这里提到市场与政府的关系。\n", encoding="utf-8")
+    resp = client.post("/api/tools/invoke", json={
+        "tool": "bookscope_verify",
+        "arguments": {"path": str(f), "quote": "完全不存在的句子"},
+    })
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["verified"] is False
+    assert body["match_type"] == "none"
