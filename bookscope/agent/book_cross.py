@@ -16,11 +16,73 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import threading
+from pathlib import Path
 from typing import Any
+
+from bookscope.agent._internal.sqlite_cache import SQLiteCache
 
 # 跨文本关系五类（与报告渲染器 REL_META 同源）
 RELATIONS = ["继承", "反驳", "补充", "落地", "检验"]
+
+# ---- 结果缓存（perspective / reason 按内容 hash，改稿自动失效、不变秒出）----
+_ENV_CACHE_DISABLED = "BOOKSCOPE_BOOK_CROSS_CACHE_DISABLED"
+_CACHE_DB_REL = ".bookscope_cache/book_cross_cache.db"
+_CACHE_TABLE = "book_cross_results"
+_CACHE_SCHEMA = "v1"
+_cache: SQLiteCache | None = None
+_cache_lock = threading.Lock()
+
+
+def _get_cache() -> SQLiteCache | None:
+    global _cache
+    if os.environ.get(_ENV_CACHE_DISABLED, "").strip() in ("1", "true", "on"):
+        return None
+    if _cache is None:
+        with _cache_lock:
+            if _cache is None:
+                root = Path(__file__).resolve().parents[3]
+                try:
+                    _cache = SQLiteCache(root / _CACHE_DB_REL, _CACHE_TABLE, _CACHE_SCHEMA)
+                except Exception:  # noqa: BLE001 — 缓存不可用就直算
+                    return None
+    return _cache
+
+
+def _content_hash(*parts: Any) -> str:
+    raw = "\n".join(
+        json.dumps(x, ensure_ascii=False, sort_keys=True) if not isinstance(x, str) else x
+        for x in parts
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+
+
+def _cache_get(key: str) -> dict | None:
+    cache = _get_cache()
+    if cache is None:
+        return None
+    try:
+        raw = cache.get(key)
+        if raw is None:
+            return None
+        data = json.loads(raw.decode("utf-8"))
+        return data if isinstance(data, dict) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _cache_set(key: str, data: dict) -> None:
+    cache = _get_cache()
+    if cache is None:
+        return
+    try:
+        cache.set(key, json.dumps(data, ensure_ascii=False).encode("utf-8"))
+    except Exception:  # noqa: BLE001
+        pass
+
 
 _PERSPECTIVE_PROMPT = """你是一位长文本分析专家。给你一本书（或一部长文档）的逐章要点（章号 + 每章关键事件/主张），请提炼这本书的「书级观点骨架」——不逐章复述，而是站在全书高度总结它真正想表达的东西。
 
@@ -144,6 +206,13 @@ def build_book_perspective(
     返回: {"title", "slug", "summary", "stance", "claims": [...]}。
     提炼失败时返回带 summary 的空骨架（不 break 对照）。
     """
+    cache_key = _content_hash(
+        "perspective", spine, book_title, slug, model, _PERSPECTIVE_PROMPT
+    )
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     compact = _compact_spine(spine)
     user = f"【{book_title}】\n{compact}"
     data = _ask_json(llm_client, model, _PERSPECTIVE_PROMPT, user)
@@ -154,6 +223,7 @@ def build_book_perspective(
     data.setdefault("summary", "")
     data.setdefault("stance", "")
     data.setdefault("claims", [])
+    _cache_set(cache_key, data)
     return data
 
 
@@ -176,11 +246,18 @@ def cross_book_reason(
         claims = "；".join(f"{c.get('claim','')}(第{c.get('chapter','?')}章)" for c in p.get("claims", [])[:8])
         blocks.append(f"《{p.get('title','')}》(slug={p.get('slug','')}) 立场：{p.get('stance','')}；主旨：{p.get('summary','')}；主张：{claims}")
     user = "\n\n".join(blocks)
+    cache_key = _content_hash("reason", perspectives, model, _REASON_PROMPT)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return _sanitize_reason(cached, perspectives)
+
     data = _ask_json(llm_client, model, _REASON_PROMPT, user, max_tokens=3000)
     if not data or not isinstance(data, dict):
         return {"nodes": [], "edges": [], "concept_evolution": [], "disagreements": [], "narrative": ""}
 
-    return _sanitize_reason(data, perspectives)
+    result = _sanitize_reason(data, perspectives)
+    _cache_set(cache_key, result)
+    return result
 
 
 def _sanitize_reason(data: dict, perspectives: list[dict]) -> dict:
