@@ -6,7 +6,7 @@
 
 import unittest
 
-from bookscope.report.service import REL_META, esc, render_report, validate_input
+from bookscope.report.service import esc, render_report, validate_input
 
 
 def _min_input() -> dict:

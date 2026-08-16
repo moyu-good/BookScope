@@ -35,7 +35,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import tempfile
 import threading
 import time
@@ -47,6 +46,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 
+from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
 from bookscope.agent.backends.minimal_kg_extractor import MinimalKGExtractor
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
 from bookscope.agent.errors import (
@@ -71,7 +71,6 @@ from bookscope.api.schemas import (
 )
 from bookscope.ingest.book_chunker import ChapterDetectionStats, chunk_book_with_stats
 from bookscope.ingest.loader import EmptyTextError, load_text, normalize_book_title
-from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
 from bookscope.models import BookKnowledgeGraph
 from bookscope.store.vector_store import SessionVectorStore
 

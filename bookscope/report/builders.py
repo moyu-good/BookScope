@@ -8,7 +8,6 @@ verified 等），输出：可直接喂 ``bookscope.report.service.render_report
 from __future__ import annotations
 
 import re
-
 from typing import Any
 
 

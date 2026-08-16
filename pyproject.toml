@@ -68,6 +68,8 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+# 中文提示词 / 内联 CSS/JS 有大量长行，行宽对可读性无益，CI 不再因 E501 失败
+ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

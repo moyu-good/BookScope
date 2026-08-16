@@ -48,10 +48,6 @@ from bookscope.agent import (
     route_question,
     run_fast_path,
 )
-from bookscope.report.builders import build_book_report, build_structure_report
-from bookscope.agent.book_cross import build_book_perspective, cross_book_reason, build_cross_book_report_input, cross_book_ask
-from bookscope.report.service import render_report
-
 from bookscope.agent._internal.chapter_spine_cache import (
     get_or_build_spine,
     peek_spine_cache,
@@ -68,6 +64,12 @@ from bookscope.agent.argument_structure import (
     generate_argument_tree,
 )
 from bookscope.agent.backends.r0_assembler import R0BookAssembler
+from bookscope.agent.book_cross import (
+    build_book_perspective,
+    build_cross_book_report_input,
+    cross_book_ask,
+    cross_book_reason,
+)
 from bookscope.agent.chapter_spine_canon import build_spine_name_map
 from bookscope.agent.chapter_spine_concept import concept_evolution_from_spine
 from bookscope.agent.chapter_spine_concept_graph import concept_graph_from_spine
@@ -160,12 +162,6 @@ from bookscope.api.deployment import (
 from bookscope.api.schemas import (
     AgentAskRequest,
     AgentAskResponse,
-    BookReportRequest,
-    CrossBookReportRequest,
-    CrossBookAskRequest,
-    CrossBookAskResponse,
-    ClusterReportRequest,
-    ClusterDiscoverRequest,
     AnnotationsRequest,
     AnnotationsResponse,
     ArgumentStructureRequest,
@@ -179,6 +175,7 @@ from bookscope.api.schemas import (
     BatchStanceResponse,
     BookModeRequest,
     BookModeResponse,
+    BookReportRequest,
     ChapterAskRequest,
     ChapterAskResponse,
     CharacterArcRequest,
@@ -193,10 +190,15 @@ from bookscope.api.schemas import (
     CharacterVoiceResponse,
     CheckCitationsRequest,
     CheckCitationsResponse,
+    ClusterDiscoverRequest,
+    ClusterReportRequest,
     ConceptEvolutionRequest,
     ConceptEvolutionResponse,
     ConsistencyScanRequest,
     ConsistencyScanResponse,
+    CrossBookAskRequest,
+    CrossBookAskResponse,
+    CrossBookReportRequest,
     EntityRecallRequest,
     EntityRecallResponse,
     ForeshadowArcsRequest,
@@ -271,6 +273,8 @@ from bookscope.api.schemas import (
     WritingTechniqueResponse,
 )
 from bookscope.ingest.back_matter import exclude_back_matter
+from bookscope.report.builders import build_book_report, build_structure_report
+from bookscope.report.service import render_report
 
 logger = logging.getLogger(__name__)
 

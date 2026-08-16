@@ -471,7 +471,6 @@ def render_report(inp: dict) -> str:
             ask_answer_html += (f'<div style="font-size:12px;color:var(--ink-3);font-family:var(--font-sans)">'
                                 f'来源: {esc(", ".join(src))}</div>')
 
-    unit = meta.get("unit_label", "篇")
     title = meta.get("title", "书鉴报告")
     spine_section_title = "各章要点" if is_doc else "各家证据脊"
     graph_caption = (

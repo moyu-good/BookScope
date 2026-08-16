@@ -9,7 +9,6 @@ import unittest
 from pathlib import Path
 
 from bookscope.agent.book_cross import (
-    RELATIONS,
     _compact_spine,
     _sanitize_reason,
     build_cross_book_report_input,
@@ -152,6 +151,7 @@ class TestResultCache(unittest.TestCase):
 
     def setUp(self):
         import tempfile
+
         import bookscope.agent.book_cross as bc
 
         self.bc = bc
