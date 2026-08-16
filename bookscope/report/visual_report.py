@@ -8,6 +8,7 @@ recap / concept_evolution / argument_structure / foreshadow_arcs / consistency_s
 from __future__ import annotations
 
 import html
+import json
 from typing import Any
 
 
@@ -64,6 +65,7 @@ section h2 .no{font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--
 .curve-detail h4{color:var(--cinnabar);margin-bottom:8px}
 .curve-detail .event{font-size:14px;padding:6px 0;border-bottom:1px dashed var(--border)}
 .verify-toggle{display:inline-block;margin-top:12px;padding:6px 14px;border-radius:20px;border:1px solid var(--jade);background:var(--paper-card);color:var(--jade);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
+.data-btn{display:inline-block;margin-top:12px;margin-left:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--cinnabar);background:var(--paper-card);color:var(--cinnabar);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
 body.verified-only .quote.unverified{display:none}
 footer{text-align:center;padding:32px 16px;color:var(--ink-3);font-size:13px;border-top:1px solid var(--border);margin-top:32px;font-family:"Noto Sans SC",sans-serif}
 @media(max-width:640px){body{font-size:15px}.hero{padding:28px 14px 22px}.hero h1{font-size:22px}.hero .subtitle{font-size:13px}.stats{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}.stat{padding:12px 8px}.stat .num{font-size:22px}section{padding:20px 14px}section h2{font-size:18px}.card{padding:14px}.grid{grid-template-columns:1fr}.graph-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.graph-wrap svg{min-width:600px}.theme-toggle{width:40px;height:40px;bottom:12px;right:12px;font-size:16px}.print-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;right:62px}}
@@ -453,6 +455,7 @@ def render_visual_report(data: dict) -> str:
         f'<div class="stat"><div class="num">{_esc(v)}</div><div class="label">{_esc(k)}</div></div>'
         for k, v in stats
     )
+    report_json = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
 
     sections = f"""
 <section id="recap"><h2><span class="no">壹</span>逻辑主线</h2>{_recap_html(recap)}</section>
@@ -478,12 +481,13 @@ def render_visual_report(data: dict) -> str:
 <style>{_build_css()}</style>
 </head>
 <body>
-<header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button></header>
+<header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button><button class="data-btn" onclick="downloadReportData()">⬇️ 数据 JSON</button></header>
 <div class="stats">{stat_html}</div>
 {sections}
 <button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
 <button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
 <footer>BookScope · 逻辑梳理与可视化报告 · 所有引文均回原文核验 · 生成时间 {_esc(__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M"))}</footer>
+<script id="report-data" type="application/json">{report_json}</script>
 <script>
 document.querySelectorAll('[data-filter]').forEach(input=>{{
   input.addEventListener('input',()=>{{
@@ -495,6 +499,16 @@ document.querySelectorAll('[data-filter]').forEach(input=>{{
     }});
   }});
 }});
+function downloadReportData(){{
+  const data=JSON.parse(document.getElementById('report-data').textContent);
+  const blob=new Blob([JSON.stringify(data,null,2)],{{type:'application/json'}});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='bookscope-report-data.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}}
 </script>
 </body>
 </html>"""
