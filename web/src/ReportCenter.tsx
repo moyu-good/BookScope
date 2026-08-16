@@ -43,6 +43,7 @@ export function ReportCenter({
   const [error, setError] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
   const [prewarming, setPrewarming] = useState(false);
+  const [historyQuery, setHistoryQuery] = useState("");
 
   const handleDeleteBook = (sessionId: string, bookTitle: string) => {
     onDeleteBook(sessionId, bookTitle);
@@ -112,6 +113,14 @@ export function ReportCenter({
       recentBySession.set(h.sessionId, h);
     }
   }
+  const qHistory = historyQuery.trim().toLowerCase();
+  const filteredHistory = qHistory
+    ? history.filter(
+        (h) =>
+          h.title.toLowerCase().includes(qHistory) ||
+          h.type.toLowerCase().includes(qHistory),
+      )
+    : history;
 
   return (
     <div
@@ -280,11 +289,22 @@ export function ReportCenter({
           <h3 className="text-xs font-bold text-[var(--color-ink-muted)] mb-2" style={{ fontFamily: "var(--font-display)" }}>
             报告历史
           </h3>
+          {history.length > 0 && (
+            <input
+              type="search"
+              value={historyQuery}
+              onChange={(e) => setHistoryQuery(e.target.value)}
+              placeholder="🔍 搜索标题或类型（书鉴/对照/簇网）…"
+              className="mb-2 w-full max-w-xs px-2.5 py-1.5 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-seal)]"
+            />
+          )}
           {history.length === 0 ? (
             <p className="text-sm text-[var(--color-ink-muted)] italic">还没有生成过报告。</p>
+          ) : filteredHistory.length === 0 ? (
+            <p className="text-sm text-[var(--color-ink-muted)] italic">没有匹配「{historyQuery}」的历史。</p>
           ) : (
             <div className="flex flex-col gap-2">
-              {history.map((h) => (
+              {filteredHistory.map((h) => (
                 <div
                   key={h.id}
                   className="rounded-md border border-[var(--color-rule)] px-3 py-2 flex items-center gap-3"
