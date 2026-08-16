@@ -385,7 +385,7 @@ def _chapters_overview_html(chapters: list[dict]) -> str:
         turn = " 🔺" if c.get("is_turning") else ""
         pov = c.get("pov") or ""
         items.append(
-            f'<div class="card" style="padding:10px 12px;margin:6px 0">'
+            f'<div class="card" style="padding:10px 12px;margin:6px 0;cursor:pointer" onclick="document.getElementById(\'curve\').scrollIntoView()">'
             f'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">'
             f'<b>第{ch}章{turn}</b><span style="font-size:12px;color:var(--ink-3);font-family:sans-serif">{c.get("event_count",0)} 事件 · {_esc(pov)}</span></div>'
             f'</div>'
