@@ -264,6 +264,14 @@ def test_tools_invoke_deep_report_structure_fallback(client: TestClient, tmp_pat
     assert "prewarm_status" not in body
 
 
+def test_tools_manifest_visualize_has_mode(client: TestClient) -> None:
+    resp = client.get("/api/tools/manifest")
+    body = resp.json()
+    vis = next(t for t in body["tools"] if t["name"] == "bookscope_visualize")
+    assert "mode" in vis["parameters"]["properties"]
+    assert vis["parameters"]["properties"]["mode"]["enum"] == ["full", "quick"]
+
+
 def test_tools_invoke_visualize_with_precomputed_data_returns_html(client: TestClient) -> None:
     data = {
         "meta": {"book": "测试书", "title": "测试书逻辑梳理"},

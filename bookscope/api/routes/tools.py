@@ -238,6 +238,7 @@ def tools_invoke(req: InvokeRequest) -> dict:
             provider = args.get("provider", "deepseek")
             model = args.get("model", "deepseek-v4-flash")
             base_url = args.get("base_url")
+            full_mode = args.get("mode", "full") == "full"
 
             def _mk(cls, **extra):
                 return cls(
@@ -257,24 +258,26 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 ).model_dump()
             except Exception as exc:  # noqa: BLE001
                 errors["narrative_curve"] = f"{type(exc).__name__}: {exc}"
-            try:
-                data["narrative_phases"] = agent_routes.agent_narrative_phases(
-                    _mk(NarrativePhasesRequest), store
-                ).model_dump()
-            except Exception as exc:  # noqa: BLE001
-                errors["narrative_phases"] = f"{type(exc).__name__}: {exc}"
+            if full_mode:
+                try:
+                    data["narrative_phases"] = agent_routes.agent_narrative_phases(
+                        _mk(NarrativePhasesRequest), store
+                    ).model_dump()
+                except Exception as exc:  # noqa: BLE001
+                    errors["narrative_phases"] = f"{type(exc).__name__}: {exc}"
             try:
                 data["character_graph"] = agent_routes.agent_character_graph(
                     _mk(CharacterGraphRequest, unit=args.get("unit", "person")), store
                 ).model_dump()
             except Exception as exc:  # noqa: BLE001
                 errors["character_graph"] = f"{type(exc).__name__}: {exc}"
-            try:
-                data["character_arc"] = agent_routes.agent_character_arc(
-                    _mk(CharacterArcRequest), store
-                ).model_dump()
-            except Exception as exc:  # noqa: BLE001
-                errors["character_arc"] = f"{type(exc).__name__}: {exc}"
+            if full_mode:
+                try:
+                    data["character_arc"] = agent_routes.agent_character_arc(
+                        _mk(CharacterArcRequest), store
+                    ).model_dump()
+                except Exception as exc:  # noqa: BLE001
+                    errors["character_arc"] = f"{type(exc).__name__}: {exc}"
             try:
                 data["timeline"] = agent_routes.agent_timeline(
                     _mk(TimelineRequest), store
@@ -299,38 +302,42 @@ def tools_invoke(req: InvokeRequest) -> dict:
                     ).model_dump()
                 except Exception as exc:  # noqa: BLE001
                     errors["concept_evolution"] = f"{type(exc).__name__}: {exc}"
-            try:
-                data["argument_structure"] = agent_routes.agent_argument_structure(
-                    _mk(ArgumentStructureRequest), store
-                ).model_dump()
-            except Exception as exc:  # noqa: BLE001
-                errors["argument_structure"] = f"{type(exc).__name__}: {exc}"
-            try:
-                data["writing_technique"] = agent_routes.agent_writing_technique(
-                    _mk(WritingTechniqueRequest), store
-                ).model_dump()
-            except Exception as exc:  # noqa: BLE001
-                errors["writing_technique"] = f"{type(exc).__name__}: {exc}"
+            if full_mode:
+                try:
+                    data["argument_structure"] = agent_routes.agent_argument_structure(
+                        _mk(ArgumentStructureRequest), store
+                    ).model_dump()
+                except Exception as exc:  # noqa: BLE001
+                    errors["argument_structure"] = f"{type(exc).__name__}: {exc}"
+            if full_mode:
+                try:
+                    data["writing_technique"] = agent_routes.agent_writing_technique(
+                        _mk(WritingTechniqueRequest), store
+                    ).model_dump()
+                except Exception as exc:  # noqa: BLE001
+                    errors["writing_technique"] = f"{type(exc).__name__}: {exc}"
             motif = args.get("motif") or concept
-            if motif:
+            if motif and full_mode:
                 try:
                     data["motif_tracking"] = agent_routes.agent_motif_tracking(
                         _mk(MotifTrackingRequest, motif=motif), store
                     ).model_dump()
                 except Exception as exc:  # noqa: BLE001
                     errors["motif_tracking"] = f"{type(exc).__name__}: {exc}"
-            try:
-                data["foreshadow_arcs"] = agent_routes.agent_foreshadow_arcs(
-                    _mk(ForeshadowArcsRequest), store
-                ).model_dump()
-            except Exception as exc:  # noqa: BLE001
-                errors["foreshadow_arcs"] = f"{type(exc).__name__}: {exc}"
-            try:
-                data["consistency_scan"] = agent_routes.agent_consistency_scan(
-                    _mk(ConsistencyScanRequest), store
-                ).model_dump()
-            except Exception as exc:  # noqa: BLE001
-                errors["consistency_scan"] = f"{type(exc).__name__}: {exc}"
+            if full_mode:
+                try:
+                    data["foreshadow_arcs"] = agent_routes.agent_foreshadow_arcs(
+                        _mk(ForeshadowArcsRequest), store
+                    ).model_dump()
+                except Exception as exc:  # noqa: BLE001
+                    errors["foreshadow_arcs"] = f"{type(exc).__name__}: {exc}"
+            if full_mode:
+                try:
+                    data["consistency_scan"] = agent_routes.agent_consistency_scan(
+                        _mk(ConsistencyScanRequest), store
+                    ).model_dump()
+                except Exception as exc:  # noqa: BLE001
+                    errors["consistency_scan"] = f"{type(exc).__name__}: {exc}"
 
             meta = {"book": args.get("title") or Path(args.get("path", "")).stem or sid, "title": args.get("title") or "长文档逻辑梳理"}
             data["meta"] = meta

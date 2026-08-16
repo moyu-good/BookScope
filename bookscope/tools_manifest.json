@@ -192,6 +192,11 @@
             "enum": ["person", "concept"],
             "description": "关系图分析单位，默认 person"
           },
+          "mode": {
+            "type": "string",
+            "enum": ["full", "quick"],
+            "description": "full=完整分析（默认）；quick=快速模式，只出主线/曲线/关系/时间线，耗时更短"
+          },
           "api_key": {
             "type": "string",
             "description": "LLM API key（可选，AI 助手环境通常已自动提供）"
