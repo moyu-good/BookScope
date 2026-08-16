@@ -22,6 +22,7 @@ AI 助手（如 Claude / GPT / 本地 agent）可以通过统一的工具调用�
 | `bookscope_stats` | 统计书库规模 |
 | `bookscope_catalog` | 生成 HTML 书库目录 |
 | `bookscope_cross` | 两个文件直接出跨文本对照 HTML 报告（需要 LLM key） |
+| `bookscope_cluster` | 2-8 个文件两两聚合，出文档簇关系网 HTML 报告（需要 LLM key） |
 
 ## 调用方式
 
@@ -49,6 +50,7 @@ POST /api/tools/ask-local {"session_id": "...", "question": "..."}
 POST /api/tools/search    {"path": "/path/to/books", "query": "..."}
 POST /api/tools/stats     {"path": "/path/to/books"}
 POST /api/tools/catalog   {"path": "/path/to/books", "out": "/tmp/catalog"}
+POST /api/tools/invoke     {"tool": "bookscope_cluster", "arguments": {"files": ["a.txt", "b.txt", "c.txt"]}}
 ```
 
 ## 接入 AI 助手的建议

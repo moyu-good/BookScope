@@ -258,5 +258,154 @@ def list_sessions(data_dir: Path) -> list[dict]:
     return books
 
 
+def _dedupe_edges(edges: list[dict]) -> list[dict]:
+    seen: set[tuple[str, str, str]] = set()
+    out: list[dict] = []
+    for e in edges:
+        key = (str(e.get("from", "")), str(e.get("to", "")), str(e.get("relation", "")))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(e)
+    return out
+
+
+def _merge_concepts(items: list[dict]) -> list[dict]:
+    merged: dict[str, list[dict]] = {}
+    for item in items:
+        name = str(item.get("concept", "")).strip()
+        if not name:
+            continue
+        stages = merged.setdefault(name, [])
+        existing = {(str(x.get("paper", "")), str(x.get("stage", ""))) for x in stages}
+        for st in item.get("stages", []):
+            key = (str(st.get("paper", "")), str(st.get("stage", "")))
+            if key not in existing:
+                stages.append(st)
+                existing.add(key)
+    arr = [{"concept": k, "stages": v} for k, v in merged.items()]
+    arr.sort(key=lambda x: len(x["stages"]), reverse=True)
+    return arr[:5]
+
+
+def _merge_disputes(items: list[dict]) -> list[dict]:
+    merged: dict[str, list[dict]] = {}
+    for item in items:
+        q = str(item.get("question", "")).strip()
+        if not q:
+            continue
+        sides = merged.setdefault(q, [])
+        existing = {(str(x.get("paper", "")), str(x.get("stance", ""))) for x in sides}
+        for sd in item.get("sides", []):
+            key = (str(sd.get("paper", "")), str(sd.get("stance", "")))
+            if key not in existing:
+                sides.append(sd)
+                existing.add(key)
+    arr = [{"question": k, "sides": v} for k, v in merged.items()]
+    arr.sort(key=lambda x: len(x["sides"]), reverse=True)
+    return arr[:5]
+
+
+def cluster_files(
+    files: list[Path],
+    api_key: str,
+    name: str = "文档簇",
+    provider: str = "deepseek",
+    model: str = "deepseek-v4-flash",
+    base_url: str | None = None,
+) -> str:
+    """多个文件直接出簇关系网 HTML 报告（两两对照聚合，需要 LLM key）。"""
+    from itertools import combinations
+
+    from bookscope.agent._internal.chapter_spine_cache import get_or_build_spine
+    from bookscope.agent.book_cross import (
+        build_book_perspective,
+        cross_book_reason,
+    )
+    from bookscope.api.dependencies import build_llm_client_from_params
+
+    if len(files) < 2 or len(files) > 8:
+        raise ValueError("簇关系需要 2-8 个文件")
+    client = build_llm_client_from_params(provider=provider, api_key=api_key, base_url=base_url)
+    perspectives = []
+    for idx, path in enumerate(files):
+        name_i, _book, _results, chunks = load_chunks(path)
+        spine = get_or_build_spine(chunks=chunks, llm_client=client, model=model, genre="fiction")
+        perspectives.append(build_book_perspective(
+            spine=spine, book_title=name_i, slug=f"b{idx}",
+            llm_client=client, model=model,
+        ))
+
+    nodes: list[dict] = []
+    seen_slugs: set[str] = set()
+    edges: list[dict] = []
+    concepts: list[dict] = []
+    disputes: list[dict] = []
+    pair_count = 0
+    for a, b in combinations(perspectives, 2):
+        reason = cross_book_reason(perspectives=[a, b], llm_client=client, model=model)
+        for n in reason.get("nodes", []):
+            slug = n.get("slug")
+            if slug and slug not in seen_slugs:
+                seen_slugs.add(slug)
+                nodes.append(n)
+        edges.extend(reason.get("edges", []))
+        concepts.extend(reason.get("concept_evolution", []))
+        disputes.extend(reason.get("disagreements", []))
+        pair_count += 1
+    if not nodes:
+        nodes = [
+            {"slug": p.get("slug", ""), "label": p.get("title", ""), "stance": p.get("stance", "")}
+            for p in perspectives if p.get("slug")
+        ]
+    edges = _dedupe_edges(edges)
+    concepts = _merge_concepts(concepts)
+    disputes = _merge_disputes(disputes)
+    narrative = (
+        f"《{name}》共 {len(nodes)} 本，两两对照 {pair_count} 对，"
+        f"发现 {len(edges)} 条关系（继承/反驳/补充/落地/检验）。关系为 LLM 研判。"
+    )
+    inp = {
+        "layout": "crossdoc",
+        "meta": {
+            "title": f"簇关系网 · {name}",
+            "subtitle": f"{len(nodes)} 本 · {len(edges)} 条关系（{pair_count} 对两两对照）· 关系为研判",
+            "seal": "书 鉴",
+            "nav_title": "簇关系 · 导航",
+            "unit_label": "本",
+            "generated_by": "书鉴 BookScope",
+        },
+        "nodes": nodes,
+        "edges": edges,
+        "concept_evolution": concepts,
+        "disagreements": disputes,
+        "narrative": narrative,
+        "spines": {
+            p.get("slug", f"b{i}"): {
+                "_title": p.get("title", ""),
+                "_slug": p.get("slug", f"b{i}"),
+                "core_thesis": p.get("summary", ""),
+                "theoretical_stance": {"label": p.get("stance", ""), "inference": True},
+                "method": "",
+                "key_citations": [
+                    {"quote": c.get("claim", ""), "role": f"第{c.get('chapter','?')}章"}
+                    for c in p.get("claims", [])[:5] if c.get("claim")
+                ],
+            }
+            for i, p in enumerate(perspectives)
+        },
+        "e1": {
+            p.get("slug", f"b{i}"): {
+                "quotes": [{"quote": c.get("claim", ""), "verified": False} for c in p.get("claims", [])[:5] if c.get("claim")]
+            }
+            for i, p in enumerate(perspectives)
+        },
+        "quality": {"e2_mean": 0, "e3": None},
+    }
+    from bookscope.report.service import render_report
+
+    return render_report(inp)
+
+
 def default_data_dir() -> Path:
     return Path(os.environ.get("BOOKSCOPE_DATA_DIR", "data/sessions"))

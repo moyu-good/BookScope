@@ -69,3 +69,27 @@ def test_local_search_ranks_higher_frequency_first() -> None:
     ]
     hits = local_search("土地财政", chunks, top_k=2)
     assert hits[0]["chapter"] == 1
+
+
+def test_cluster_merge_dedupes_edges() -> None:
+    from bookscope.local_tools import _dedupe_edges
+
+    edges = [
+        {"from": "a", "to": "b", "relation": "继承", "rationale": "1"},
+        {"from": "a", "to": "b", "relation": "继承", "rationale": "2"},
+        {"from": "b", "to": "a", "relation": "反驳", "rationale": "3"},
+    ]
+    out = _dedupe_edges(edges)
+    assert len(out) == 2
+
+
+def test_cluster_merge_groups_concepts() -> None:
+    from bookscope.local_tools import _merge_concepts
+
+    items = [
+        {"concept": "法治", "stages": [{"paper": "a", "stage": "提出"}]},
+        {"concept": "法治", "stages": [{"paper": "b", "stage": "发展"}, {"paper": "a", "stage": "提出"}]},
+    ]
+    out = _merge_concepts(items)
+    assert out[0]["concept"] == "法治"
+    assert len(out[0]["stages"]) == 2
