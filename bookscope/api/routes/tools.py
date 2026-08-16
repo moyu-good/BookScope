@@ -222,9 +222,11 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 CharacterGraphRequest,
                 ConsistencyScanRequest,
                 ForeshadowArcsRequest,
+                MotifTrackingRequest,
                 NarrativeCurveRequest,
                 RecapRequest,
                 TimelineRequest,
+                WritingTechniqueRequest,
             )
             from bookscope.api.session_storage import JSONFileSessionStorage
 
@@ -296,6 +298,20 @@ def tools_invoke(req: InvokeRequest) -> dict:
                 ).model_dump()
             except Exception as exc:  # noqa: BLE001
                 errors["argument_structure"] = f"{type(exc).__name__}: {exc}"
+            try:
+                data["writing_technique"] = agent_routes.agent_writing_technique(
+                    _mk(WritingTechniqueRequest), store
+                ).model_dump()
+            except Exception as exc:  # noqa: BLE001
+                errors["writing_technique"] = f"{type(exc).__name__}: {exc}"
+            motif = args.get("motif") or concept
+            if motif:
+                try:
+                    data["motif_tracking"] = agent_routes.agent_motif_tracking(
+                        _mk(MotifTrackingRequest, motif=motif), store
+                    ).model_dump()
+                except Exception as exc:  # noqa: BLE001
+                    errors["motif_tracking"] = f"{type(exc).__name__}: {exc}"
             try:
                 data["foreshadow_arcs"] = agent_routes.agent_foreshadow_arcs(
                     _mk(ForeshadowArcsRequest), store

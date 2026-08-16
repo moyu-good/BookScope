@@ -307,6 +307,38 @@ def _foreshadow_html(foreshadow: dict) -> str:
         )
     return '<div class="card">' + "".join(items) + "</div>"
 
+def _writing_technique_html(technique: dict) -> str:
+    items = technique.get("techniques", [])
+    if not items:
+        return '<p style="color:var(--ink-3)">暂无写作技法数据。</p>'
+    cards = []
+    for t in items[:24]:
+        v = t.get("verified", False)
+        cards.append(
+            f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+            f'<h3 style="color:var(--cinnabar);font-size:16px">{_esc(t.get("technique",""))}</h3>'
+            f'<span class="badge">第{t.get("chapter","?")}章</span></div>'
+            f'<p style="font-size:14px;color:var(--ink-2);margin:6px 0">{_esc(t.get("how",""))}</p>'
+            f'<div class="quote{" unverified" if not v else ""}"><span class="seal">{"鉴" if v else "研判"}</span>{_esc(t.get("snippet",""))}</div></div>'
+        )
+    return '<div class="grid">' + "".join(cards) + "</div>"
+
+
+def _motif_html(motif: dict) -> str:
+    occurrences = motif.get("occurrences", [])
+    if not occurrences:
+        return '<p style="color:var(--ink-3)">暂无母题追踪数据。</p>'
+    items = []
+    for o in occurrences[:40]:
+        v = o.get("verified", False)
+        items.append(
+            f'<div class="point"><span class="badge">第{o.get("chapter","?")}章</span>'
+            f'<div><div style="font-weight:bold">{_esc(o.get("manifestation",""))}</div>'
+            f'<div class="quote{" unverified" if not v else ""}"><span class="seal">{"鉴" if v else "研判"}</span>{_esc(o.get("snippet",""))}</div></div></div>'
+        )
+    return f'<div class="card"><h3 style="color:var(--cinnabar);margin-bottom:10px">「{_esc(motif.get("motif",""))}」的母题追踪</h3>{"".join(items)}</div>'
+
+
 
 def _consistency_html(consistency: dict) -> str:
     contradictions = consistency.get("contradictions", [])
@@ -339,6 +371,8 @@ def render_visual_report(data: dict) -> str:
     foreshadow = data.get("foreshadow_arcs", {})
     consistency = data.get("consistency_scan", {})
     character_arc = data.get("character_arc", {})
+    writing_technique = data.get("writing_technique", {})
+    motif = data.get("motif_tracking", {})
 
     stats = [
         ("章", len(curve.get("chapters", [])) or len(timeline.get("events", []))),
@@ -347,7 +381,7 @@ def render_visual_report(data: dict) -> str:
         ("主线要点", len(recap.get("points", []))),
         ("论证", len(argument.get("claims", []))),
         ("伏笔", len(foreshadow.get("arcs", []))),
-        ("矛盾", len(consistency.get("contradictions", []))),
+        ("技法", len(writing_technique.get("techniques", []))),
         ("核验", f'{sum(1 for p in recap.get("points", []) if p.get("verified"))}/{len(recap.get("points", []))}'),
     ]
     stat_html = "".join(
@@ -363,8 +397,10 @@ def render_visual_report(data: dict) -> str:
 <section id="timeline"><h2><span class="no">伍</span>事件时间线</h2>{_timeline_html(timeline)}</section>
 <section id="concept"><h2><span class="no">陆</span>概念演变</h2>{_concept_html(concept)}</section>
 <section id="argument"><h2><span class="no">柒</span>论证结构</h2>{_argument_html(argument)}</section>
-<section id="foreshadow"><h2><span class="no">捌</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
-<section id="consistency"><h2><span class="no">玖</span>前后一致性</h2>{_consistency_html(consistency)}</section>
+<section id="writing"><h2><span class="no">捌</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
+<section id="motif"><h2><span class="no">玖</span>母题追踪</h2>{_motif_html(motif)}</section>
+<section id="foreshadow"><h2><span class="no">拾</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
+<section id="consistency"><h2><span class="no">拾壹</span>前后一致性</h2>{_consistency_html(consistency)}</section>
 """
 
     return f"""<!DOCTYPE html>
