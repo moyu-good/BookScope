@@ -2071,8 +2071,41 @@ export function App() {
     const folder = window.prompt("输入本地书库文件夹绝对路径（如 D:\\书）");
     if (!folder || !folder.trim()) return;
     const path = folder.trim();
+    // 零配置路径：没 key 也能导入（tools API 只做本地 ingest，不调 LLM）
     if (!apiKey) {
-      alert("先配置 LLM key（设置里）再导入");
+      try {
+        const resp = await fetch("/api/tools/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path }),
+        });
+        if (!resp.ok) {
+          let msg = `导入失败（${resp.status}）`;
+          try {
+            const d = (await resp.json()) as { detail?: string };
+            if (typeof d?.detail === "string") msg = d.detail;
+          } catch {
+            /* 非 JSON */
+          }
+          alert(msg);
+          return;
+        }
+        const data = (await resp.json()) as {
+          imported?: { session_id?: string | null; file?: string; book_title?: string | null; error?: string | null }[];
+          session_id?: string;
+          book_title?: string;
+        };
+        const entries = data.imported ?? (data.session_id ? [{ session_id: data.session_id, book_title: data.book_title }] : []);
+        rememberImportSources(
+          entries
+            .filter((r) => r.session_id && !r.error)
+            .map((r) => ({ session_id: r.session_id!, source_folder: path })),
+        );
+        alert(`导入完成：${entries.filter((r) => r.session_id && !r.error).length} 本`);
+        setShelfRefresh((n) => n + 1);
+      } catch {
+        alert("导入失败：网络错误");
+      }
       return;
     }
     try {
@@ -2194,10 +2227,8 @@ export function App() {
 
   /** 出书鉴报告：/agent/book/report 拿 HTML → 下载。章脉没建过后端 404，弹提示。 */
   const openReport = useCallback(async (s: SessionMetadata) => {
-    if (!apiKey) {
-      alert("先配置 LLM key（设置里）再出报告");
-      return;
-    }
+    // 结构版报告不需要 key；后端只读缓存/零 LLM。没 key 时给一个占位串过 schema。
+    const reportKey = apiKey || "local-no-key";
     try {
       const resp = await fetch("/api/agent/book/report", {
         method: "POST",
@@ -2205,7 +2236,7 @@ export function App() {
         body: JSON.stringify({
           book_session_id: s.session_id,
           provider,
-          api_key: apiKey,
+          api_key: reportKey,
           model: model.trim() || undefined,
           base_url: effectiveBaseUrl() || undefined,
         }),
