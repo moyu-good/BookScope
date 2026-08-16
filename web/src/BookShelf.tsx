@@ -59,6 +59,9 @@ export interface BookShelfProps {
   onOpenHistory?: () => void;
   /** 打开报告中心（聚合视图） */
   onOpenReportCenter?: () => void;
+  /** 进度查询用的 provider/model（与报告请求同款，避免默认模型对不上） */
+  progressProvider?: string;
+  progressModel?: string;
   /** 文档簇问答：对选中的多本书直接提问 */
   onAskBooks?: (question: string, sessions: SessionMetadata[]) => Promise<string>;
   /** 簇总览报告：来源组聚合清单 */
@@ -223,6 +226,8 @@ export function BookShelf({
   importProgress,
   onOpenHistory,
   onOpenReportCenter,
+  progressProvider,
+  progressModel,
   onAskBooks,
   onClusterReport,
   onClusterDiscover,
@@ -414,6 +419,8 @@ export function BookShelf({
         onClusterReport={onClusterReport}
         onClusterDiscover={onClusterDiscover}
         onPrewarmGroup={onPrewarmGroup}
+        progressProvider={progressProvider}
+        progressModel={progressModel}
         onReopenReport={onReopenReport}
         reportHistory={reportHistory}
         onSelect={onSelect}
@@ -444,6 +451,8 @@ function ShelfBody(props: {
   onClusterReport?: (sessions: SessionMetadata[], clusterName: string) => void;
   onClusterDiscover?: (sessions: SessionMetadata[], clusterName: string) => void;
   onPrewarmGroup?: (sessions: SessionMetadata[]) => void;
+  progressProvider?: string;
+  progressModel?: string;
   onReopenReport?: (entry: ReportHistoryEntry) => void;
   reportHistory: ReportHistoryEntry[];
   onSelect: (session: SessionMetadata) => void;
@@ -470,6 +479,8 @@ function ShelfBody(props: {
     onClusterReport,
     onClusterDiscover,
     onPrewarmGroup,
+    progressProvider,
+    progressModel,
     onReopenReport,
     reportHistory,
     onSelect,
@@ -517,7 +528,12 @@ function ShelfBody(props: {
     let cancelled = false;
     const ids = state.sessions.map((x) => x.session_id).join(",");
     const fetchOnce = () =>
-      fetch(`/api/agent/spine-progress?ids=${encodeURIComponent(ids)}&model=deepseek-v4-flash`)
+      (() => {
+        const params = new URLSearchParams({ ids });
+        if (progressModel) params.set("model", progressModel);
+        if (progressProvider) params.set("provider", progressProvider);
+        return fetch(`/api/agent/spine-progress?${params.toString()}`);
+      })()
         .then((r) => (r.ok ? r.json() : null))
         .then((data: { books?: { session_id: string; built: number; total: number; ready: boolean }[] } | null) => {
           if (cancelled || !data?.books) return;
@@ -545,7 +561,7 @@ function ShelfBody(props: {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [state, spineRefreshTick]);
+  }, [state, spineRefreshTick, progressProvider, progressModel]);
 
   if (state.kind === "loading" || state.kind === "idle") {
     return (

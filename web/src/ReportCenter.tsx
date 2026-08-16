@@ -23,6 +23,8 @@ export function ReportCenter({
   onClusterDiscover,
   onPrewarmGroup,
   onDeleteBook,
+  progressProvider,
+  progressModel,
   onClose,
 }: {
   onOpenReport: (session: SessionMetadata) => void;
@@ -31,6 +33,8 @@ export function ReportCenter({
   onClusterDiscover: (sessions: SessionMetadata[], clusterName: string) => void;
   onPrewarmGroup: (sessions: SessionMetadata[]) => Promise<void> | void;
   onDeleteBook: (sessionId: string, bookTitle: string) => void;
+  progressProvider?: string;
+  progressModel?: string;
   onClose: () => void;
 }) {
   const [sessions, setSessions] = useState<SessionMetadata[] | null>(null);
@@ -61,7 +65,10 @@ export function ReportCenter({
 
     const loadProgress = async (ids: string) => {
       try {
-        const pr = await fetch(`/api/agent/spine-progress?ids=${encodeURIComponent(ids)}&model=deepseek-v4-flash`);
+        const params = new URLSearchParams({ ids });
+        if (progressModel) params.set("model", progressModel);
+        if (progressProvider) params.set("provider", progressProvider);
+        const pr = await fetch(`/api/agent/spine-progress?${params.toString()}`);
         if (!pr.ok || cancelled) return;
         const data = (await pr.json()) as { books?: { session_id: string; built: number; total: number; ready: boolean }[] };
         if (!data.books) return;
@@ -96,7 +103,7 @@ export function ReportCenter({
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [refreshTick]);
+  }, [refreshTick, progressProvider, progressModel]);
 
   const readyCount = sessions?.filter((s) => progress[s.session_id]?.ready).length ?? 0;
   const recentBySession = new Map<string, ReportHistoryEntry>();

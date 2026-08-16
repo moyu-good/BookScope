@@ -24,6 +24,8 @@ export function ReportPreview({
   preview,
   onAsk,
   onRegenerate,
+  progressProvider,
+  progressModel,
   onClose,
 }: {
   preview: ReportPreviewState;
@@ -31,6 +33,9 @@ export function ReportPreview({
   onAsk?: (question: string, chapter?: number) => Promise<string>;
   /** 重新生成（结构版/部分版时可用，拉取更全版本） */
   onRegenerate?: () => Promise<void>;
+  /** 进度查询用的 provider/model（与报告请求同款，避免默认模型对不上） */
+  progressProvider?: string;
+  progressModel?: string;
   onClose: () => void;
 }) {
   const [question, setQuestion] = useState("");
@@ -51,7 +56,10 @@ export function ReportPreview({
     let timer: ReturnType<typeof setInterval> | null = null;
     const fetchOnce = async () => {
       try {
-        const resp = await fetch(`/api/agent/spine-progress?ids=${encodeURIComponent(sessionId)}&model=deepseek-v4-flash`);
+        const params = new URLSearchParams({ ids: sessionId });
+        if (progressModel) params.set("model", progressModel);
+        if (progressProvider) params.set("provider", progressProvider);
+        const resp = await fetch(`/api/agent/spine-progress?${params.toString()}`);
         if (!resp.ok || cancelled) return;
         const data = (await resp.json()) as { books?: { session_id: string; built: number; total: number; ready: boolean }[] };
         const b = data.books?.find((x) => x.session_id === sessionId);
@@ -74,7 +82,7 @@ export function ReportPreview({
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [preview.sessionId, preview.coverage]);
+  }, [preview.sessionId, preview.coverage, progressProvider, progressModel]);
 
   const download = () => {
     const a = document.createElement("a");

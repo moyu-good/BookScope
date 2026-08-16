@@ -2607,6 +2607,8 @@ export function App() {
                 onClusterReport={handleClusterReport}
                 onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
                 onPrewarmGroup={(list) => void handlePrewarmGroup(list)}
+                progressProvider={provider}
+                progressModel={model.trim() || undefined}
                 onReopenReport={(e) => void handleReopenReport(e)}
                 onImportFolder={handleImportFolder}
                 importProgress={importProgress}
@@ -3398,6 +3400,8 @@ export function App() {
           onClusterDiscover={(list, name) => void handleClusterDiscover(list, name)}
           onPrewarmGroup={(list) => handlePrewarmGroup(list)}
           onDeleteBook={(sid, title) => void handleDeleteBookFromCenter(sid, title)}
+          progressProvider={provider}
+          progressModel={model.trim() || undefined}
           onClose={() => setReportCenterOpen(false)}
         />
       )}
@@ -3426,6 +3430,8 @@ export function App() {
       {reportPreview && (
         <ReportPreview
           preview={reportPreview}
+          progressProvider={provider}
+          progressModel={model.trim() || undefined}
           onAsk={
             reportPreview.sessionId || (reportPreview.sessionIds && reportPreview.sessionIds.length >= 2)
               ? (q, ch) => handleReportAsk(q, reportPreview, ch)
