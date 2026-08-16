@@ -290,25 +290,31 @@ def cmd_cluster(args: argparse.Namespace) -> int:
 
 def cmd_list(args: argparse.Namespace) -> int:
     """列出书库里已导入的书。"""
+    import json
+
     from bookscope.api.session_storage import JSONFileSessionStorage
 
     storage = JSONFileSessionStorage(root=Path(args.data_dir))
     ids = storage.list_all()
-    if not ids:
-        print("书库为空")
-        return 0
+    books = []
     for sid in sorted(ids):
         meta_path = Path(args.data_dir) / sid / "metadata.json"
         title = sid
         if meta_path.exists():
-            import json
-
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
                 title = meta.get("book_title", sid)
             except Exception:  # noqa: BLE001
                 pass
-        print(f"{sid}	{title}")
+        books.append({"session_id": sid, "book_title": title})
+    if getattr(args, "json", False):
+        print(json.dumps({"books": books, "count": len(books)}, ensure_ascii=False, indent=2))
+    else:
+        if not books:
+            print("书库为空")
+        else:
+            for b in books:
+                print(f"{b['session_id']}	{b['book_title']}")
     return 0
 
 
@@ -338,21 +344,30 @@ def cmd_import(args: argparse.Namespace) -> int:
     else:
         files = [path]
 
+    import json
+
     data_dir = Path(args.data_dir)
-    count = 0
+    imported = []
     for f in sorted(files):
-        print(f"正在导入 {f} …")
         try:
             session_id = _import_one(f, data_dir, title=args.title if len(files) == 1 else None)
         except Exception as exc:  # noqa: BLE001
-            print(f"  导入失败: {exc}", file=sys.stderr)
+            imported.append({"file": str(f), "session_id": None, "error": str(exc)})
             continue
-        print(f"  已导入书库：{session_id} · 《{f.stem}》")
-        count += 1
-
-    print(f"完成：成功 {count}/{len(files)} 本")
-    print(f"  数据目录：{data_dir.resolve()}")
+        imported.append({"file": str(f), "session_id": session_id, "book_title": f.stem})
+    count = sum(1 for x in imported if x["session_id"])
+    if getattr(args, "json", False):
+        print(json.dumps({"imported": imported, "count": count, "total": len(files), "data_dir": str(data_dir.resolve())}, ensure_ascii=False, indent=2))
+    else:
+        for x in imported:
+            if x["session_id"]:
+                print(f"  已导入书库：{x['session_id']} · 《{x['book_title']}》（{Path(x['file']).name}）")
+            else:
+                print(f"  导入失败: {x['error']}")
+        print(f"完成：成功 {count}/{len(files)} 本")
+        print(f"  数据目录：{data_dir.resolve()}")
     return 0 if count else 1
+
 
 
 def _local_ask(question: str, chunks: list[dict], json_out: bool) -> int:
@@ -497,6 +512,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 def cmd_summary(args: argparse.Namespace) -> int:
     """零配置：在终端打印书的结构/章节摘要。"""
+    import json
+
     path = Path(args.path)
     if not path.exists():
         print(f"文件不存在: {path}", file=sys.stderr)
@@ -507,11 +524,17 @@ def cmd_summary(args: argparse.Namespace) -> int:
     for c in chunks:
         ch = c.get("chapter") or 0
         groups.setdefault(ch, []).append(c)
-    print(f"《{title}》 · {len(groups)} 章")
+    chapters = []
     for ch in sorted(groups):
         text = " ".join(str(c.get("text", "")) for c in groups[ch])
         excerpt = " ".join(text.split())[:80]
-        print(f"  第{ch}章：{excerpt}")
+        chapters.append({"chapter": ch, "excerpt": excerpt})
+    if getattr(args, "json", False):
+        print(json.dumps({"title": title, "chapter_count": len(groups), "chapters": chapters}, ensure_ascii=False, indent=2))
+    else:
+        print(f"《{title}》 · {len(groups)} 章")
+        for ch in chapters:
+            print(f"  第{ch['chapter']}章：{ch['excerpt']}")
     return 0
 
 
@@ -566,7 +589,17 @@ def cmd_report(args: argparse.Namespace) -> int:
     html = render_report(inp)
     out = Path(args.out)
     out.write_text(html, encoding="utf-8")
-    print(f"已生成: {out.resolve()} ({len(html)} bytes)")
+    if getattr(args, "json", False):
+        import json
+
+        print(json.dumps({
+            "out": str(out.resolve()),
+            "bytes": len(html),
+            "mode": "deep" if getattr(args, "deep", False) else "structure",
+            "title": title,
+        }, ensure_ascii=False, indent=2))
+    else:
+        print(f"已生成: {out.resolve()} ({len(html)} bytes)")
     if getattr(args, "open", False):
         import webbrowser
 
@@ -600,6 +633,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_summary = sub.add_parser("summary", help="零配置：在终端打印书的结构/章节摘要")
     p_summary.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
     p_summary.add_argument("--title", default=None, help="书名（默认取文件名）")
+    p_summary.add_argument("--json", action="store_true", help="以 JSON 输出章节摘要")
     p_summary.set_defaults(func=cmd_summary)
 
     p_report = sub.add_parser("report", help="把一本书秒出结构版 HTML 报告")
@@ -612,6 +646,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_report.add_argument("--model", default=None, help="模型名（默认 deepseek-v4-flash）")
     p_report.add_argument("--base-url", default=None, help="OpenAI 兼容 base_url")
     p_report.add_argument("--open", action="store_true", help="生成后自动在浏览器打开")
+    p_report.add_argument("--json", action="store_true", help="以 JSON 输出生成结果元数据")
     p_report.set_defaults(func=cmd_report)
 
     p_prewarm = sub.add_parser("prewarm", help="预建一本书的章脉缓存（后续操作秒出）")
@@ -636,12 +671,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_list = sub.add_parser("list", help="列出书库里已导入的书")
     p_list.add_argument("--data-dir", default="data/sessions", help="书库数据目录（默认 data/sessions）")
+    p_list.add_argument("--json", action="store_true", help="以 JSON 输出书库列表")
     p_list.set_defaults(func=cmd_list)
 
     p_import = sub.add_parser("import", help="把本地文件导入书库（Web 直接可见）")
     p_import.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")
     p_import.add_argument("--title", default=None, help="书名（默认取文件名）")
     p_import.add_argument("--data-dir", default="data/sessions", help="书库数据目录（默认 data/sessions）")
+    p_import.add_argument("--json", action="store_true", help="以 JSON 输出导入结果")
     p_import.set_defaults(func=cmd_import)
 
     p_ask = sub.add_parser("ask", help="对一本书直接提问，输出带原文引用的答案")
