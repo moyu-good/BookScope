@@ -2700,17 +2700,30 @@ export function App() {
           )}
 
           {!apiKey && (
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              className="mb-6 w-full text-left rounded-lg border border-[var(--color-seal)]/40 px-4 py-3 text-sm text-[var(--color-ink)] hover:border-[var(--color-seal)] transition-colors"
+            <div
+              className="mb-6 rounded-lg border border-[var(--color-seal)]/40 px-4 py-3 text-sm text-[var(--color-ink)]"
               style={{ background: "var(--color-seal-soft)" }}
             >
-              基础功能（结构报告/导入/列表）不需要 key；深度分析/问答需要时再填。
-              点这里去
-              <span style={{ color: "var(--color-seal)" }}>设置</span>
-              （左栏底部，自带的 key、不上传服务器）。
-            </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-seal)] text-[var(--color-seal)]"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  零配置模式
+                </span>
+                <span>基础功能可直接用：上传 / 导入 / 结构报告 / 章节摘要 / 本地问答</span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-muted)]">
+                <span>深度分析 / 跨文本对照需要 LLM key 时才配置。</span>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-seal)] hover:border-[var(--color-seal)] transition-colors"
+                >
+                  去设置（可选）
+                </button>
+              </div>
+            </div>
           )}
 
           {/* 主画布：一次只显示一件事 */}
