@@ -67,8 +67,16 @@ section h2 .no{font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--
 .verify-toggle{display:inline-block;margin-top:12px;padding:6px 14px;border-radius:20px;border:1px solid var(--jade);background:var(--paper-card);color:var(--jade);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
 .data-btn{display:inline-block;margin-top:12px;margin-left:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--cinnabar);background:var(--paper-card);color:var(--cinnabar);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
 body.verified-only .quote.unverified{display:none}
+.toc-btn{position:fixed;bottom:16px;left:16px;height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--border);background:var(--paper-card);cursor:pointer;font-size:14px;box-shadow:var(--shadow);z-index:100;font-family:"Noto Sans SC",sans-serif;color:var(--ink)}
+.toc-panel{position:fixed;top:0;left:0;bottom:0;width:min(320px,86vw);background:var(--paper);border-right:1px solid var(--border);z-index:200;padding:24px 16px;overflow-y:auto;transform:translateX(-100%);transition:transform .25s;box-shadow:var(--shadow)}
+.toc-panel.open{transform:none}
+.toc-panel h3{color:var(--cinnabar);margin-bottom:12px}
+.toc-panel a{display:block;padding:9px 10px;color:var(--ink-2);text-decoration:none;border-radius:8px;font-size:14px;font-family:"Noto Sans SC",sans-serif}
+.toc-panel a:hover{background:var(--cinnabar-soft);color:var(--cinnabar)}
+.toc-close{position:absolute;top:14px;right:14px;border:none;background:none;font-size:20px;cursor:pointer;color:var(--ink-2)}
 footer{text-align:center;padding:32px 16px;color:var(--ink-3);font-size:13px;border-top:1px solid var(--border);margin-top:32px;font-family:"Noto Sans SC",sans-serif}
-@media(max-width:640px){body{font-size:15px}.hero{padding:28px 14px 22px}.hero h1{font-size:22px}.hero .subtitle{font-size:13px}.stats{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}.stat{padding:12px 8px}.stat .num{font-size:22px}section{padding:20px 14px}section h2{font-size:18px}.card{padding:14px}.grid{grid-template-columns:1fr}.graph-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.graph-wrap svg{min-width:600px}.theme-toggle{width:40px;height:40px;bottom:12px;right:12px;font-size:16px}.print-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;right:62px}}
+@media(max-width:640px){body{font-size:15px}.hero{padding:28px 14px 22px}.hero h1{font-size:22px}.hero .subtitle{font-size:13px}.stats{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}.stat{padding:12px 8px}.stat .num{font-size:22px}section{padding:20px 14px}section h2{font-size:18px}.card{padding:14px}.grid{grid-template-columns:1fr}.graph-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.graph-wrap svg{min-width:600px}.theme-toggle{width:40px;height:40px;bottom:12px;right:12px;font-size:16px}.print-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;right:62px}.toc-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;left:12px}}
+@media print{.toc-btn,.toc-panel{display:none!important}}
 """
 
 
@@ -508,6 +516,25 @@ def render_visual_report(data: dict) -> str:
 <header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button><button class="data-btn" onclick="downloadReportData()">⬇️ 数据 JSON</button></header>
 <div class="stats">{stat_html}</div>
 {sections}
+<button class="toc-btn" onclick="document.getElementById('toc-panel').classList.add('open')">☰ 目录</button>
+<div class="toc-panel" id="toc-panel">
+<button class="toc-close" onclick="document.getElementById('toc-panel').classList.remove('open')">✕</button>
+<h3>📑 报告目录</h3>
+<a href="#recap">壹 · 逻辑主线</a>
+<a href="#phases">贰 · 情节阶段</a>
+<a href="#chapters">叁 · 章节速览</a>
+<a href="#curve">肆 · 叙事曲线</a>
+<a href="#graph">伍 · 人物/概念关系图</a>
+<a href="#character-arc">陆 · 核心人物弧线</a>
+<a href="#relationship">柒 · 关系演变</a>
+<a href="#timeline">捌 · 事件时间线</a>
+<a href="#concept">玖 · 概念演变</a>
+<a href="#argument">拾 · 论证结构</a>
+<a href="#writing">拾壹 · 写作技法</a>
+<a href="#motif">拾贰 · 母题追踪</a>
+<a href="#foreshadow">拾叁 · 伏笔与回收</a>
+<a href="#consistency">拾肆 · 前后一致性</a>
+</div>
 <button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
 <button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
 <footer>BookScope · 逻辑梳理与可视化报告 · 所有引文均回原文核验 · 生成时间 {_esc(__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M"))}</footer>
@@ -522,6 +549,9 @@ document.querySelectorAll('[data-filter]').forEach(input=>{{
       el.style.display=(!q||(el.textContent||'').toLowerCase().includes(q))?'':'none';
     }});
   }});
+}});
+document.querySelectorAll('.toc-panel a').forEach(a=>{{
+  a.addEventListener('click',()=>document.getElementById('toc-panel').classList.remove('open'));
 }});
 function downloadReportData(){{
   const data=JSON.parse(document.getElementById('report-data').textContent);
