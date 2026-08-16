@@ -56,6 +56,8 @@ section h2 .no{font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--
 .claim .no{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--cinnabar);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-family:"Noto Sans SC",sans-serif}
 .graph-wrap{background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
 .graph-wrap svg{display:block;width:100%;height:auto}
+.graph-wrap .dim{opacity:.12}
+.graph-wrap .node-highlight{filter:drop-shadow(0 0 6px rgba(176,58,46,.55))}
 .chart-wrap{background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;overflow-x:auto}
 .chart-wrap svg{min-width:680px;width:100%;height:auto}
 .curve-detail{background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-top:12px;box-shadow:var(--shadow)}
@@ -132,28 +134,52 @@ def _graph_svg(graph: dict, limit: int = 36) -> str:
     W, H = 800, 640
     cx, cy = W / 2, H / 2
     r = min(W, H) / 2 - 70
+    import math
     pos = {}
     for i, name in enumerate(top):
         ang = -90 + i * 360 / n
-        rad = ang * 3.14159265 / 180
-        pos[name] = (cx + r * __import__("math").cos(rad), cy + r * __import__("math").sin(rad))
+        rad = ang * math.pi / 180
+        pos[name] = (cx + r * math.cos(rad), cy + r * math.sin(rad))
     parts = [f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">']
     for e in keep_edges[:120]:
         a, b = pos.get(e.get("source")), pos.get(e.get("target"))
         if not a or not b:
             continue
+        src = _esc(e.get("source", ""))
+        tgt = _esc(e.get("target", ""))
         parts.append(
-            f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" '
+            f'<line class="graph-edge" data-a="{src}" data-b="{tgt}" x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" '
             f'stroke="var(--border)" stroke-width="{min(3, max(1, e.get("strength", 1)))}" opacity="0.6"/>'
         )
     for name in top:
         x, y = pos[name]
+        safe = _esc(name)
         parts.append(
+            f'<g class="graph-node" data-node="{safe}" style="cursor:pointer">'
             f'<circle cx="{x:.1f}" cy="{y:.1f}" r="16" fill="var(--cinnabar-soft)" stroke="var(--cinnabar)" stroke-width="1.5"/>'
             f'<text x="{x:.1f}" y="{y+4:.1f}" font-size="11" fill="var(--ink)" text-anchor="middle" font-family="sans-serif">{_esc(name[:6])}</text>'
+            f'</g>'
         )
     parts.append("</svg>")
-    return '<div class="graph-wrap">' + "".join(parts) + "</div>"
+    legend = '<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">点击人物高亮其关系；再点空白处取消。</p>'
+    script = (
+        "<script>"
+        "document.querySelectorAll('.graph-node').forEach(node=>{"
+        "node.addEventListener('click',e=>{e.stopPropagation();const name=node.dataset.node;const active=node.classList.contains('active');"
+        "document.querySelectorAll('.graph-node').forEach(n=>n.classList.remove('active','node-highlight'));"
+        "document.querySelectorAll('.graph-edge').forEach(ed=>ed.classList.remove('dim'));"
+        "if(!active){node.classList.add('active','node-highlight');"
+        "document.querySelectorAll('.graph-node').forEach(n=>{if(n!==node)n.classList.add('dim');});"
+        "document.querySelectorAll('.graph-edge').forEach(ed=>{const on=ed.dataset.a===name||ed.dataset.b===name;ed.classList.toggle('dim',!on);if(on)ed.style.stroke='var(--cinnabar)';else ed.style.stroke='';});"
+        "}else{document.querySelectorAll('.graph-edge').forEach(ed=>ed.style.stroke='');}"
+        "});});"
+        "document.querySelector('.graph-wrap').addEventListener('click',e=>{if(e.target.tagName==='svg'){"
+        "document.querySelectorAll('.graph-node').forEach(n=>n.classList.remove('active','node-highlight','dim'));"
+        "document.querySelectorAll('.graph-edge').forEach(ed=>{ed.classList.remove('dim');ed.style.stroke='';});"
+        "}});"
+        "</script>"
+    )
+    return '<div class="graph-wrap">' + "".join(parts) + "</div>" + legend + script
 
 
 def _timeline_html(timeline: dict) -> str:
