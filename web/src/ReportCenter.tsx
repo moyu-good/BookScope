@@ -213,9 +213,9 @@ export function ReportCenter({
                           </button>
                           <button
                             type="button"
-                            disabled={!groupReady}
+                            disabled={!groupReady || list.length > 8}
                             onClick={() => onClusterDiscover(list, src)}
-                            title={groupReady ? `自动发现「${src}」两两关系（最多 8 本）` : "章脉未全就绪，先预建整组"}
+                            title={list.length > 8 ? "一次最多 8 本，请分批" : groupReady ? `自动发现「${src}」两两关系（最多 8 本）` : "章脉未全就绪，先预建整组"}
                             className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-rule)] text-[var(--color-ink-muted)] hover:text-[var(--color-seal)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             发现关系
