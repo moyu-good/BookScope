@@ -20,7 +20,14 @@ def _build_css() -> str:
 :root{--cinnabar:#B03A2E;--cinnabar-deep:#8E2A20;--cinnabar-soft:#F5E6E3;--ink:#2B2622;--ink-2:#5A534C;--ink-3:#8A8278;--paper:#F7F2E7;--paper-card:#FFFCF5;--gold:#9C7A2E;--jade:#2E7D5B;--indigo:#3D5A99;--violet:#6A4E8E;--border:#E4DCCB;--radius:12px;--shadow:0 1px 3px rgba(43,38,34,.06),0 4px 16px rgba(43,38,34,.05)}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
+[data-theme="dark"]{--paper:#201C18;--paper-card:#2A2520;--ink:#E8E0D2;--ink-2:#B5AC9E;--ink-3:#8A8278;--border:#3A342C;--cinnabar-soft:#3A2A26}
 body{background:var(--paper);color:var(--ink);font-family:"Noto Serif SC","Songti SC","Source Han Serif SC",serif;line-height:1.7;font-size:16px}
+.theme-toggle{position:fixed;bottom:16px;right:16px;width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--paper-card);cursor:pointer;font-size:18px;box-shadow:var(--shadow);z-index:100}
+.print-btn{position:fixed;bottom:16px;right:70px;height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--border);background:var(--paper-card);cursor:pointer;font-size:14px;box-shadow:var(--shadow);z-index:100;font-family:"Noto Sans SC",sans-serif;color:var(--ink)}
+.search-box{max-width:1200px;margin:0 auto 12px;padding:0}
+.search-box input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--paper-card);font-family:"Noto Sans SC",sans-serif;font-size:14px;color:var(--ink);outline:none}
+.search-box input:focus{border-color:var(--cinnabar);box-shadow:0 0 0 3px var(--cinnabar-soft)}
+@media print{.theme-toggle,.print-btn{display:none!important}.hero{padding:24px 16px}section{padding:16px}.card{box-shadow:none;break-inside:avoid}}
 .hero{background:linear-gradient(135deg,var(--cinnabar-soft),transparent 65%);border-bottom:1px solid var(--border);padding:42px 20px 30px;text-align:center}
 .hero h1{font-size:28px;color:var(--cinnabar);letter-spacing:.04em;margin-bottom:8px}
 .hero .subtitle{color:var(--ink-2);font-size:14px;max-width:720px;margin:0 auto}
@@ -52,7 +59,7 @@ section h2 .no{font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--
 .chart-wrap{background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;overflow-x:auto}
 .chart-wrap svg{min-width:680px;width:100%;height:auto}
 footer{text-align:center;padding:32px 16px;color:var(--ink-3);font-size:13px;border-top:1px solid var(--border);margin-top:32px;font-family:"Noto Sans SC",sans-serif}
-@media(max-width:640px){body{font-size:15px}.hero{padding:28px 14px 22px}.hero h1{font-size:22px}.hero .subtitle{font-size:13px}.stats{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}.stat{padding:12px 8px}.stat .num{font-size:22px}section{padding:20px 14px}section h2{font-size:18px}.card{padding:14px}.grid{grid-template-columns:1fr}}
+@media(max-width:640px){body{font-size:15px}.hero{padding:28px 14px 22px}.hero h1{font-size:22px}.hero .subtitle{font-size:13px}.stats{grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}.stat{padding:12px 8px}.stat .num{font-size:22px}section{padding:20px 14px}section h2{font-size:18px}.card{padding:14px}.grid{grid-template-columns:1fr}.graph-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.graph-wrap svg{min-width:600px}.theme-toggle{width:40px;height:40px;bottom:12px;right:12px;font-size:16px}.print-btn{height:38px;padding:0 12px;font-size:13px;bottom:12px;right:62px}}
 """
 
 
@@ -281,8 +288,9 @@ def render_visual_report(data: dict) -> str:
 <header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span></header>
 <div class="stats">{stat_html}</div>
 {sections}
+<button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
 <button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
-<footer>BookScope · 逻辑梳理与可视化报告 · 所有引文均回原文核验</footer>
+<footer>BookScope · 逻辑梳理与可视化报告 · 所有引文均回原文核验 · 生成时间 {_esc(__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M"))}</footer>
 <script>
 document.querySelectorAll('[data-filter]').forEach(input=>{{
   input.addEventListener('input',()=>{{
