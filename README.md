@@ -115,6 +115,27 @@ bookscope list
   <sub>叙事曲线与人物弧线：用有书卷气的画法呈现分析结果。</sub>
 </p>
 
+<p align="center">
+  <img src="docs/images/graph.png" width="48%" alt="人物关系星图">
+  <img src="docs/images/relationship.png" width="48%" alt="关系演变">
+  <br>
+  <sub>人物关系星图与关系演变。</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/hero-timeline.png" width="48%" alt="时间线">
+  <img src="docs/images/hero-consistency.png" width="48%" alt="一致性自检">
+  <br>
+  <sub>时间线与一致性自检。</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/foreshadow.png" width="48%" alt="伏笔回收">
+  <img src="docs/images/flow.png" width="48%" alt="支线编织">
+  <br>
+  <sub>伏笔回收与支线编织。</sub>
+</p>
+
 ---
 
 ## 技术栈
