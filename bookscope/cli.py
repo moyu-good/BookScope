@@ -585,6 +585,38 @@ def cmd_catalog(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_self_test(args: argparse.Namespace) -> int:
+    """零配置核心链路自检：读文件 → 结构报告 → 导入 → 本地问答。"""
+    import tempfile
+
+    from bookscope.local_tools import import_file, load_chunks, local_search, structure_report_html
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        book = root / "sample.txt"
+        book.write_text("第一章 开端\n这是关于经济改革的讨论。\n第二章 发展\n这里提到市场与政府的关系。\n", encoding="utf-8")
+
+        # 1. 结构报告
+        html = structure_report_html(book, title="自检书")
+        assert "<!DOCTYPE html>" in html
+        print("  ✓ 结构报告")
+
+        # 2. 导入
+        data_dir = root / "sessions"
+        session_id = import_file(book, data_dir, title="自检书")
+        assert session_id.startswith("api-")
+        print(f"  ✓ 导入书库 {session_id}")
+
+        # 3. 本地问答
+        _name, _b, _results, chunks = load_chunks(book, title="自检书")
+        results = local_search("市场与政府", chunks)
+        assert results
+        print(f"  ✓ 本地问答（{len(results)} 条相关）")
+
+    print("零配置核心链路自检通过")
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     path = Path(args.path)
     if not path.exists():
@@ -687,6 +719,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_catalog.add_argument("path", help="书库文件夹路径")
     p_catalog.add_argument("--out", default="bookscope-catalog", help="输出目录（默认 bookscope-catalog）")
     p_catalog.set_defaults(func=cmd_catalog)
+
+    p_self_test = sub.add_parser("self-test", help="零配置核心链路自检")
+    p_self_test.set_defaults(func=cmd_self_test)
 
     p_report = sub.add_parser("report", help="把一本书秒出结构版 HTML 报告")
     p_report.add_argument("path", help="书文件路径（txt / epub / pdf / docx / md）")

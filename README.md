@@ -66,6 +66,9 @@ bookscope summary 书.epub --json
 # 零配置：一个文件夹生成可浏览的 HTML 书库目录
 bookscope catalog ./我的书库 --out ./书库目录
 
+# 零配置核心链路自检（读文件→报告→导入→本地问答）
+bookscope self-test
+
 # 深度版书鉴报告（需要 LLM key）
 bookscope report 书.epub --deep --out 书鉴深度.html --api-key sk-...
 

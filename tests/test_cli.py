@@ -205,3 +205,13 @@ def test_cmd_catalog_generates_index(tmp_path: Path, capsys) -> None:
     assert (out / "index.html").exists()
     assert (out / "a.html").exists()
     assert (out / "b.html").exists()
+
+
+def test_cmd_self_test_passes(capsys) -> None:
+    import argparse
+
+    import bookscope.cli as cli
+
+    assert cli.cmd_self_test(argparse.Namespace()) == 0
+    out = capsys.readouterr().out
+    assert "零配置核心链路自检通过" in out
