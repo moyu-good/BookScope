@@ -4747,6 +4747,63 @@ def agent_cluster_report(
     return Response(content=html, media_type="text/html; charset=utf-8", headers={"X-Report-Coverage": "full"})
 
 
+def _dedupe_cluster_edges(edges: list[dict]) -> list[dict]:
+    """按 (from,to,relation) 去重，保留第一条 rationale。"""
+    seen: set[tuple[str, str, str]] = set()
+    out: list[dict] = []
+    for e in edges:
+        key = (str(e.get("from", "")), str(e.get("to", "")), str(e.get("relation", "")))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(e)
+    return out
+
+
+def _merge_cluster_concepts(items: list[dict]) -> list[dict]:
+    """把两两对照里的概念演进按概念名合并，stage 按 (paper,stage) 去重。
+
+    返回出现次数最多的前 5 个概念——比直接取前 N 条 pair 结果更有簇代表性。
+    """
+    merged: dict[str, list[dict]] = {}
+    for item in items:
+        name = str(item.get("concept", "")).strip()
+        if not name:
+            continue
+        stages = merged.setdefault(name, [])
+        existing = {(str(x.get("paper", "")), str(x.get("stage", ""))) for x in stages}
+        for st in item.get("stages", []):
+            key = (str(st.get("paper", "")), str(st.get("stage", "")))
+            if key not in existing:
+                stages.append(st)
+                existing.add(key)
+    arr = [{"concept": k, "stages": v} for k, v in merged.items()]
+    arr.sort(key=lambda x: len(x["stages"]), reverse=True)
+    return arr[:5]
+
+
+def _merge_cluster_disputes(items: list[dict]) -> list[dict]:
+    """把两两对照里的分歧按问题合并，side 按 (paper,stance) 去重。
+
+    返回涉及书最多的前 5 个问题——簇级分歧比单对更完整。
+    """
+    merged: dict[str, list[dict]] = {}
+    for item in items:
+        q = str(item.get("question", "")).strip()
+        if not q:
+            continue
+        sides = merged.setdefault(q, [])
+        existing = {(str(x.get("paper", "")), str(x.get("stance", ""))) for x in sides}
+        for sd in item.get("sides", []):
+            key = (str(sd.get("paper", "")), str(sd.get("stance", "")))
+            if key not in existing:
+                sides.append(sd)
+                existing.add(key)
+    arr = [{"question": k, "sides": v} for k, v in merged.items()]
+    arr.sort(key=lambda x: len(x["sides"]), reverse=True)
+    return arr[:5]
+
+
 @agent_router.post("/agent/cluster/discover")
 def agent_cluster_discover(
     request: ClusterDiscoverRequest,
@@ -4822,6 +4879,11 @@ def agent_cluster_discover(
             for p in perspectives if p.get("slug")
         ]
 
+    # 聚合后整理：边去重，概念/分歧按主题合并排序（簇级比单对更完整）
+    edges = _dedupe_cluster_edges(edges)
+    concepts = _merge_cluster_concepts(concepts)
+    disputes = _merge_cluster_disputes(disputes)
+
     title = f"簇关系网 · {request.cluster_name}"
     inp = {
         "layout": "crossdoc",
@@ -4835,8 +4897,8 @@ def agent_cluster_discover(
         },
         "nodes": nodes,
         "edges": edges,
-        "concept_evolution": concepts[:3],
-        "disagreements": disputes[:3],
+        "concept_evolution": concepts,
+        "disagreements": disputes,
         "narrative": f"《{request.cluster_name}》共 {len(nodes)} 本，两两对照 {pair_count} 对，"
                      f"发现 {len(edges)} 条关系（继承/反驳/补充/落地/检验）。关系为 LLM 研判，锚到各书主张。",
         "spines": {
