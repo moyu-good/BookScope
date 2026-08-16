@@ -372,6 +372,33 @@ def _relationship_timeline_html(rt: dict) -> str:
         )
     return '<div class="grid">' + "".join(cards) + "</div>"
 
+def _top_characters_html(graph: dict, arc: dict) -> str:
+    nodes = graph.get("nodes", [])
+    edges = graph.get("edges", [])
+    if not nodes:
+        return '<p style="color:var(--ink-3)">暂无核心人物数据。</p>'
+    degree: dict[str, int] = {}
+    for e in edges:
+        degree[e.get("source", "")] = degree.get(e.get("source", ""), 0) + 1
+        degree[e.get("target", "")] = degree.get(e.get("target", ""), 0) + 1
+    arc_map: dict[str, int] = {}
+    for c in arc.get("characters", []):
+        pts = c.get("points", []) or []
+        if pts:
+            arc_map[c.get("name", "")] = max(p.get("presence", 0) for p in pts)
+    top = sorted(nodes, key=lambda x: degree.get(x, 0), reverse=True)[:20]
+    items = []
+    for i, name in enumerate(top, 1):
+        presence = arc_map.get(name)
+        presence_html = f'<span style="font-size:12px;color:var(--ink-3)">峰值戏份 {presence}/10</span>' if presence is not None else ""
+        items.append(
+            f'<div class="card" style="padding:12px 14px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+            f'<div><b style="color:var(--cinnabar)">{i}. {_esc(name)}</b> <span style="font-size:12px;color:var(--ink-3);margin-left:6px">{degree.get(name,0)} 条关系</span></div>'
+            f'{presence_html}</div>'
+        )
+    return '<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">' + "".join(items) + "</div>"
+
+
 
 
 
@@ -495,15 +522,16 @@ def render_visual_report(data: dict) -> str:
 <section id="chapters"><h2><span class="no">叁</span>章节速览</h2>{_chapters_overview_html(curve.get("chapters", []))}</section>
 <section id="curve"><h2><span class="no">肆</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
 <section id="graph"><h2><span class="no">伍</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
-<section id="character-arc"><h2><span class="no">陆</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
-<section id="relationship"><h2><span class="no">柒</span>关系演变</h2>{_relationship_timeline_html(relationship_timeline)}</section>
-<section id="timeline"><h2><span class="no">捌</span>事件时间线</h2>{_timeline_html(timeline)}</section>
-<section id="concept"><h2><span class="no">玖</span>概念演变</h2>{_concept_html(concept)}</section>
-<section id="argument"><h2><span class="no">拾</span>论证结构</h2>{_argument_html(argument)}</section>
-<section id="writing"><h2><span class="no">拾壹</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
-<section id="motif"><h2><span class="no">拾贰</span>母题追踪</h2>{_motif_html(motif)}</section>
-<section id="foreshadow"><h2><span class="no">拾叁</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
-<section id="consistency"><h2><span class="no">拾肆</span>前后一致性</h2>{_consistency_html(consistency)}</section>
+<section id="top-characters"><h2><span class="no">陆</span>核心人物榜</h2>{_top_characters_html(graph, character_arc)}</section>
+<section id="character-arc"><h2><span class="no">柒</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
+<section id="relationship"><h2><span class="no">捌</span>关系演变</h2>{_relationship_timeline_html(relationship_timeline)}</section>
+<section id="timeline"><h2><span class="no">玖</span>事件时间线</h2>{_timeline_html(timeline)}</section>
+<section id="concept"><h2><span class="no">拾</span>概念演变</h2>{_concept_html(concept)}</section>
+<section id="argument"><h2><span class="no">拾壹</span>论证结构</h2>{_argument_html(argument)}</section>
+<section id="writing"><h2><span class="no">拾贰</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
+<section id="motif"><h2><span class="no">拾叁</span>母题追踪</h2>{_motif_html(motif)}</section>
+<section id="foreshadow"><h2><span class="no">拾肆</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
+<section id="consistency"><h2><span class="no">拾伍</span>前后一致性</h2>{_consistency_html(consistency)}</section>
 """
 
     return f"""<!DOCTYPE html>
@@ -527,15 +555,16 @@ def render_visual_report(data: dict) -> str:
 <a href="#chapters">叁 · 章节速览</a>
 <a href="#curve">肆 · 叙事曲线</a>
 <a href="#graph">伍 · 人物/概念关系图</a>
-<a href="#character-arc">陆 · 核心人物弧线</a>
-<a href="#relationship">柒 · 关系演变</a>
-<a href="#timeline">捌 · 事件时间线</a>
-<a href="#concept">玖 · 概念演变</a>
-<a href="#argument">拾 · 论证结构</a>
-<a href="#writing">拾壹 · 写作技法</a>
-<a href="#motif">拾贰 · 母题追踪</a>
-<a href="#foreshadow">拾叁 · 伏笔与回收</a>
-<a href="#consistency">拾肆 · 前后一致性</a>
+<a href="#top-characters">陆 · 核心人物榜</a>
+<a href="#character-arc">柒 · 核心人物弧线</a>
+<a href="#relationship">捌 · 关系演变</a>
+<a href="#timeline">玖 · 事件时间线</a>
+<a href="#concept">拾 · 概念演变</a>
+<a href="#argument">拾壹 · 论证结构</a>
+<a href="#writing">拾贰 · 写作技法</a>
+<a href="#motif">拾叁 · 母题追踪</a>
+<a href="#foreshadow">拾肆 · 伏笔与回收</a>
+<a href="#consistency">拾伍 · 前后一致性</a>
 </div>
 <button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
 <button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
