@@ -202,8 +202,8 @@
           },
           "mode": {
             "type": "string",
-            "enum": ["full", "quick"],
-            "description": "full=完整分析（默认）；quick=快速模式，只出主线/曲线/关系/时间线，耗时更短"
+            "enum": ["quick", "full"],
+            "description": "quick=默认，秒出总览/主线/曲线/关系/时间线；full=完整分析（耗时较长，按需使用）"
           },
           "api_key": {
             "type": "string",

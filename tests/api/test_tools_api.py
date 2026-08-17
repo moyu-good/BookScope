@@ -269,7 +269,7 @@ def test_tools_manifest_visualize_has_mode(client: TestClient) -> None:
     body = resp.json()
     vis = next(t for t in body["tools"] if t["name"] == "bookscope_visualize")
     assert "mode" in vis["parameters"]["properties"]
-    assert vis["parameters"]["properties"]["mode"]["enum"] == ["full", "quick"]
+    assert vis["parameters"]["properties"]["mode"]["enum"] == ["quick", "full"]
     assert "title" in vis["parameters"]["properties"]
     assert "motif" in vis["parameters"]["properties"]
     assert "save_path" in vis["parameters"]["properties"]

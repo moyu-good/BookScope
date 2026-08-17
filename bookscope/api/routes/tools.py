@@ -246,7 +246,7 @@ def tools_invoke(req: InvokeRequest) -> dict:
             provider = args.get("provider", "deepseek")
             model = args.get("model", "deepseek-v4-flash")
             base_url = args.get("base_url")
-            full_mode = args.get("mode", "full") == "full"
+            full_mode = args.get("mode", "quick") == "full"
 
             def _mk(cls, **extra):
                 return cls(
