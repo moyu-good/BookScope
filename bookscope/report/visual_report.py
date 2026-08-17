@@ -452,6 +452,33 @@ def _top_characters_html(graph: dict, arc: dict) -> str:
         )
     return '<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">' + "".join(items) + "</div>"
 
+def _overview_dashboard_html(data: dict) -> str:
+    recap = data.get("recap", {}).get("points", [])
+    graph = data.get("character_graph", {})
+    timeline = data.get("timeline", {}).get("events", [])
+    phases = data.get("narrative_phases", {}).get("phases", [])
+    degree: dict[str, int] = {}
+    for e in graph.get("edges", []):
+        degree[e.get("source", "")] = degree.get(e.get("source", ""), 0) + 1
+        degree[e.get("target", "")] = degree.get(e.get("target", ""), 0) + 1
+    top_chars = sorted(degree, key=degree.get, reverse=True)[:5]
+    top_events = timeline[:5]
+    top_points = recap[:3]
+
+    def _li(items, key):
+        return "".join(f"<li>{_esc(x.get(key,''))}</li>" for x in items if x.get(key)) or "<li style='color:var(--ink-3)'>暂无</li>"
+
+    chars = "".join(f"<li>{_esc(c)}</li>" for c in top_chars) or "<li style='color:var(--ink-3)'>暂无</li>"
+    phases_html = "".join(f"<li>{_esc(p.get('name',''))}（第{p.get('start_ch','?')}-{p.get('end_ch','?')}章）</li>" for p in phases[:5]) or "<li style='color:var(--ink-3)'>暂无</li>"
+    return f"""
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+  <div class="card"><h3 style="color:var(--cinnabar);margin-bottom:8px">🧭 核心结论</h3><ul style="padding-left:18px;font-size:14px;color:var(--ink-2)">{_li(top_points,'point')}</ul></div>
+  <div class="card"><h3 style="color:var(--cinnabar);margin-bottom:8px">👤 关键人物</h3><ul style="padding-left:18px;font-size:14px;color:var(--ink-2)">{chars}</ul></div>
+  <div class="card"><h3 style="color:var(--cinnabar);margin-bottom:8px">⚡ 关键事件</h3><ul style="padding-left:18px;font-size:14px;color:var(--ink-2)">{_li(top_events,'event')}</ul></div>
+  <div class="card"><h3 style="color:var(--cinnabar);margin-bottom:8px">🗺️ 主要阶段</h3><ul style="padding-left:18px;font-size:14px;color:var(--ink-2)">{phases_html}</ul></div>
+</div>"""
+
+
 def _next_steps_html() -> str:
     items = [
         ("📖 深读追问", "对某个角色/概念继续提问，答案会挂原文出处。"),
@@ -622,24 +649,25 @@ def render_visual_report(data: dict) -> str:
     report_json = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
     sections = f"""
-<section id="recap"><h2><span class="no">壹</span>逻辑主线</h2>{_recap_html(recap)}</section>
-<section id="phases"><h2><span class="no">贰</span>情节阶段</h2>{_phases_html(phases)}</section>
-<section id="chapters"><h2><span class="no">叁</span>章节速览</h2>{_chapters_overview_html(curve.get("chapters", []))}</section>
-<section id="curve"><h2><span class="no">肆</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
-<section id="graph"><h2><span class="no">伍</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
-<section id="top-characters"><h2><span class="no">陆</span>核心人物榜</h2>{_top_characters_html(graph, character_arc)}</section>
-<section id="character-arc"><h2><span class="no">柒</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
-<section id="relationship"><h2><span class="no">捌</span>关系演变</h2>{_relationship_timeline_html(relationship_timeline)}</section>
-<section id="timeline"><h2><span class="no">玖</span>事件时间线</h2>{_timeline_html(timeline)}</section>
-<section id="concept"><h2><span class="no">拾</span>概念演变</h2>{_concept_html(concept)}</section>
-<section id="argument"><h2><span class="no">拾壹</span>论证结构</h2>{_argument_html(argument)}</section>
-<section id="writing"><h2><span class="no">拾贰</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
-<section id="motif"><h2><span class="no">拾叁</span>母题追踪</h2>{_motif_html(motif)}</section>
-<section id="foreshadow"><h2><span class="no">拾肆</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
-<section id="consistency"><h2><span class="no">拾伍</span>前后一致性</h2>{_consistency_html(consistency)}</section>
-<section id="method"><h2><span class="no">拾陆</span>方法说明</h2>{_method_html()}</section>
-<section id="integration"><h2><span class="no">拾柒</span>AI 助手接入方式</h2>{_integration_html()}</section>
-<section id="next"><h2><span class="no">拾捌</span>下一步可以做什么</h2>{_next_steps_html()}</section>
+<section id="overview"><h2><span class="no">壹</span>总览驾驶舱</h2>{_overview_dashboard_html(data)}</section>
+<section id="recap"><h2><span class="no">贰</span>逻辑主线</h2>{_recap_html(recap)}</section>
+<section id="phases"><h2><span class="no">叁</span>情节阶段</h2>{_phases_html(phases)}</section>
+<section id="chapters"><h2><span class="no">肆</span>章节速览</h2>{_chapters_overview_html(curve.get("chapters", []))}</section>
+<section id="curve"><h2><span class="no">伍</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
+<section id="graph"><h2><span class="no">陆</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
+<section id="top-characters"><h2><span class="no">柒</span>核心人物榜</h2>{_top_characters_html(graph, character_arc)}</section>
+<section id="character-arc"><h2><span class="no">捌</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
+<section id="relationship"><h2><span class="no">玖</span>关系演变</h2>{_relationship_timeline_html(relationship_timeline)}</section>
+<section id="timeline"><h2><span class="no">拾</span>事件时间线</h2>{_timeline_html(timeline)}</section>
+<section id="concept"><h2><span class="no">拾壹</span>概念演变</h2>{_concept_html(concept)}</section>
+<section id="argument"><h2><span class="no">拾贰</span>论证结构</h2>{_argument_html(argument)}</section>
+<section id="writing"><h2><span class="no">拾叁</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
+<section id="motif"><h2><span class="no">拾肆</span>母题追踪</h2>{_motif_html(motif)}</section>
+<section id="foreshadow"><h2><span class="no">拾伍</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
+<section id="consistency"><h2><span class="no">拾陆</span>前后一致性</h2>{_consistency_html(consistency)}</section>
+<section id="method"><h2><span class="no">拾柒</span>方法说明</h2>{_method_html()}</section>
+<section id="integration"><h2><span class="no">拾捌</span>AI 助手接入方式</h2>{_integration_html()}</section>
+<section id="next"><h2><span class="no">拾玖</span>下一步可以做什么</h2>{_next_steps_html()}</section>
 """
 
     return f"""<!DOCTYPE html>
@@ -659,24 +687,25 @@ def render_visual_report(data: dict) -> str:
 <div class="toc-panel" id="toc-panel">
 <button class="toc-close" onclick="document.getElementById('toc-panel').classList.remove('open')">✕</button>
 <h3>📑 报告目录</h3>
-<a href="#recap">壹 · 逻辑主线</a>
-<a href="#phases">贰 · 情节阶段</a>
-<a href="#chapters">叁 · 章节速览</a>
-<a href="#curve">肆 · 叙事曲线</a>
-<a href="#graph">伍 · 人物/概念关系图</a>
-<a href="#top-characters">陆 · 核心人物榜</a>
-<a href="#character-arc">柒 · 核心人物弧线</a>
-<a href="#relationship">捌 · 关系演变</a>
-<a href="#timeline">玖 · 事件时间线</a>
-<a href="#concept">拾 · 概念演变</a>
-<a href="#argument">拾壹 · 论证结构</a>
-<a href="#writing">拾贰 · 写作技法</a>
-<a href="#motif">拾叁 · 母题追踪</a>
-<a href="#foreshadow">拾肆 · 伏笔与回收</a>
-<a href="#consistency">拾伍 · 前后一致性</a>
-<a href="#method">拾陆 · 方法说明</a>
-<a href="#integration">拾柒 · AI 助手接入方式</a>
-<a href="#next">拾捌 · 下一步可以做什么</a>
+<a href="#overview">壹 · 总览驾驶舱</a>
+<a href="#recap">贰 · 逻辑主线</a>
+<a href="#phases">叁 · 情节阶段</a>
+<a href="#chapters">肆 · 章节速览</a>
+<a href="#curve">伍 · 叙事曲线</a>
+<a href="#graph">陆 · 人物/概念关系图</a>
+<a href="#top-characters">柒 · 核心人物榜</a>
+<a href="#character-arc">捌 · 核心人物弧线</a>
+<a href="#relationship">玖 · 关系演变</a>
+<a href="#timeline">拾 · 事件时间线</a>
+<a href="#concept">拾壹 · 概念演变</a>
+<a href="#argument">拾贰 · 论证结构</a>
+<a href="#writing">拾叁 · 写作技法</a>
+<a href="#motif">拾肆 · 母题追踪</a>
+<a href="#foreshadow">拾伍 · 伏笔与回收</a>
+<a href="#consistency">拾陆 · 前后一致性</a>
+<a href="#method">拾柒 · 方法说明</a>
+<a href="#integration">拾捌 · AI 助手接入方式</a>
+<a href="#next">拾玖 · 下一步可以做什么</a>
 </div>
 <button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
 <button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
