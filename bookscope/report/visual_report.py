@@ -73,6 +73,10 @@ section h2 .no{font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--
 .data-btn{display:inline-block;margin-top:12px;margin-left:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--cinnabar);background:var(--paper-card);color:var(--cinnabar);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
 .md-btn{display:inline-block;margin-top:12px;margin-left:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--indigo);background:var(--paper-card);color:var(--indigo);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
 body.verified-only .quote.unverified{display:none}
+.compact-btn{display:inline-block;margin-top:12px;margin-left:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--gold);background:var(--paper-card);color:var(--gold);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
+body.compact section .card,body.compact section .graph-wrap,body.compact section .chart-wrap,body.compact section .search-box,body.compact section p,body.compact section .tl{display:none}
+body.compact section h2{cursor:pointer}
+body.compact section.open .card,body.compact section.open .graph-wrap,body.compact section.open .chart-wrap,body.compact section.open .search-box,body.compact section.open p,body.compact section.open .tl{display:block}
 .toc-btn{position:fixed;bottom:16px;left:16px;height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--border);background:var(--paper-card);cursor:pointer;font-size:14px;box-shadow:var(--shadow);z-index:100;font-family:"Noto Sans SC",sans-serif;color:var(--ink)}
 .toc-panel{position:fixed;top:0;left:0;bottom:0;width:min(320px,86vw);background:var(--paper);border-right:1px solid var(--border);z-index:200;padding:24px 16px;overflow-y:auto;transform:translateX(-100%);transition:transform .25s;box-shadow:var(--shadow)}
 .toc-panel.open{transform:none}
@@ -217,6 +221,48 @@ def _timeline_html(timeline: dict) -> str:
         )
     return ('<div class="search-box"><input type="search" placeholder="🔍 搜索时间线…" data-filter="timeline"></div>'
             '<div class="card" data-list="timeline"><div class="tl">' + "".join(items) + "</div></div>")
+
+
+def _keywords_html(data: dict) -> str:
+    texts: list[str] = []
+    for p in data.get("recap", {}).get("points", []):
+        texts.append(str(p.get("point", "")))
+    for e in data.get("timeline", {}).get("events", []):
+        texts.append(str(e.get("event", "")))
+    for c in data.get("argument_structure", {}).get("claims", []):
+        texts.append(str(c.get("claim", "")))
+    for st in data.get("concept_evolution", {}).get("stages", []):
+        texts.append(str(st.get("development", "")))
+    for o in data.get("motif_tracking", {}).get("occurrences", []):
+        texts.append(str(o.get("manifestation", "")))
+    all_text = "\n".join(texts)
+    if not all_text.strip():
+        return '<p style="color:var(--ink-3)">暂无高频主题数据。</p>'
+    try:
+        from collections import Counter
+
+        import jieba
+
+        stop = {
+            "这个", "那个", "我们", "你们", "他们", "什么", "一个", "没有", "就是",
+            "可以", "这样", "已经", "还是", "但是", "因为", "所以", "如果", "不是",
+            "以及", "对于", "通过", "进行", "成为", "这些", "那些", "本书", "本章",
+            "这里", "那里", "一种", "之间", "之后", "其中", "主要", "重要", "自己",
+        }
+        words = [w for w in jieba.lcut(all_text) if len(w) >= 2 and w not in stop and not w.isdigit()]
+        top = Counter(words).most_common(20)
+        if not top:
+            return '<p style="color:var(--ink-3)">暂无高频主题数据。</p>'
+        max_n = max(n for _, n in top)
+        spans = []
+        for w, n in top:
+            size = 13 + int(10 * n / max_n)
+            spans.append(
+                f'<span style="display:inline-block;font-size:{size}px;color:var(--cinnabar);background:var(--cinnabar-soft);border-radius:20px;padding:4px 12px;margin:4px">{_esc(w)}</span>'
+            )
+        return '<div class="card">' + "".join(spans) + "</div>"
+    except Exception:  # noqa: BLE001
+        return '<p style="color:var(--ink-3)">暂无高频主题数据。</p>'
 
 
 def _recap_html(recap: dict) -> str:
@@ -604,7 +650,7 @@ def render_visual_report(data: dict) -> str:
 <style>{_build_css()}</style>
 </head>
 <body>
-<header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button><button class="data-btn" onclick="downloadReportData()">⬇️ 数据 JSON</button><button class="md-btn" onclick="copyMarkdown()">📋 Markdown 摘要</button><button class="md-btn" onclick="downloadMarkdown()">⬇️ Markdown</button></header>
+<header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button><button class="data-btn" onclick="downloadReportData()">⬇️ 数据 JSON</button><button class="md-btn" onclick="copyMarkdown()">📋 Markdown 摘要</button><button class="md-btn" onclick="downloadMarkdown()">⬇️ Markdown</button><button class="compact-btn" onclick="document.body.classList.toggle('compact');this.textContent=document.body.classList.contains('compact')?'展开全部':'精简模式'">精简模式</button></header>
 <div class="search-box" style="max-width:1200px;margin:16px auto 0;padding:0 16px"><input type="search" id="global-search" placeholder="🔍 全局搜索：输入人物 / 概念 / 关键词，只显示相关板块…"></div>
 <div class="stats">{stat_html}</div>
 {sections}
@@ -654,6 +700,13 @@ document.getElementById('global-search').addEventListener('input',e=>{{
   const q=e.target.value.trim().toLowerCase();
   document.querySelectorAll('main section, body > section').forEach(sec=>{{
     sec.style.display=(!q||(sec.textContent||'').toLowerCase().includes(q))?'':'none';
+  }});
+}});
+document.querySelectorAll('body > section h2').forEach(h=>{{
+  h.addEventListener('click',()=>{{
+    if(document.body.classList.contains('compact')){{
+      h.parentElement.classList.toggle('open');
+    }}
   }});
 }});
   function buildMarkdown(){{
