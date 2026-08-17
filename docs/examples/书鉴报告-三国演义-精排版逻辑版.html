@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="light">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>《三国演义》逻辑梳理</title>
+<style>
+:root{
+  --ink:#25211C; --ink-2:#5A5248; --ink-3:#948B7E;
+  --paper:#FAF7F0; --line:#E2D9C8; --accent:#A63A2B; --accent-soft:#F4E6E0;
+  --serif:"Noto Serif SC","Songti SC","Source Han Serif SC",serif;
+  --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--serif);line-height:1.9;font-size:17px}
+.wrap{max-width:820px;margin:0 auto;padding:64px 36px 100px}
+header{padding-bottom:36px;border-bottom:1px solid var(--line);margin-bottom:36px}
+.kicker{font-family:var(--sans);font-size:12px;letter-spacing:.2em;color:var(--ink-3);text-transform:uppercase;margin-bottom:16px}
+h1{font-size:40px;line-height:1.25;font-weight:800;letter-spacing:.01em}
+.subtitle{font-size:17px;color:var(--ink-2);margin-top:12px;max-width:640px;line-height:1.8}
+.meta{font-family:var(--sans);font-size:13px;color:var(--ink-3);margin-top:20px;display:flex;flex-wrap:wrap;gap:8px 20px}
+.seal{display:inline-block;border:1px solid var(--accent);color:var(--accent);border-radius:3px;padding:2px 12px;font-size:12px;letter-spacing:.3em;font-family:var(--sans);margin-top:18px}
+.toc{margin:36px 0;padding:0 0 8px;border-bottom:1px solid var(--line)}
+.toc .toc-title{font-family:var(--sans);font-size:12px;letter-spacing:.2em;color:var(--ink-3);margin-bottom:12px}
+.toc a{display:block;color:var(--ink-2);text-decoration:none;font-size:15px;padding:5px 0;border-bottom:1px dashed var(--line);font-family:var(--sans)}
+.toc a:last-child{border-bottom:none}
+.toc a:hover{color:var(--accent)}
+section{margin-bottom:52px}
+h2{font-size:24px;font-weight:800;color:var(--ink);padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:22px;display:flex;align-items:baseline;gap:12px}
+h2 .no{font-family:var(--sans);font-size:12px;color:var(--ink-3);letter-spacing:.12em}
+p{color:var(--ink-2);margin-bottom:16px}
+.summary{font-size:19px;line-height:2.1;color:var(--ink);padding:8px 0 8px 22px;border-left:3px solid var(--accent);margin:0 0 20px}
+.flow{width:100%;height:auto;margin:18px 0;background:transparent}
+ol.args{list-style:none;counter-reset:arg;margin:0}
+ol.args>li{counter-increment:arg;padding:22px 0 22px 56px;border-bottom:1px solid var(--line);position:relative}
+ol.args>li:last-child{border-bottom:none}
+ol.args>li::before{content:counter(arg,decimal-leading-zero);position:absolute;left:0;top:24px;font-family:var(--sans);font-size:13px;color:var(--accent);letter-spacing:.05em}
+.claim{font-size:18px;color:var(--ink);font-weight:700;line-height:1.7}
+.cite{font-family:var(--sans);font-size:12px;color:var(--accent);vertical-align:super;margin-left:3px}
+blockquote{margin:12px 0 0;padding:2px 0 2px 18px;border-left:2px solid var(--line);color:var(--ink-2);font-size:15px;line-height:1.8}
+blockquote .src{font-family:var(--sans);font-size:12px;color:var(--ink-3);display:block;margin-top:4px}
+.timeline{list-style:none;margin:0;padding-left:22px;border-left:1px solid var(--line)}
+.timeline>li{position:relative;padding:0 0 26px 22px}
+.timeline>li::before{content:"";position:absolute;left:-27px;top:8px;width:9px;height:9px;border-radius:50%;background:var(--accent);border:2px solid var(--paper)}
+.timeline .ch{font-family:var(--sans);font-size:12px;color:var(--ink-3);letter-spacing:.05em}
+.timeline .dev{font-size:17px;color:var(--ink);margin-top:2px}
+.qa{border-top:1px solid var(--line);padding-top:22px}
+.qa .q{font-size:19px;font-weight:800;color:var(--ink);margin-bottom:10px}
+.qa .a{font-size:16px;color:var(--ink-2);line-height:2}
+.qa .src{font-family:var(--sans);font-size:13px;color:var(--ink-3);margin-top:12px}
+.method{font-family:var(--sans);font-size:13px;color:var(--ink-3);line-height:1.9}
+.method b{color:var(--ink-2)}
+footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);font-family:var(--sans);font-size:12px;color:var(--ink-3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+@media(max-width:640px){
+  .wrap{padding:36px 20px 70px}
+  h1{font-size:28px}
+  h2{font-size:20px}
+  body{font-size:16px}
+  ol.args>li{padding-left:0;padding-top:24px}
+  ol.args>li::before{left:0;top:26px}
+  .timeline{padding-left:14px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">BookScope · 深度逻辑梳理</div>
+    <h1>《三国演义》逻辑梳理</h1>
+    <p class="subtitle">一份从论证结构、概念演变与主线要点出发的深度逻辑报告。</p>
+    <span class="seal">书 鉴</span>
+    <div class="meta"><span>书鉴 BookScope</span><span>引文均回原文核验</span></div>
+  </header>
+
+  
+<div class="toc"><div class="toc-title">目录</div>
+<a href="#summary">一、逻辑主线</a>
+<a href="#flow">二、逻辑推进</a>
+<a href="#args">三、论证结构</a>
+<a href="#concept">四、概念演变</a>
+<a href="#qa">五、追问</a>
+<a href="#method">六、方法说明</a>
+</div>
+
+  <section id="summary">
+    <h2><span class="no">壹</span>逻辑主线</h2>
+    <p class="summary">黄巾起义爆发，百姓从张角者四五十万，官军望风而靡。；朝廷主张不纳黄巾降者，认为容其降无以劝善。；董卓在阳城屠杀村民，掠妇女财物，悬头还都。；董卓声称‘吾为天下计，岂惜小民哉’，驱民迁都，纵军淫掠。；董卓筑郿坞，囤积粮食，选美女八百，金玉彩帛堆积无数。；曹操为报父仇攻徐州，军队杀戮人民，发掘坟墓。；徐州百姓哭拜请刘备领郡，称若不受则不能安生。；战乱中百姓食枣菜，饿莩遍野。</p>
+  </section>
+
+  <section id="flow">
+    <h2><span class="no">贰</span>逻辑推进</h2>
+    <svg class="flow" viewBox="0 0 680 120" xmlns="http://www.w3.org/2000/svg"><text x="60.0" y="38" font-size="13" fill="var(--ink)" text-anchor="middle" font-family="var(--sans)" font-weight="600">《三国演义》并不是简</text><circle cx="60.0" cy="60" r="5" fill="var(--accent)"/><line x1="140.0" y1="60" x2="166.7" y2="60" stroke="var(--line)" stroke-width="1.5"/><text x="246.7" y="38" font-size="13" fill="var(--ink)" text-anchor="middle" font-family="var(--sans)" font-weight="600">《三国演义》的这种描</text><circle cx="246.7" cy="60" r="5" fill="var(--accent)"/><line x1="326.7" y1="60" x2="353.3" y2="60" stroke="var(--line)" stroke-width="1.5"/><text x="433.3" y="38" font-size="13" fill="var(--ink)" text-anchor="middle" font-family="var(--sans)" font-weight="600">《三国演义》的这些描</text><circle cx="433.3" cy="60" r="5" fill="var(--accent)"/><line x1="513.3" y1="60" x2="540.0" y2="60" stroke="var(--line)" stroke-width="1.5"/><text x="620.0" y="38" font-size="13" fill="var(--ink)" text-anchor="middle" font-family="var(--sans)" font-weight="600">《三国演义》对农民革</text><circle cx="620.0" cy="60" r="5" fill="var(--accent)"/></svg>
+    <p>这张图是全书论证的推进骨架：从总判断出发，经过价值肯定、立场批判，最后落到具体成就。</p>
+  </section>
+
+  <section id="args">
+    <h2><span class="no">叁</span>论证结构</h2>
+    <ol class="args"><li><div class="claim">《三国演义》并不是简单地复述三国的历史人物和历史事实，而是一部经过艺术构思和艺术加工的文学作品。</div><blockquote>《三国演义》并不是简单地复述三国的历史人物和历史事实，而是一部经过艺术构思和艺术加工的文学作品。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">《三国演义》的这种描写不仅有助于我们了解封建社会的历史，而且对认识剥削阶级的实质也有所帮助。</div><blockquote>因此，《三国演义》的这种描写不仅有助于我们了解封建社会的历史，而且对认识剥削阶级的实质也有所帮助。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">《三国演义》的这些描写，对于我们了解剥削阶级的狡诈手段，识破他们的阴谋诡计，具有一定的认识作用。</div><blockquote>因此，《三国演义》的这些描写，对于我们了解剥削阶级的狡诈手段，识破他们的阴谋诡计，具有一定的认识作用。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">《三国演义》对农民革命直接进行了诬蔑。</div><blockquote>也正是从这种维护封建统治的立场出发，《三国演义》对农民革命直接进行了诬蔑。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">《三国演义》虽然为我们提供了若干对于封建社会的历史具有认识意义的材料，但也宣扬了错误的有害的封建思想。</div><blockquote>总之，《三国演义》虽然为我们提供了若干对于封建社会的历史具有认识意义的材料，但也宣扬了错误的有害的封建思想。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">《三国演义》在曹操的形象中，却反映了封建统治阶级残酷、狡诈的特点，具有深刻的典型意义。</div><blockquote>然而，《三国演义》在曹操的形象中，却反映了封建统治阶级残酷、狡诈的特点，具有深刻的典型意义。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">善于描写战争，提供封建社会战争的某些有价值的研究材料，是《三国演义》具有积极意义的又一个重要方面。</div><blockquote>善于描写战争，提供封建社会战争的某些有价值的研究材料，是《三国演义》具有积极意义的又一个重要方面。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">《三国演义》虽然描写了某些具有辩证法因素的战争事例，但作者对于唯物辩证法的科学规律，没有也不可能有自觉的认识；只有用毛泽东思想进行分析，这些事例内在的唯物辩证法原则才能被人们所认识。</div><blockquote>《三国演义》虽然描写了某些具有辩证法因素的战争事例，但作者对于唯物辩证法的科学规律，没有也不可能有自觉的认识；只有用毛泽东思想进行分析，这些事例内在的唯物辩证法原则才能被人们所认识。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">取材于历史，又不为历史事实所限制，是《三国演义》创作方法的一个特点。</div><blockquote>取材于历史，又不为历史事实所限制，是《三国演义》创作方法的一个特点。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">在现实矛盾的斗争中，用人物自己的言行，表现他们的性格。</div><blockquote>在现实矛盾的斗争中，用人物自己的言行，表现他们的性格。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">运用生动的细节描写，突出人物的性格特征。</div><blockquote>运用生动的细节描写，突出人物的性格特征。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">渲染环境气氛，以加深人物性格的刻划。</div><blockquote>渲染环境气氛，以加深人物性格的刻划。<span class="src">鉴 · 第0章</span></blockquote></li><li><div class="claim">何进无谋，自取灭亡</div><blockquote>汉室倾危天数终，无谋何进作三公<span class="src">鉴 · 第3章</span></blockquote></li><li><div class="claim">曹操狠毒，与董卓同流</div><blockquote>设心狠毒非良士，操卓原来一路人<span class="src">鉴 · 第4章</span></blockquote></li><li><div class="claim">孙坚私匿玉玺引发祸端</div><blockquote>玉玺得来无用处，反因此宝动刀兵<span class="src">鉴 · 第6章</span></blockquote></li><li><div class="claim">董卓暴虐，结果败亡</div><blockquote>伯业成时为帝王，不成且作富家郎。谁知天意无私曲，郿坞方成已灭亡<span class="src">鉴 · 第9章</span></blockquote></li></ol>
+  </section>
+
+  <section id="concept">
+    <h2><span class="no">肆</span>概念演变</h2>
+    <ul class="timeline"><li><span class="ch">第1章</span><div class="dev">桃园结义，提出忠义——兄弟之义与匡扶汉室之忠。</div><blockquote>次日，于桃园中，备下乌牛白马祭礼等项，三人焚香再拜而说誓曰：‘念刘备、关羽、张飞，虽然异姓，既结为兄弟，则同心协力，救困扶危，上报国家，下安黎庶，不求同年同月同日生，只愿同年同月同日死。’<span class="src">鉴</span></blockquote></li><li><span class="ch">第25章</span><div class="dev">关羽约三事降曹（降汉不降曹、保全二嫂、知刘备去向即辞），将忠义具体化，强调对刘备的忠诚高于对曹操的恩义。</div><blockquote>关公曰：“吾观颜良，如插标卖首耳！”<span class="src">鉴</span></blockquote></li><li><span class="ch">第50章</span><div class="dev">华容道义释曹操，关羽在私人旧恩与军国大义间选择后者，体现忠义的复杂性与个人义气的分量。</div><blockquote>云长是个义重如山之人，想起当日曹操许多恩义，与后来五关斩将之事，如何不动心？又见曹军惶惶，皆欲垂泪，一发心中不忍。于是把马头勒回，谓众军曰：‘四散摆开。’<span class="src">鉴</span></blockquote></li><li><span class="ch">第53章</span><div class="dev">关羽战黄忠，因义气感化黄忠，义释之，展现忠义对敌手的感召力。</div><blockquote>云长引魏延来见，孔明喝令刀斧手推下斩之。玄德惊问孔明曰：‘魏延乃有功无罪之人，军师何故欲杀之？’孔明曰：‘食其禄而杀其主，是不忠也；居其土而献其地，是不义也。吾观魏延脑后有反骨，久后必反，故先斩之，以绝祸根。’<span class="src">鉴</span></blockquote></li><li><span class="ch">第64章</span><div class="dev">张飞义释严颜，用义气收服降将，忠义化为凝聚人心的力量。</div><blockquote>只听山坡前一声炮响，箭如飞蝗，只望骑白马者射来。可怜庞统竟死于乱箭之下。时年止三十六岁。<span class="src">鉴</span></blockquote></li><li><span class="ch">第85章</span><div class="dev">白帝城托孤，刘备将兴汉大业托付诸葛亮，忠义从兄弟之义升华为君臣之义、兴国之志。</div><blockquote>孔明叹曰：‘汉朝气数休矣！’<span class="src">鉴</span></blockquote></li><li><span class="ch">第103章</span><div class="dev">诸葛亮六出祁山，誓死伐魏，将忠义推向鞠躬尽瘁的极致。</div><blockquote>孔明曰：“吾受先帝托孤之重，当竭力讨贼，岂可以虚妄之灾氛，而废国家大事耶！”遂命有司设太牢祭于昭烈之庙，涕泣拜告曰：“臣亮五出祁山，未得寸土，负罪非轻！今臣复统全师，再出祁山，誓竭力尽心，剿灭汉贼，恢复中原，鞠躬尽瘁，死而后已！”<span class="src">鉴</span></blockquote></li><li><span class="ch">第104章</span><div class="dev">诸葛亮病重禳星，谋事在人成事在天，忠义面对天命仍不放弃。</div><blockquote>孔明叹曰：‘谋事在人，成事在天。’不可强也！<span class="src">鉴</span></blockquote></li><li><span class="ch">第105章</span><div class="dev">诸葛亮病逝，遗计退兵，死而后已，忠义以生命践行。</div><blockquote>懿叹曰：‘吾能料其生，不能料其死也！’<span class="src">鉴</span></blockquote></li><li><span class="ch">第119章</span><div class="dev">刘谌杀妻儿自刎于昭烈庙，姜维假降钟会图谋复国，忠义以殉国与诈降两种悲壮方式延续。</div><blockquote>谌乃自杀其三子，并割妻头，提至昭烈庙中，伏地哭曰：“臣羞见基业弃于他人，故先杀妻子，以绝挂念，后将一命报祖！祖如有灵，知孙之心！”大哭一场，眼中流血，自刎而死。<span class="src">鉴</span></blockquote></li></ul>
+  </section>
+
+  <section id="qa">
+    <h2><span class="no">伍</span>追问</h2>
+    <div class="qa"><div class="q">这本书的总体逻辑是怎么推进的？</div><div class="a">报告从“《三国演义》是艺术加工的文学作品”这一总判断出发，先讲它的认识价值，再指出它维护封建统治的立场局限，最后落到“善于描写战争”等具体成就——是一个先肯定价值、再批判局限、再分点论证的结构。</div><div class="src">来源：论点1、论点5、论点7</div></div>
+  </section>
+
+  <section id="method">
+    <h2><span class="no">陆</span>方法说明</h2>
+    <div class="method">
+      <p><b>数据来源：</b>本地原文。</p>
+      <p><b>分析方式：</b>AI 从原文抽取论点、概念与主线，再由核验器回原文逐字比对。</p>
+      <p><b>判定标识：</b>「鉴」= 原文逐字命中；「研判」= 模型推断。</p>
+      <p><b>使用建议：</b>本报告是辅助梳理，重要结论请回到原文核对。</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>《三国演义》逻辑梳理</span>
+    <span>BookScope · 书鉴</span>
+  </footer>
+</div>
+</body>
+</html>
