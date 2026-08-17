@@ -80,6 +80,11 @@ body.compact section h2{cursor:pointer}
 body.compact section.open .card,body.compact section.open .graph-wrap,body.compact section.open .chart-wrap,body.compact section.open .search-box,body.compact section.open p,body.compact section.open .tl{display:block}
 .charts-btn{display:inline-block;margin-top:12px;margin-left:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--violet);background:var(--paper-card);color:var(--violet);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
 body.charts-only .quote,body.charts-only .point,body.charts-only .claim,body.charts-only .arc,body.charts-only .tl-item .quote{display:none}
+.tab-bar{position:sticky;top:0;z-index:50;display:flex;gap:6px;overflow-x:auto;background:var(--paper);padding:10px 16px;border-bottom:1px solid var(--border);font-family:"Noto Sans SC",sans-serif}
+.tab-btn{padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--paper-card);color:var(--ink-2);cursor:pointer;font-size:13px;white-space:nowrap;transition:all .15s}
+.tab-btn.active{background:var(--cinnabar);color:#fff;border-color:var(--cinnabar)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
 .toc-btn{position:fixed;bottom:16px;left:16px;height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--border);background:var(--paper-card);cursor:pointer;font-size:14px;box-shadow:var(--shadow);z-index:100;font-family:"Noto Sans SC",sans-serif;color:var(--ink)}
 .toc-panel{position:fixed;top:0;left:0;bottom:0;width:min(320px,86vw);background:var(--paper);border-right:1px solid var(--border);z-index:200;padding:24px 16px;overflow-y:auto;transform:translateX(-100%);transition:transform .25s;box-shadow:var(--shadow)}
 .toc-panel.open{transform:none}
@@ -686,28 +691,53 @@ def render_visual_report(data: dict) -> str:
     )
     report_json = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
-    sections = f"""
+    overview_panel = f"""
 <section id="overview"><h2><span class="no">壹</span>总览驾驶舱</h2>{_overview_dashboard_html(data)}</section>
 <section id="logic-flow"><h2><span class="no">贰</span>逻辑主线图</h2>{_logic_flow_html(data)}</section>
+"""
+    logic_panel = f"""
 <section id="recap"><h2><span class="no">叁</span>逻辑主线</h2>{_recap_html(recap)}</section>
 <section id="phases"><h2><span class="no">肆</span>情节阶段</h2>{_phases_html(phases)}</section>
-<section id="chapters"><h2><span class="no">伍</span>章节速览</h2>{_chapters_overview_html(curve.get("chapters", []))}</section>
-<section id="curve"><h2><span class="no">陆</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
+<section id="argument"><h2><span class="no">拾叁</span>论证结构</h2>{_argument_html(argument)}</section>
+"""
+    people_panel = f"""
 <section id="graph"><h2><span class="no">柒</span>人物/概念关系图</h2>{_graph_svg(graph)}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">按关联度取核心节点，边越粗关系越强。</p></section>
 <section id="top-characters"><h2><span class="no">捌</span>核心人物榜</h2>{_top_characters_html(graph, character_arc)}</section>
 <section id="character-arc"><h2><span class="no">玖</span>核心人物弧线</h2>{_character_arc_html(character_arc)}</section>
 <section id="relationship"><h2><span class="no">拾</span>关系演变</h2>{_relationship_timeline_html(relationship_timeline)}</section>
+"""
+    events_panel = f"""
+<section id="chapters"><h2><span class="no">伍</span>章节速览</h2>{_chapters_overview_html(curve.get("chapters", []))}</section>
+<section id="curve"><h2><span class="no">陆</span>叙事曲线</h2>{_curve_svg(curve.get("chapters", []))}<p style="font-size:13px;color:var(--ink-3);font-family:sans-serif;margin-top:8px">纵轴 = 每章事件密度；朱砂点 = 转折章。</p></section>
 <section id="timeline"><h2><span class="no">拾壹</span>事件时间线</h2>{_timeline_html(timeline)}</section>
 <section id="concept"><h2><span class="no">拾贰</span>概念演变</h2>{_concept_html(concept)}</section>
-<section id="argument"><h2><span class="no">拾叁</span>论证结构</h2>{_argument_html(argument)}</section>
 <section id="writing"><h2><span class="no">拾肆</span>写作技法</h2>{_writing_technique_html(writing_technique)}</section>
 <section id="motif"><h2><span class="no">拾伍</span>母题追踪</h2>{_motif_html(motif)}</section>
 <section id="foreshadow"><h2><span class="no">拾陆</span>伏笔与回收</h2>{_foreshadow_html(foreshadow)}</section>
 <section id="consistency"><h2><span class="no">拾柒</span>前后一致性</h2>{_consistency_html(consistency)}</section>
+"""
+    meta_panel = f"""
 <section id="method"><h2><span class="no">拾捌</span>方法说明</h2>{_method_html()}</section>
 <section id="integration"><h2><span class="no">拾玖</span>AI 助手接入方式</h2>{_integration_html()}</section>
 <section id="next"><h2><span class="no">贰拾</span>下一步可以做什么</h2>{_next_steps_html()}</section>
 """
+    tab_bar = """
+<div class="tab-bar">
+<button class="tab-btn active" data-tab="overview">📋 总览</button>
+<button class="tab-btn" data-tab="logic">🧭 逻辑</button>
+<button class="tab-btn" data-tab="people">👥 人物关系</button>
+<button class="tab-btn" data-tab="events">📜 事件与文本</button>
+<button class="tab-btn" data-tab="meta">📐 方法与接入</button>
+</div>
+"""
+    tab_panels = f"""
+<div class="tab-panel active" id="tab-overview">{overview_panel}</div>
+<div class="tab-panel" id="tab-logic">{logic_panel}</div>
+<div class="tab-panel" id="tab-people">{people_panel}</div>
+<div class="tab-panel" id="tab-events">{events_panel}</div>
+<div class="tab-panel" id="tab-meta">{meta_panel}</div>
+"""
+    sections = tab_bar + tab_panels
 
     return f"""<!DOCTYPE html>
 <html lang="zh" data-theme="light">
@@ -726,26 +756,11 @@ def render_visual_report(data: dict) -> str:
 <div class="toc-panel" id="toc-panel">
 <button class="toc-close" onclick="document.getElementById('toc-panel').classList.remove('open')">✕</button>
 <h3>📑 报告目录</h3>
-<a href="#overview">壹 · 总览驾驶舱</a>
-<a href="#logic-flow">贰 · 逻辑主线图</a>
-<a href="#recap">叁 · 逻辑主线</a>
-<a href="#phases">肆 · 情节阶段</a>
-<a href="#chapters">伍 · 章节速览</a>
-<a href="#curve">陆 · 叙事曲线</a>
-<a href="#graph">柒 · 人物/概念关系图</a>
-<a href="#top-characters">捌 · 核心人物榜</a>
-<a href="#character-arc">玖 · 核心人物弧线</a>
-<a href="#relationship">拾 · 关系演变</a>
-<a href="#timeline">拾壹 · 事件时间线</a>
-<a href="#concept">拾贰 · 概念演变</a>
-<a href="#argument">拾叁 · 论证结构</a>
-<a href="#writing">拾肆 · 写作技法</a>
-<a href="#motif">拾伍 · 母题追踪</a>
-<a href="#foreshadow">拾陆 · 伏笔与回收</a>
-<a href="#consistency">拾柒 · 前后一致性</a>
-<a href="#method">拾捌 · 方法说明</a>
-<a href="#integration">拾玖 · AI 助手接入方式</a>
-<a href="#next">贰拾 · 下一步可以做什么</a>
+<a href="#tab-overview" onclick="switchTab('overview');return false;">📋 总览</a>
+<a href="#tab-logic" onclick="switchTab('logic');return false;">🧭 逻辑</a>
+<a href="#tab-people" onclick="switchTab('people');return false;">👥 人物关系</a>
+<a href="#tab-events" onclick="switchTab('events');return false;">📜 事件与文本</a>
+<a href="#tab-meta" onclick="switchTab('meta');return false;">📐 方法与接入</a>
 </div>
 <button class="print-btn" onclick="window.print()" title="导出/打印 PDF">🖨️ 导出</button>
 <button class="theme-toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'" title="切换主题">🌓</button>
@@ -753,6 +768,13 @@ def render_visual_report(data: dict) -> str:
 <script id="report-data" type="application/json">{report_json}</script>
 <script>
 document.querySelector('.compact-btn').textContent=document.body.classList.contains('compact')?'展开全部':'精简模式';
+function switchTab(name){{
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+  const panel=document.getElementById('tab-'+name);
+  if(panel)panel.scrollIntoView({{behavior:'smooth',block:'start'}});
+}}
+document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
 document.querySelectorAll('[data-filter]').forEach(input=>{{
   input.addEventListener('input',()=>{{
     const q=input.value.trim().toLowerCase();
@@ -768,11 +790,11 @@ document.querySelectorAll('.toc-panel a').forEach(a=>{{
 }});
 document.getElementById('global-search').addEventListener('input',e=>{{
   const q=e.target.value.trim().toLowerCase();
-  document.querySelectorAll('main section, body > section').forEach(sec=>{{
+  document.querySelectorAll('section').forEach(sec=>{{
     sec.style.display=(!q||(sec.textContent||'').toLowerCase().includes(q))?'':'none';
   }});
 }});
-document.querySelectorAll('body > section h2').forEach(h=>{{
+document.querySelectorAll('section h2').forEach(h=>{{
   h.addEventListener('click',()=>{{
     if(document.body.classList.contains('compact')){{
       h.parentElement.classList.toggle('open');
