@@ -18,8 +18,11 @@ def _esc(s: Any) -> str:
 def _css() -> str:
     return """
 :root{
-  --ink:#25211C; --ink-2:#5A5248; --ink-3:#948B7E;
-  --paper:#FAF7F0; --line:#E2D9C8; --accent:#A63A2B; --accent-soft:#F4E6E0;
+  --cinnabar:#B03A2E; --cinnabar-deep:#8E2A20; --cinnabar-soft:#F5E6E3;
+  --ink:#2B2622; --ink-2:#5A534C; --ink-3:#8A8278;
+  --paper:#F7F2E7; --paper-card:#FFFCF5; --gold:#9C7A2E; --jade:#2E7D5B;
+  --indigo:#3D5A99; --violet:#6A4E8E; --border:#E4DCCB;
+  --accent:#B03A2E; --accent-soft:#F5E6E3; --line:#E4DCCB;
   --serif:"Noto Serif SC","Songti SC","Source Han Serif SC",serif;
   --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
 }
@@ -57,6 +60,11 @@ blockquote .src{font-family:var(--sans);font-size:12px;color:var(--ink-3);displa
 .timeline>li::before{content:"";position:absolute;left:-27px;top:8px;width:9px;height:9px;border-radius:50%;background:var(--accent);border:2px solid var(--paper)}
 .timeline .ch{font-family:var(--sans);font-size:12px;color:var(--ink-3);letter-spacing:.05em}
 .timeline .dev{font-size:17px;color:var(--ink);margin-top:2px}
+.graph{width:100%;height:auto;background:transparent;margin:18px 0}
+.event-list{list-style:none;margin:0}
+.event-list>li{padding:12px 0;border-bottom:1px solid var(--line)}
+.event-list .ch{font-family:var(--sans);font-size:12px;color:var(--ink-3)}
+.event-list .ev{font-size:16px;color:var(--ink);margin-top:2px}
 .qa{border-top:1px solid var(--line);padding-top:22px}
 .qa .q{font-size:19px;font-weight:800;color:var(--ink);margin-bottom:10px}
 .qa .a{font-size:16px;color:var(--ink-2);line-height:2}
@@ -96,6 +104,59 @@ def _flow_svg(labels: list[str]) -> str:
     return "".join(parts)
 
 
+
+def _graph_svg_simple(graph: dict, limit: int = 24) -> str:
+    nodes = graph.get("nodes", [])
+    edges = graph.get("edges", [])
+    if not nodes:
+        return '<p>暂无关系图数据。</p>'
+    degree = {}
+    for e in edges:
+        degree[e.get("source", "")] = degree.get(e.get("source", ""), 0) + 1
+        degree[e.get("target", "")] = degree.get(e.get("target", ""), 0) + 1
+    top = sorted(nodes, key=lambda x: degree.get(x, 0), reverse=True)[:limit]
+    top_set = set(top)
+    keep = [e for e in edges if e.get("source") in top_set and e.get("target") in top_set]
+    n = len(top)
+    W, H = 720, 520
+    cx, cy = W / 2, H / 2
+    r = min(W, H) / 2 - 60
+    import math
+    pos = {}
+    for i, name in enumerate(top):
+        ang = -90 + i * 360 / n
+        rad = ang * math.pi / 180
+        pos[name] = (cx + r * math.cos(rad), cy + r * math.sin(rad))
+    parts = [f'<svg class="graph" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">']
+    for e in keep[:80]:
+        a, b = pos.get(e.get("source")), pos.get(e.get("target"))
+        if not a or not b:
+            continue
+        parts.append(
+            f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" '
+            f'stroke="var(--border)" stroke-width="{min(2.5, max(1, e.get("strength", 1)))}" opacity="0.7"/>'
+        )
+    for name in top:
+        x, y = pos[name]
+        parts.append(
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="14" fill="var(--cinnabar-soft)" stroke="var(--cinnabar)" stroke-width="1.5"/>'
+            f'<text x="{x:.1f}" y="{y+4:.1f}" font-size="11" fill="var(--ink)" text-anchor="middle" font-family="var(--sans)">{_esc(name[:6])}</text>'
+        )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _event_list_html(timeline: dict) -> str:
+    events = timeline.get("events", []) or []
+    if not events:
+        return '<p>暂无事件时间线数据。</p>'
+    lis = []
+    for e in events[:20]:
+        lis.append(
+            f'<li><span class="ch">第{e.get("chapter","?")}章</span><div class="ev">{_esc(e.get("event",""))}</div></li>'
+        )
+    return '<ul class="event-list">' + "".join(lis) + "</ul>"
+
 def render_polished_report(data: dict) -> str:
     meta = data.get("meta", {})
     title = meta.get("title", "逻辑梳理报告")
@@ -105,6 +166,8 @@ def render_polished_report(data: dict) -> str:
     recap = data.get("recap", {})
     argument = data.get("argument_structure", {})
     concept = data.get("concept_evolution", {})
+    graph = data.get("character_graph", {})
+    timeline = data.get("timeline", {})
     ask = data.get("ask", {})
 
     points = recap.get("points", []) or []
@@ -144,6 +207,8 @@ def render_polished_report(data: dict) -> str:
     # 逻辑流程图：从论证结构前几条提炼阶段
     flow_labels = [str(c.get("claim", ""))[:10] for c in claims[:4]] or ["起点", "发展", "转折", "结论"]
     flow_html = _flow_svg(flow_labels)
+    graph_html = _graph_svg_simple(graph)
+    events_html = _event_list_html(timeline)
 
     ask_html = ""
     if ask.get("question"):
@@ -161,8 +226,10 @@ def render_polished_report(data: dict) -> str:
 <a href="#flow">二、逻辑推进</a>
 <a href="#args">三、论证结构</a>
 <a href="#concept">四、概念演变</a>
-<a href="#qa">五、追问</a>
-<a href="#method">六、方法说明</a>
+<a href="#graph">五、人物关系</a>
+<a href="#events">六、事件时间线</a>
+<a href="#qa">七、追问</a>
+<a href="#method">八、方法说明</a>
 </div>"""
 
     return f"""<!DOCTYPE html>
@@ -205,13 +272,23 @@ def render_polished_report(data: dict) -> str:
     {stages_html}
   </section>
 
+  <section id="graph">
+    <h2><span class="no">伍</span>人物关系</h2>
+    {graph_html}
+  </section>
+
+  <section id="events">
+    <h2><span class="no">陆</span>事件时间线</h2>
+    {events_html}
+  </section>
+
   <section id="qa">
-    <h2><span class="no">伍</span>追问</h2>
+    <h2><span class="no">柒</span>追问</h2>
     {ask_html if ask_html else '<p>暂无追问。</p>'}
   </section>
 
   <section id="method">
-    <h2><span class="no">陆</span>方法说明</h2>
+    <h2><span class="no">捌</span>方法说明</h2>
     <div class="method">
       <p><b>数据来源：</b>本地原文。</p>
       <p><b>分析方式：</b>AI 从原文抽取论点、概念与主线，再由核验器回原文逐字比对。</p>
