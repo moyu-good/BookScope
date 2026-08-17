@@ -75,6 +75,7 @@ section h2 .no{font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--
 body.verified-only .quote.unverified{display:none}
 .compact-btn{display:inline-block;margin-top:12px;margin-left:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--gold);background:var(--paper-card);color:var(--gold);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
 body.compact section .card,body.compact section .graph-wrap,body.compact section .chart-wrap,body.compact section .search-box,body.compact section p,body.compact section .tl{display:none}
+body.compact #overview .card{display:block}
 body.compact section h2{cursor:pointer}
 body.compact section.open .card,body.compact section.open .graph-wrap,body.compact section.open .chart-wrap,body.compact section.open .search-box,body.compact section.open p,body.compact section.open .tl{display:block}
 .charts-btn{display:inline-block;margin-top:12px;margin-left:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--violet);background:var(--paper-card);color:var(--violet);cursor:pointer;font-size:13px;font-family:"Noto Sans SC",sans-serif}
@@ -715,7 +716,7 @@ def render_visual_report(data: dict) -> str:
 <title>书鉴 · {_esc(title)}</title>
 <style>{_build_css()}</style>
 </head>
-<body>
+<body class="compact">
 <header class="hero"><h1>📜 {_esc(title)}</h1><p class="subtitle">{_esc(subtitle)}</p><span class="seal">书 鉴</span><br><button class="verify-toggle" onclick="document.body.classList.toggle('verified-only');this.textContent=document.body.classList.contains('verified-only')?'显示全部（含研判）':'只看已核验'">只看已核验</button><button class="data-btn" onclick="downloadReportData()">⬇️ 数据 JSON</button><button class="md-btn" onclick="copyMarkdown()">📋 Markdown 摘要</button><button class="md-btn" onclick="downloadMarkdown()">⬇️ Markdown</button><button class="compact-btn" onclick="document.body.classList.toggle('compact');this.textContent=document.body.classList.contains('compact')?'展开全部':'精简模式'">精简模式</button><button class="charts-btn" onclick="document.body.classList.toggle('charts-only');this.textContent=document.body.classList.contains('charts-only')?'显示全文':'只看图表'">只看图表</button></header>
 <div class="search-box" style="max-width:1200px;margin:16px auto 0;padding:0 16px"><input type="search" id="global-search" placeholder="🔍 全局搜索：输入人物 / 概念 / 关键词，只显示相关板块…"></div>
 <div class="stats">{stat_html}</div>
@@ -751,6 +752,7 @@ def render_visual_report(data: dict) -> str:
 <footer>BookScope · 逻辑梳理与可视化报告 · 所有引文均回原文核验 · 生成时间 {_esc(__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M"))}</footer>
 <script id="report-data" type="application/json">{report_json}</script>
 <script>
+document.querySelector('.compact-btn').textContent=document.body.classList.contains('compact')?'展开全部':'精简模式';
 document.querySelectorAll('[data-filter]').forEach(input=>{{
   input.addEventListener('input',()=>{{
     const q=input.value.trim().toLowerCase();
