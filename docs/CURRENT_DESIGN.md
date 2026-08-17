@@ -37,7 +37,6 @@
 | `docs/USER_GUIDE.md` | ✅ 当前用户手册 |
 | `docs/architecture-decisions/001~010, 012` | ✅ 仍有效的技术决策 |
 | `docs/architecture-decisions/011-hosted-account-backend.md` | ⚠️ 已废弃（托管/Docker 方向，不符合轻量本地工具） |
-| `docs/internal/academic-vertical/*` | ⚠️ 已废弃（论文垂直试点，仅作历史参考，不是当前方向） |
 | `docs/internal/case-study/*` | 🗄️ 历史记录（不是设计指令） |
 | `docs/internal/ROADMAP.md` | ⚠️ 历史路线图（含已废弃方向，当前以本文为准） |
 | `docs/internal/NORTH_STAR.md` / `WORKFLOW.md` / `ASSESSMENT_20260814.md` | 🗄️ 内部历史工作文档，不是当前设计依据 |

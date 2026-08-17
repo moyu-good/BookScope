@@ -4,8 +4,8 @@
 纯函数：输入 = 报告契约 dict，输出 = HTML 字符串。不碰文件系统、不依赖试点路径、
 不调 LLM——任何题材（书 / 公文 / 会议 / 论文簇 / 跨文本对照）都可复用。
 
-起源：academic-vertical 试点 build_report_v2.py（2026-08-15 验证的书鉴渲染），
-P0 阶段从试点提为引擎能力。设计稿：docs/internal/academic-vertical/design/WP-report-engine.md。
+起源：早期报告引擎试点 build_report_v2.py（2026-08-15 验证的书鉴渲染），
+P0 阶段提为引擎能力。
 
 契约（report input）：
 {
